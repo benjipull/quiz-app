@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz App</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <header>
+        <!-- User Profile Icon and Dropdown -->
+        <div id="user-profile" class="hidden">
+            <div id="user-initials" class="profile-icon"></div>
+            <div id="user-dropdown" class="dropdown hidden">
+                <button id="logout-btn">Logout</button>
+            </div>
+        </div>
+
+        <div class="auth-container">
+            <button id="login-btn">Login</button>
+            <button id="signup-btn">Sign Up</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="hidden">
+            <p>Loading...</p>
+        </div>
+
+        <!-- Back Button -->
+        <button id="back-button" class="hidden">&lt; </button>
+
+        <!-- Progress Bar -->
+        <div id="progress-bar-container" class="hidden">
+            <p id="progress-text">Question 1 of 10</p>
+            <div id="progress-bar"></div>
+        </div>
+
+        <div id="quiz-container">
+            
+            <!-- Category Selection -->
+            <div id="category-container">
+                <h2>Select a Category</h2>
+                <div id="category-buttons" class="category-grid"></div>
+                <button id="open-create-category-modal" class="create-category-btn">+ Create a new Category</button>
+            </div>
+
+            <div id="question-container" class="hidden">
+                <h2 id="category-label">Questions about <span id="selected-category-label"></span></h2>
+                <p id="question" class="hidden"></p>
+                <div id="options-container"></div>
+                <p id="explanation" class="hidden"></p>
+                <button id="next-question-button" class="hidden">Next Question</button>
+            </div>
+
+            <!-- Congratulations Screen -->
+            <div id="congratulations-container" class="hidden">
+                <h2>🎉 Congratulations! 🎉</h2>
+                <p>You have completed the quiz.</p>
+                <button id="back-to-categories">Back to Categories</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Login</h2>
+            <input type="email" id="login-email" placeholder="Email">
+            <input type="password" id="login-password" placeholder="Password">
+            <button id="submit-login">Login</button>
+            <button id="close-login" class="close-modal" data-modal="login-modal">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Signup Modal -->
+    <div id="signup-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Sign Up</h2>
+            <input type="text" id="signup-fullname" placeholder="Full Name">
+            <input type="email" id="signup-email" placeholder="Email">
+            <input type="password" id="signup-password" placeholder="Password">
+            <button id="submit-signup">Sign Up</button>
+            <button id="close-signup" class="close-modal" data-modal="signup-modal">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Create Category Modal -->
+    <div id="create-category-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Create a New Category</h2>
+            <input type="text" id="category-name" placeholder="Category Name">
+            <button id="submit-category">Create Category</button>
+            <button id="close-create-category" class="close-modal" data-modal="create-category-modal">Cancel</button>
+        </div>
+    </div>
+
+
+    <script src="script.js"></script>
+    <script src="quiz.js"></script>
+    <script src="login.js"></script>
+    <script src="register.js"></script>
+    <script src="categories.js"></script>
+</body>
+
+</html>

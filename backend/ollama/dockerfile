@@ -1,0 +1,25 @@
+# Use Ubuntu as base image
+FROM ubuntu:22.04
+
+# Set non-interactive mode
+ENV DEBIAN_FRONTEND=noninteractive
+ENV OLLAMA_ORIGINS="*"
+
+# Install dependencies
+RUN apt update && apt install -y curl socat iproute2
+
+# Install Ollama
+RUN curl -fsSL -o ollama-install.sh https://ollama.com/install.sh && \
+    chmod +x ollama-install.sh && \
+    ./ollama-install.sh && \
+    rm ollama-install.sh
+
+# Expose API port
+EXPOSE 11440
+
+# Copy the startup script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Use the script as the entrypoint
+ENTRYPOINT ["/entrypoint.sh"]

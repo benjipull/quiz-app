@@ -1,0 +1,56 @@
+const express = require("express");
+const connectDB = require("./config/db");
+const cors = require("cors");
+const path = require("path");
+
+require("dotenv").config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Connect to MongoDB
+connectDB();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Serve static files from "frontend" directory
+app.use(express.static(path.join(__dirname, "frontend")));
+
+// Routes
+
+//Users
+app.use("/api/users/register", require("./routes/register"));
+app.use("/api/users/login", require("./routes/login"));
+app.use("/api/users", require("./routes/getUsers"));
+
+//Quiz
+app.use("/api/generate", require("./routes/generate")); 
+
+//Categories
+app.use("/api/categories", require("./routes/createCategory"));
+app.use("/api/categories", require("./routes/getCategories"));
+app.use("/api/categories", require("./routes/deleteCategories"));
+app.use("/api/categories", require("./routes/recordCompletion")); 
+
+//Images
+app.use("/api/getImageUrl", require("./routes/getImageUrl")); 
+
+
+// Default route (serves index.html for all other routes)
+app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "frontend", "index.html"));
+});
+
+
+// Protected Route Example (Requires Authentication)
+const authenticateToken = require("./middleware/auth");
+app.get("/api/users/protected", authenticateToken, (req, res) => {
+    res.json({ message: "Protected route accessed", user: req.user });
+});
+
+// Start Server
+app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+});
