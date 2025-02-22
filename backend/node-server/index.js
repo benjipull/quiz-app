@@ -8,6 +8,10 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ✅ Store generated questions per user token
+const userQuestions = {}; // { userToken: [question1, question2, ...] }
+module.exports = { userQuestions };
+
 // Connect to MongoDB
 connectDB();
 
@@ -27,6 +31,8 @@ app.use("/api/users", require("./routes/getUsers"));
 
 //Quiz
 app.use("/api/generate", require("./routes/generate")); 
+app.use("/api/startQuiz", require("./routes/startQuiz")); 
+app.use("/api/nextQuestion", require("./routes/nextQuestion")); 
 
 //Categories
 app.use("/api/categories", require("./routes/createCategory"));

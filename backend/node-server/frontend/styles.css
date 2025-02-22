@@ -528,3 +528,53 @@ main {
     border-radius: 50%;
     margin-right: 8px;
 }
+
+/* ✅ Results Container Styling */
+#results-container {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: white;
+    color: #673ab7;
+    border-radius: 10px;
+    padding: 30px;
+    width: 80%;
+    max-width: 600px;
+    margin: 40px auto;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.15);
+    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+
+/* ✅ Heading */
+#results-container h2 {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+/* ✅ Results Text */
+#quiz-results {
+    font-size: 18px;
+    line-height: 1.6;
+    font-weight: 500;
+    margin-bottom: 20px;
+    color: #444;
+}
+
+.standard-button {
+    background: #673ab7;
+    color: white;
+    font-size: 18px;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s ease-in-out, transform 0.2s ease-in-out;
+}
+
+/* ✅ Hover Effect */
+.standard-button:hover {
+    background: #512da8;
+    transform: scale(1.05);
+}

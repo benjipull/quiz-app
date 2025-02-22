@@ -182,13 +182,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function resetQuiz() {
+        
+        correctAnswers = 0;
+        incorrectAnswers = 0;
+        totalQuestions = 4;
         questionIndex = 0;
-        correctAnswers = 0; // ✅ Reset correct count
-        incorrectAnswers = 0; // ✅ Reset incorrect count
+        SelectedCategory = "";
+        SelectedCategoryId = 0;
+
         document.getElementById("progress-bar-container").classList.add("hidden"); // ✅ Hide progress bar
         categoryContainer.classList.remove("hidden");
         quizContainer.classList.add("hidden");
         backButton.classList.add("hidden");
+        
     }
 
     window.startQuiz = async function (selectedCategoryId, selectedCategory) {
