@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quiz App</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 
@@ -33,10 +35,12 @@
         <!-- Back Button -->
         <button id="back-button" class="hidden">&lt; </button>
 
-        <!-- Progress Bar -->
+        <!-- Modern Progress Bar -->
         <div id="progress-bar-container" class="hidden">
             <p id="progress-text">Question 1 of 10</p>
-            <div id="progress-bar"></div>
+            <div class="progress-wrapper">
+                <div id="progress-bar"></div>
+            </div>
         </div>
 
         <div id="quiz-container">
@@ -53,6 +57,13 @@
                 <p id="question" class="hidden"></p>
                 <div id="options-container"></div>
                 <p id="explanation" class="hidden"></p>
+
+                <!-- ✅ Thumbs Up and Down Buttons -->
+                <div id="thumbs-container">
+                    <button id="thumbs-up" class="thumb-button"><i class="fas fa-thumbs-up"></i></button>
+                    <button id="thumbs-down" class="thumb-button"><i class="fas fa-thumbs-down"></i></button>
+                </div>
+
                 <button id="next-question-button" class="hidden standard-button">Next Question</button>
                 <button id="show-results-button" class="hidden standard-button">Finish</button>
             </div>
@@ -63,8 +74,10 @@
                 <p id="quiz-results"></p>
                 <button id="restart-quiz" class="standard-button">Back to Categories</button>
             </div>
-            
         </div>
+
+        <!-- ✅ Notification Panel -->
+        <div id="notification-container"></div>
     </main>
 
     <!-- Login Modal -->

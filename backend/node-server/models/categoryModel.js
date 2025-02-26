@@ -1,39 +1,44 @@
 const mongoose = require("mongoose");
 
+// ✅ Schema for individual answers
 const AnswerSchema = new mongoose.Schema({
     text: { type: String, required: true },
-    correctCount: { type: Number, default: 0 }, // ✅ Times this answer was selected correctly
-    incorrectCount: { type: Number, default: 0 } // ✅ Times this answer was selected incorrectly
+    correctCount: { type: Number, default: 0 }, // ✅ Tracks how many times this answer was chosen correctly
+    incorrectCount: { type: Number, default: 0 } // ✅ Tracks how many times this answer was chosen incorrectly
 });
 
-// ✅ Question Schema
+// ✅ Schema for questions
 const QuestionSchema = new mongoose.Schema({
-    _id: { type: mongoose.Schema.Types.ObjectId, auto: true }, // ✅ Unique ID for each question
-    text: { type: String, required: true },
-    answers: [AnswerSchema], // ✅ Each answer has stats
-    correct_answer: { type: String, required: true },
-    explanation: { type: String },
-    timesLoaded: { type: Number, default: 0 }, // ✅ How many times this question was loaded
-    likes: { type: Number, default: 0 }, // ✅ Net likes (upvotes - downvotes)
-    hash: { type: String, required: true, unique: true }, // ✅ Unique identifier for question
-    disabled: { type: Boolean, default: false }, // ✅ Mark if the question is disabled
-    timesAnsweredCorrectly: { type: Number, default: 0 }, // ✅ Tracks overall correct attempts
-    timesAnsweredIncorrectly: { type: Number, default: 0 } // ✅ Tracks overall incorrect attempts
+    _id: { type: mongoose.Schema.Types.ObjectId, auto: true }, // ✅ Unique ObjectId for each question
+    text: { type: String, required: true }, // ✅ Question text
+    answers: [AnswerSchema], // ✅ Array of possible answers
+    correct_answer: { type: String, required: true }, // ✅ Stores the correct answer text
+    explanation: { type: String, default: "" }, // ✅ Explanation of correct answer
+    timesLoaded: { type: Number, default: 0 }, // ✅ Tracks how many times the question has been loaded
+    popularity: { type: Number, default: 0 }, // ✅ Tracks likes/dislikes balance
+    disabled: { type: Boolean, default: false }, // ✅ Allows disabling a question
+    timesAnsweredCorrectly: { type: Number, default: 0 }, // ✅ Tracks how many times the question was answered correctly
+    timesAnsweredIncorrectly: { type: Number, default: 0 }, // ✅ Tracks how many times the question was answered incorrectly
+    hash: { type: String, required: true, unique: true } // ✅ Unique hash to prevent duplicate questions
 });
 
-// ✅ Category Schema
+// ✅ Schema for quiz completions
+const CompletionSchema = new mongoose.Schema({
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // ✅ User who completed the quiz
+    questionsAttempted: { type: Number, required: true },
+    correctAnswers: { type: Number, required: true },
+    incorrectAnswers: { type: Number, required: true },
+}, { timestamps: true }); // ✅ Auto-adds createdAt & updatedAt timestamps
+
+// ✅ Schema for quiz categories
 const CategorySchema = new mongoose.Schema({
-    name: { type: String, required: true, unique: true },
-    imageUrl: { type: String },
-    createdAt: { type: Date, default: Date.now },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    completions: [{ 
-        user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-        questionsAttempted: { type: Number, required: true },
-        correctAnswers: { type: Number, required: true },
-        incorrectAnswers: { type: Number, required: true }
-    }],
-    questions: [QuestionSchema] // ✅ Attach questions array
+    name: { type: String, required: true, unique: true }, // ✅ Category name
+    disabled: { type: Boolean, default: false }, // ✅ Disabled until it is filled with questions
+    imageUrl: { type: String }, // ✅ Category image URL
+    createdAt: { type: Date, default: Date.now }, // ✅ Timestamp for creation
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // ✅ Tracks who created the category
+    completions: [CompletionSchema], // ✅ Tracks quiz completions
+    questions: [QuestionSchema] // ✅ Array of questions inside the category
 });
 
 module.exports = mongoose.model("Category", CategorySchema);

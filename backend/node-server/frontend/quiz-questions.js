@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-    
+
     // ✅ Store DOM elements in `window` so they can be used in quiz-results.js
     window.questionElement = document.getElementById("question");
     window.questionContainer = document.getElementById("question-container");
@@ -27,13 +27,16 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.classList.remove("no-click");
     }
 
-    function updateProgress() {
-        let progressText = document.getElementById("progress-text");
-        let progressBar = document.getElementById("progress-bar");
+    function updateProgress(current, total) {
+        const progressBar = document.getElementById("progress-bar");
+        const progressText = document.getElementById("progress-text");
 
-        let progress = ((questionIndex + 1) / totalQuestions) * 100;
+        // ✅ Update progress percentage
+        let progress = (currentQuestionIndex / totalQuestions) * 100;
         progressBar.style.width = progress + "%";
-        progressText.textContent = `Question ${questionIndex + 1} of ${totalQuestions}`;
+
+        // ✅ Update text to show question number
+        progressText.textContent = `Question ${currentQuestionIndex} of ${totalQuestions}`;
     }
 
     function handleAnswerSelection(selectedButton, explanation) {
@@ -48,11 +51,17 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
+        if (isCorrect)
+            correctAnswers += 1;
+        else
+            incorrectAnswers += 1;
+
         const explanationElement = document.getElementById("explanation");
         explanationElement.textContent = isCorrect ? `✅ Correct! ${explanation}` : `❌ Incorrect! ${explanation}`;
-        
+
         explanationElement.classList.remove("hidden");
         nextQuestionButton.classList.remove("hidden");
+        document.getElementById("thumbs-container").classList.remove("hidden");
     }
 
     function displayQuestion(data) {
@@ -64,6 +73,11 @@ document.addEventListener("DOMContentLoaded", () => {
         explanationElement.classList.add("hidden");
         explanationElement.textContent = "";
 
+        // ✅ Reset thumbs buttons
+        thumbsUpBtn.classList.remove("active");
+        thumbsDownBtn.classList.remove("active");
+        document.getElementById("thumbs-container").classList.add("hidden");
+        
         data.answers.forEach(answer => {
             const button = document.createElement("button");
             button.classList.add("option-button");
@@ -75,7 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
             optionsContainer.appendChild(button);
         });
 
-        updateProgress();
+        updateProgress(questionIndex, totalQuestions);
         nextQuestionButton.classList.add("hidden");
     }
 
@@ -83,16 +97,18 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const response = await fetch(`/api/nextQuestion/${userToken}`);
             const data = await response.json();
-    
+
             if (response.ok) {
                 if (data.remaining === 0) {
                     // ✅ Hide "Next Question" button and show "Finish" button
                     document.getElementById("show-results-button").classList.remove("hidden");
                 }
-    
+
                 currentQuestionIndex++;
+                currentQuestionId = data.question._id;
+
                 displayQuestion(data.question);
-                updateProgress();
+                updateProgress(questionIndex, totalQuestions);
 
                 document.getElementById("next-question-button").classList.add("hidden");
             } else {
@@ -114,8 +130,9 @@ document.addEventListener("DOMContentLoaded", () => {
         questionIndex = 0;
         SelectedCategory = "";
         SelectedCategoryId = 0;
-        
-        selectedCategoryId = categoryId;
+        currentQuestionIndex = 0;
+
+        SelectedCategoryId = categoryId;
         selectedCategory = categoryName;
         userToken = localStorage.getItem("token"); // Use stored token
 
@@ -143,7 +160,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    categoryId: selectedCategoryId,
+                    categoryId: SelectedCategoryId,
                     numQuestions: totalQuestions,
                     userToken: userToken
                 })
@@ -172,4 +189,60 @@ document.addEventListener("DOMContentLoaded", () => {
             hideLoading();
         }
     };
+
+    const thumbsUpBtn = document.getElementById("thumbs-up");
+    const thumbsDownBtn = document.getElementById("thumbs-down");
+
+    let currentQuestionId = null;
+
+    // ✅ Function to send popularity update
+    async function updatePopularity(questionId, action) {
+        try {
+            const response = await fetch("/api/updatePopularity", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ questionId, action })
+            });
+
+            if (!response.ok) {
+                console.error("❌ Error updating popularity");
+            }
+        } catch (error) {
+            console.error("⚠️ Network error:", error);
+        }
+    }
+
+    // ✅ Handle Thumbs Up Click
+    thumbsUpBtn.addEventListener("click", () => {
+        if (!currentQuestionId) return;
+
+        if (thumbsUpBtn.classList.contains("active")) {
+            // ✅ Undo thumbs up ➝ Post a dislike
+            updatePopularity(currentQuestionId, 2);
+            thumbsUpBtn.classList.remove("active");
+        } else {
+            // ✅ Click thumbs up ➝ Post a like
+            updatePopularity(currentQuestionId, 1);
+            thumbsUpBtn.classList.add("active");
+            thumbsDownBtn.classList.remove("active"); // Remove thumbs down
+        }
+    });
+
+    // ✅ Handle Thumbs Down Click
+    thumbsDownBtn.addEventListener("click", () => {
+        if (!currentQuestionId) return;
+
+        if (thumbsDownBtn.classList.contains("active")) {
+            // ✅ Undo thumbs down ➝ Post a like
+            updatePopularity(currentQuestionId, 1);
+            thumbsDownBtn.classList.remove("active");
+        } else {
+            // ✅ Click thumbs down ➝ Post a dislike
+            updatePopularity(currentQuestionId, 2);
+            thumbsDownBtn.classList.add("active");
+            thumbsUpBtn.classList.remove("active"); // Remove thumbs up
+        }
+    });
+
+
 });

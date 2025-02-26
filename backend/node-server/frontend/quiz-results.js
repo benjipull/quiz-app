@@ -13,6 +13,7 @@ async function showResults() {
     resultsContainer.classList.remove("hidden");
 
     // ✅ Calculate Score
+
     let totalScore = Math.round((correctAnswers / totalQuestions) * 100);
 
     // ✅ Display Results
@@ -36,8 +37,12 @@ function resetQuiz() {
     document.getElementById("results-container").classList.add("hidden"); // ✅ Hide results
     document.getElementById("category-container").classList.remove("hidden");
     document.getElementById("quiz-container").classList.add("hidden");
-    document.getElementById("back-button").classList.add("hidden");   
+    document.getElementById("back-button").classList.add("hidden");
+
+    // ✅ Reload categories
+    fetchCategories();
 }
+
 
 async function recordQuizCompletion() {
     const user = JSON.parse(localStorage.getItem("user"));

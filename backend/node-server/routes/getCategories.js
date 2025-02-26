@@ -4,11 +4,14 @@ const Category = require("../models/categoryModel");
 const router = express.Router();
 
 // @route   GET /api/categories
-// @desc    Get all categories with imageUrl, completion count, and creator's full name
+// @desc    Get all categories that are NOT disabled, with imageUrl, completion count, and creator's full name
 // @access  Public
 router.get("/", async (req, res) => {
     try {
         const categories = await Category.aggregate([
+            {
+                $match: { disabled: { $ne: true } } // ✅ Exclude categories where disabled = true
+            },
             {
                 $addFields: {
                     completionsCount: { $size: { $ifNull: ["$completions", []] } } // ✅ Count completions

@@ -22,7 +22,7 @@ app.use(express.json());
 // Serve static files from "frontend" directory
 app.use(express.static(path.join(__dirname, "frontend")));
 
-// Routes
+// ==Routes== //
 
 //Users
 app.use("/api/users/register", require("./routes/register"));
@@ -30,15 +30,17 @@ app.use("/api/users/login", require("./routes/login"));
 app.use("/api/users", require("./routes/getUsers"));
 
 //Quiz
-app.use("/api/generate", require("./routes/generate")); 
 app.use("/api/startQuiz", require("./routes/startQuiz")); 
-app.use("/api/nextQuestion", require("./routes/nextQuestion")); 
 
 //Categories
 app.use("/api/categories", require("./routes/createCategory"));
 app.use("/api/categories", require("./routes/getCategories"));
 app.use("/api/categories", require("./routes/deleteCategories"));
 app.use("/api/categories", require("./routes/recordCompletion")); 
+
+//Questions
+app.use("/api/nextQuestion", require("./routes/nextQuestion")); 
+app.use("/api/updatePopularity", require("./routes/updatePopularity")); 
 
 //Images
 app.use("/api/getImageUrl", require("./routes/getImageUrl")); 

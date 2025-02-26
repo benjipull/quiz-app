@@ -11,17 +11,17 @@ document.addEventListener("DOMContentLoaded", async () => {
                 throw new Error("Failed to fetch categories.");
             }
             const categories = await response.json();
-    
+
             // ✅ Clear previous categories
             const categoryButtonsContainer = document.getElementById("category-buttons");
             categoryButtonsContainer.innerHTML = "";
-    
+
             // ✅ Create category cards dynamically
             categories.forEach(category => {
                 const categoryCard = document.createElement("div");
                 categoryCard.classList.add("category-card");
                 categoryCard.setAttribute("data-category", category._id);
-    
+
                 categoryCard.innerHTML = `
                     <div class="category-image">
                         <img src="${category.imageUrl}" alt="${category.name}" loading="lazy" />
@@ -32,17 +32,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                         <div class="category-meta">${category.completionsCount} completions</div>
                     </div>
                 `;
-    
+
                 // ✅ Click to start quiz
                 categoryCard.addEventListener("click", () => startQuiz(category._id, category.name));
-    
+
                 categoryButtonsContainer.appendChild(categoryCard);
             });
         } catch (error) {
             console.error("Error fetching categories:", error);
         }
     }
-    
 
     window.fetchCategories = fetchCategories;
     fetchCategories();
@@ -87,6 +86,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (response.ok) {
                 createCategoryModal.classList.remove("show");
                 fetchCategories(); // Reload categories after successful creation
+
+                // ✅ Show notification when category creation starts
+                showNotification("Your category is being created, we will notify you once it's done.");
             } else {
                 alert(data.message || "Failed to create category.");
             }
@@ -95,4 +97,20 @@ document.addEventListener("DOMContentLoaded", async () => {
             alert("An error occurred. Please try again.");
         }
     });
+
+    // ✅ Function to Show Notification
+    function showNotification(message) {
+        const container = document.getElementById("notification-container");
+
+        const notification = document.createElement("div");
+        notification.classList.add("notification");
+        notification.textContent = message;
+
+        container.appendChild(notification);
+
+        // Remove notification after animation
+        setTimeout(() => {
+            notification.remove();
+        }, 7000); // Matches the CSS animation duration
+    }
 });

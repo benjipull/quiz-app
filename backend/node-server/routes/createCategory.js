@@ -2,12 +2,13 @@ const express = require("express");
 const Category = require("../models/categoryModel");
 const { body, validationResult } = require("express-validator");
 const authenticateToken = require("../middleware/auth"); // ✅ Middleware to extract user ID
-const getImageForCategory = require('../utils/fetchImage');
+const getImageForCategory = require("../utils/fetchImage"); // ✅ Import image fetch function
+const { populateCategory } = require("../scripts/populateCategories"); // ✅ Import async question population
 
 const router = express.Router();
 
 // @route   POST /api/categories/createCategory
-// @desc    Create a new category with createdBy and createdAt
+// @desc    Create a new category with createdBy, createdAt, and auto-populate questions
 // @access  Private (Requires Auth)
 router.post(
     "/createCategory",
@@ -33,36 +34,45 @@ router.post(
                 return res.status(401).json({ message: "⚠️ User ID not found in token" });
             }
 
-            // Fetch image from Unsplash
-            let imageUrl = "default-image-url.jpg"; // Default in case fetch fails
+            // ✅ Fetch image for category
+            let imageUrl = "default-image-url.jpg"; // Default image
             try {
                 imageUrl = await getImageForCategory(name) || imageUrl;
             } catch (error) {
-                console.error("Failed to fetch category image:", error.message);
+                console.error("⚠️ Failed to fetch category image:", error.message);
             }
 
-            // Check if category already exists (case insensitive)
+            // ✅ Check if category already exists (case insensitive)
             const existingCategory = await Category.findOne({ name: { $regex: new RegExp(`^${name}$`, "i") } });
             if (existingCategory) {
                 return res.status(400).json({ message: "⚠️ Category already exists" });
             }
 
-            // Create new category with createdBy & createdAt
+            // ✅ Create category with `disabled: true` (until questions are added)
             const category = new Category({
                 name,
                 createdBy: userId,
-                imageUrl: imageUrl
+                imageUrl: imageUrl,
+                disabled: true, // 🚀 Category starts disabled
             });
 
             await category.save();
 
-            res.status(201).json({ message: "✅ Category created successfully", category });
+            // ✅ Run `populateCategory` asynchronously
+            console.log(`⏳ Populating category: ${category._id} (${name})`);
+            populateCategory(category._id, 20) // 🚀 Default to 20 questions
+                .then(() => {
+                    console.log(`✅ Category ${name} populated and enabled!`);
+                    return Category.findByIdAndUpdate(category._id, { disabled: false }); // ✅ Enable category
+                })
+                .catch(err => console.error("❌ Error populating category:", err));
+
+            res.status(201).json({ message: "✅ Category created and populating...", category });
         } catch (error) {
             console.error("⚠️ Server error:", error.message);
             res.status(500).json({ message: "⚠️ Server error", error: error.message });
         }
     }
 );
-
 
 module.exports = router;
