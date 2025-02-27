@@ -15,7 +15,7 @@ dns.lookup("ollama-container", (err, address) => {
         return;
     }
     console.log("✅ Resolved Ollama IP:", address);
-    OLLAMA_URL = `http://${address}:11440/api/generate`;
+    OLLAMA_URL = `https://da3e-105-185-157-37.ngrok-free.app/api/generate`;
 });
 
 // ✅ Generate a unique hash for each question

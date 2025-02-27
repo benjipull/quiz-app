@@ -20,7 +20,8 @@ echo "Pulling Mistral"
 echo "Starting Socat for external access..."
 # Restart Socat (force it to ensure it's bound)
 pkill socat  # Kill old instance (if any)
-socat TCP-LISTEN:11440,fork,reuseaddr TCP:127.0.0.1:11434 &
+#socat TCP-LISTEN:11440,fork,reuseaddr TCP:127.0.0.1:11434 &
+socat TCP-LISTEN:11440,fork,reuseaddr PROXY:127.0.0.1:11434,proxyport=11434
 
 # Keep container running
 wait
