@@ -661,3 +661,31 @@ main {
     color: white;
     transform: scale(1.1);
 }
+
+/* ✅ Star Rating Container */
+#rating-container {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    margin-bottom: 15px; /* Space before thumbs */
+}
+
+/* ✅ Star Styling */
+.star {
+    font-size: 30px;
+    color: #ccc; /* Default gray */
+    cursor: pointer;
+    transition: color 0.3s, transform 0.2s ease-in-out;
+}
+
+/* ✅ Hover Effect (Fill Stars on Hover) */
+.star:hover,
+.star:hover ~ .star {
+    color: #FFD700; /* Gold color */
+    transform: scale(1.2); /* Slightly enlarge */
+}
+
+/* ✅ Clicked (Active) Stars */
+.star.active {
+    color: #FFD700; /* Gold when selected */
+}

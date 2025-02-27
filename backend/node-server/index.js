@@ -35,8 +35,8 @@ app.use("/api/startQuiz", require("./routes/startQuiz"));
 //Categories
 app.use("/api/categories", require("./routes/createCategory"));
 app.use("/api/categories", require("./routes/getCategories"));
-app.use("/api/categories", require("./routes/deleteCategories"));
 app.use("/api/categories", require("./routes/recordCompletion")); 
+app.use("/api/categories", require("./routes/rateCategory")); 
 
 //Questions
 app.use("/api/nextQuestion", require("./routes/nextQuestion")); 

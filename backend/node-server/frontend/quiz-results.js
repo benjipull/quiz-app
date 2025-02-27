@@ -4,7 +4,8 @@ async function showResults() {
     let questionContainer = document.getElementById("question-container");
     let quizResults = document.getElementById("quiz-results");
     let restartQuizButton = document.getElementById("restart-quiz");
-
+    let ratingContainer = document.getElementById("rating-container"); // ✅ Rating UI
+    
     // ✅ Hide quiz UI
     progressContainer.classList.add("hidden");
     questionContainer.classList.add("hidden");
@@ -12,8 +13,10 @@ async function showResults() {
     // ✅ Show results UI
     resultsContainer.classList.remove("hidden");
 
-    // ✅ Calculate Score
+    // ✅ Display Rating UI
+    ratingContainer.classList.remove("hidden");
 
+    // ✅ Calculate Score
     let totalScore = Math.round((correctAnswers / totalQuestions) * 100);
 
     // ✅ Display Results
@@ -80,11 +83,61 @@ async function recordQuizCompletion() {
     }
 }
 
+// ✅ Function to send rating to API
+async function submitCategoryRating(rating) {
+    const token = localStorage.getItem("token");
+    if (!token) {
+        console.error("❌ User not logged in. Cannot submit rating.");
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/categories/${SelectedCategoryId}/rate`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ rating })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            console.log("✅ Rating submitted successfully!", data);
+        } else {
+            console.error("❌ Failed to submit rating:", data.message);
+        }
+    } catch (error) {
+        console.error("⚠️ Error submitting rating:", error);
+    }
+}
+
 // ✅ Keep the DOM Ready event listener separate
 document.addEventListener("DOMContentLoaded", () => {
     const nextQuestionButton = document.getElementById("next-question-button");
     const questionElement = document.getElementById("question");
     const optionsContainer = document.getElementById("options-container");
+
+    const stars = document.querySelectorAll(".star");
+    const ratingContainer = document.getElementById("rating-container");
+
+    let selectedRating = 0;
+
+    stars.forEach(star => {
+        star.addEventListener("click", async () => {
+            selectedRating = parseInt(star.getAttribute("data-value"));
+
+            // ✅ Highlight selected stars
+            stars.forEach(s => s.classList.remove("active"));
+            for (let i = 0; i < selectedRating; i++) {
+                stars[i].classList.add("active");
+            }
+
+            // ✅ Submit rating to API
+            await submitCategoryRating(selectedRating);
+        });
+    });
+
 });
 
 window.showResults = showResults;

@@ -38,7 +38,9 @@ const CategorySchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }, // ✅ Timestamp for creation
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // ✅ Tracks who created the category
     completions: [CompletionSchema], // ✅ Tracks quiz completions
-    questions: [QuestionSchema] // ✅ Array of questions inside the category
+    questions: [QuestionSchema], // ✅ Array of questions inside the category
+    ratings: [{ type: Number, min: 1, max: 5 }], // ✅ Store all individual ratings
+    averageRating: { type: Number, default: 0 }  // ✅ Store the computed average rating
 });
 
 module.exports = mongoose.model("Category", CategorySchema);
