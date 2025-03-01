@@ -5,7 +5,7 @@ async function showResults() {
     let quizResults = document.getElementById("quiz-results");
     let restartQuizButton = document.getElementById("restart-quiz");
     let ratingContainer = document.getElementById("rating-container"); // ✅ Rating UI
-    
+
     // ✅ Hide quiz UI
     progressContainer.classList.add("hidden");
     questionContainer.classList.add("hidden");
@@ -41,6 +41,14 @@ function resetQuiz() {
     document.getElementById("category-container").classList.remove("hidden");
     document.getElementById("quiz-container").classList.add("hidden");
     document.getElementById("back-button").classList.add("hidden");
+
+    ratingLocked = false; // Unlock rating
+    
+    const stars = document.querySelectorAll(".star");
+    
+    stars.forEach(star => {
+        star.style.pointerEvents = "auto"; // Re-enable interactions
+    });
 
     // ✅ Reload categories
     fetchCategories();
@@ -104,6 +112,17 @@ async function submitCategoryRating(rating) {
         const data = await response.json();
         if (response.ok) {
             console.log("✅ Rating submitted successfully!", data);
+            
+            const stars = document.querySelectorAll(".star");
+            stars.forEach((star, i) => {
+                star.classList.toggle("active", i <= rating);
+            });
+    
+            // Remove all event listeners to prevent further changes
+            stars.forEach(star => {
+                star.style.pointerEvents = "none"; // Disable interactions
+            });
+
         } else {
             console.error("❌ Failed to submit rating:", data.message);
         }
@@ -114,30 +133,35 @@ async function submitCategoryRating(rating) {
 
 // ✅ Keep the DOM Ready event listener separate
 document.addEventListener("DOMContentLoaded", () => {
-    const nextQuestionButton = document.getElementById("next-question-button");
-    const questionElement = document.getElementById("question");
-    const optionsContainer = document.getElementById("options-container");
-
     const stars = document.querySelectorAll(".star");
-    const ratingContainer = document.getElementById("rating-container");
+    let ratingLocked = false; // Flag to prevent further changes after selection
 
-    let selectedRating = 0;
+    stars.forEach((star, index) => {
+        star.addEventListener("mouseover", function () {
+            if (!ratingLocked) highlightStars(index);
+        });
 
-    stars.forEach(star => {
-        star.addEventListener("click", async () => {
-            selectedRating = parseInt(star.getAttribute("data-value"));
+        star.addEventListener("mouseout", function () {
+            if (!ratingLocked) resetStars();
+        });
 
-            // ✅ Highlight selected stars
-            stars.forEach(s => s.classList.remove("active"));
-            for (let i = 0; i < selectedRating; i++) {
-                stars[i].classList.add("active");
+        star.addEventListener("click", function () {
+            if (!ratingLocked) {
+                submitCategoryRating(index);
+                ratingLocked = true; // Lock rating after selection
             }
-
-            // ✅ Submit rating to API
-            await submitCategoryRating(selectedRating);
         });
     });
 
+    function highlightStars(index) {
+        stars.forEach((star, i) => {
+            star.classList.toggle("active", i <= index);
+        });
+    }
+
+    function resetStars() {
+        stars.forEach(star => star.classList.remove("active"));
+    }
 });
 
 window.showResults = showResults;

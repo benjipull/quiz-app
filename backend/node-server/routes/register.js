@@ -8,16 +8,26 @@ const router = express.Router();
 // @access  Public
 router.post("/", async (req, res) => {
     try {
-        const { full_name, email, password } = req.body;
+        const { alias, email, password, age } = req.body;
 
-        // Check if user already exists
-        let userExists = await User.findOne({ email });
-        if (userExists) {
-            return res.status(400).json({ message: "User already exists" });
+        // Validate input (Ensure all fields are filled)
+        if (!alias || !email || !password || !age) {
+            return res.status(400).json({ message: "All fields are required" });
+        }
+
+        // Check if user email or alias already exists
+        let emailExists = await User.findOne({ email });
+        let aliasExists = await User.findOne({ alias });
+
+        if (emailExists) {
+            return res.status(400).json({ message: "Email already exists" });
+        }
+        if (aliasExists) {
+            return res.status(400).json({ message: "Alias already exists" });
         }
 
         // Create new user
-        const newUser = new User({ full_name, email, password });
+        const newUser = new User({ alias, email, password, age });
         await newUser.save();
 
         res.status(201).json({ message: "User registered successfully" });

@@ -4,13 +4,13 @@ const Category = require("../models/categoryModel");
 const router = express.Router();
 
 // @route   GET /api/categories
-// @desc    Get all categories that are NOT disabled, with imageUrl, completion count, and creator's full name
+// @desc    Get all categories that are NOT disabled, with imageUrl, completion count, and creator's alias
 // @access  Public
 router.get("/", async (req, res) => {
     try {
         const categories = await Category.aggregate([
             {
-                $match: { disabled: { $ne: true } } // ✅ Exclude categories where disabled = true
+                $match: { disabled: { $ne: true } } // ✅ Exclude disabled categories
             },
             {
                 $addFields: {
@@ -19,7 +19,7 @@ router.get("/", async (req, res) => {
             },
             {
                 $lookup: {
-                    from: "users", // ✅ Collection name in MongoDB (must match actual collection)
+                    from: "users", // ✅ Ensure this matches your users collection name
                     localField: "createdBy",
                     foreignField: "_id",
                     as: "creator"
@@ -33,12 +33,14 @@ router.get("/", async (req, res) => {
             },
             {
                 $project: {
-                    name: 1,           // ✅ Include category name
-                    imageUrl: 1,       // ✅ Include category image URL
-                    completionsCount: 1, // ✅ Include completion count
-                    createdAt: 1,      // ✅ Include created date
-                    createdBy: 1,      // ✅ Keep createdBy ID
-                    creatorName: "$creator.full_name" // ✅ Extract full name from joined user document
+                    name: 1,            // ✅ Include category name
+                    imageUrl: 1,        // ✅ Include category image URL
+                    completionsCount: 1,// ✅ Include completion count
+                    averageRating: 1,
+                    createdAt: 1,       // ✅ Include created date
+                    createdBy: { 
+                        $ifNull: ["$creator.alias", "Unknown"] // ✅ Replace `createdBy` with alias (or "Unknown" if missing)
+                    }
                 }
             }
         ]);

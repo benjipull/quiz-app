@@ -30,8 +30,7 @@ router.post("/", async (req, res) => {
         const token = jwt.sign(
             {
                 id: user._id.toString(),
-                email: user.email,
-                full_name: user.full_name,
+                alias: user.alias
             },
             process.env.JWT_SECRET,
             { expiresIn: "30d" }
@@ -42,7 +41,8 @@ router.post("/", async (req, res) => {
         res.json({
             message: "Login successful",
             token,
-            full_name: user.full_name // Return the full name to be stored in frontend
+            id: user._id.toString(),
+            userAlias: user.alias
         });
 
     } catch (error) {

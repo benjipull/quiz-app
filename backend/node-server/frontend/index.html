@@ -7,26 +7,23 @@
     <title>Quiz App</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles/styles.css">
+    <link rel="stylesheet" href="styles/categories.css">
+    <link rel="stylesheet" href="styles/questions.css">
+    <link rel="stylesheet" href="styles/avatar.css">
 </head>
 
 <body>
-    <header>
-        <!-- User Profile Icon and Dropdown -->
-        <div id="user-profile" class="hidden">
-            <div id="user-initials" class="profile-icon"></div>
-            <div id="user-dropdown" class="dropdown hidden">
-                <button id="logout-btn">Logout</button>
-            </div>
-        </div>
-
-        <div class="auth-container">
-            <button id="login-btn">Login</button>
-            <button id="signup-btn">Sign Up</button>
-        </div>
-    </header>
-
     <main>
+
+        <!-- User Profile Section -->
+        <div id="user-profile" class="hidden">
+            <div id="avatar-container">
+                <img id="user-avatar" src="images/avatars/male 1.png" alt="User Avatar">
+            </div>
+            <p id="user-alias">Username</p>
+        </div>
+
         <!-- Loading Overlay -->
         <div id="loading-overlay" class="hidden">
             <p>Loading...</p>
@@ -43,17 +40,38 @@
             </div>
         </div>
 
-        <div id="quiz-container">
+        <!-- Authentication Section (Visible when NOT logged in) -->
+        <div id="auth-section">
+            <div class="auth-box">
+                <h2>Login</h2>
+                <input type="email" id="login-email" placeholder="Email">
+                <input type="password" id="login-password" placeholder="Password">
+                <button id="submit-login">Login</button>
+            </div>
 
+            <div class="auth-box">
+                <h2>Sign Up</h2>
+                <input type="text" id="signup-alias" placeholder="Alias" required>
+                <input type="email" id="signup-email" placeholder="Email" required>
+                <input type="password" id="signup-password" placeholder="Password" required>
+                <input type="number" id="signup-age" placeholder="Age" min="1" required>
+                <button id="submit-signup">Sign Up</button>
+            </div>
+        </div>
+
+        <div id="quiz-container">
             <!-- Category Selection -->
             <div id="category-container">
-                <h2>Select a Category</h2>
-                <div id="category-buttons" class="category-grid"></div>
-                <button id="open-create-category-modal" class="create-category-btn">+ Create a new Category</button>
+                <div id="category-buttons" class="category-grid">
+                    <!-- ✅ Create Category Card -->
+                    <div id="create-category-card" class="category-button create-category-card">
+                        <span>+ Create a new Category</span>
+                    </div>
+                </div>
             </div>
 
             <div id="question-container" class="hidden">
-                <h2 id="category-label">Questions about <span id="selected-category-label"></span></h2>
+                <h2 id="category-label"> <span id="selected-category-label"></span></h2>
                 <p id="question" class="hidden"></p>
                 <div id="options-container"></div>
                 <p id="explanation" class="hidden"></p>
@@ -68,19 +86,20 @@
                 <button id="show-results-button" class="hidden standard-button">Finish</button>
             </div>
 
-            <!-- ✅ Star Rating System -->
-            <div id="rating-container">
-                <span class="star" data-value="1">&#9733;</span>
-                <span class="star" data-value="2">&#9733;</span>
-                <span class="star" data-value="3">&#9733;</span>
-                <span class="star" data-value="4">&#9733;</span>
-                <span class="star" data-value="5">&#9733;</span>
-            </div>
-
             <!-- Results Container (For Quiz Completion) -->
             <div id="results-container" class="hidden">
                 <h2>🎉 Quiz Completed! 🎉</h2>
                 <p id="quiz-results"></p>
+
+                <!-- ✅ Star Rating System -->
+                <div id="rating-container" class="hidden">
+                    <span class="star" data-value="1">&#9733;</span>
+                    <span class="star" data-value="2">&#9733;</span>
+                    <span class="star" data-value="3">&#9733;</span>
+                    <span class="star" data-value="4">&#9733;</span>
+                    <span class="star" data-value="5">&#9733;</span>
+                </div>
+
                 <button id="restart-quiz" class="standard-button">Back to Categories</button>
             </div>
         </div>
@@ -104,11 +123,13 @@
     <div id="signup-modal" class="modal hidden">
         <div class="modal-content">
             <h2>Sign Up</h2>
-            <input type="text" id="signup-fullname" placeholder="Full Name">
-            <input type="email" id="signup-email" placeholder="Email">
-            <input type="password" id="signup-password" placeholder="Password">
+            <input type="text" id="signup-alias" placeholder="Alias" required>
+            <input type="email" id="signup-email" placeholder="Email" required>
+            <input type="password" id="signup-password" placeholder="Password" required>
+            <input type="number" id="signup-age" placeholder="Age" min="1" required>
             <button id="submit-signup">Sign Up</button>
             <button id="close-signup" class="close-modal" data-modal="signup-modal">Cancel</button>
+            <p id="signup-message" class="hidden"></p>
         </div>
     </div>
 
@@ -122,12 +143,12 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
     <script src="quiz-questions.js"></script>
     <script src="quiz-results.js"></script>
     <script src="login.js"></script>
     <script src="register.js"></script>
     <script src="categories.js"></script>
+    <script src="script.js"></script>
 </body>
 
 </html>

@@ -1,0 +1,155 @@
+#category-container {
+    width: 100%;
+    max-width: 100%;
+    justify-content: center;
+    display: flex;
+}
+
+.category-grid {
+    width: 100%;
+    max-width: 1200px; /* Limits extreme stretching on very large screens */
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* Auto-adjust columns */
+    gap: 15px;
+    padding: 5px;
+    justify-content: center;
+}
+
+.category-button,
+.create-category-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: linear-gradient(to bottom, #ffffff, #e0e0e0);
+    border-radius: 12px;
+    box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.2);
+    padding: 5px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    width: 175px; /* Fixed width */
+    height: 220px; /* Fixed height */
+}
+
+.create-category-card {
+    background: linear-gradient(to bottom, #4CAF50, #2E7D32); /* Green gradient */
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+}
+
+/* ✅ Fixed Image Container */
+.category-image {
+    width: 100%;
+    height: 120px; /* Keeps all images uniform */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f0f0f0; /* Light gray for missing images */
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* ✅ Ensure Cards Stay Centered on Mobile */
+@media (max-width: 768px) {
+    .category-grid {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .category-button,
+    .create-category-card {
+        width: 175px; /* Ensures all cards stay same size */
+        height: 220px;
+    }
+}
+
+.category-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Ensures consistent image display */
+}
+
+/* ✅ Category Info */
+.category-info {
+    text-align: center;
+    padding: 6px 0;
+}
+
+/* ✅ Fixed Category Name (1-2 Lines Max) */
+.category-name {
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+    height: 36px; /* Ensures 1-2 lines of text */
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* Limit to 2 lines */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ✅ Creator Info */
+.category-meta {
+    font-size: 12px;
+    color: #555;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ✅ Creator Icon */
+.category-meta i {
+    margin-right: 5px;
+    color: #777;
+}
+
+/* ✅ Rating Section (Always Below Creator) */
+.category-rating {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #333;
+    margin-top: 5px;
+    min-height: 22px; /* Ensures spacing remains consistent */
+}
+
+/* ✅ Rating Stars */
+.star-full {
+    color: #f5a623; /* Gold */
+}
+
+.star-half {
+    color: #f5a623; /* Gold */
+}
+
+.star-empty {
+    color: #ccc; /* Gray */
+}
+
+/* ✅ Completion Count */
+.completion-count {
+    font-size: 12px;
+    color: #777;
+    margin-left: 5px;
+}
+
+/* ✅ Hover Effect (Subtle scale-up) */
+.category-button:hover {
+    transform: scale(1.04);
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.25);
+}
+
+/* ✅ Hover Effect for "Create Category" */
+.create-category-card:hover {
+    background: linear-gradient(to bottom, #43A047, #1B5E20);
+    transform: scale(1.05);
+}

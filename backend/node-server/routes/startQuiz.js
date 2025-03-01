@@ -26,7 +26,12 @@ router.post("/", async (req, res) => {
             .slice(0, numQuestions); // Get the top `numQuestions`
 
         if (selectedQuestions.length === 0) {
-            return res.status(404).json({ message: "❌ No available questions in this category." });
+
+            // ✅ Run `populateCategory` asynchronously
+            console.error(`Cannot start Quiz, mo questions found. Populating category: ${category._id} (${category.name})`);
+            populateCategory(category._id, 20);
+
+            return res.status(404).json({ message: "❌ No available questions in this category please try again in a few minutes." });
         }
 
         // ✅ Run `populateCategory` asynchronously

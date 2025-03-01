@@ -1,46 +1,42 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.getElementById("submit-signup").addEventListener("click", async () => {
+    const alias = document.getElementById("signup-alias").value.trim();
+    const email = document.getElementById("signup-email").value.trim();
+    const password = document.getElementById("signup-password").value.trim();
+    const age = document.getElementById("signup-age").value.trim();
+    const message = document.getElementById("signup-message");
 
-    const signupModal = document.getElementById("signup-modal");
-    const signupBtn = document.getElementById("signup-btn");
-    const closeSignupBtn = document.getElementById("close-signup");
-    const submitSignup = document.getElementById("submit-signup");
+    // Reset message display
+    message.classList.add("hidden");
+    message.textContent = "";
 
-    // Open Signup Modal
-    signupBtn.addEventListener("click", () => {
-        signupModal.style.display = "block";
-    });
+    if (!alias || !email || !password || !age) {
+        message.textContent = "All fields are required.";
+        message.classList.remove("hidden");
+        message.style.color = "red";
+        return;
+    }
 
-    // Close Signup Modal
-    closeSignupBtn.addEventListener("click", () => {
-        signupModal.style.display = "none";
-    });
+    try {
+        const response = await fetch("/api/users/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ alias, email, password, age })
+        });
 
-    // Handle Signup Submission
-    submitSignup.addEventListener("click", async (event) => {
-        event.preventDefault();
-        
-        const fullName = document.getElementById("signup-fullname").value;
-        const email = document.getElementById("signup-email").value;
-        const password = document.getElementById("signup-password").value;
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message);
 
-        try {
-            const response = await fetch("/api/users/register", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ full_name: fullName, email, password })
-            });
+        message.textContent = "🎉 Registration successful!";
+        message.style.color = "green";
+        message.classList.remove("hidden");
 
-            const data = await response.json();
-
-            if (response.ok) {
-                loginUser(email, password);
-                signupModal.style.display = "none"; // Close modal on success
-            } else {
-                alert(data.message || "Registration failed.");
-            }
-        } catch (error) {
-            console.error("Signup error:", error);
-            alert("An error occurred. Please try again.");
-        }
-    });
+        // Optionally, close the modal after success
+        setTimeout(() => {
+            document.getElementById("signup-modal").classList.add("hidden");
+        }, 2000);
+    } catch (error) {
+        message.textContent = `❌ ${error.message}`;
+        message.style.color = "red";
+        message.classList.remove("hidden");
+    }
 });
