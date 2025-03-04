@@ -26,14 +26,8 @@ document.getElementById("submit-signup").addEventListener("click", async () => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.message);
 
-        message.textContent = "🎉 Registration successful!";
-        message.style.color = "green";
-        message.classList.remove("hidden");
+        loginUser(email, password);
 
-        // Optionally, close the modal after success
-        setTimeout(() => {
-            document.getElementById("signup-modal").classList.add("hidden");
-        }, 2000);
     } catch (error) {
         message.textContent = `❌ ${error.message}`;
         message.style.color = "red";

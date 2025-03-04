@@ -82,12 +82,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Open Modal
     createCategoryButton.addEventListener("click", () => {
-        createCategoryModal.classList.add("show");
+        createCategoryModal.classList.remove("hidden");
     });
 
     // Close Modal
     closeCreateCategoryButton.addEventListener("click", () => {
-        createCategoryModal.classList.remove("show");
+        createCategoryModal.classList.add("hidden");
     });
 
     // Handle Category Submission
@@ -118,7 +118,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             const data = await response.json();
 
             if (response.ok) {
-                createCategoryModal.classList.remove("show");
+                createCategoryModal.classList.add("hidden");
                 fetchCategories(); // Reload categories after successful creation
 
                 // ✅ Show notification when category creation starts

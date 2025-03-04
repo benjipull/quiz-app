@@ -39,7 +39,6 @@ function resetQuiz() {
     document.getElementById("question-container").classList.add("hidden");
     document.getElementById("results-container").classList.add("hidden"); // ✅ Hide results
     document.getElementById("category-container").classList.remove("hidden");
-    document.getElementById("quiz-container").classList.add("hidden");
     document.getElementById("back-button").classList.add("hidden");
 
     ratingLocked = false; // Unlock rating

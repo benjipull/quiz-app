@@ -17,16 +17,6 @@ document.addEventListener("DOMContentLoaded", () => {
     window.SelectedCategory = "";
     window.SelectedCategoryId = 0;
 
-    function showLoading() {
-        loadingOverlay.classList.add("show");
-        document.body.classList.add("no-click");
-    }
-
-    function hideLoading() {
-        loadingOverlay.classList.remove("show");
-        document.body.classList.remove("no-click");
-    }
-
     function updateProgress(current, total) {
         const progressBar = document.getElementById("progress-bar");
         const progressText = document.getElementById("progress-text");
@@ -58,10 +48,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const explanationElement = document.getElementById("explanation");
         explanationElement.textContent = isCorrect ? `✅ Correct! ${explanation}` : `❌ Incorrect! ${explanation}`;
-
         explanationElement.classList.remove("hidden");
-        nextQuestionButton.classList.remove("hidden");
         document.getElementById("thumbs-container").classList.remove("hidden");
+
+        if (currentQuestionIndex == totalQuestions) {
+            nextQuestionButton.classList.add("hidden");
+            showResultsButton.classList.remove("hidden")
+        }
+        else {
+            nextQuestionButton.classList.remove("hidden");
+            showResultsButton.classList.add("hidden")
+        }
     }
 
     function displayQuestion(data) {
@@ -76,8 +73,10 @@ document.addEventListener("DOMContentLoaded", () => {
         // ✅ Reset thumbs buttons
         thumbsUpBtn.classList.remove("active");
         thumbsDownBtn.classList.remove("active");
+        thumbsUpBtn.disabled = false;
+        thumbsDownBtn.disabled = false;  // ✅ Re-enable when new question appears
         document.getElementById("thumbs-container").classList.add("hidden");
-        
+
         data.answers.forEach(answer => {
             const button = document.createElement("button");
             button.classList.add("option-button");
@@ -91,6 +90,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         updateProgress(questionIndex, totalQuestions);
         nextQuestionButton.classList.add("hidden");
+        showResultsButton.classList.add("hidden")
     }
 
     async function fetchNextQuestion() {
@@ -99,11 +99,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json();
 
             if (response.ok) {
-                if (data.remaining === 0) {
-                    // ✅ Hide "Next Question" button and show "Finish" button
-                    document.getElementById("show-results-button").classList.remove("hidden");
-                }
-
                 currentQuestionIndex++;
                 currentQuestionId = data.question._id;
 
@@ -141,6 +136,36 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        const stars = document.querySelectorAll(".star");
+        let ratingLocked = false; // Flag to prevent further changes after selection
+    
+        stars.forEach((star, index) => {
+            star.addEventListener("mouseover", function () {
+                if (!ratingLocked) highlightStars(index);
+            });
+    
+            star.addEventListener("mouseout", function () {
+                if (!ratingLocked) resetStars();
+            });
+    
+            star.addEventListener("click", function () {
+                if (!ratingLocked) {
+                    submitCategoryRating(index);
+                    ratingLocked = true; // Lock rating after selection
+                }
+            });
+        });
+    
+        function highlightStars(index) {
+            stars.forEach((star, i) => {
+                star.classList.toggle("active", i <= index);
+            });
+        }
+    
+        function resetStars() {
+            stars.forEach(star => star.classList.remove("active"));
+        }
+
         const selectedCategoryLabel = document.getElementById("selected-category-label");
         const categoryContainer = document.getElementById("category-container");
         const quizContainer = document.getElementById("quiz-container");
@@ -150,10 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         selectedCategoryLabel.textContent = `${categoryName}`;
         selectedCategoryLabel.classList.remove("hidden");
-
         currentQuestionIndex = 0;
-
-        showLoading();
 
         try {
             const response = await fetch("/api/startQuiz", {
@@ -167,7 +189,6 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             const data = await response.json();
-            hideLoading();
 
             if (!response.ok) {
                 alert("❌ Error starting quiz.");
@@ -186,7 +207,6 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (error) {
             questionElement.classList.remove("hidden");
             questionElement.textContent = "Failed to start quiz.";
-            hideLoading();
         }
     };
 
@@ -214,7 +234,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ✅ Handle Thumbs Up Click
     thumbsUpBtn.addEventListener("click", () => {
-        if (!currentQuestionId) return;
+        if (!currentQuestionId || thumbsUpBtn.disabled || thumbsDownBtn.disabled) return;
 
         if (thumbsUpBtn.classList.contains("active")) {
             // ✅ Undo thumbs up ➝ Post a dislike
@@ -224,13 +244,16 @@ document.addEventListener("DOMContentLoaded", () => {
             // ✅ Click thumbs up ➝ Post a like
             updatePopularity(currentQuestionId, 1);
             thumbsUpBtn.classList.add("active");
-            thumbsDownBtn.classList.remove("active"); // Remove thumbs down
         }
+
+        // ✅ Disable both buttons after selection
+        thumbsUpBtn.disabled = true;
+        thumbsDownBtn.disabled = true;
     });
 
     // ✅ Handle Thumbs Down Click
     thumbsDownBtn.addEventListener("click", () => {
-        if (!currentQuestionId) return;
+        if (!currentQuestionId || thumbsUpBtn.disabled || thumbsDownBtn.disabled) return;
 
         if (thumbsDownBtn.classList.contains("active")) {
             // ✅ Undo thumbs down ➝ Post a like
@@ -240,9 +263,10 @@ document.addEventListener("DOMContentLoaded", () => {
             // ✅ Click thumbs down ➝ Post a dislike
             updatePopularity(currentQuestionId, 2);
             thumbsDownBtn.classList.add("active");
-            thumbsUpBtn.classList.remove("active"); // Remove thumbs up
         }
+
+        // ✅ Disable both buttons after selection
+        thumbsUpBtn.disabled = true;
+        thumbsDownBtn.disabled = true;
     });
-
-
 });

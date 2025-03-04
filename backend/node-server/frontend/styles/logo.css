@@ -1,0 +1,11 @@
+/* ✅ Centered Logo (Scrolls Out) */
+#logo-container {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+#quizicle-logo {
+    height: 40px; /* Reduced height */
+    max-width: 80%; /* Ensures it scales well on smaller screens */
+}

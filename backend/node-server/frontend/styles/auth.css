@@ -1,0 +1,89 @@
+
+/* ✅ Authentication Section (Side by Side Forms) */
+#auth-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+}
+
+/* ✅ Common styles for login & signup sections */
+.login-section, .signup-section {
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+}
+
+/* ✅ Stylish input fields */
+input {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    outline: none;
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* ✅ Buttons */
+.btn {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+}
+
+/* Login Button */
+.login-btn {
+    background: white;
+    color: #3ab78f;
+    border: 2px solid #673ab7;
+    font-weight: bold;
+    padding: 10px 20px;
+    font-size: 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+}
+
+.login-btn:hover {
+    background: #f3e5f5;
+}
+
+/* Sign Up Button */
+.signup-btn {
+    background: #673ab7;
+    color: white;
+    border: none;
+    font-weight: bold;
+    padding: 10px 20px;
+    font-size: 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+}
+
+.signup-btn:hover {
+    background: #512da8;
+}
+
+/* ✅ Forgot Password Button */
+.forgot-password-btn {
+    background: none;
+    border: none;
+    color: #6a1b9a;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.forgot-password-btn:hover {
+    text-decoration: underline;
+}

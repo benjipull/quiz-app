@@ -18,3 +18,16 @@
     height: 100%;
     object-fit: cover;
 }
+
+#user-alias {
+    font-size: 26px;
+    font-weight: 700;
+    color: black; /* Change to solid black */
+    font-family: "Poppins", sans-serif;
+    text-align: center;
+    margin-top: 8px;
+    letter-spacing: 1px;
+    background: none; /* Remove gradient */
+    -webkit-background-clip: initial;
+    -webkit-text-fill-color: initial;
+}

@@ -9,9 +9,15 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="styles/styles.css">
     <link rel="stylesheet" href="styles/categories.css">
+    <link rel="stylesheet" href="styles/auth.css">
     <link rel="stylesheet" href="styles/questions.css">
     <link rel="stylesheet" href="styles/avatar.css">
+    <link rel="stylesheet" href="styles/logo.css">
 </head>
+
+<header id="logo-container">
+    <img id="quizicle-logo" src="images/QuizicleLogo-removebg-preview.png" alt="Quizicle Logo">
+</header>
 
 <body>
     <main>
@@ -41,22 +47,29 @@
         </div>
 
         <!-- Authentication Section (Visible when NOT logged in) -->
-        <div id="auth-section">
-            <div class="auth-box">
+        <div id="auth-section" class="hidden">
+            <!-- 🚀 Login Section -->
+            <div class="login-section">
                 <h2>Login</h2>
                 <input type="email" id="login-email" placeholder="Email">
                 <input type="password" id="login-password" placeholder="Password">
-                <button id="submit-login">Login</button>
+                <button id="submit-login" class="btn login-btn" >Login</button>
+                <button id="forgot-password-btn" class="forgot-password-btn">Forgot Password?</button>
             </div>
 
-            <div class="auth-box">
+            <!-- 🚀 Sign Up Section -->
+            <div class="signup-section">
                 <h2>Sign Up</h2>
-                <input type="text" id="signup-alias" placeholder="Alias" required>
-                <input type="email" id="signup-email" placeholder="Email" required>
-                <input type="password" id="signup-password" placeholder="Password" required>
-                <input type="number" id="signup-age" placeholder="Age" min="1" required>
-                <button id="submit-signup">Sign Up</button>
+                <input type="text" id="signup-alias" placeholder="Alias">
+                <input type="email" id="signup-email" placeholder="Email">
+                <input type="password" id="signup-password" placeholder="Password">
+                <input type="number" id="signup-age" placeholder="Age">
+                <button id="submit-signup" class="btn signup-btn">Sign Up</button>
             </div>
+        </div>
+
+        <div id="reset-message" class="hidden">
+
         </div>
 
         <div id="quiz-container">

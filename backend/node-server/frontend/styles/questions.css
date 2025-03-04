@@ -7,7 +7,7 @@
 
 /* ✅ Improve Question Readability */
 #question {
-    font-size: 24px;
+    font-size: 20px;
     font-weight: bold;
     color: #fff; /* White text */
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); /* Shadow for readability */
@@ -130,4 +130,12 @@
     color: rgb(0, 0, 0);
     margin-top: -25px;
     position: relative;
+}
+
+#category-label {
+    padding-top: 5px;  /* Adjust the top padding */
+    padding-bottom: 5px;  /* Adjust the bottom padding */
+    margin-top: 5px;  /* Optional: Adjust margin to control spacing further */
+    margin-bottom: 5px;
+    font-size: 1.5rem;  /* Adjust size if needed */
 }

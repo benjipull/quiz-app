@@ -8,7 +8,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm install && npm install resend dotenv @sendgrid/mail express-rate-limit
+
 
 # Copy application source code
 COPY . .

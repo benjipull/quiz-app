@@ -52,11 +52,9 @@ async function fetchQuestions(categoryName, numQuestions) {
             model: "mistral",
             prompt: systemPrompt,
             stream: false,
-            max_tokens: 250 * numQuestions,
-            temperature: 0.1
+            max_tokens: 300 * numQuestions,
+            temperature: 0.0
         });
-
-        console.log("✅ Ollama response received:", response.data);
 
         if (!response.data || !response.data.response) {
             throw new Error("❌ Ollama response missing 'response' field.");
