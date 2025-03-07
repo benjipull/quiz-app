@@ -115,7 +115,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    document.getElementById("show-results-button").addEventListener("click", showResults);
+    document.getElementById("show-results-button").addEventListener("click", showResults);   
+    document.getElementById("back-button").addEventListener("click", resetQuiz);
     nextQuestionButton.addEventListener("click", fetchNextQuestion);
 
     window.startQuiz = async function (categoryId, categoryName) {

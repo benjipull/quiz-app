@@ -36,7 +36,7 @@ router.post("/", async (req, res) => {
 
         // ✅ Run `populateCategory` asynchronously
         console.log(`⏳ Populating category: ${category._id} (${category.name})`);
-        populateCategory(category._id, 5);
+        populateCategory(category._id, 10);
 
         // ✅ Store questions for user in memory for `nextQuestion.js`
         userQuestions[userToken] = selectedQuestions.map(q => ({

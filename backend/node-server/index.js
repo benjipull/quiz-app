@@ -27,9 +27,10 @@ app.use(express.static(path.join(__dirname, "frontend")));
 //Users
 app.use("/api/users/register", require("./routes/register"));
 app.use("/api/users/login", require("./routes/login"));
-app.use("/api/users", require("./routes/getUsers"));
 app.use("/api/resetPassword", require("./routes/resetPassword"));
 app.use("/api/updatePassword", require("./routes/updatePassword"));
+app.use("/api/getUserDetails", require("./routes/getUserDetails"));
+app.use("/api/updateUserDetails", require("./routes/updateUserDetails"));
 
 //Quiz
 app.use("/api/startQuiz", require("./routes/startQuiz")); 

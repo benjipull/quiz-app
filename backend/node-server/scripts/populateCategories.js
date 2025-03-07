@@ -1,6 +1,5 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
-const connectDB = require("../config/db");
 const Category = require("../models/categoryModel");
 const crypto = require("crypto");
 const axios = require("axios");
@@ -88,7 +87,7 @@ async function fetchQuestions(categoryName, numQuestions) {
 }
 
 // ✅ Populate a single category with questions and detailed logging
-async function populateCategory(categoryId, numQuestions = 20) {
+async function populateCategory(categoryId, numQuestions) {
     try {
         const category = await Category.findById(categoryId);
         if (!category) {

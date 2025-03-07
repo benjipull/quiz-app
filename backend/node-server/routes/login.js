@@ -38,11 +38,16 @@ router.post("/", async (req, res) => {
 
         console.log("Generated Token:", token); // ✅ Log token for debugging
 
+        user.lastlogin_at = Date.now();
+        await user.save();
+
+        // Exclude password field from response
+        const { password: _, ...userWithoutPassword } = user.toObject();
+
         res.json({
             message: "Login successful",
             token,
-            id: user._id.toString(),
-            userAlias: user.alias
+            user: userWithoutPassword
         });
 
     } catch (error) {

@@ -11,6 +11,7 @@ const AnswerSchema = new mongoose.Schema({
 const QuestionSchema = new mongoose.Schema({
     _id: { type: mongoose.Schema.Types.ObjectId, auto: true }, // ✅ Unique ObjectId for each question
     text: { type: String, required: true }, // ✅ Question text
+    createdAt: { type: Date, default: Date.now }, // ✅ Timestamp for creation
     answers: [AnswerSchema], // ✅ Array of possible answers
     correct_answer: { type: String, required: true }, // ✅ Stores the correct answer text
     explanation: { type: String, default: "" }, // ✅ Explanation of correct answer

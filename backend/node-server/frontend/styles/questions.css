@@ -139,3 +139,35 @@
     margin-bottom: 5px;
     font-size: 1.5rem;  /* Adjust size if needed */
 }
+
+
+/* ✅ Thumbs Container */
+#thumbs-container {
+    justify-content: center;
+    gap: 15px;
+    margin: 15px;
+}
+
+/* ✅ Thumbs Button */
+.thumb-button {
+    font-size: 24px;
+    padding: 10px 15px;
+    border: none;
+    background: #e0e0e0;
+    color: #333;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+}
+
+/* ✅ Hover Effect */
+.thumb-button:hover {
+    background: #d6d6d6;
+}
+
+/* ✅ Active State */
+.thumb-button.active {
+    background: #673ab7;
+    color: white;
+    transform: scale(1.1);
+}

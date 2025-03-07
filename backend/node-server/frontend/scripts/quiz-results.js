@@ -40,7 +40,9 @@ function resetQuiz() {
     document.getElementById("results-container").classList.add("hidden"); // ✅ Hide results
     document.getElementById("category-container").classList.remove("hidden");
     document.getElementById("back-button").classList.add("hidden");
-
+    document.getElementById("user-profile").classList.remove("hidden");
+    document.getElementById("user-details-container").classList.add("hidden");
+    
     ratingLocked = false; // Unlock rating
     
     const stars = document.querySelectorAll(".star");
@@ -164,3 +166,4 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 window.showResults = showResults;
+window.resetQuiz = resetQuiz;

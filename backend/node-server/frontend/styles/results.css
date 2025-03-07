@@ -1,0 +1,58 @@
+
+/* ✅ Results Container Styling */
+#results-container {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: white;
+    color: #673ab7;
+    border-radius: 10px;
+    padding: 30px;
+    width: 80%;
+    max-width: 600px;
+    margin: 40px auto;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.15);
+    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+
+/* ✅ Heading */
+#results-container h2 {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+/* ✅ Results Text */
+#quiz-results {
+    font-size: 18px;
+    line-height: 1.6;
+    font-weight: 500;
+    margin-bottom: 20px;
+    color: #444;
+}
+
+/* ✅ Star Rating Container */
+#rating-container {
+    justify-content: center;
+    gap: 5px;
+    margin-bottom: 15px; /* Space before thumbs */
+}
+
+/* ✅ Star Styling */
+.star {
+    font-size: 30px;
+    color: #ccc; /* Default gray */
+    cursor: pointer;
+    transition: color 0.3s, transform 0.2s ease-in-out;
+}
+
+/* ✅ Hover Effect */
+.star:hover {
+    transform: scale(1.2); /* Slightly enlarge */
+}
+
+/* ✅ Clicked (Active) Stars */
+.star.active {
+    color: #FFD700; /* Gold when selected */
+}

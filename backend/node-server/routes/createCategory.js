@@ -58,14 +58,22 @@ router.post(
 
             await category.save();
 
-            // ✅ Run `populateCategory` asynchronously
             console.log(`⏳ Populating category: ${category._id} (${name})`);
-            populateCategory(category._id, 20) // 🚀 Default to 20 questions
+
+            async function runPopulateCategory(categoryId, times) {
+                for (let i = 0; i < times; i++) {
+                    console.log(`🔄 Running populateCategory attempt ${i + 1} for ${name}...`);
+                    await populateCategory(categoryId, 10);
+                }
+            }
+            
+            // ✅ Run the function asynchronously without blocking other operations
+            runPopulateCategory(category._id, 4)
                 .then(() => {
-                    console.log(`✅ Category ${name} populated and enabled!`);
+                    console.log(`✅ Category ${name} populated 4 times and enabled!`);
                     return Category.findByIdAndUpdate(category._id, { disabled: false }); // ✅ Enable category
                 })
-                .catch(err => console.error("❌ Error populating category:", err));
+                .catch(err => console.error("❌ Error populating category:", err));      
 
             res.status(201).json({ message: "✅ Category created and populating...", category });
         } catch (error) {

@@ -24,10 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (response.ok) {
                 // ✅ Store token and user info
                 localStorage.setItem("token", data.token);
-                localStorage.setItem("user", JSON.stringify({
-                    id: data.id, // ✅ Store user ID
-                    alias: data.userAlias // ✅ Store alias instead of full_name
-                }));
+                localStorage.setItem("user", JSON.stringify(user));
 
                 updateUI();
 
@@ -79,14 +76,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Update UI based on login status
     window.updateUI = function () {
-        const alias = JSON.parse(localStorage.getItem("user"))?.alias
         
-        if (alias) {
+        const token = localStorage.getItem("token");
+        if (token) {
+            //Logged in
             quizContainer.classList.remove("hidden");    
-            userAlias.textContent = alias;
-            userProfile.classList.remove("hidden"); // Show profile
-            authSection.classList.add("hidden"); // Hide auth modals
+            userProfile.classList.remove("hidden");
+            authSection.classList.add("hidden");
+            loadUserDetails();
+
+            const user = JSON.parse(localStorage.getItem("user"));
+
+            userAlias.textContent = user.alias;
+            document.getElementById("user-avatar").src = `images/avatars/${user.avatar}.png`;
+
         } else {
+            //Not logged in
             userProfile.classList.add("hidden"); // Hide profile -- still need to put in profile
             authSection.classList.remove("hidden"); // Show auth modals
             quizContainer.classList.add("hidden"); // Hide Quiz

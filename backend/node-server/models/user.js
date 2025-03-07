@@ -4,9 +4,13 @@ const bcrypt = require("bcryptjs");
 const UserSchema = new mongoose.Schema({
     alias: { type: String, required: true, unique: true, trim: true },
     email: { type: String, required: true, unique: true, trim: true },
+    avatar: { type: Number, required: true, default: 1},
     password: { type: String, required: true },
-    age: { type: Number, required: true, min: 1 }, // Ensure age is a positive number
-    created_at: { type: Date, default: Date.now },
+    age: { type: Number, required: true, min: 1 },
+    created_at: { type: Date },
+    lastupdated_at: { type: Date, default: Date.now, required: true },
+    lastlogin_at: { type: Date },
+    
 
     // 🔑 Password Reset Fields
     resetPasswordToken: { type: String, default: null },
