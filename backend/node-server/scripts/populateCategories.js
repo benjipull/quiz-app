@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const Category = require("../models/categoryModel");
 const crypto = require("crypto");
 const axios = require("axios");
+const { version } = require("os");
 
 // ✅ Set Ollama URL explicitly via environment variable or default
 const OLLAMA_URL = process.env.OLLAMA_URL || "https://c652-105-185-157-37.ngrok-free.app/api/generate";
@@ -21,38 +22,40 @@ const generateQuestionHash = (questionText) => {
 
 // ✅ Fetch questions from Ollama with detailed logging
 async function fetchQuestions(categoryName, numQuestions) {
-    console.log(`🚀 Preparing to fetch ${numQuestions} questions for category: "${categoryName}"`);
+    console.log(`🚀 Fetching ${numQuestions} questions for category: "${categoryName}"`);
 
     const systemPrompt = `
-    You are an AI trivia generator. Your task is to generate **${numQuestions}** trivia questions related to **${categoryName}**.
+        You are an AI trivia generator with expert-level knowledge. Your task is to generate ${numQuestions} trivia questions related to ${categoryName}.
 
-    ### **Instructions:**
-    - Generate **fact-based, objective trivia questions** about **${categoryName}**.
-    - Each question must have **exactly 4 distinct answer choices**.
-    - **The correct_answer MUST be one of the 4 choices in the answers array**.
-    - Provide a **brief and accurate explanation** for why the correct answer is correct.
-    - **The response MUST be a valid JSON array** with NO extra text.
+        ### **Instructions:**
+        - Generate fact-based, objective trivia questions about ${categoryName}.
+        - Each question must have **exactly 4 distinct answer choices**.
+        - The correct_answer MUST be one of the 4 choices in the answers array.
+        - There must only be one correct answer, the other 3 answer must be incorrect.
+        - Provide an accurate and factually correct explanation for why the correct answer is correct.
+        - Verify that each fact is accurate based on reputable sources. If unsure, omit the question.
+        - Do NOT fabricate or assume information.
+        - The response MUST be a valid JSON array** with NO extra text.
 
-    ### **Response Format:**
-    [
-        {
-            "question": "What is the capital of France?",
-            "answers": ["Berlin", "Madrid", "Paris", "Rome"],
-            "correct_answer": "Paris",
-            "explanation": "Paris is the capital city of France."
-        }
-    ]
-    `;
+        ### **Response Format:**
+        [
+            {
+                "question": "What is the capital of France?",
+                "answers": ["Berlin", "Madrid", "Paris", "Rome"],
+                "correct_answer": "Paris",
+                "explanation": "Paris is the capital city of France."
+            }
+        ]
+            `;
 
     try {
-        console.log(`🚀 Sending request to Ollama at: ${OLLAMA_URL}`);
-
         const response = await axios.post(OLLAMA_URL, {
             model: "mistral",
             prompt: systemPrompt,
             stream: false,
-            max_tokens: 300 * numQuestions,
-            temperature: 0.0
+            max_tokens: 150 * numQuestions,
+            temperature: 0.0,
+            top_p: 0.1
         });
 
         if (!response.data || !response.data.response) {
@@ -97,7 +100,7 @@ async function populateCategory(categoryId, numQuestions) {
 
         const nonDisabledCount = category.questions.filter(q => !q.disabled).length;
 
-        if (nonDisabledCount >= 200) {
+        if (nonDisabledCount >= 100) {
             console.log(`🚫 Skipping ${category.name} (already has ${nonDisabledCount} questions).`);
             return;
         }
@@ -131,7 +134,8 @@ async function populateCategory(categoryId, numQuestions) {
                 disabled: false,
                 timesAnsweredCorrectly: 0,
                 timesAnsweredIncorrectly: 0,
-                hash: questionHash
+                hash: questionHash,
+                version: 3
             };
 
             category.questions.push(newQuestion);

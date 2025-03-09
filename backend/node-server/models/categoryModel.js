@@ -20,7 +20,8 @@ const QuestionSchema = new mongoose.Schema({
     disabled: { type: Boolean, default: false }, // ✅ Allows disabling a question
     timesAnsweredCorrectly: { type: Number, default: 0 }, // ✅ Tracks how many times the question was answered correctly
     timesAnsweredIncorrectly: { type: Number, default: 0 }, // ✅ Tracks how many times the question was answered incorrectly
-    hash: { type: String, required: true, unique: true } // ✅ Unique hash to prevent duplicate questions
+    hash: { type: String, required: true, unique: true }, // ✅ Unique hash to prevent duplicate questions
+    version: { type: Number, default: 1, required: true}
 });
 
 // ✅ Schema for quiz completions

@@ -63,12 +63,12 @@ router.post(
             async function runPopulateCategory(categoryId, times) {
                 for (let i = 0; i < times; i++) {
                     console.log(`🔄 Running populateCategory attempt ${i + 1} for ${name}...`);
-                    await populateCategory(categoryId, 10);
+                    await populateCategory(categoryId, 1);
                 }
             }
             
             // ✅ Run the function asynchronously without blocking other operations
-            runPopulateCategory(category._id, 4)
+            runPopulateCategory(category._id, 40)
                 .then(() => {
                     console.log(`✅ Category ${name} populated 4 times and enabled!`);
                     return Category.findByIdAndUpdate(category._id, { disabled: false }); // ✅ Enable category

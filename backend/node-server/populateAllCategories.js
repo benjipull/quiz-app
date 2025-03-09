@@ -31,8 +31,16 @@ async function populateAllCategories() {
         console.log(`🔹 Populating the 10 categories with the lowest quesiton count.`);
 
         for (const category of categories) {
-            console.log(`🛠 Populating category: ${category.name}`);
-            await populateCategory(category._id, 20);
+            await populateCategory(category._id, 1);
+            await populateCategory(category._id, 1);
+            await populateCategory(category._id, 1);
+            await populateCategory(category._id, 1);
+            await populateCategory(category._id, 1);
+            await populateCategory(category._id, 1);
+            await populateCategory(category._id, 1);
+            await populateCategory(category._id, 1);
+            await populateCategory(category._id, 1);
+            await populateCategory(category._id, 1);
         }
 
         console.log("🎉 All categories populated successfully!");
