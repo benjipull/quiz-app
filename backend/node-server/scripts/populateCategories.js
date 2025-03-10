@@ -25,27 +25,32 @@ async function fetchQuestions(categoryName, numQuestions) {
     console.log(`🚀 Fetching ${numQuestions} questions for category: "${categoryName}"`);
 
     const systemPrompt = `
-        You are an AI trivia generator with expert-level knowledge. Your task is to generate ${numQuestions} trivia questions related to ${categoryName}.
+        You are an AI trivia generator with expert-level knowledge. Your task is to generate a trivia question related to **${categoryName}** using **only factually verified information**.
 
         ### **Instructions:**
-        - Generate fact-based, objective trivia questions about ${categoryName}.
+        - **DO NOT generate a question unless it is based on a real, verifiable fact.**
+        - **DO NOT fabricate** or assume information. If unsure, return an empty JSON array.
+        - The trivia question **must be 100% factual and verifiable**.
         - Each question must have **exactly 4 distinct answer choices**.
-        - The correct_answer MUST be one of the 4 choices in the answers array.
-        - There must only be one correct answer, the other 3 answer must be incorrect.
-        - Provide an accurate and factually correct explanation for why the correct answer is correct.
-        - Verify that each fact is accurate based on reputable sources. If unsure, omit the question.
-        - Do NOT fabricate or assume information.
-        - The response MUST be a valid JSON array** with NO extra text.
+        - The **correct_answer MUST be one of the 4 choices** in the answers array.
+        - There must be **only one correct answer**; the other 3 must be incorrect.
+        - **Provide a reliable source-based explanation** for why the correct answer is correct.
 
         ### **Response Format:**
+        - The response **MUST be a valid JSON array** with **NO extra text**.
+        - If you cannot verify the fact, return '[]' (an empty array).
+
+        ### **Response Example:**
+        '''json
         [
             {
                 "question": "What is the capital of France?",
                 "answers": ["Berlin", "Madrid", "Paris", "Rome"],
                 "correct_answer": "Paris",
-                "explanation": "Paris is the capital city of France."
+                "explanation": "Paris is the capital city of France and has been since 508 AD."
             }
         ]
+
             `;
 
     try {
@@ -53,7 +58,7 @@ async function fetchQuestions(categoryName, numQuestions) {
             model: "mistral",
             prompt: systemPrompt,
             stream: false,
-            max_tokens: 150 * numQuestions,
+            max_tokens: 150,
             temperature: 0.0,
             top_p: 0.1
         });
@@ -74,7 +79,19 @@ async function fetchQuestions(categoryName, numQuestions) {
         }
 
         console.log(`✅ Successfully parsed ${questions.length} questions from Ollama.`);
-        return questions;
+
+        // ✅ Self-verify each question
+        const verifiedQuestions = [];
+        for (const question of questions) {
+            const isValid = await verifyQuestion(question);
+            if (isValid) {
+                verifiedQuestions.push(question);
+            } else {
+                console.log(`❌ Discarding hallucinated question: "${question.question}"`);
+            }
+        }
+
+        return verifiedQuestions;
 
     } catch (error) {
         console.error("⚠️ Error fetching questions from Ollama:");
@@ -135,7 +152,7 @@ async function populateCategory(categoryId, numQuestions) {
                 timesAnsweredCorrectly: 0,
                 timesAnsweredIncorrectly: 0,
                 hash: questionHash,
-                version: 3
+                version: 4
             };
 
             category.questions.push(newQuestion);
@@ -152,6 +169,54 @@ async function populateCategory(categoryId, numQuestions) {
 
     } catch (error) {
         console.error("❌ Error populating category:", error.message);
+    }
+}
+
+// ✅ Function to verify the question back with Mistral
+async function verifyQuestion(question) {
+    console.log(`🔍 Verifying question: "${question.question}"`);
+
+    const verificationPrompt = `
+        You are a fact-checking AI. Your task is to verify if the following trivia question is factually accurate.
+
+        ### **Trivia Question:**
+        "${question.question}"
+
+        Correct Answer: "${question.correct_answer}"
+        Explanation: "${question.explanation}"
+
+        ### **Instructions:**
+        - Research existing legal records or widely known facts.
+        - If this law does not exist or is unverifiable, return \`false\`.
+        - If this law is accurate, return \`true\`.
+
+        ### **Response Format:**
+        '''json
+        { "is_factually_correct": true }
+        '''`;
+
+    try {
+        const response = await axios.post(OLLAMA_URL, {
+            model: "mistral",
+            prompt: verificationPrompt,
+            stream: false,
+            max_tokens: 50,
+            temperature: 0.0,
+            top_p: 0.5
+        });
+
+        if (!response.data || !response.data.response) {
+            throw new Error("❌ Ollama verification response missing 'response' field.");
+        }
+
+        const aiResponse = response.data.response.trim();
+        console.log("✅ AI Verification Response:", aiResponse);
+
+        return aiResponse.includes('"is_factually_correct": true');
+
+    } catch (error) {
+        console.error("❌ Error verifying question:", error.message);
+        return false;
     }
 }
 

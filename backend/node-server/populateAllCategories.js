@@ -36,11 +36,6 @@ async function populateAllCategories() {
             await populateCategory(category._id, 1);
             await populateCategory(category._id, 1);
             await populateCategory(category._id, 1);
-            await populateCategory(category._id, 1);
-            await populateCategory(category._id, 1);
-            await populateCategory(category._id, 1);
-            await populateCategory(category._id, 1);
-            await populateCategory(category._id, 1);
         }
 
         console.log("🎉 All categories populated successfully!");
