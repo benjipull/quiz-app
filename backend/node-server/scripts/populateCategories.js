@@ -25,32 +25,32 @@ async function fetchQuestions(categoryName, numQuestions) {
     console.log(`🚀 Fetching ${numQuestions} questions for category: "${categoryName}"`);
 
     const systemPrompt = `
-        You are an AI trivia generator with expert-level knowledge. Your task is to generate a trivia question related to **${categoryName}** using **only factually verified information**.
+        You are an AI trivia generator with a knowledge base which is limited to the information it contains. Your task is to generate a trivia question related to **${categoryName}** using **only factually verified information from documented sources**.
 
         ### **Instructions:**
-        - **DO NOT generate a question unless it is based on a real, verifiable fact.**
-        - **DO NOT fabricate** or assume information. If unsure, return an empty JSON array.
+        - **You MUST reference a real, verifiable source (legal code, historical record, or government document) before generating a question.**
+        - **DO NOT fabricate** or assume information. If unsure, return an empty JSON array '[]'.
         - The trivia question **must be 100% factual and verifiable**.
         - Each question must have **exactly 4 distinct answer choices**.
         - The **correct_answer MUST be one of the 4 choices** in the answers array.
         - There must be **only one correct answer**; the other 3 must be incorrect.
-        - **Provide a reliable source-based explanation** for why the correct answer is correct.
+        - **Provide a reliable source-based explanation** that explicitly cites where the fact is documented.
 
         ### **Response Format:**
         - The response **MUST be a valid JSON array** with **NO extra text**.
-        - If you cannot verify the fact, return '[]' (an empty array).
+        - If you cannot verify the fact, return '[]'.
 
         ### **Response Example:**
         '''json
         [
             {
-                "question": "What is the capital of France?",
-                "answers": ["Berlin", "Madrid", "Paris", "Rome"],
-                "correct_answer": "Paris",
-                "explanation": "Paris is the capital city of France and has been since 508 AD."
+                "question": "",
+                "answers": ["1", "2", "3", "4"],
+                "correct_answer": "1",
+                "explanation": "",
+                "source": ""
             }
         ]
-
             `;
 
     try {
@@ -152,7 +152,7 @@ async function populateCategory(categoryId, numQuestions) {
                 timesAnsweredCorrectly: 0,
                 timesAnsweredIncorrectly: 0,
                 hash: questionHash,
-                version: 4
+                version: 6
             };
 
             category.questions.push(newQuestion);
@@ -177,23 +177,28 @@ async function verifyQuestion(question) {
     console.log(`🔍 Verifying question: "${question.question}"`);
 
     const verificationPrompt = `
-        You are a fact-checking AI. Your task is to verify if the following trivia question is factually accurate.
+        You are a fact-checking AI with expert-level knowledge of laws, historical records and general trivia.  
+        However, your knowledge base it also finite and there are times when you do not have the information to correctly verify information.
+        Your task is to verify whether the following trivia question is based on a **real**, verifiable fact.
 
         ### **Trivia Question:**
-        "${question.question}"
+        "{question.question}"
 
-        Correct Answer: "${question.correct_answer}"
-        Explanation: "${question.explanation}"
+        Correct Answer: "{question.correct_answer}"
+        Explanation: "{question.explanation}"
 
         ### **Instructions:**
-        - Research existing legal records or widely known facts.
-        - If this law does not exist or is unverifiable, return \`false\`.
-        - If this law is accurate, return \`true\`.
+        - **Check against government records, historical laws, or widely accepted sources**.
+        - If this fact is **not documented in a verifiable source**, return '"is_factually_correct": false'.
+        - If this fact **is documented**, provide a source reference.
 
         ### **Response Format:**
         '''json
-        { "is_factually_correct": true }
-        '''`;
+        {
+            "is_factually_correct": true,
+            "source": ""
+        }
+        `;
 
     try {
         const response = await axios.post(OLLAMA_URL, {
@@ -202,7 +207,7 @@ async function verifyQuestion(question) {
             stream: false,
             max_tokens: 50,
             temperature: 0.0,
-            top_p: 0.5
+            top_p: 0.1
         });
 
         if (!response.data || !response.data.response) {
