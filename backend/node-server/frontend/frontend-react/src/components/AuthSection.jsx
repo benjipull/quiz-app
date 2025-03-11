@@ -1,0 +1,134 @@
+// AuthSection.js
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import "../styles/AuthSection.css";
+
+const AuthSection = () => {
+  const navigate = useNavigate();
+  const [isLogin, setIsLogin] = useState(true);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [signupAlias, setSignupAlias] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupAge, setSignupAge] = useState("");
+  const [message, setMessage] = useState("");
+
+  const handleLogin = async () => {
+    if (!loginEmail || !loginPassword) {
+      setMessage("Please enter both email and password.");
+      return;
+    }
+
+    try {
+      const response = await fetch("http://localhost:3000/api/users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+      });
+      const data = await response.json();
+      console.log("Login response data:", data); // Debugging line
+      if (response.ok) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        console.log("Token and User saved to localStorage:", data.token, data.user); // Debugging line
+        navigate("/"); // Navigate to the home page after successful login
+      } else {
+        setMessage(data.message || "Login failed.");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setMessage("An error occurred. Please try again.");
+    }
+  };
+
+  const handleSignup = async () => {
+    if (!signupAlias || !signupEmail || !signupPassword || !signupAge) {
+      setMessage("All fields are required.");
+      return;
+    }
+
+    try {
+      const response = await fetch("http://localhost:3000/api/users/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          alias: signupAlias,
+          email: signupEmail,
+          password: signupPassword,
+          age: signupAge,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      handleLogin(); // Auto-login after successful registration
+    } catch (error) {
+      setMessage(`❌ ${error.message}`);
+    }
+  };
+
+  return (
+    <div className="auth-container">
+      <div className="auth-card">
+        <h2>{isLogin ? "Login" : "Sign Up"}</h2>
+        {isLogin ? (
+          <>
+            <input
+              type="email"
+              placeholder="Email"
+              value={loginEmail}
+              onChange={(e) => setLoginEmail(e.target.value)}
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+            />
+            <button onClick={handleLogin}>Login</button>
+            {message && <p className="error-message">{message}</p>}
+            <p className="toggle-text">
+              Don't have an account?{" "}
+              <span onClick={() => setIsLogin(false)}>Sign Up</span>
+            </p>
+          </>
+        ) : (
+          <>
+            <input
+              type="text"
+              placeholder="Alias"
+              value={signupAlias}
+              onChange={(e) => setSignupAlias(e.target.value)}
+            />
+            <input
+              type="email"
+              placeholder="Email"
+              value={signupEmail}
+              onChange={(e) => setSignupEmail(e.target.value)}
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={signupPassword}
+              onChange={(e) => setSignupPassword(e.target.value)}
+            />
+            <input
+              type="number"
+              placeholder="Age"
+              value={signupAge}
+              onChange={(e) => setSignupAge(e.target.value)}
+            />
+            <button onClick={handleSignup}>Sign Up</button>
+            {message && <p className="error-message">{message}</p>}
+            <p className="toggle-text">
+              Already have an account?{" "}
+              <span onClick={() => setIsLogin(true)}>Login</span>
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default AuthSection;
