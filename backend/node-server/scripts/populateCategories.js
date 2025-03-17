@@ -3,10 +3,9 @@ const mongoose = require("mongoose");
 const Category = require("../models/categoryModel");
 const crypto = require("crypto");
 const axios = require("axios");
-const { version } = require("os");
 
 // ✅ Set Ollama URL explicitly via environment variable or default
-const OLLAMA_URL = process.env.OLLAMA_URL || "https://d54c-105-185-157-37.ngrok-free.app/api/generate";
+const OLLAMA_URL = process.env.OLLAMA_URL || "https://e53f-105-185-157-37.ngrok-free.app/api/generate";
 
 if (!OLLAMA_URL) {
     console.error("❌ OLLAMA_URL is not set! Please set it in your environment variables.");
@@ -25,10 +24,11 @@ async function fetchQuestions(categoryName, numQuestions) {
     console.log(`🚀 Fetching ${numQuestions} questions for category: "${categoryName}"`);
 
     const systemPrompt = `
-        You are an AI trivia generator with a knowledge base which is limited to the information it contains. Your task is to generate a trivia question related to **${categoryName}** using **only factually verified information from documented sources**.
+        You are an AI trivia generator with a knowledge base which is limited to the information it contains. 
+        Your task is to generate a trivia question related to **${categoryName}** using **only factually verified information from documented sources**.
 
         ### **Instructions:**
-        - **You MUST reference a real, verifiable source (legal code, historical record, or government document) before generating a question.**
+        - **You MUST reference a real, verifiable source before generating a question.**
         - **DO NOT fabricate** or assume information. If unsure, return an empty JSON array '[]'.
         - The trivia question **must be 100% factual and verifiable**.
         - Each question must have **exactly 4 distinct answer choices**.
@@ -52,6 +52,14 @@ async function fetchQuestions(categoryName, numQuestions) {
             }
         ]
             `;
+
+    try {
+        console.log(`🔍 Fetching Wikipedia summary....`);
+        const summary = await fetchWikipediaSummary(categoryName);
+        console.log(`Wikipedia summary: ${summary}`);
+    } catch (error) {
+        console.error("❌ Request error:", error.message);
+    }
 
     try {
         const response = await axios.post(OLLAMA_URL, {
@@ -177,9 +185,9 @@ async function verifyQuestion(question) {
     console.log(`🔍 Verifying question: "${question.question}"`);
 
     const verificationPrompt = `
-        You are a fact-checking AI with expert-level knowledge of laws, historical records and general trivia.  
+        You are a fact-checking AI with expert-level knowledge of general trivia.  
         However, your knowledge base it also finite and there are times when you do not have the information to correctly verify information.
-        Your task is to verify whether the following trivia question is based on a **real**, verifiable fact.
+        Your task is to verify whether the following trivia question is based on a **real**, verifiable source.
 
         ### **Trivia Question:**
         "{question.question}"
@@ -188,9 +196,9 @@ async function verifyQuestion(question) {
         Explanation: "{question.explanation}"
 
         ### **Instructions:**
-        - **Check against government records, historical laws, or widely accepted sources**.
+        - **Check against widely accepted sources**.
         - If this fact is **not documented in a verifiable source**, return '"is_factually_correct": false'.
-        - If this fact **is documented**, provide a source reference.
+        - If this fact **is documented**, provide a source reference, and return '"is_factually_correct": true'.
 
         ### **Response Format:**
         '''json
@@ -222,6 +230,18 @@ async function verifyQuestion(question) {
     } catch (error) {
         console.error("❌ Error verifying question:", error.message);
         return false;
+    }
+}
+
+async function fetchWikipediaSummary(topic) {
+    const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`;
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        return data.extract || "No additional context found.";
+    } catch (error) {
+        console.error("❌ Wikipedia Fetch Error:", error);
+        return "No additional context available.";
     }
 }
 

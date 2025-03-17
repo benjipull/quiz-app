@@ -48,6 +48,8 @@ app.use("/api/updatePopularity", require("./routes/updatePopularity"));
 //Images
 app.use("/api/getImageUrl", require("./routes/getImageUrl")); 
 
+//Sources
+app.use("/api/DBpedia", require("./routes/DBpedia")); 
 
 // Default route (serves index.html for all other routes)
 app.get("*", (req, res) => {
