@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import "../styles/Categories.css";
 
 const OneMoreTry = () => {
     const [quizzes, setQuizzes] = useState([]);

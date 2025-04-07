@@ -4,7 +4,7 @@ import "../styles/AddCategory.css";
 export default function AddCategory({ fetchCategories }) {
   const [isOpen, setIsOpen] = useState(false);
   const [categoryName, setCategoryName] = useState("");
-  const [notification, setNotification] = useState("");
+  const [notification, setNotification] = useState(null); // ✅ Changed from "" to null
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState({ name: "User", avatar: "" });
 
@@ -62,8 +62,8 @@ export default function AddCategory({ fetchCategories }) {
   };
 
   const showNotification = (message, type = "info") => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(""), 7000);
+    setNotification({ message, type }); // ✅ Set notification as object
+    setTimeout(() => setNotification(null), 7000); // ✅ Reset using null
   };
 
   return (

@@ -6,17 +6,17 @@
   padding: 12px 24px;
   background-color: #e170c1; /* Main background color */
   border-bottom: 2px solid #ddd;
-  transition: all 0.3s ease-in-out;
   box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-  position: fixed; /* Keep the header fixed on top */
-  top: 0; /* Make sure it stays at the top */
+  position: fixed;
+  top: 0;
   left: 0;
   right: 0;
-  z-index: 9999; /* Make sure the header is above other content */
-  background-attachment: fixed; /* Ensures the background stays fixed */
+  z-index: 9999; /* Ensure header is above other content */
+  background-attachment: fixed;
   background-position: center;
-  background-size: cover; /* Optional, if you want the background to cover the entire header */
-  height: 60px; /* Adjust based on your desired header height */
+  background-size: cover;
+  height: 60px; /* Adjust header height */
+  transition: all 0.3s ease-in-out;
 }
 
 /* Left Section */
@@ -35,50 +35,12 @@
   transform: scale(1.1);
 }
 
-/* Search Bar */
-.search-bar {
-  display: flex;
-  align-items: center;
-  background: #f0f2f5;
-  padding: 7px 12px;
-  border-radius: 20px;
-  transition: all 0.3s ease-in-out;
-  box-shadow: inset 0px 0px 8px rgba(0, 0, 0, 0.05);
-  position: relative;
-  z-index: 10;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.search-icon {
-  color: #a24fa4; /* Muted purple */
-  transition: transform 0.3s ease-in-out, color 0.3s ease-in-out;
-}
-
-.search-bar:hover .search-icon {
-  transform: scale(1.1);
-  color: #f5b921; /* Yellow hover effect */
-}
-
-/* Search Input */
-.search-input {
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 16px;
-  width: 150px;
-  transition: width 0.3s ease-in-out, opacity 0.3s ease-in-out;
-}
-
-.search-input:focus {
-  width: 200px;
-  border-bottom: 2px solid #f5b921;
-}
-
 /* Center Navigation */
 .center-nav {
   display: flex;
   gap: 35px;
+  justify-content: center;
+  align-items: center;
 }
 
 .nav-icon a {
@@ -100,16 +62,70 @@
   gap: 20px;
 }
 
+.profile-container a {
+  background: none !important;
+  display: inline-block;
+}
+
 .avatar-image {
   width: 40px;
   border-radius: 50%;
   transition: transform 0.3s ease-in-out;
-  box-shadow: none; /* Remove any shadow that appears on hover */
 }
 
 .avatar-image:hover {
-  transform: none; /* Remove scaling effect */
-  box-shadow: none; /* Remove shadow on hover */
+  transform: scale(1.1);
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2); /* Avatar hover effect */
+}
+
+.logo-link{
+  background: none !important;
+}
+/* Container for the search bar */
+.search-bar {
+  position: relative; /* Position relative to contain the icon */
+  display: flex; /* Use flexbox to align items */
+  align-items: center; /* Vertically align the icon and input */
+  max-width: 100%; /* Ensure it doesn't overflow */
+}
+
+/* Search input styling */
+.search-input {
+  width: 100%; /* Make the input take full available width */
+  max-width: 200px; /* Limit the maximum width */
+  padding: 4px 8px; /* Add padding inside the input */
+  padding-right: 30px; /* Add extra space on the right for the icon */
+  border-radius: 4px;
+  border: none;
+  font-size: 14px; /* Adjust the font size */
+  transition: all 0.3s ease;
+}
+
+/* Search icon inside the input */
+.search-icon {
+  position: absolute;
+  right: 10px; 
+  top: 20%;
+  cursor: pointer; /* Make the icon clickable */
+  color: #e170c1 ; 
+  font-size: 18px;
+}
+
+.search-icon:hover {
+  color: #f5b921;
+  transform: scale(1.1);
+}
+
+.search-input:focus {
+  border-color: #1f5156; /* Border color when input is focused */
+}
+
+.search-input::placeholder {
+  color: #999; /* Placeholder color */
+}
+
+.search-input:focus::placeholder {
+  color: transparent; /* Hide placeholder text on focus */
 }
 
 /* Menu Icon */
@@ -117,6 +133,9 @@
   display: none;
   font-size: 26px;
   cursor: pointer;
+  background: none !important;
+  border: none;
+  color: #ffffff;
   transition: transform 0.3s ease-in-out;
 }
 
@@ -131,13 +150,24 @@
   transform: rotate(90deg);
 }
 
-/* Links styling */
+/* Notification Icon */
+.notif-icon {
+  background: none !important;
+  font-size: 25px;
+  color: #ffffff;
+}
+
+.notif-icon:hover {
+  color: #f5b921;
+}
+
+/* Links Styling */
 a {
-  text-decoration: none;  /* Remove underline */
-  color: inherit;  /* Inherit color from parent */
+  text-decoration: none;
+  color: inherit;
   display: inline-block;
   padding: 5px 15px;
-  background-color: #ffffff;  /* Set a background color */
+  background-color: #ffffff;
   border: none;
   border-radius: 5px;
   cursor: pointer;
@@ -145,12 +175,17 @@ a {
 }
 
 a:hover {
-  background-color: #f5b921;  /* Dark background for hover */
-  color: white;  /* White text on hover */
+  background-color: #f5b921;
+  color: white;
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
+  .header-container {
+    padding: 8px 20px; /* Adjust header padding for smaller screens */
+    height: auto; /* Adjust header height for mobile */
+  }
+
   .center-nav {
     display: none;
   }
@@ -171,19 +206,6 @@ a:hover {
 
   .menu-icon {
     display: block;
-  }
-
-  .search-bar {
-    max-width: 80%;
-  }
-
-  .search-input {
-    display: none;
-  }
-
-  .search-bar.open .search-input {
-    display: block;
-    width: 100%;
   }
 }
 
