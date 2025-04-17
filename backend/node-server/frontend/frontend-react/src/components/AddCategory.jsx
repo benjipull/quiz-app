@@ -4,9 +4,9 @@ import "../styles/AddCategory.css";
 export default function AddCategory({ fetchCategories }) {
   const [isOpen, setIsOpen] = useState(false);
   const [categoryName, setCategoryName] = useState("");
-  const [notification, setNotification] = useState(null); // ✅ Changed from "" to null
+  const [notification, setNotification] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [userProfile, setUserProfile] = useState({ name: "User", avatar: "" });
+  const [userProfile, setUserProfile] = useState({ name: "User", avatar: "default-avatar.png" });
 
   useEffect(() => {
     // Fetch user details (replace with actual API call)
@@ -15,7 +15,7 @@ export default function AddCategory({ fetchCategories }) {
 
     setUserProfile({
       name: storedName,
-      avatar: storedAvatar || "default-avatar.png",
+      avatar: storedAvatar && storedAvatar.trim() !== "" ? storedAvatar : "default-avatar.png",
     });
   }, []);
 
@@ -62,8 +62,8 @@ export default function AddCategory({ fetchCategories }) {
   };
 
   const showNotification = (message, type = "info") => {
-    setNotification({ message, type }); // ✅ Set notification as object
-    setTimeout(() => setNotification(null), 7000); // ✅ Reset using null
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 7000);
   };
 
   return (
@@ -77,7 +77,11 @@ export default function AddCategory({ fetchCategories }) {
 
       {/* Right Side: User Profile */}
       <div className="right-side">
-        <img src={userProfile.avatar} alt="User Avatar" className="user-avatar" />
+        <img
+          src={userProfile.avatar || "default-avatar.png"}
+          alt="User Avatar"
+          className="user-avatar"
+        />
       </div>
 
       {/* Create Category Modal */}

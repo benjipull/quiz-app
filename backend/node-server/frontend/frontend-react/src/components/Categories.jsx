@@ -10,6 +10,8 @@ const Categories = () => {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [resultsLoading, setResultsLoading] = useState(false);
+
     const [quizState, setQuizState] = useState({
         started: false,
         completed: false,
@@ -21,6 +23,7 @@ const Categories = () => {
         results: null,
         isAnswerSelected: false,
     });
+
     const [quizLoading, setQuizLoading] = useState(false);
     const userToken = localStorage.getItem("token");
     const navigate = useNavigate();
@@ -58,6 +61,7 @@ const Categories = () => {
             question: null,
             correctAnswers: 0,
             incorrectAnswers: 0,
+            results: null,
         });
 
         try {
@@ -94,12 +98,12 @@ const Categories = () => {
                     isAnswerSelected: false,
                 }));
             } else {
+                await recordQuizCompletion();
                 setQuizState((prev) => ({
                     ...prev,
                     completed: true,
                     started: false,
                 }));
-                recordQuizCompletion();
             }
         } catch (error) {
             setError("Error fetching the next question.");
@@ -120,20 +124,24 @@ const Categories = () => {
     const recordQuizCompletion = async () => {
         if (!userToken || !quizState.selectedCategory) return;
 
+        setResultsLoading(true);
         try {
             const { correctAnswers, incorrectAnswers } = quizState;
-            const response = await fetch(`http://localhost:3000/api/categories/${quizState.selectedCategory.id}/completion`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${userToken}`,
-                },
-                body: JSON.stringify({
-                    questionsAttempted: 10,
-                    correctAnswers,
-                    incorrectAnswers,
-                }),
-            });
+            const response = await fetch(
+                `http://localhost:3000/api/categories/${quizState.selectedCategory.id}/completion`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${userToken}`,
+                    },
+                    body: JSON.stringify({
+                        questionsAttempted: 10,
+                        correctAnswers,
+                        incorrectAnswers,
+                    }),
+                }
+            );
 
             if (response.ok) {
                 setQuizState((prev) => ({
@@ -149,6 +157,8 @@ const Categories = () => {
             }
         } catch (error) {
             setError("Error recording quiz completion.");
+        } finally {
+            setResultsLoading(false);
         }
     };
 
@@ -167,7 +177,12 @@ const Categories = () => {
         navigate("/");
     };
 
-    const updatePopularity = async (questionId, value) => {
+    const updatePopularity = async (questionId, action) => {
+        if (!questionId || (action !== 1 && action !== 2)) {
+            console.error("❌ Invalid parameters: Ensure questionId is provided and action is 1 (like) or 2 (dislike).");
+            return;
+        }
+
         try {
             const response = await fetch("http://localhost:3000/api/updatePopularity", {
                 method: "POST",
@@ -175,16 +190,17 @@ const Categories = () => {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${userToken}`,
                 },
-                body: JSON.stringify({ questionId, value }),
+                body: JSON.stringify({ questionId, action }),
             });
 
-            if (response.ok) {
-                console.log(`Successfully updated popularity for Question ID: ${questionId}`);
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error("❌ Failed to update popularity:", errorData.message || errorData);
             } else {
-                console.error("❌ Failed to update popularity");
+                console.log(`✅ Popularity updated for question ${questionId}`);
             }
-        } catch (error) {
-            console.error("Error updating popularity:", error);
+        } catch (err) {
+            console.error("⚠️ Error updating popularity:", err);
         }
     };
 
@@ -207,13 +223,12 @@ const Categories = () => {
 
     return (
         <>
-            {/* AddCategory is outside the category container */}
             {!quizState.started && !quizState.completed && (
                 <div className="addCategoryWrapper">
                     <AddCategory />
                 </div>
             )}
-            
+
             <div className="categoryContainer">
                 {!quizState.started && !quizState.completed ? (
                     <div className="categoryGrid">
@@ -222,7 +237,11 @@ const Categories = () => {
                         ))}
                     </div>
                 ) : quizState.completed ? (
-                    <QuizResults results={quizState.results} handleBack={handleBackToCategories} />
+                    resultsLoading ? (
+                        <div>Recording results...</div>
+                    ) : (
+                        <QuizResults results={quizState.results} handleBack={handleBackToCategories} />
+                    )
                 ) : (
                     <Quiz
                         question={quizState.question}
@@ -234,6 +253,7 @@ const Categories = () => {
                         handleBack={handleBackToCategories}
                         resetQuiz={resetQuiz}
                         updatePopularity={updatePopularity}
+                        categoryName={quizState.selectedCategory?.name}
                     />
                 )}
             </div>

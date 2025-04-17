@@ -4,7 +4,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 20px;
-  background-color: #f3f1f8; /* Light color to match the header, lighter shade */
+  background-color: #ffff; 
   padding: 20px 30px;
   margin: 30px;
   border-radius: 12px;
@@ -26,7 +26,7 @@
 
 /* Create Category Card */
 .create-category-card {
-  background-color: #e170c1; /* Match header color */
+  background-color: var(--primary-blue); 
   color: white;
   padding: 15px 20px;
   cursor: pointer;
@@ -41,7 +41,7 @@
 }
 
 .create-category-card:hover {
-  background-color: #d159a0; /* Slightly darker shade for hover */
+  background-color: var(--blue-dark); 
   transform: translateY(-3px); /* Subtle hover effect */
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); /* Enhance shadow on hover */
 }
@@ -59,7 +59,7 @@
   height: 60px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid #e170c1;
+  border: 3px solid var(--primary-blue);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
@@ -123,9 +123,9 @@ input:focus {
 .modal-buttons button {
   padding: 12px 20px;
   cursor: pointer;
-  border: 1px solid #e170c1;
+  border: 1px solid var(--primary-blue);
   border-radius: 8px;
-  background-color: #e170c1;
+  background-color: var(--primary-blue);
   color: white;
   font-size: 14px;
   font-weight: 600;
@@ -139,7 +139,7 @@ input:focus {
 }
 
 .modal-buttons button:hover:not(:disabled) {
-  background-color: #d159a0;
+  background-color: var(--primary-blue);
   transform: translateY(-2px);
 }
 

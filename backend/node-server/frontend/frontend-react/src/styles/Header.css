@@ -4,7 +4,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 24px;
-  background-color: #e170c1; /* Main background color */
+  background-color: var(--primary-blue); 
   border-bottom: 2px solid #ddd;
   box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
   position: fixed;
@@ -51,7 +51,7 @@
 }
 
 .nav-icon a:hover {
-  color: #f5b921; /* Yellow hover effect */
+  color: var(--blue-dark); 
   transform: scale(1.2);
 }
 

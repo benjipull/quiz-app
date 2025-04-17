@@ -1,19 +1,16 @@
-const QuizResults = ({ results }) => {
+const QuizResults = ({ results, handleBack }) => {
+    if (!results) {
+        return <div>Results not available yet.</div>;
+    }
+
     return (
-        <div className="results-container">
-            <h2>Quiz Completed!</h2>
-            {results ? (
-                <>
-                    <p>✅ Total Questions: <strong>{results.totalQuestions}</strong></p>
-                    <p>✅ Correct Answers: <strong>{results.correctAnswers}</strong></p>
-                    <p>❌ Incorrect Answers: <strong>{results.incorrectAnswers}</strong></p>
-                    <p>📊 Score: <strong>{Math.round((results.correctAnswers / results.totalQuestions) * 100)}%</strong></p>
-                </>
-            ) : (
-                <p>Loading results...</p>
-            )}
+        <div className="quizResults">
+            <h2>Quiz Completed</h2>
+            <p>Total Questions: {results.totalQuestions}</p>
+            <p>Correct Answers: {results.correctAnswers}</p>
+            <p>Incorrect Answers: {results.incorrectAnswers}</p>
+            <button onClick={handleBack}>Back to Categories</button>
         </div>
     );
 };
-
-export default QuizResults;
+export default QuizResults
