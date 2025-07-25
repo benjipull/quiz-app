@@ -1,70 +1,86 @@
-# Getting Started with Create React App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+🧠 Quizicle – Spark Your Knowledge
+Quizicle is a fun, interactive, and community-powered quiz platform built to challenge your mind, enhance learning, and spark curiosity. With AI-powered question generation and competitive leaderboards, it brings learning to life in a gamified way.
 
-## Available Scripts
+🌐 Live URL
+http://localhost:8080/ (for development — update with production URL when hosted)
 
-In the project directory, you can run:
+🚀 Features
+🧠 Challenge Your Mind: Discover and complete thousands of quizzes across diverse topics.
 
-### `npm start`
+📊 Leaderboard: Compete with players globally and view top scorers.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+🧑‍🤝‍🧑 User Accounts: Personalized experience with avatars and saved progress.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+🗂️ Quiz Categories: Browse quizzes by difficulty, popularity, and freshness.
 
-### `npm test`
+✍️ Create Your Own Quizzes: Let users generate and share quizzes in a few clicks.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+📈 Quiz Stats: View ratings, creator, difficulty, and question count for each quiz.
 
-### `npm run build`
+🧩 AI-Powered Learning: Smart explanations and adaptive difficulty coming soon.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+📸 UI Overview
+Search bar to find specific quizzes
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Category filters (All, Popular, Top Rated, New, Trending)
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Hero section with stats like:
 
-### `npm run eject`
+✅ 247 Quizzes Completed
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+✅ 51 Categories Available
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+✅ 3.6 Avg. Rating
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+Card Layouts for each quiz:
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+Title, Description
 
-## Learn More
+Difficulty level
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Number of questions
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+Created by info
 
-### Code Splitting
+Star rating + attempts
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+User dashboard (Avatar + Create Category functionality)
 
-### Analyzing the Bundle Size
+📦 Tech Stack
+Frontend: React + Tailwind CSS
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+Backend: Node.js + Express 
 
-### Making a Progressive Web App
+Auth: Token-based local storage login
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+UI Icons: Lucide React
 
-### Advanced Configuration
+State Management: React Hooks
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+🛠️ How to Run Locally
+Clone the repository
 
-### Deployment
+bash
+Copy
+Edit
+git clone https://github.com/benjipull/quiz-app.git
+cd q\backend\node-server\frontend\frontend-react
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+Install dependencies
+npm install
 
-### `npm run build` fails to minify
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Start frontend
+
+npm run dev
+
+
+Start backend ()
+
+cd backend\node-server
+npm install
+node index.js
+
+Access at http://localhost:8080
+

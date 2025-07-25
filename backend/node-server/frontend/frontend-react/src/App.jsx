@@ -2,17 +2,17 @@
 import React from "react";
 import { Route, Routes } from "react-router-dom";
 import Home from "./components/Home";
-import Header from "./components/Header" ;
 import AuthSection from "./components/AuthSection"; 
 import PrivateRoute from "./components/PrivateRoute"; 
 import Users from "./components/Users"; 
 import Profile from "./components/Profile";
 import Quiz from "./components/Quiz";
+import Header from "./components/Header";
 
 const App = () => {
   return (
     <>
-    <Header />
+    <Header/>
     <Routes>
       <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
       <Route path="/auth" element={<AuthSection />} />
