@@ -70,6 +70,8 @@ document.addEventListener("DOMContentLoaded", () => {
         explanationElement.classList.add("hidden");
         explanationElement.textContent = "";
 
+        createAnswerButtons(data);
+
         // ✅ Reset thumbs buttons
         thumbsUpBtn.classList.remove("active");
         thumbsDownBtn.classList.remove("active");
@@ -77,6 +79,13 @@ document.addEventListener("DOMContentLoaded", () => {
         thumbsDownBtn.disabled = false;  // ✅ Re-enable when new question appears
         document.getElementById("thumbs-container").classList.add("hidden");
 
+        updateProgress(questionIndex, totalQuestions);
+        nextQuestionButton.classList.add("hidden");
+        showResultsButton.classList.add("hidden")
+    }
+
+    function createAnswerButtons(data)
+    {
         data.answers.forEach(answer => {
             const button = document.createElement("button");
             button.classList.add("option-button");
@@ -87,12 +96,8 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             optionsContainer.appendChild(button);
         });
-
-        updateProgress(questionIndex, totalQuestions);
-        nextQuestionButton.classList.add("hidden");
-        showResultsButton.classList.add("hidden")
     }
-
+    
     async function fetchNextQuestion() {
         try {
             const response = await fetch(`/api/nextQuestion/${userToken}`);
