@@ -39,7 +39,7 @@ const AuthSection = () => {
 
     setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:3000/api/users/login", {
+      const response = await fetch("https://quiz-app-node-606998948537.europe-west4.run.app/api/users/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: loginEmail, password: loginPassword }),
@@ -102,7 +102,7 @@ const AuthSection = () => {
 
     setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:3000/api/users/register", {
+      const response = await fetch("https://quiz-app-node-606998948537.europe-west4.run.app/api/users/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -46,7 +46,7 @@ const Profile = () => {
           setAvatar(localStorage.getItem("userAvatar") || parsedUser.avatar || null);
         }
 
-        const response = await fetch("http://localhost:3000/api/getUserDetails", {
+        const response = await fetch("https://quiz-app-node-606998948537.europe-west4.run.app/api/getUserDetails", {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -122,7 +122,7 @@ const Profile = () => {
       const token = localStorage.getItem("token");
       if (!token) return;
 
-      const response = await fetch("http://localhost:3000/api/updateUserDetails", {
+      const response = await fetch("https://quiz-app-node-606998948537.europe-west4.run.app/api/updateUserDetails", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

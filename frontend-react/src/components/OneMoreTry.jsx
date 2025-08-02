@@ -12,7 +12,7 @@ const OneMoreTry = () => {
 
     const fetchQuizzes = async () => {
         try {
-            const response = await fetch("http://localhost:3000/api/categories");
+            const response = await fetch("https://quiz-app-node-606998948537.europe-west4.run.app/api/categories");
             if (!response.ok) {
                 throw new Error(`Failed to fetch quizzes. Status: ${response.status}`);
             }
