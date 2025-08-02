@@ -24,7 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (response.ok) {
                 // ✅ Store token and user info
                 localStorage.setItem("token", data.token);
-                localStorage.setItem("user", JSON.stringify(user));
+                localStorage.setItem("user", JSON.stringify(data.user));
 
                 updateUI();
 
