@@ -47,7 +47,7 @@ const Categories = () => {
     const fetchCategories = async () => {
         setError(null);
         try {
-            const response = await fetch("http://localhost:3000/api/categories");
+            const response = await fetch("https://quiz-app-node-606998948537.europe-west4.run.app/api/categories");
             if (!response.ok) throw new Error(`Failed to fetch categories. Status: ${response.status}`);
             const data = await response.json();
 
@@ -129,7 +129,7 @@ const Categories = () => {
 
         try {
             setQuizLoading(true);
-            const response = await fetch("http://localhost:3000/api/startQuiz", {
+            const response = await fetch("https://quiz-app-node-606998948537.europe-west4.run.app/api/startQuiz", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ categoryId, numQuestions: 10, userToken }),
@@ -150,7 +150,7 @@ const Categories = () => {
 
         try {
             setQuizLoading(true);
-            const response = await fetch(`http://localhost:3000/api/nextQuestion/${userToken}`);
+            const response = await fetch(`https://quiz-app-node-606998948537.europe-west4.run.app/api/nextQuestion/${userToken}`);
             const data = await response.json();
 
             if (response.ok && data.question) {
@@ -191,7 +191,7 @@ const Categories = () => {
         try {
             const { correctAnswers, incorrectAnswers } = quizState;
             const response = await fetch(
-                `http://localhost:3000/api/categories/${quizState.selectedCategory.id}/completion`,
+                `https://quiz-app-node-606998948537.europe-west4.run.app/api/categories/${quizState.selectedCategory.id}/completion`,
                 {
                     method: "POST",
                     headers: {
@@ -248,7 +248,7 @@ const Categories = () => {
         }
 
         try {
-            const response = await fetch("http://localhost:3000/api/updatePopularity", {
+            const response = await fetch("https://quiz-app-node-606998948537.europe-west4.run.app/api/updatePopularity", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

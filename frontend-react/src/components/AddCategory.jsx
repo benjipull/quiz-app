@@ -33,7 +33,7 @@ export default function AddCategory({ fetchCategories = () => {} }) {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:3000/api/categories/createCategory", {
+      const response = await fetch("https://quiz-app-node-606998948537.europe-west4.run.app/api/categories/createCategory", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

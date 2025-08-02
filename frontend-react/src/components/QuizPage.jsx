@@ -30,7 +30,7 @@ const QuizPage = () => {
   const fetchNextQuestion = async () => {
     setQuizState((prev) => ({ ...prev, loading: true }));
     try {
-      const response = await fetch(`http://localhost:3000/api/nextQuestion/${categoryId}`);
+      const response = await fetch(`https://quiz-app-node-606998948537.europe-west4.run.app/api/nextQuestion/${categoryId}`);
       const data = await response.json();
       console.log(data); // Ensure the response contains the correct question
 
