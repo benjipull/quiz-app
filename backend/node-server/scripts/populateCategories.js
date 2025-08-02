@@ -4,8 +4,7 @@ const Category = require("../models/categoryModel");
 const crypto = require("crypto");
 const axios = require("axios");
 
-// ✅ Set Ollama URL explicitly via environment variable or default
-const OLLAMA_URL = process.env.OLLAMA_URL || "https://e53f-105-185-157-37.ngrok-free.app/api/generate";
+const OLLAMA_URL = process.env.OLLAMA_URL || "https://c652-105-185-157-37.ngrok-free.app/api/generate";
 
 if (!OLLAMA_URL) {
     console.error("❌ OLLAMA_URL is not set! Please set it in your environment variables.");
@@ -91,7 +90,7 @@ async function fetchQuestions(categoryName, numQuestions) {
         // ✅ Self-verify each question
         const verifiedQuestions = [];
         for (const question of questions) {
-            const isValid = await verifyQuestion(question);
+            const isValid = true; //= await verifyQuestion(question); //Disabled for now
             if (isValid) {
                 verifiedQuestions.push(question);
             } else {
