@@ -4,7 +4,7 @@ const Category = require("../models/categoryModel");
 const crypto = require("crypto");
 const axios = require("axios");
 
-const OLLAMA_URL = process.env.OLLAMA_URL || "https://c652-105-185-157-37.ngrok-free.app/api/generate";
+const OLLAMA_URL = process.env.OLLAMA_URL || "https://4fb9764041e3.ngrok-free.app/api/generate";
 
 if (!OLLAMA_URL) {
     console.error("❌ OLLAMA_URL is not set! Please set it in your environment variables.");
@@ -51,15 +51,6 @@ async function fetchQuestions(categoryName, numQuestions) {
             }
         ]
             `;
-
-    try {
-        console.log(`🔍 Fetching Wikipedia summary....`);
-        const summary = await fetchWikipediaSummary(categoryName);
-        console.log(`Wikipedia summary: ${summary}`);
-    } catch (error) {
-        console.error("❌ Request error:", error.message);
-    }
-
     try {
         const response = await axios.post(OLLAMA_URL, {
             model: "mistral",
@@ -159,7 +150,7 @@ async function populateCategory(categoryId, numQuestions) {
                 timesAnsweredCorrectly: 0,
                 timesAnsweredIncorrectly: 0,
                 hash: questionHash,
-                version: 6
+                version: 7
             };
 
             category.questions.push(newQuestion);
