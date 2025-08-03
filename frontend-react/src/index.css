@@ -8,46 +8,66 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 20 14.3% 4.1%;
-    --foreground: 0 0% 95%;
+    /* Quiz App Color Palette - Vibrant & Engaging */
+    --background: 250 100% 98%;
+    --foreground: 235 25% 15%;
 
-    --card: 20 14.3% 4.1%;
-    --card-foreground: 0 0% 95%;
+    --card: 0 0% 100%;
+    --card-foreground: 235 25% 15%;
 
-    --popover: 20 14.3% 4.1%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 235 25% 15%;
 
-    --primary: 270 95% 70%;
-    --primary-foreground: 0 0% 9%;
-    --primary-glow: 280 100% 80%;
+    /* Primary: Vibrant Purple for main actions */
+    --primary: 270 95% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 270 95% 75%;
+    
+    /* Secondary: Energetic Blue */
+    --secondary: 220 100% 65%;
+    --secondary-foreground: 0 0% 100%;
 
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
+    /* Success: Green for correct answers */
+    --success: 140 70% 50%;
+    --success-foreground: 0 0% 100%;
+    
+    /* Warning: Orange for hints/warnings */
+    --warning: 35 100% 60%;
+    --warning-foreground: 0 0% 100%;
 
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted: 240 20% 96%;
+    --muted-foreground: 235 15% 45%;
 
-    --accent: 191 90% 55%;
-    --accent-foreground: 0 0% 9%;
+    --accent: 280 85% 65%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 270 95% 70%;
+    --border: 240 15% 90%;
+    --input: 240 15% 95%;
+    --ring: 270 95% 60%;
 
-    --success: 142 71% 45%;
-    --warning: 38 92% 50%;
-    --info: 199 89% 48%;
-
-    --gradient-primary: linear-gradient(135deg, hsl(270 95% 70%), hsl(280 100% 80%));
-    --gradient-secondary: linear-gradient(135deg, hsl(191 90% 55%), hsl(220 90% 65%));
-    --gradient-accent: linear-gradient(135deg, hsl(280 100% 75%), hsl(320 90% 70%));
-    --gradient-bg: linear-gradient(135deg, hsl(20 14.3% 4.1%), hsl(240 10% 8%));
-
-    --shadow-glow: 0 0 40px hsl(270 95% 75% / 0.3);
-    --shadow-card: 0 10px 30px -10px hsl(0 0% 0% / 0.3);
+    /* Quiz-specific colors */
+    --quiz-background: 245 60% 97%;
+    --quiz-card: 0 0% 100%;
+    --quiz-progress: 270 95% 60%;
+    --category-bg: 250 100% 98%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(270 95% 60%), hsl(280 85% 65%));
+    --gradient-secondary: linear-gradient(135deg, hsl(220 100% 65%), hsl(200 100% 70%));
+    --gradient-success: linear-gradient(135deg, hsl(140 70% 50%), hsl(160 60% 55%));
+    --gradient-bg: linear-gradient(180deg, hsl(250 100% 98%), hsl(240 60% 97%));
+    
+    /* Shadows */
+    --shadow-card: 0 4px 20px hsl(270 95% 60% / 0.15);
+    --shadow-button: 0 8px 25px hsl(270 95% 60% / 0.25);
+    --shadow-quiz: 0 6px 30px hsl(220 100% 65% / 0.2);
+    
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     --radius: 1rem;
 
@@ -68,37 +88,53 @@ All colors MUST be HSL.
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
-  .light {
-    --background: 0 0% 100%;
-    --foreground: 20 14.3% 4.1%;
+  .dark {
+    /* Dark Quiz App Color Palette */
+    --background: 222 84% 5%;
+    --foreground: 210 40% 98%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 20 14.3% 4.1%;
+    --card: 224 71% 8%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 20 14.3% 4.1%;
+    --popover: 224 71% 8%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 270 95% 65%;
-    --primary-foreground: 0 0% 98%;
+    /* Primary: Vibrant Purple for main actions (same as light) */
+    --primary: 270 95% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 270 95% 75%;
+    
+    /* Secondary: Energetic Blue (same as light) */
+    --secondary: 220 100% 65%;
+    --secondary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 98%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Success: Green for correct answers (same as light) */
+    --success: 140 70% 50%;
+    --success-foreground: 0 0% 100%;
+    
+    /* Warning: Orange for hints/warnings (same as light) */
+    --warning: 35 100% 60%;
+    --warning-foreground: 0 0% 100%;
 
-    --muted: 210 40% 98%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 217 32% 18%;
+    --muted-foreground: 215 20% 65%;
 
-    --accent: 191 90% 50%;
-    --accent-foreground: 0 0% 9%;
+    --accent: 280 85% 65%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 270 95% 65%;
+    --border: 217 32% 18%;
+    --input: 217 32% 18%;
+    --ring: 270 95% 60%;
 
-    --gradient-bg: linear-gradient(135deg, hsl(0 0% 100%), hsl(220 50% 98%));
-    
+    /* Quiz-specific colors for dark mode */
+    --quiz-background: 222 84% 6%;
+    --quiz-card: 224 71% 8%;
+    --quiz-progress: 270 95% 60%;
+    --category-bg: 222 84% 5%;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -116,129 +152,6 @@ All colors MUST be HSL.
   }
 
   body {
-    background: var(--gradient-bg);
-    @apply text-foreground min-h-screen font-sans antialiased;
-    transition: background 0.3s ease-in-out;
-  }
-}
-
-@layer components {
-  .quiz-card {
-    @apply bg-card/90 backdrop-blur-md border border-border/60 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-500 hover:scale-[1.03] hover:border-primary/20;
-    box-shadow: 0 8px 32px -12px hsl(0 0% 0% / 0.25);
-  }
-  
-  .quiz-card:hover {
-    box-shadow: 0 20px 40px -12px hsl(270 95% 70% / 0.15), 0 8px 32px -12px hsl(0 0% 0% / 0.3);
-    transform: translateY(-2px) scale(1.03);
-  }
-  
-  .btn-primary {
-    background: var(--gradient-primary);
-    @apply text-white border-0 rounded-xl px-6 py-3 font-semibold transition-all duration-300 hover:scale-105 hover:shadow-lg relative overflow-hidden;
-    box-shadow: 0 4px 14px 0 hsl(270 95% 70% / 0.4);
-  }
-  
-  .btn-primary:hover {
-    box-shadow: 0 6px 20px 0 hsl(270 95% 70% / 0.6);
-    transform: translateY(-1px) scale(1.05);
-  }
-  
-  .btn-secondary {
-    background: var(--gradient-secondary);
-    @apply text-white border-0 rounded-xl px-6 py-3 font-semibold transition-all duration-300 hover:scale-105 hover:shadow-lg;
-    box-shadow: 0 4px 14px 0 hsl(191 90% 55% / 0.4);
-  }
-  
-  .btn-secondary:hover {
-    box-shadow: 0 6px 20px 0 hsl(191 90% 55% / 0.6);
-    transform: translateY(-1px) scale(1.05);
-  }
-  
-  .btn-accent {
-    background: var(--gradient-accent);
-    @apply text-white border-0 rounded-xl px-6 py-3 font-semibold transition-all duration-300 hover:scale-105 hover:shadow-lg;
-    box-shadow: 0 4px 14px 0 hsl(280 100% 75% / 0.4);
-  }
-  
-  .btn-accent:hover {
-    box-shadow: 0 6px 20px 0 hsl(280 100% 75% / 0.6);
-    transform: translateY(-1px) scale(1.05);
-  }
-  
-  .input-modern {
-    @apply bg-card/60 backdrop-blur-md border border-border/50 rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/60 focus:border-primary/60 transition-all duration-300 hover:border-primary/30;
-    box-shadow: 0 2px 8px -2px hsl(0 0% 0% / 0.1);
-  }
-  
-  .input-modern:focus {
-    box-shadow: 0 4px 16px -4px hsl(270 95% 70% / 0.2), 0 2px 8px -2px hsl(0 0% 0% / 0.1);
-  }
-  
-  .gradient-text {
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  
-  .animate-float {
-    animation: float 6s ease-in-out infinite;
-  }
-  
-  @keyframes float {
-    0%, 100% { transform: translateY(0px) rotate(0deg); }
-    33% { transform: translateY(-5px) rotate(1deg); }
-    66% { transform: translateY(-10px) rotate(-1deg); }
-  }
-  
-  .animate-pulse-glow {
-    animation: pulse-glow 3s ease-in-out infinite;
-  }
-  
-  @keyframes pulse-glow {
-    0%, 100% { 
-      box-shadow: 0 8px 32px -12px hsl(0 0% 0% / 0.25);
-    }
-    50% { 
-      box-shadow: 0 20px 40px -12px hsl(270 95% 70% / 0.15), 0 8px 32px -12px hsl(0 0% 0% / 0.3);
-    }
-  }
-  
-  .animate-bounce-in {
-    animation: bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  }
-  
-  @keyframes bounce-in {
-    0% { 
-      opacity: 0;
-      transform: scale(0.3) translateY(100px);
-    }
-    50% {
-      opacity: 0.9;
-      transform: scale(1.05) translateY(-10px);
-    }
-    70% {
-      transform: scale(0.95) translateY(5px);
-    }
-    100% {
-      opacity: 1;
-      transform: scale(1) translateY(0);
-    }
-  }
-  
-  .animate-slide-up {
-    animation: slide-up 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  }
-  
-  @keyframes slide-up {
-    0% {
-      opacity: 0;
-      transform: translateY(30px);
-    }
-    100% {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    @apply bg-background text-foreground;
   }
 }
