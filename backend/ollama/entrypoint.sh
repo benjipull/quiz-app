@@ -1,6 +1,8 @@
 #!/bin/sh
 set -x  # Debugging enabled
 
+export OLLAMA_NUM_THREADS=12
+
 # Start Ollama explicitly using the config
 OLLAMA_CONFIG=/etc/ollama/config.yaml /usr/local/bin/ollama serve &
 

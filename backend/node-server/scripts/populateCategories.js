@@ -20,7 +20,7 @@ const generateQuestionHash = (questionText) => {
 
 // ✅ Fetch questions from Ollama with detailed logging
 async function fetchQuestions(categoryName, numQuestions) {
-    console.log(`🚀 Fetching ${numQuestions} questions for category: "${categoryName}"`);
+    console.log(`Fetching ${numQuestions} questions for category: "${categoryName}" from ollama`);
 
     const systemPrompt = `
         You are an AI trivia generator with a knowledge base which is limited to the information it contains. 
@@ -76,7 +76,7 @@ async function fetchQuestions(categoryName, numQuestions) {
             throw new Error("❌ Ollama response not a valid JSON array.");
         }
 
-        console.log(`✅ Successfully parsed ${questions.length} questions from Ollama.`);
+        console.log(`Successfully parsed ${questions.length} questions from Ollama.`);
 
         // ✅ Self-verify each question
         const verifiedQuestions = [];
@@ -104,7 +104,6 @@ async function fetchQuestions(categoryName, numQuestions) {
     }
 }
 
-// ✅ Populate a single category with questions and detailed logging
 async function populateCategory(categoryId, numQuestions) {
     try {
         const category = await Category.findById(categoryId);

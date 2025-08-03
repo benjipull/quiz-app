@@ -8,10 +8,13 @@ services:
       - "11434:11434"
       - "11440:11440"
     environment:
-      - OLLAMA_MAX_LOADED_MODELS=1    # ✅ Keeps only 1 model loaded at a time
-      - OLLAMA_KV_CACHE_TYPE=none     # ✅ Disables KV caching to save RAM
-      - OLLAMA_NUM_PARALLEL=1         # ✅ Restricts parallel processing to reduce CPU/RAM load
-      - OLLAMA_LOAD_TIMEOUT=60s       # ✅ Ensures models unload if idle
+      - OLLAMA_MAX_LOADED_MODELS=1    # Keeps only 1 model loaded at a time
+      - OLLAMA_KV_CACHE_TYPE=none     # Disables KV caching to save RAM
+      - OLLAMA_NUM_PARALLEL=1         # Restricts parallel processing to reduce CPU/RAM load
+      - OLLAMA_LOAD_TIMEOUT=60s       # Ensures models unload if idle
+      - OLLAMA_NUM_THREADS=14
+    mem_limit: 8g
+    cpus: 14.0
     networks:
       - quiz-app-network
     restart: unless-stopped
