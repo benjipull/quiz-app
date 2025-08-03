@@ -35,17 +35,7 @@ router.post("/", async (req, res) => {
         }
 
         // ✅ Run `populateCategory` asynchronously
-        console.log(`⏳ Populating category: ${category._id} (${category.name})`);
-        populateCategory(category._id, 1);
-        populateCategory(category._id, 1);
-        populateCategory(category._id, 1);
-        populateCategory(category._id, 1);
-        populateCategory(category._id, 1);
-        populateCategory(category._id, 1);
-        populateCategory(category._id, 1);
-        populateCategory(category._id, 1);
-        populateCategory(category._id, 1);
-        populateCategory(category._id, 1);
+        runSequentially();
 
         // ✅ Store questions for user in memory for `nextQuestion.js`
         userQuestions[userToken] = selectedQuestions.map(q => ({
@@ -66,4 +56,11 @@ router.post("/", async (req, res) => {
     }
 });
 
+async function runSequentially() {
+  for (let i = 0; i < 10; i++) {
+    // Fire and forget, but wait before starting the next
+    populateCategory(category._id, 1); 
+    await new Promise(resolve => setTimeout(resolve, 50)); // short pause between calls
+  }
+}
 module.exports = router;
