@@ -135,7 +135,7 @@ export default function Home() {
   if (error && featuredCategories.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background">
-        <Header imageSrc={logo} logoAsTitle showNotifications />
+       <Header logoAsTitle imageSrc={logo} showNotifications />
         <div className="mx-auto max-w-full space-y-6 px-4 pb-20 lg:px-8 lg:pb-8">
           <div className="pt-4">
             <Card className="p-8 text-center">
@@ -155,7 +155,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background">
-      <Header imageSrc={logo} logoAsTitle showNotifications />
+     <Header logoAsTitle imageSrc={logo} showNotifications />
       <div className="mx-auto max-w-full space-y-6 px-4 pb-20 lg:px-8 lg:pb-8">
         {/* Welcome Section */}
         <div className="pt-4">
