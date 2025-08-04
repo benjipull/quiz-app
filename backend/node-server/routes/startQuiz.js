@@ -4,7 +4,6 @@ const Category = require("../models/categoryModel");
 const { userQuestions } = require("../index"); // ✅ Import shared store
 const { populateCategory } = require("../scripts/populateCategories"); // ✅ Import async question population
 
-// ✅ Route: Load Questions from Database Without Updating `timesLoaded`
 router.post("/", async (req, res) => {
     const { categoryId, numQuestions, userToken } = req.body;
 
