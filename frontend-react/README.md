@@ -1,12 +1,8 @@
+🧠 Quizicle – Spark Your Knowledge Quizicle is a fun, interactive, and community-powered quiz platform built to challenge your mind, enhance learning, and spark curiosity. With AI-powered question generation and competitive leaderboards, it brings learning to life in a gamified way.
 
-🧠 Quizicle – Spark Your Knowledge
-Quizicle is a fun, interactive, and community-powered quiz platform built to challenge your mind, enhance learning, and spark curiosity. With AI-powered question generation and competitive leaderboards, it brings learning to life in a gamified way.
+🌐 Live URL http://localhost:8080/ (for development — update with production URL when hosted)
 
-🌐 Live URL
-http://localhost:8080/ (for development — update with production URL when hosted)
-
-🚀 Features
-🧠 Challenge Your Mind: Discover and complete thousands of quizzes across diverse topics.
+🚀 Features 🧠 Challenge Your Mind: Discover and complete thousands of quizzes across diverse topics.
 
 📊 Leaderboard: Compete with players globally and view top scorers.
 
@@ -20,8 +16,7 @@ http://localhost:8080/ (for development — update with production URL when host
 
 🧩 AI-Powered Learning: Smart explanations and adaptive difficulty coming soon.
 
-📸 UI Overview
-Search bar to find specific quizzes
+📸 UI Overview Search bar to find specific quizzes
 
 Category filters (All, Popular, Top Rated, New, Trending)
 
@@ -47,10 +42,9 @@ Star rating + attempts
 
 User dashboard (Avatar + Create Category functionality)
 
-📦 Tech Stack
-Frontend: React + Tailwind CSS
+📦 Tech Stack Frontend: React + Tailwind CSS
 
-Backend: Node.js + Express 
+Backend: Node.js + Express
 
 Auth: Token-based local storage login
 
@@ -58,29 +52,18 @@ UI Icons: Lucide React
 
 State Management: React Hooks
 
-🛠️ How to Run Locally
-Clone the repository
+🛠️ How to Run Locally Clone the repository
 
-bash
-Copy
-Edit
-git clone https://github.com/benjipull/quiz-app.git
-cd q\backend\node-server\frontend\frontend-react
+bash Copy Edit git clone https://github.com/benjipull/quiz-app.git cd q\backend\node-server\frontend\frontend-react
 
-Install dependencies
-npm install
-
+Install dependencies npm install
 
 Start frontend
 
 npm run dev
 
-
 Start backend ()
 
-cd backend\node-server
-npm install
-node index.js
+cd backend\node-server npm install node index.js
 
 Access at http://localhost:8080
-
