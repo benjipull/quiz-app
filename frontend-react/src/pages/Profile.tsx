@@ -13,7 +13,6 @@ import { useToast } from "@/hooks/use-toast";
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
-// Load avatars using Vite's glob import and assert their type
 const avatarImages = import.meta.glob('../assets/images/avatars/*.png', {
   eager: true,
   import: 'default',
@@ -45,19 +44,17 @@ const Profile = () => {
       }
 
       try {
-        // First, get user from localStorage
         const storedUser = localStorage.getItem("user");
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser);
           setUser(parsedUser);
           setAlias(parsedUser.alias || "");
           setAge(parsedUser.age || "");
-          setAvatar(localStorage.getItem("userAvatar") || parsedUser.avatar || null);
+          setAvatar(localStorage.getItem("userAvatar") || avatars[parsedUser.avatar - 1] || null);
         }
 
-        // Try to fetch fresh user details from server (if endpoint exists)
         try {
-          const response = await fetch(`${BASE_URL}/api/users/me`, {
+          const response = await fetch(`${BASE_URL}/api/users/`, {
             method: "GET",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -67,23 +64,19 @@ const Profile = () => {
 
           if (response.ok) {
             const userData = await response.json();
-            // Update state with fresh data
             setUser(userData);
             setAlias(userData.alias || "");
             setAge(userData.age || "");
-            setAvatar(localStorage.getItem("userAvatar") || userData.avatar || null);
-            
-            // Update localStorage with fresh data
+            setAvatar(localStorage.getItem("userAvatar") || avatars[userData.avatar - 1] || null);
+
             localStorage.setItem("user", JSON.stringify(userData));
           } else if (response.status === 401) {
-            // Token expired or invalid
             localStorage.removeItem("token");
             localStorage.removeItem("user");
             navigate("/login");
             return;
           }
         } catch (fetchError) {
-          // If user profile endpoint doesn't exist, just use localStorage data
           console.log("User profile endpoint not available, using localStorage data");
         }
       } catch (error) {
@@ -100,8 +93,13 @@ const Profile = () => {
 
     fetchDetails();
     fetchQuizScores();
-    fetchUserCategories();
   }, [navigate, toast]);
+
+  useEffect(() => {
+    if (user) {
+      fetchUserCategories();
+    }
+  }, [user]);
 
   const fetchUserCategories = async () => {
     setCategoriesLoading(true);
@@ -109,43 +107,33 @@ const Profile = () => {
       const token = localStorage.getItem("token");
       if (!token) return;
 
-      // Try different possible endpoints for user categories
-      let response;
-      try {
-        response = await fetch(`${BASE_URL}/api/categories/user`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-      } catch (error) {
-        // If that endpoint doesn't exist, try an alternative
-        response = await fetch(`${BASE_URL}/api/categories?createdBy=${user?.id || ''}`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-      }
+      const response = await fetch(`${BASE_URL}/api/categories`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
 
       if (response.ok) {
         const categories = await response.json();
-        // Transform the categories to match the expected format
-        const transformedCategories = Array.isArray(categories) ? categories.map((category) => ({
+        const userAlias = user?.alias;
+        const filteredCategories = Array.isArray(categories)
+          ? categories.filter((category) => category.createdBy === userAlias)
+          : [];
+        const transformedCategories = filteredCategories.map((category) => ({
           _id: category._id || category.id,
           name: category.name,
           description: category.description || `Test your knowledge in ${category.name}`,
-          createdBy: category.createdBy || alias || "You",
-          completionCount: category.completionsCount || category.completionCount || 0,
-          completionsCount: category.completionsCount || category.completionCount || 0,
-          questionCount: category.questionCount || category.questions?.length || 10,
+          createdBy: category.createdBy || "You",
+          completionCount: category.completionsCount || 0,
+          completionsCount: category.completionsCount || 0,
+          questionCount: category.questionCount || 10,
           averageRating: category.averageRating || 0,
           difficulty: category.difficulty || "Medium",
           imageUrl: category.imageUrl || category.image,
           createdAt: category.createdAt,
-        })) : [];
+        }));
         setUserCategories(transformedCategories);
       } else {
         console.log("User categories endpoint not available");
@@ -164,7 +152,6 @@ const Profile = () => {
       const token = localStorage.getItem("token");
       if (!token) return;
 
-      // Try to fetch quiz history from server
       try {
         const response = await fetch(`${BASE_URL}/api/users/history`, {
           method: "GET",
@@ -183,7 +170,6 @@ const Profile = () => {
         console.log("Quiz history endpoint not available");
       }
 
-      // Fallback: Use mock data or check localStorage for any quiz results
       const mockScores = [
         {
           id: "1",
@@ -211,9 +197,10 @@ const Profile = () => {
     }
   };
 
-  const handleAvatarSelection = (selectedAvatar: string) => {
+  const handleAvatarSelection = (selectedAvatar: string, index: number) => {
     setAvatar(selectedAvatar);
     localStorage.setItem("userAvatar", selectedAvatar);
+    localStorage.setItem("userAvatarIndex", index.toString());
   };
 
   const updateUserDetails = async () => {
@@ -230,76 +217,44 @@ const Profile = () => {
         return;
       }
 
-      // Try different possible endpoints for updating user profile
-      let response;
-      const updateData = { 
-        alias, 
-        age: parseInt(age), 
-        avatar 
+      const updateData = {
+        alias,
+        age: parseInt(age),
+        avatar: avatar || user.avatar,
       };
 
-      // First try the most likely endpoint based on your auth structure
-      try {
-        response = await fetch(`${BASE_URL}/api/users/update`, {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(updateData),
-        });
-      } catch (error) {
-        // If that doesn't work, try another common pattern
-        response = await fetch(`${BASE_URL}/api/users/profile`, {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(updateData),
-        });
-      }
+      const response = await fetch(`${BASE_URL}/api/updateUserDetails`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateData),
+      });
 
       if (response.ok) {
         const data = await response.json();
-        const updatedUser = { ...user, alias, age: parseInt(age), avatar };
+        const updatedUser = { ...user, alias, age: parseInt(age), avatar: data.user.avatar };
         setUser(updatedUser);
         localStorage.setItem("user", JSON.stringify(updatedUser));
-        
+
         toast({
           title: "Success",
           description: "Profile updated successfully!",
         });
-        
+
         setIsProfileVisible(true);
       } else {
-        // If the API update fails, still update localStorage and show success
-        // This handles the case where the backend doesn't have update endpoints yet
-        const updatedUser = { ...user, alias, age: parseInt(age), avatar };
-        setUser(updatedUser);
-        localStorage.setItem("user", JSON.stringify(updatedUser));
-        
-        toast({
-          title: "Profile Updated",
-          description: "Changes saved locally. Some features may require server support.",
-        });
-        
-        setIsProfileVisible(true);
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update profile on server.");
       }
     } catch (error) {
-      console.log("Server update failed, updating locally:", (error as Error).message);
-      
-      // Fallback: Update localStorage even if server update fails
-      const updatedUser = { ...user, alias, age: parseInt(age), avatar };
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      
+      console.log("Server update failed:", (error as Error).message);
       toast({
-        title: "Profile Updated",
-        description: "Changes saved locally. Server connection may be limited.",
+        title: "Error",
+        description: `Failed to save changes: ${(error as Error).message}`,
+        variant: "destructive",
       });
-      
-      setIsProfileVisible(true);
     } finally {
       setUpdating(false);
     }
@@ -363,13 +318,12 @@ const Profile = () => {
       return;
     }
 
-    // Navigate back to home with the quiz starting
-    navigate("/", { 
-      state: { 
-        startQuiz: true, 
-        categoryId, 
-        categoryName 
-      } 
+    navigate("/", {
+      state: {
+        startQuiz: true,
+        categoryId,
+        categoryName
+      }
     });
   };
 
@@ -377,12 +331,13 @@ const Profile = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("userAvatar");
+    localStorage.removeItem("userAvatarIndex");
     navigate("/login");
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-muted-foreground">Loading profile...</p>
@@ -393,7 +348,7 @@ const Profile = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">Failed to load profile</p>
           <Button onClick={() => navigate("/login")}>Go to Login</Button>
@@ -404,86 +359,87 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container max-w-6xl mx-auto p-6">
-        <div className="flex items-center justify-between mb-8">
-          <Button variant="ghost" onClick={() => navigate("/")} className="flex items-center space-x-2">
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Home</span>
+      <div className="container max-w-6xl mx-auto p-4 md:p-6">
+        {/* Header with back and logout buttons */}
+        <div className="flex items-center justify-between mb-6 md:mb-8">
+          <Button variant="ghost" onClick={() => navigate("/")} className="flex items-center space-x-1 p-2 md:p-4">
+            <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
+            <span className="hidden md:inline">Back to Home</span>
           </Button>
-          <Button variant="outline" onClick={handleLogout} className="flex items-center space-x-2">
-            <span>Logout</span>
+          <Button variant="outline" onClick={handleLogout} className="flex items-center space-x-1 p-2 md:p-4">
+            <span className="hidden md:inline">Logout</span>
+            <span className="md:hidden">Logout</span>
           </Button>
         </div>
 
         {isProfileVisible ? (
           <>
-            <Card className="mb-8">
-              <CardContent className="p-8">
-                <div className="flex items-center space-x-6">
-                  <Avatar className="w-24 h-24">
-                    <AvatarImage src={avatar || user.avatar} />
-                    <AvatarFallback>{alias.charAt(0).toUpperCase()}</AvatarFallback>
+            {/* Profile Card Section */}
+            <Card className="mb-6 md:mb-8">
+              <CardContent className="p-4 md:p-8">
+                <div className="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6">
+                  <Avatar className="w-20 h-20 md:w-24 md:h-24">
+                    <AvatarImage src={avatars[user.avatar - 1] || avatar} />
+                    <AvatarFallback>{(alias || user.alias).charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
-                  <div className="flex-1">
-                    <h1 className="text-3xl font-bold text-foreground">{alias || user.alias}</h1>
-                    <p className="text-muted-foreground text-lg">{user.email}</p>
-                    <p className="text-sm text-muted-foreground mt-2">Age: {age || user.age}</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Member since {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "N/A"}
+                  <div className="flex-1 text-center md:text-left">
+                    <h1 className="text-2xl md:text-3xl font-bold text-foreground">{alias || user.alias}</h1>
+                    <p className="text-muted-foreground text-sm md:text-lg">{user.email}</p>
+                    <p className="text-xs md:text-sm text-muted-foreground mt-2">Age: {age || user.age}</p>
+                    <p className="text-xs md:text-sm text-muted-foreground mt-1">
+                      Member since {user.created_at ? new Date(user.created_at).toLocaleDateString() : "N/A"}
                     </p>
                   </div>
-                  <div className="text-right space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Trophy className="w-5 h-5 text-yellow-500" />
-                      <span className="font-semibold">Best Score: {user.bestScore || 0}%</span>
+                  <div className="text-center md:text-right space-y-2 w-full md:w-auto">
+                    <div className="flex items-center space-x-2 justify-center md:justify-end">
+                      <Trophy className="w-4 h-4 md:w-5 md:h-5 text-yellow-500" />
+                      <span className="font-semibold text-sm md:text-base">Best Score: {user.bestScore || 0}%</span>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <User className="w-5 h-5 text-blue-500" />
-                      <span className="font-semibold">Avg Score: {user.averageScore || 0}%</span>
+                    <div className="flex items-center space-x-2 justify-center md:justify-end">
+                      <User className="w-4 h-4 md:w-5 md:h-5 text-blue-500" />
+                      <span className="font-semibold text-sm md:text-base">Avg Score: {user.averageScore || 0}%</span>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Clock className="w-5 h-5 text-green-500" />
-                      <span className="font-semibold">Total Quizzes: {user.totalQuizzes || quizScores.length}</span>
+                    <div className="flex items-center space-x-2 justify-center md:justify-end">
+                      <Clock className="w-4 h-4 md:w-5 md:h-5 text-green-500" />
+                      <span className="font-semibold text-sm md:text-base">Total Quizzes: {user.totalQuizzes || quizScores.length}</span>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Brain className="w-5 h-5 text-purple-500" />
-                      <span className="font-semibold">Categories Created: {userCategories.length}</span>
+                    <div className="flex items-center space-x-2 justify-center md:justify-end">
+                      <Brain className="w-4 h-4 md:w-5 md:h-5 text-purple-500" />
+                      <span className="font-semibold text-sm md:text-base">Categories Created: {userCategories.length}</span>
                     </div>
                   </div>
                 </div>
                 <div className="mt-6 text-center">
-                  <Button onClick={() => setIsProfileVisible(false)}>
+                  <Button onClick={() => setIsProfileVisible(false)} className="w-full md:w-auto">
                     <Edit className="w-4 h-4 mr-2" />
                     Edit Profile
                   </Button>
                 </div>
               </CardContent>
             </Card>
-
             <Tabs defaultValue="quiz-history" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="quiz-history" className="flex items-center space-x-2">
+                <TabsTrigger value="quiz-history" className="flex items-center justify-center space-x-2">
                   <Trophy className="w-4 h-4" />
-                  <span>Quiz History</span>
+                  <span>History</span>
                 </TabsTrigger>
-                <TabsTrigger value="my-categories" className="flex items-center space-x-2">
+                <TabsTrigger value="my-categories" className="flex items-center justify-center space-x-2">
                   <Brain className="w-4 h-4" />
-                  <span>My Categories</span>
+                  <span>My Quizzes</span>
                 </TabsTrigger>
               </TabsList>
-
               <TabsContent value="quiz-history">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Trophy className="w-6 h-6" />
+                    <CardTitle className="flex items-center space-x-2 text-xl md:text-2xl">
+                      <Trophy className="w-5 h-5 md:w-6 md:h-6" />
                       <span>Quiz History</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     {quizScores.length === 0 ? (
                       <div className="text-center py-8">
-                        <p className="text-muted-foreground">No quizzes completed yet</p>
+                        <p className="text-muted-foreground mb-4">No quizzes completed yet</p>
                         <Button onClick={() => navigate("/")} className="mt-4">
                           Take Your First Quiz
                         </Button>
@@ -492,16 +448,16 @@ const Profile = () => {
                       <div className="space-y-4">
                         {quizScores.map((score, index) => (
                           <div key={score.id || index}>
-                            <div className="flex items-center justify-between p-4 rounded-lg bg-card border">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-lg bg-card border space-y-2 sm:space-y-0">
                               <div className="flex-1">
-                                <h3 className="font-semibold text-foreground">{score.categoryName}</h3>
-                                <p className="text-sm text-muted-foreground">
+                                <h3 className="font-semibold text-foreground text-base sm:text-lg">{score.categoryName}</h3>
+                                <p className="text-xs text-muted-foreground">
                                   Completed on {new Date(score.completedAt).toLocaleDateString()}
                                 </p>
                               </div>
                               <div className="flex items-center space-x-4">
                                 <div className="text-center">
-                                  <p className={`text-2xl font-bold ${getScoreColor(score.percentage)}`}>
+                                  <p className={`text-xl sm:text-2xl font-bold ${getScoreColor(score.percentage)}`}>
                                     {score.score}/{score.totalQuestions}
                                   </p>
                                   <Badge variant={getScoreBadgeVariant(score.percentage)}>
@@ -514,7 +470,7 @@ const Profile = () => {
                                   className="flex items-center space-x-2"
                                 >
                                   <RotateCcw className="w-4 h-4" />
-                                  <span>Play Again</span>
+                                  <span className="hidden sm:inline">Play Again</span>
                                 </Button>
                               </div>
                             </div>
@@ -526,12 +482,11 @@ const Profile = () => {
                   </CardContent>
                 </Card>
               </TabsContent>
-
               <TabsContent value="my-categories">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Brain className="w-6 h-6" />
+                    <CardTitle className="flex items-center space-x-2 text-xl md:text-2xl">
+                      <Brain className="w-5 h-5 md:w-6 md:h-6" />
                       <span>Categories I Created</span>
                     </CardTitle>
                   </CardHeader>
@@ -543,15 +498,15 @@ const Profile = () => {
                       </div>
                     ) : userCategories.length === 0 ? (
                       <div className="text-center py-8">
-                        <Brain className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+                        <Brain className="w-12 h-12 md:w-16 md:h-16 text-muted-foreground/50 mx-auto mb-4" />
                         <p className="text-muted-foreground mb-4">You haven't created any categories yet</p>
                         <Button onClick={() => navigate("/")} className="flex items-center space-x-2">
                           <Brain className="w-4 h-4" />
-                          <span>Create Your First Category</span>
+                          <span>Create Your First Quiz</span>
                         </Button>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         {userCategories.map((category) => (
                           <div
                             key={category._id}
@@ -578,13 +533,11 @@ const Profile = () => {
                                 </Button>
                               </div>
                             </div>
-
                             <div className="space-y-2">
                               <h3 className="font-semibold text-foreground line-clamp-1">{category.name}</h3>
                               {category.description && (
                                 <p className="text-sm text-muted-foreground line-clamp-2">{category.description}</p>
                               )}
-                              
                               <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <div className="flex items-center space-x-3">
                                   {category.completionCount > 0 && (
@@ -604,7 +557,6 @@ const Profile = () => {
                                   {category.questionCount} questions
                                 </Badge>
                               </div>
-
                               {category.createdAt && (
                                 <p className="text-xs text-muted-foreground">
                                   Created {new Date(category.createdAt).toLocaleDateString()}
@@ -621,7 +573,7 @@ const Profile = () => {
             </Tabs>
           </>
         ) : (
-          <Card className="max-w-md mx-auto">
+          <Card className="max-w-full md:max-w-md mx-auto">
             <CardHeader>
               <CardTitle>Edit Profile</CardTitle>
             </CardHeader>
@@ -629,9 +581,9 @@ const Profile = () => {
               <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSaveClick(); }}>
                 <div className="space-y-2">
                   <Label htmlFor="alias">Username</Label>
-                  <Input 
-                    id="alias" 
-                    value={alias} 
+                  <Input
+                    id="alias"
+                    value={alias}
                     onChange={(e) => setAlias(e.target.value)}
                     placeholder="Enter your username"
                     required
@@ -639,19 +591,19 @@ const Profile = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
-                  <Input 
-                    value={user.email} 
-                    disabled 
-                    className="cursor-not-allowed bg-muted" 
+                  <Input
+                    value={user.email}
+                    disabled
+                    className="cursor-not-allowed bg-muted"
                   />
                   <p className="text-xs text-muted-foreground">Email cannot be changed</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="age">Age</Label>
-                  <Input 
-                    id="age" 
-                    type="number" 
-                    value={age} 
+                  <Input
+                    id="age"
+                    type="number"
+                    value={age}
                     onChange={(e) => setAge(e.target.value)}
                     placeholder="Enter your age"
                     min="1"
@@ -661,16 +613,16 @@ const Profile = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Select Avatar</Label>
-                  <div className="grid grid-cols-4 gap-2 p-2 border rounded-md">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 p-2 border rounded-md">
                     {avatars.map((avatarImg, index) => (
                       <Avatar
                         key={index}
                         className={`w-16 h-16 cursor-pointer border-2 transition-all ${
-                          avatar === avatarImg 
-                            ? "border-primary ring-2 ring-primary shadow-lg" 
+                          avatar === avatarImg
+                            ? "border-primary ring-2 ring-primary shadow-lg"
                             : "border-transparent hover:border-muted-foreground"
                         }`}
-                        onClick={() => handleAvatarSelection(avatarImg)}
+                        onClick={() => handleAvatarSelection(avatarImg, index)}
                       >
                         <AvatarImage src={avatarImg} alt={`Avatar ${index + 1}`} />
                         <AvatarFallback>AV</AvatarFallback>
@@ -678,22 +630,22 @@ const Profile = () => {
                     ))}
                   </div>
                 </div>
-                <div className="flex justify-end space-x-2 mt-6">
-                  <Button 
+                <div className="flex flex-col-reverse sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 mt-6">
+                  <Button
                     type="button"
-                    variant="outline" 
+                    variant="outline"
                     onClick={() => {
                       setIsProfileVisible(true);
-                      // Reset form to original values
                       setAlias(user.alias || "");
                       setAge(user.age || "");
-                      setAvatar(localStorage.getItem("userAvatar") || user.avatar || null);
+                      setAvatar(avatars[user.avatar - 1] || null);
                     }}
                     disabled={updating}
+                    className="w-full sm:w-auto"
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={updating}>
+                  <Button type="submit" disabled={updating} className="w-full sm:w-auto">
                     {updating ? (
                       <div className="flex items-center space-x-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />

@@ -10,7 +10,7 @@ import {
   Trophy,
   User,
 } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -33,7 +33,7 @@ interface HeaderProps {
 }
 
 export const Header = ({
-  title,
+  title = "Quizicle",
   imageSrc,
   logoAsTitle = false,
   showMenu = false,
@@ -43,6 +43,7 @@ export const Header = ({
   onBack,
 }: HeaderProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
 
   return (
@@ -64,7 +65,8 @@ export const Header = ({
             <img
               src={imageSrc}
               alt="Logo"
-              className="h-8 w-auto max-w-[120px]"
+              className="h-8 w-auto max-w-[120px] cursor-pointer"
+              onClick={() => navigate("/")}
             />
           ) : (
             <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
@@ -107,7 +109,12 @@ export const Header = ({
           )}
 
           {showNotifications && (
-            <Button variant="ghost" size="icon" className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative"
+              onClick={() => navigate("/notifications")}
+            >
               <Bell className="h-5 w-5" />
               <div className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full animate-pulse" />
             </Button>
