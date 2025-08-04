@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { Home, Grid3X3, PlayCircle, User, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const tabs = [
   { icon: Home, label: "Home", path: "/" },
@@ -11,6 +12,12 @@ const tabs = [
 
 export const BottomTabs = () => {
   const location = useLocation();
+  const isMobile = useIsMobile();
+
+  // Only show bottom tabs on mobile
+  if (!isMobile) {
+    return null;
+  }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-lg border-t border-border z-50">
