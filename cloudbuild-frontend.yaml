@@ -3,6 +3,17 @@ steps:
     args: ['build', '-t', 'gcr.io/$PROJECT_ID/quiz-frontend:$SHORT_SHA', '.']
     dir: 'frontend-react'
 
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      [
+        'run', 'deploy', 'quiz-frontend',
+        '--image', 'gcr.io/$PROJECT_ID/quiz-frontend:$SHORT_SHA',
+        '--region', 'europe-west1',
+        '--platform', 'managed',
+        '--allow-unauthenticated'
+      ]
+      
 images:
   - 'gcr.io/$PROJECT_ID/quiz-frontend:$SHORT_SHA'
 
