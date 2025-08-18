@@ -17,8 +17,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 const navTabs = [
   { icon: Home, label: "Home", path: "/" },
   { icon: Grid3X3, label: "Categories", path: "/categories" },
-  { icon: Trophy, label: "Leaderboard", path: "/leaderboard" },
   { icon: User, label: "Profile", path: "/profile" },
+  { icon: Menu, label: "Menu", path: "/menu" },
 ];
 
 interface HeaderProps {

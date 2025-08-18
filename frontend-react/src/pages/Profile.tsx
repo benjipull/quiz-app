@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, Trophy, Clock, RotateCcw, ArrowLeft, Edit, Play, Brain, Users, Star } from "lucide-react";
+import { User, Trophy, Clock, RotateCcw, ArrowLeft, Edit, Play, Brain, Users, Star, ShoppingBag, Crown, Target, Zap, Award, TrendingUp, Calendar, Gift } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import GameStatsHeader from "@/components/GameStatsHeader";
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
@@ -17,7 +17,7 @@ const avatarImages = import.meta.glob('../assets/images/avatars/*.png', {
   eager: true,
   import: 'default',
 });
-const avatars: string[] = Object.values(avatarImages) as string[];
+const avatars = Object.values(avatarImages) as string[];
 
 const Profile = () => {
   const [user, setUser] = useState<any | null>(null);
@@ -32,6 +32,87 @@ const Profile = () => {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const achievements = [
+    {
+      id: 1,
+      name: "Quiz Scout",
+      description: "Play 7 days in a row",
+      progress: 14,
+      total: 100,
+      icon: "🕵️",
+      unlocked: false
+    },
+    {
+      id: 2,
+      name: "Quiz Enthusiast", 
+      description: "Play 20 days in a row",
+      progress: 5,
+      total: 100,
+      icon: "🎯",
+      unlocked: false
+    },
+    {
+      id: 3,
+      name: "Quiz Hunter",
+      description: "Play 50 days in a row", 
+      progress: 2,
+      total: 100,
+      icon: "🏹",
+      unlocked: false
+    },
+    {
+      id: 4,
+      name: "Quiz Devotee",
+      description: "Play 100 days in a row",
+      progress: 1,
+      total: 100,
+      icon: "💡",
+      unlocked: false
+    },
+    {
+      id: 5,
+      name: "Quiz Master",
+      description: "Get 10 perfect scores",
+      progress: 60,
+      total: 100,
+      icon: "👑",
+      unlocked: true
+    }
+  ];
+
+  const purchases = [
+    {
+      id: 1,
+      name: "Premium Avatar Pack",
+      description: "Unlock 20 exclusive avatars",
+      price: "$4.99",
+      purchased: true,
+      date: "2024-01-15"
+    },
+    {
+      id: 2,
+      name: "Double XP Boost",
+      description: "2x experience points for 7 days",
+      price: "$2.99",
+      purchased: false
+    },
+    {
+      id: 3,
+      name: "Quiz Creator Pro",
+      description: "Advanced quiz creation tools",
+      price: "$9.99",
+      purchased: true,
+      date: "2024-01-10"
+    },
+    {
+      id: 4,
+      name: "Hint Master Pack",
+      description: "100 quiz hints bundle",
+      price: "$1.99",
+      purchased: false
+    }
+  ];
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -68,7 +149,6 @@ const Profile = () => {
             setAlias(userData.alias || "");
             setAge(userData.age || "");
             setAvatar(localStorage.getItem("userAvatar") || avatars[userData.avatar - 1] || null);
-
             localStorage.setItem("user", JSON.stringify(userData));
           } else if (response.status === 401) {
             localStorage.removeItem("token");
@@ -213,7 +293,7 @@ const Profile = () => {
           description: "Please log in again.",
           variant: "destructive",
         });
-        navigate("/login");
+        navigate("/auth");
         return;
       }
 
@@ -292,9 +372,9 @@ const Profile = () => {
   };
 
   const getScoreColor = (percentage: number) => {
-    if (percentage >= 80) return "text-emerald-600";
-    if (percentage >= 60) return "text-yellow-600";
-    return "text-red-600";
+    if (percentage >= 80) return "text-green-600 dark:text-green-400";
+    if (percentage >= 60) return "text-yellow-600 dark:text-yellow-400";
+    return "text-red-600 dark:text-red-400";
   };
 
   const getScoreBadgeVariant = (percentage: number) => {
@@ -318,10 +398,8 @@ const Profile = () => {
       return;
     }
 
-    navigate("/", {
+    navigate(`/quiz/${categoryId}`, {
       state: {
-        startQuiz: true,
-        categoryId,
         categoryName
       }
     });
@@ -332,7 +410,7 @@ const Profile = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("userAvatar");
     localStorage.removeItem("userAvatarIndex");
-    navigate("/login");
+    navigate("/auth");
   };
 
   if (loading) {
@@ -340,7 +418,7 @@ const Profile = () => {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading profile...</p>
+          <p className="mt-4 text-muted-foreground font-semibold">Loading profile...</p>
         </div>
       </div>
     );
@@ -359,122 +437,157 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container max-w-6xl mx-auto p-4 md:p-6">
-        {/* Header with back and logout buttons */}
-        <div className="flex items-center justify-between mb-6 md:mb-8">
-          <Button variant="ghost" onClick={() => navigate("/")} className="flex items-center space-x-1 p-2 md:p-4">
-            <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
-            <span className="hidden md:inline">Back to Home</span>
-          </Button>
-          <Button variant="outline" onClick={handleLogout} className="flex items-center space-x-1 p-2 md:p-4">
-            <span className="hidden md:inline">Logout</span>
-            <span className="md:hidden">Logout</span>
-          </Button>
-        </div>
-
-        {isProfileVisible ? (
-          <>
-            {/* Profile Card Section */}
-            <Card className="mb-6 md:mb-8">
-              <CardContent className="p-4 md:p-8">
-                <div className="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6">
-                  <Avatar className="w-20 h-20 md:w-24 md:h-24">
+      {isProfileVisible ? (
+        <>
+          {/* Main sticky header with backdrop blur */}
+          <div className="sticky top-0 z-20 w-full bg-background/50 backdrop-blur-md">
+            {/* Header Stats Bar */}
+            <div className="container max-w-4xl mx-auto p-4 flex items-center justify-between">
+              <Button variant="ghost" onClick={() => navigate("/")} className="text-foreground p-2 hover:bg-accent">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <div className="flex items-center space-x-3">
+                <GameStatsHeader />
+              </div>
+              <Button variant="destructive" onClick={handleLogout} size="sm" className="rounded-full">
+                <span className="text-xs font-semibold">Logout</span>
+              </Button>
+            </div>
+            
+            {/* Profile Info Section */}
+            <div className="container max-w-4xl mx-auto p-4 pb-0">
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="relative inline-block">
+                  <Avatar className="w-20 h-20 md:w-24 md:h-24 border-4 border-background shadow-2xl">
                     <AvatarImage src={avatars[user.avatar - 1] || avatar} />
-                    <AvatarFallback>{(alias || user.alias).charAt(0).toUpperCase()}</AvatarFallback>
+                    <AvatarFallback className="text-2xl bg-muted text-muted-foreground">
+                      {(alias || user.alias).charAt(0).toUpperCase()}
+                    </AvatarFallback>
                   </Avatar>
-                  <div className="flex-1 text-center md:text-left">
-                    <h1 className="text-2xl md:text-3xl font-bold text-foreground">{alias || user.alias}</h1>
-                    <p className="text-muted-foreground text-sm md:text-lg">{user.email}</p>
-                    <p className="text-xs md:text-sm text-muted-foreground mt-2">Age: {age || user.age}</p>
-                    <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                      Member since {user.created_at ? new Date(user.created_at).toLocaleDateString() : "N/A"}
-                    </p>
-                  </div>
-                  <div className="text-center md:text-right space-y-2 w-full md:w-auto">
-                    <div className="flex items-center space-x-2 justify-center md:justify-end">
-                      <Trophy className="w-4 h-4 md:w-5 md:h-5 text-yellow-500" />
-                      <span className="font-semibold text-sm md:text-base">Best Score: {user.bestScore || 0}%</span>
-                    </div>
-                    <div className="flex items-center space-x-2 justify-center md:justify-end">
-                      <User className="w-4 h-4 md:w-5 md:h-5 text-blue-500" />
-                      <span className="font-semibold text-sm md:text-base">Avg Score: {user.averageScore || 0}%</span>
-                    </div>
-                    <div className="flex items-center space-x-2 justify-center md:justify-end">
-                      <Clock className="w-4 h-4 md:w-5 md:h-5 text-green-500" />
-                      <span className="font-semibold text-sm md:text-base">Total Quizzes: {user.totalQuizzes || quizScores.length}</span>
-                    </div>
-                    <div className="flex items-center space-x-2 justify-center md:justify-end">
-                      <Brain className="w-4 h-4 md:w-5 md:h-5 text-purple-500" />
-                      <span className="font-semibold text-sm md:text-base">Categories Created: {userCategories.length}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-6 text-center">
-                  <Button onClick={() => setIsProfileVisible(false)} className="w-full md:w-auto">
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Profile
+                  <Button
+                    onClick={() => setIsProfileVisible(false)}
+                    size="sm"
+                    className="absolute -top-2 -right-2 w-8 h-8 p-0 bg-primary hover:bg-primary/80 rounded-full border-2 border-background shadow-lg"
+                  >
+                    <Edit className="w-4 h-4 text-primary-foreground" />
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-            <Tabs defaultValue="quiz-history" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="quiz-history" className="flex items-center justify-center space-x-2">
-                  <Trophy className="w-4 h-4" />
-                  <span>History</span>
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground">{alias || user.alias}</h1>
+                  <div className="flex items-center mt-1 space-x-1">
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 16'%3E%3Crect width='24' height='16' fill='%23007A4D'/%3E%3Cpath d='M0 0h24v5.33H0z' fill='%23DE3831'/%3E%3Cpath d='M0 10.67h24V16H0z' fill='%23002395'/%3E%3Cpath d='M0 5.33h24v5.34H0z' fill='%23FFB612'/%3E%3Cpath d='M12 8L9 6v4l3-2z' fill='%23007A4D'/%3E%3C/svg%3E" alt="SA Flag" className="w-5 h-3" />
+                    <span className="text-muted-foreground text-sm">South Africa</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* This container holds the entire Tabs component, fixing the structural error */}
+          <div className="container max-w-4xl mx-auto p-4">
+            <Tabs defaultValue="history" className="w-full">
+              {/* TabsList is now sticky, appearing right below the main header */}
+              <TabsList className="sticky top-[90px] z-10 grid w-full grid-cols-3 bg-background/50 backdrop-blur-sm border-b border-muted-foreground/30">
+                <TabsTrigger
+                  value="history"
+                  className="rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:font-bold text-muted-foreground font-semibold hover:bg-transparent transition-all"
+                >
+                  <Trophy className="w-4 h-4 mr-2" />
+                  History
                 </TabsTrigger>
-                <TabsTrigger value="my-categories" className="flex items-center justify-center space-x-2">
-                  <Brain className="w-4 h-4" />
-                  <span>My Quizzes</span>
+                <TabsTrigger
+                  value="categories"
+                  className="rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:font-bold text-muted-foreground font-semibold hover:bg-transparent transition-all"
+                >
+                  <Brain className="w-4 h-4 mr-2" />
+                  My Quizzes
+                </TabsTrigger>
+                <TabsTrigger
+                  value="purchases"
+                  className="rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:font-bold text-muted-foreground font-semibold hover:bg-transparent transition-all"
+                >
+                  <ShoppingBag className="w-4 h-4 mr-2" />
+                  Store
                 </TabsTrigger>
               </TabsList>
-              <TabsContent value="quiz-history">
-                <Card>
+              
+              <TabsContent value="history" className="mt-6 space-y-4">
+                <Card className="bg-card/90 backdrop-blur-sm border-border/50 shadow-xl">
                   <CardHeader>
-                    <CardTitle className="flex items-center space-x-2 text-xl md:text-2xl">
-                      <Trophy className="w-5 h-5 md:w-6 md:h-6" />
-                      <span>Quiz History</span>
+                    <CardTitle className="flex items-center space-x-2 text-foreground">
+                      <Award className="w-5 h-5" />
+                      <span>Achievements</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {achievements.map((achievement) => (
+                      <div key={achievement.id} className="flex items-center space-x-4 p-3 rounded-lg bg-accent/50 border border-border/30">
+                        <div className="w-12 h-12 rounded-full bg-card flex items-center justify-center text-2xl border-2 border-border">
+                          {achievement.icon}
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-foreground">{achievement.name}</h3>
+                          <p className="text-sm text-muted-foreground">{achievement.description}</p>
+                          <div className="w-full bg-muted rounded-full h-2 mt-2">
+                            <div
+                              className="bg-primary h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${achievement.progress}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-foreground">{achievement.progress}%</p>
+                          {achievement.unlocked && <Crown className="w-4 h-4 text-yellow-500 dark:text-yellow-400 mx-auto mt-1" />}
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-card/90 backdrop-blur-sm border-border/50 shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-foreground">
+                      <TrendingUp className="w-5 h-5" />
+                      <span>Recent Performances</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     {quizScores.length === 0 ? (
                       <div className="text-center py-8">
+                        <Target className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
                         <p className="text-muted-foreground mb-4">No quizzes completed yet</p>
-                        <Button onClick={() => navigate("/")} className="mt-4">
+                        <Button onClick={() => navigate("/")} className="bg-primary text-primary-foreground hover:bg-primary/80">
                           Take Your First Quiz
                         </Button>
                       </div>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         {quizScores.map((score, index) => (
-                          <div key={score.id || index}>
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-lg bg-card border space-y-2 sm:space-y-0">
-                              <div className="flex-1">
-                                <h3 className="font-semibold text-foreground text-base sm:text-lg">{score.categoryName}</h3>
-                                <p className="text-xs text-muted-foreground">
-                                  Completed on {new Date(score.completedAt).toLocaleDateString()}
-                                </p>
-                              </div>
-                              <div className="flex items-center space-x-4">
-                                <div className="text-center">
-                                  <p className={`text-xl sm:text-2xl font-bold ${getScoreColor(score.percentage)}`}>
-                                    {score.score}/{score.totalQuestions}
-                                  </p>
-                                  <Badge variant={getScoreBadgeVariant(score.percentage)}>
-                                    {score.percentage}%
-                                  </Badge>
-                                </div>
-                                <Button
-                                  onClick={() => handlePlayAgain(score.categoryId)}
-                                  size="sm"
-                                  className="flex items-center space-x-2"
-                                >
-                                  <RotateCcw className="w-4 h-4" />
-                                  <span className="hidden sm:inline">Play Again</span>
-                                </Button>
-                              </div>
+                          <div key={score.id || index} className="flex items-center justify-between p-4 rounded-lg bg-accent/30 border border-border/30 hover:bg-accent/50 transition-colors">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-foreground">{score.categoryName}</h3>
+                              <p className="text-xs text-muted-foreground flex items-center mt-1">
+                                <Calendar className="w-3 h-3 mr-1" />
+                                {new Date(score.completedAt).toLocaleDateString()}
+                              </p>
                             </div>
-                            {index < quizScores.length - 1 && <Separator />}
+                            <div className="flex items-center space-x-3">
+                              <div className="text-center">
+                                <p className={`text-xl font-bold ${getScoreColor(score.percentage)}`}>
+                                  {score.score}/{score.totalQuestions}
+                                </p>
+                                <Badge variant={getScoreBadgeVariant(score.percentage)}>
+                                  {score.percentage}%
+                                </Badge>
+                              </div>
+                              <Button
+                                onClick={() => handlePlayAgain(score.categoryId)}
+                                size="sm"
+                                className="bg-primary text-primary-foreground hover:bg-primary/80"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -482,12 +595,13 @@ const Profile = () => {
                   </CardContent>
                 </Card>
               </TabsContent>
-              <TabsContent value="my-categories">
-                <Card>
+
+              <TabsContent value="categories" className="mt-6">
+                <Card className="bg-card/90 backdrop-blur-sm border-border/50 shadow-xl">
                   <CardHeader>
-                    <CardTitle className="flex items-center space-x-2 text-xl md:text-2xl">
-                      <Brain className="w-5 h-5 md:w-6 md:h-6" />
-                      <span>Categories I Created</span>
+                    <CardTitle className="flex items-center space-x-2 text-foreground">
+                      <Brain className="w-5 h-5" />
+                      <span>My Quiz Categories</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -498,21 +612,22 @@ const Profile = () => {
                       </div>
                     ) : userCategories.length === 0 ? (
                       <div className="text-center py-8">
-                        <Brain className="w-12 h-12 md:w-16 md:h-16 text-muted-foreground/50 mx-auto mb-4" />
+                        <Brain className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
                         <p className="text-muted-foreground mb-4">You haven't created any categories yet</p>
-                        <Button onClick={() => navigate("/")} className="flex items-center space-x-2">
-                          <Brain className="w-4 h-4" />
-                          <span>Create Your First Quiz</span>
+                        <Button onClick={() => navigate("/")} className="bg-primary text-primary-foreground hover:bg-primary/80">
+                          <Brain className="w-4 h-4 mr-2" />
+                          Create Your First Quiz
                         </Button>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {userCategories.map((category) => (
                           <div
                             key={category._id}
-                            className="bg-card border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group"
+                            onClick={() => startQuiz(category._id, category.name)}
+                            className="bg-card border border-border/50 rounded-xl overflow-hidden hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 hover:scale-105 hover:border-primary/30 group cursor-pointer"
                           >
-                            <div className="relative overflow-hidden rounded-lg mb-3 h-32 bg-gradient-to-br from-blue-500/20 to-purple-500/20">
+                            <div className="relative overflow-hidden h-32 bg-gradient-to-br from-primary/20 to-secondary/20">
                               <img
                                 src={category.imageUrl || `https://picsum.photos/seed/${category._id}/300/200`}
                                 alt={category.name}
@@ -522,19 +637,9 @@ const Profile = () => {
                                   target.src = `https://picsum.photos/seed/${category._id}/300/200`;
                                 }}
                               />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                <Button
-                                  size="sm"
-                                  onClick={() => startQuiz(category._id, category.name)}
-                                  className="mb-2 bg-primary/90 hover:bg-primary text-primary-foreground"
-                                >
-                                  <Play className="w-4 h-4 mr-2" />
-                                  Play Quiz
-                                </Button>
-                              </div>
                             </div>
-                            <div className="space-y-2">
-                              <h3 className="font-semibold text-foreground line-clamp-1">{category.name}</h3>
+                            <div className="p-4 space-y-2">
+                              <h3 className="font-bold text-foreground line-clamp-1">{category.name}</h3>
                               {category.description && (
                                 <p className="text-sm text-muted-foreground line-clamp-2">{category.description}</p>
                               )}
@@ -548,14 +653,11 @@ const Profile = () => {
                                   )}
                                   {category.averageRating > 0 && (
                                     <div className="flex items-center space-x-1">
-                                      <Star className="w-3 h-3 text-yellow-500 fill-current" />
+                                      <Star className="w-3 h-3 text-yellow-500 dark:text-yellow-400 fill-current" />
                                       <span>{category.averageRating.toFixed(1)}</span>
                                     </div>
                                   )}
                                 </div>
-                                <Badge variant="secondary" className="text-xs">
-                                  {category.questionCount} questions
-                                </Badge>
                               </div>
                               {category.createdAt && (
                                 <p className="text-xs text-muted-foreground">
@@ -570,97 +672,145 @@ const Profile = () => {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              <TabsContent value="purchases" className="mt-6">
+                <Card className="bg-card/90 backdrop-blur-sm border-border/50 shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-foreground">
+                      <ShoppingBag className="w-5 h-5" />
+                      <span>Store & Purchases</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {purchases.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Gift className="w-16 h-16 mx-auto mb-4" />
+                          <p>No purchases yet. Check out the store!</p>
+                        </div>
+                      ) : (
+                        purchases.map((purchase) => (
+                          <div key={purchase.id} className="flex items-center justify-between p-4 rounded-lg bg-accent/30 border border-border/30">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-foreground">{purchase.name}</h3>
+                              <p className="text-sm text-muted-foreground">{purchase.description}</p>
+                              {purchase.purchased && (
+                                <p className="text-xs text-green-500 flex items-center mt-1">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  Purchased on {purchase.date}
+                                </p>
+                              )}
+                            </div>
+                            <Badge variant={purchase.purchased ? "default" : "secondary"}>
+                              {purchase.purchased ? "Purchased" : purchase.price}
+                            </Badge>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </Tabs>
-          </>
-        ) : (
-          <Card className="max-w-full md:max-w-md mx-auto">
-            <CardHeader>
-              <CardTitle>Edit Profile</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSaveClick(); }}>
-                <div className="space-y-2">
-                  <Label htmlFor="alias">Username</Label>
-                  <Input
-                    id="alias"
-                    value={alias}
-                    onChange={(e) => setAlias(e.target.value)}
-                    placeholder="Enter your username"
-                    required
-                  />
+          </div>
+        </>
+      ) : (
+        <Card className="bg-card/90 backdrop-blur-sm border-border/50 shadow-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2 text-foreground">
+              <User className="w-5 h-5" />
+              <span>Edit Profile</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSaveClick(); }}>
+              <div className="space-y-2">
+                <Label htmlFor="alias" className="text-primary-700">Username</Label>
+                <Input
+                  id="alias"
+                  value={alias}
+                  onChange={(e) => setAlias(e.target.value)}
+                  placeholder="Enter your username"
+                  required
+                  className="border-primary-200 focus:border-primary-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-primary-700">Email</Label>
+                <Input
+                  value={user.email}
+                  disabled
+                  className="cursor-not-allowed bg-primary-50 border-primary-200"
+                />
+                <p className="text-xs text-primary-500">Email cannot be changed</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="age" className="text-primary-700">Age</Label>
+                <Input
+                  id="age"
+                  type="number"
+                  value={age}
+                  onChange={(e) => setAge(e.target.value)}
+                  placeholder="Enter your age"
+                  min="1"
+                  max="120"
+                  required
+                  className="border-primary-200 focus:border-primary-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-primary-700">Select Avatar</Label>
+                <div className="grid grid-cols-4 gap-2 p-3 border border-primary-200 rounded-lg bg-primary-50/50">
+                  {avatars.map((avatarImg, index) => (
+                    <Avatar
+                      key={index}
+                      className={`w-16 h-16 cursor-pointer border-2 transition-all ${
+                        avatar === avatarImg
+                          ? "border-primary-500 ring-2 ring-primary-300 shadow-lg transform scale-110"
+                          : "border-transparent hover:border-primary-300 hover:scale-105"
+                      }`}
+                      onClick={() => handleAvatarSelection(avatarImg, index)}
+                    >
+                      <AvatarImage src={avatarImg} alt={`Avatar ${index + 1}`} />
+                      <AvatarFallback className="bg-primary-100 text-primary-600">AV</AvatarFallback>
+                    </Avatar>
+                  ))}
                 </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    value={user.email}
-                    disabled
-                    className="cursor-not-allowed bg-muted"
-                  />
-                  <p className="text-xs text-muted-foreground">Email cannot be changed</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="age">Age</Label>
-                  <Input
-                    id="age"
-                    type="number"
-                    value={age}
-                    onChange={(e) => setAge(e.target.value)}
-                    placeholder="Enter your age"
-                    min="1"
-                    max="120"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Select Avatar</Label>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 p-2 border rounded-md">
-                    {avatars.map((avatarImg, index) => (
-                      <Avatar
-                        key={index}
-                        className={`w-16 h-16 cursor-pointer border-2 transition-all ${
-                          avatar === avatarImg
-                            ? "border-primary ring-2 ring-primary shadow-lg"
-                            : "border-transparent hover:border-muted-foreground"
-                        }`}
-                        onClick={() => handleAvatarSelection(avatarImg, index)}
-                      >
-                        <AvatarImage src={avatarImg} alt={`Avatar ${index + 1}`} />
-                        <AvatarFallback>AV</AvatarFallback>
-                      </Avatar>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex flex-col-reverse sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 mt-6">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIsProfileVisible(true);
-                      setAlias(user.alias || "");
-                      setAge(user.age || "");
-                      setAvatar(avatars[user.avatar - 1] || null);
-                    }}
-                    disabled={updating}
-                    className="w-full sm:w-auto"
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={updating} className="w-full sm:w-auto">
-                    {updating ? (
-                      <div className="flex items-center space-x-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                        <span>Saving...</span>
-                      </div>
-                    ) : (
-                      "Save Changes"
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+              </div>
+              <div className="flex flex-col-reverse sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 mt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsProfileVisible(true);
+                    setAlias(user.alias || "");
+                    setAge(user.age || "");
+                    setAvatar(avatars[user.avatar - 1] || null);
+                  }}
+                  disabled={updating}
+                  className="w-full sm:w-auto border-primary-300 text-primary-700 hover:bg-primary-50"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={updating}
+                  className="w-full sm:w-auto bg-gradient-to-r from-primary-500 to-pink-500 text-white"
+                >
+                  {updating ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                      <span>Saving...</span>
+                    </div>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
