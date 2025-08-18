@@ -20,7 +20,7 @@ const generateQuestionHash = (questionText) => {
 
 // ✅ Fetch questions from Ollama with detailed logging
 async function fetchQuestions(categoryName, numQuestions) {
-    console.log(`Fetching ${numQuestions} questions for category: "${categoryName}" from ollama`);
+    console.log(`Generating for category: "${categoryName}" from ollama`);
 
     const systemPrompt = `
         You are an AI trivia generator with a knowledge base which is limited to the information it contains. 
@@ -65,9 +65,22 @@ async function fetchQuestions(categoryName, numQuestions) {
             throw new Error("❌ Ollama response missing 'response' field.");
         }
 
+        let raw = response.data.response.trim();
+
+        // 🧼 Strip everything before the first `[` (start of JSON array)
+        const firstBracketIndex = raw.indexOf('[');
+        if (firstBracketIndex !== -1) {
+            raw = raw.slice(firstBracketIndex);
+        } else {
+            throw new Error(`❌ JSON array not found in response.\nRaw response: ${response.data.response}`);
+        }
+
+        // 🧹 Remove markdown backticks if somehow still present at end
+        raw = raw.replace(/```$/, '').trim();
+
         let questions;
         try {
-            questions = JSON.parse(response.data.response.trim());
+            questions = JSON.parse(raw);
         } catch (jsonError) {
             throw new Error(`❌ JSON parse error: ${jsonError.message}\nRaw response: ${response.data.response}`);
         }
@@ -133,7 +146,7 @@ async function populateCategory(categoryId, numQuestions) {
             }
 
             if (!q.answers.includes(q.correct_answer)) {
-                console.warn(`⚠️ Correct answer missing for question: ${q.question}`);
+                console.log(`Fixed missing correct answer for question: ${q.question}`);
                 q.answers[Math.floor(Math.random() * q.answers.length)] = q.correct_answer;
             }
 
@@ -160,77 +173,10 @@ async function populateCategory(categoryId, numQuestions) {
             category.disabled = false;
             await category.save();
             console.log(`✅ Added ${newQuestionsAdded} questions to ${category.name}.`);
-        } else {
-            console.log(`ℹ️ No new questions added to ${category.name}.`);
         }
 
     } catch (error) {
         console.error("❌ Error populating category:", error.message);
-    }
-}
-
-// ✅ Function to verify the question back with Mistral
-async function verifyQuestion(question) {
-    console.log(`🔍 Verifying question: "${question.question}"`);
-
-    const verificationPrompt = `
-        You are a fact-checking AI with expert-level knowledge of general trivia.  
-        However, your knowledge base it also finite and there are times when you do not have the information to correctly verify information.
-        Your task is to verify whether the following trivia question is based on a **real**, verifiable source.
-
-        ### **Trivia Question:**
-        "{question.question}"
-
-        Correct Answer: "{question.correct_answer}"
-        Explanation: "{question.explanation}"
-
-        ### **Instructions:**
-        - **Check against widely accepted sources**.
-        - If this fact is **not documented in a verifiable source**, return '"is_factually_correct": false'.
-        - If this fact **is documented**, provide a source reference, and return '"is_factually_correct": true'.
-
-        ### **Response Format:**
-        '''json
-        {
-            "is_factually_correct": true,
-            "source": ""
-        }
-        `;
-
-    try {
-        const response = await axios.post(OLLAMA_URL, {
-            model: "mistral",
-            prompt: verificationPrompt,
-            stream: false,
-            max_tokens: 50,
-            temperature: 0.0,
-            top_p: 0.1
-        });
-
-        if (!response.data || !response.data.response) {
-            throw new Error("❌ Ollama verification response missing 'response' field.");
-        }
-
-        const aiResponse = response.data.response.trim();
-        console.log("✅ AI Verification Response:", aiResponse);
-
-        return aiResponse.includes('"is_factually_correct": true');
-
-    } catch (error) {
-        console.error("❌ Error verifying question:", error.message);
-        return false;
-    }
-}
-
-async function fetchWikipediaSummary(topic) {
-    const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`;
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
-        return data.extract || "No additional context found.";
-    } catch (error) {
-        console.error("❌ Wikipedia Fetch Error:", error);
-        return "No additional context available.";
     }
 }
 
