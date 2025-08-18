@@ -241,7 +241,7 @@ export default function Categories() {
                   completions={category.completionCount || category.completionsCount || 0}
                   rating={category.averageRating || 0}
                   timeEstimate={category.timeEstimate || "5 min"}
-                  imageUrl={category.imageUrl || category.image || `https://picsum.photos/seed/${category._id}/600/300`}
+                  imageUrl={category.imageUrl || category.image || `coming soon`}
                   createdBy={category.createdBy || "QuizMaster"}
                   onPlay={handlePlayQuiz}
                 />

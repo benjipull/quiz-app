@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"; // Import Navigate for redirection
 import { MobileLayout } from "@/components/layout/MobileLayout";
 import Home from "./pages/Home";
 import Categories from "./pages/Categories";
@@ -12,31 +12,46 @@ import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import AuthSection from "./pages/AuthSection";
 import Notifications from "./pages/Notification";
+import React from "react"; // Explicitly import React
 
 const queryClient = new QueryClient();
 
+// ProtectedRoute component to guard routes
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+    const userToken = localStorage.getItem("token");
+    if (!userToken) {
+        // Redirect to the login page if not authenticated
+        return <Navigate to="/auth" replace />;
+    }
+    return children;
+};
+
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<MobileLayout />}>
-            <Route index element={<Home />} />
-            <Route path="categories" element={<Categories />} />
-            <Route path="quiz/:categoryId?" element={<Quiz />} />
-            <Route path="leaderboard" element={<Leaderboard />} />
-            <Route path="login" element={<AuthSection />} />
-            <Route path="profile" element={<Profile />} />
-            <Route path="notifications" element={<Notifications />} />
-          </Route>
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+                <Routes>
+                    {/* Public route for authentication */}
+                    <Route path="/auth" element={<AuthSection />} />
+
+                    {/* Protected routes wrapped by ProtectedRoute */}
+                    <Route path="/" element={<ProtectedRoute><MobileLayout /></ProtectedRoute>}>
+                        <Route index element={<Home />} />
+                        <Route path="categories" element={<Categories />} />
+                        <Route path="quiz/:categoryId?" element={<Quiz />} />
+                        <Route path="leaderboard" element={<Leaderboard />} />
+                        <Route path="profile" element={<Profile />} />
+                        <Route path="notifications" element={<Notifications />} />
+                    </Route>
+
+                    {/* Catch-all route for any undefined paths */}
+                    <Route path="*" element={<NotFound />} />
+                </Routes>
+            </BrowserRouter>
+        </TooltipProvider>
+    </QueryClientProvider>
 );
 
 export default App;

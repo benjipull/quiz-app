@@ -9,7 +9,7 @@ All colors MUST be HSL.
 @layer base {
   :root {
     /* Quiz App Color Palette - Vibrant & Engaging */
-    --background: 250 100% 98%;
+    --background: 0 0% 100%;
     --foreground: 235 25% 15%;
 
     --card: 0 0% 100%;
@@ -35,8 +35,8 @@ All colors MUST be HSL.
     --warning: 35 100% 60%;
     --warning-foreground: 0 0% 100%;
 
-    --muted: 240 20% 96%;
-    --muted-foreground: 235 15% 45%;
+    --muted: 240 16% 92%;
+    --muted-foreground: 235 15% 40%;
 
     --accent: 280 85% 65%;
     --accent-foreground: 0 0% 100%;
@@ -44,8 +44,8 @@ All colors MUST be HSL.
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 15% 90%;
-    --input: 240 15% 95%;
+    --border: 240 8% 80%;
+    --input: 240 12% 90%;
     --ring: 270 95% 60%;
 
     /* Quiz-specific colors */
