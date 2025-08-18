@@ -4,7 +4,6 @@ const Category = require("../models/categoryModel");
 const { userQuestions } = require("../index"); // ✅ Import shared store
 const { populateCategory } = require("../scripts/populateCategories"); // ✅ Import async question population
 
-// ✅ Route: Load Questions from Database Without Updating `timesLoaded`
 router.post("/", async (req, res) => {
     const { categoryId, numQuestions, userToken } = req.body;
 
@@ -35,7 +34,7 @@ router.post("/", async (req, res) => {
         }
 
         // ✅ Run `populateCategory` asynchronously
-        runSequentially();
+        runSequentially(category);
 
         // ✅ Store questions for user in memory for `nextQuestion.js`
         userQuestions[userToken] = selectedQuestions.map(q => ({
@@ -56,7 +55,7 @@ router.post("/", async (req, res) => {
     }
 });
 
-async function runSequentially() {
+async function runSequentially(category) {
   for (let i = 0; i < 10; i++) {
     // Fire and forget, but wait before starting the next
     populateCategory(category._id, 1); 

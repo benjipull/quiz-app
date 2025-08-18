@@ -8,7 +8,6 @@ router.get("/:userToken", async (req, res) => {
     try {
         const { userToken } = req.params;
 
-        // ✅ Validate userToken
         if (!userToken) {
             console.error("❌ Invalid request: Missing user token.");
             return res.status(400).json({ message: "❌ User token is required." });
