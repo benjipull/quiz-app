@@ -8,8 +8,8 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ Store generated questions per user token
-const userQuestions = {}; // { userToken: [question1, question2, ...] }
+// Store generated questions per user token
+const userQuestions = {};
 module.exports = { userQuestions };
 
 // Connect to MongoDB
@@ -32,6 +32,7 @@ app.use("/api/updatePassword", require("./routes/updatePassword"));
 app.use("/api/getUserDetails", require("./routes/getUserDetails"));
 app.use("/api/updateUserDetails", require("./routes/updateUserDetails"));
 app.use("/api/users", require("./routes/users")); 
+
 //Quiz
 app.use("/api/startQuiz", require("./routes/startQuiz")); 
 
@@ -57,7 +58,7 @@ app.get("*", (req, res) => {
 });
 
 
-// Protected Route Example (Requires Authentication)
+// Protected Route (Requires Authentication)
 const authenticateToken = require("./middleware/auth");
 app.get("/api/users/protected", authenticateToken, (req, res) => {
     res.json({ message: "Protected route accessed", user: req.user });
