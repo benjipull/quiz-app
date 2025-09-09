@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card"; // Same as above. I will assume this is available.
-import { Badge } from "@/components/ui/badge"; // Same as above. I will assume this is available.
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Clock, ThumbsUp, ThumbsDown, Flag, Lightbulb } from "lucide-react";
 
 // Placeholder components to make the code runnable in a single file
@@ -38,13 +38,6 @@ const QuizResults = ({ results, onPlayAgain }) => {
     </div>
   );
 };
-
-
-// Note: The Header and QuizProgress components were also imported with a non-relative path.
-// They appear to be simple components and their functionality is already partially implemented
-// in the JSX of the Quiz component itself (e.g., the sticky header and the progress bar).
-// To make this file self-contained and avoid further import errors,
-// I've removed the imports for Header and QuizProgress.
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
@@ -510,7 +503,7 @@ export default function Quiz() {
               >
                 {showExplanation && !timeUp && quizState.question.answerStats && (
                   <div 
-                    className="absolute top-0 left-0 h-full bg-primary/10 transition-all duration-700 ease-out"
+                    className="absolute top-0 left-0 h-full bg-primary/15 transition-all duration-1000 ease-out rounded-r-md"
                     style={{ width: `${quizState.question.answerStats[answer] || 0}%` }}
                   />
                 )}
@@ -521,15 +514,10 @@ export default function Quiz() {
                   }`}>
                     {String.fromCharCode(65 + index)}
                   </div>
-                  <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0">
+                  <div className="flex-1 min-w-0">
                     <span className="font-medium text-base md:text-lg lg:text-xl leading-snug break-words">
                       {answer}
                     </span>
-                    {showExplanation && !timeUp && quizState.question.answerStats && (
-                      <span className="text-xs md:text-sm text-muted-foreground font-medium flex-shrink-0">
-                        {quizState.question.answerStats[answer]}%
-                      </span>
-                    )}
                   </div>
                 </div>
               </Card>
