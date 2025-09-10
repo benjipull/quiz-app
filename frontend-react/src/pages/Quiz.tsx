@@ -231,6 +231,18 @@ export default function Quiz() {
     }
   };
 
+  const handleVibration = (isCorrect: boolean) => {
+    if ("vibrate" in navigator) {
+      if (isCorrect) {
+        // A single, short vibration for a correct answer
+        navigator.vibrate(200);
+      } else {
+        // A pattern of two short vibrations for an incorrect answer
+        navigator.vibrate([200, 100, 200]);
+      }
+    }
+  };
+
   const handleAnswerSelection = (answer: string) => {
     if (selectedAnswer !== null || timeUp) return;
 
@@ -242,6 +254,9 @@ export default function Quiz() {
     setSelectedAnswer(answer);
     setShowExplanation(true);
     const isCorrect = answer === quizState.question?.correct_answer;
+    
+    // Call the new vibration handler
+    handleVibration(isCorrect);
     
     setQuizState((prev) => ({
       ...prev,
