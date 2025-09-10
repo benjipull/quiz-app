@@ -1,3 +1,4 @@
+import React from "react"; 
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,8 +13,8 @@ import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import AuthSection from "./pages/AuthSection";
 import Notifications from "./pages/Notification";
-import React from "react"; // Explicitly import React
-
+import Store from "./pages/Store";
+import Menu from "./pages/Menu";
 const queryClient = new QueryClient();
 
 // ProtectedRoute component to guard routes
@@ -44,6 +45,8 @@ const App = () => (
                         <Route path="leaderboard" element={<Leaderboard />} />
                         <Route path="profile" element={<Profile />} />
                         <Route path="notifications" element={<Notifications />} />
+                        <Route path="store" element={<Store />} />
+                        <Route path="menu" element={<Menu />} />
                     </Route>
 
                     {/* Catch-all route for any undefined paths */}
