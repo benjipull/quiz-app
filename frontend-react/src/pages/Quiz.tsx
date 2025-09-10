@@ -1,43 +1,12 @@
+"use client";
+
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Clock, ThumbsUp, ThumbsDown, Flag, Lightbulb } from "lucide-react";
-
-// Placeholder components to make the code runnable in a single file
-// In a real project, these would be separate files from a UI library like Shadcn/ui
-const QuizResults = ({ results, onPlayAgain }) => {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-quiz-background to-background text-foreground">
-      <Card className="p-8 md:p-12 lg:p-16 w-full max-w-2xl text-center shadow-lg border-primary/20 bg-quiz-card space-y-6">
-        <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-primary">Quiz Complete!</h2>
-        <div className="space-y-2 md:space-y-3">
-          <p className="text-sm md:text-base font-medium">Category: <span className="text-primary font-bold">{results.categoryName}</span></p>
-          <div className="grid grid-cols-2 gap-4 text-left">
-            <div className="col-span-1 p-4 rounded-xl bg-green-500/10 border border-green-500/30">
-              <p className="text-xl md:text-2xl font-bold text-green-500">{results.correctAnswers}</p>
-              <p className="text-xs md:text-sm text-green-400">Correct</p>
-            </div>
-            <div className="col-span-1 p-4 rounded-xl bg-red-500/10 border border-red-500/30">
-              <p className="text-xl md:text-2xl font-bold text-red-500">{results.incorrectAnswers}</p>
-              <p className="text-xs md:text-sm text-red-400">Incorrect</p>
-            </div>
-          </div>
-          <p className="text-xl md:text-2xl font-bold">Your Score: <span className="text-primary">{Math.round((results.correctAnswers / results.totalQuestions) * 100)}%</span></p>
-        </div>
-        <div className="space-y-4 pt-4">
-          <Button onClick={onPlayAgain} className="w-full text-base md:text-lg h-12 md:h-14">
-            Play Again
-          </Button>
-          <Button onClick={() => window.location.href = "/categories"} variant="outline" className="w-full text-base md:text-lg h-12 md:h-14">
-            Back to Categories
-          </Button>
-        </div>
-      </Card>
-    </div>
-  );
-};
+import QuizResults from "@/components/quiz/QuizResults";
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
@@ -95,6 +64,9 @@ export default function Quiz() {
   const totalQuestions = 10;
   const progress = ((quizState.currentQuestionIndex - 1) / totalQuestions) * 100;
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
+
+  const correctSound = new Audio("/correct.mp3");
+  const incorrectSound = new Audio("/incorrect.mp3");
 
   useEffect(() => {
     if (categoryId && userToken) {
@@ -277,6 +249,12 @@ export default function Quiz() {
       incorrectAnswers: prev.incorrectAnswers + (isCorrect ? 0 : 1),
       isAnswerSelected: true,
     }));
+    
+    if (isCorrect) {
+      correctSound.play();
+    } else {
+      incorrectSound.play();
+    }
   };
 
   const recordQuizCompletion = async () => {
@@ -386,6 +364,27 @@ export default function Quiz() {
     return "border-border bg-muted/30";
   };
 
+  const getLetterStyle = (answer: string) => {
+    if (timeUp) {
+      return "border-current text-muted-foreground";
+    }
+    
+    if (selectedAnswer === null) {
+      return "border-current text-current";
+    }
+    
+    if (answer === quizState.question?.correct_answer) {
+      return "bg-success text-white border-success";
+    }
+    
+    if (answer === selectedAnswer) {
+      return "bg-destructive text-white border-destructive";
+    }
+    
+    return "bg-muted text-muted-foreground border-border";
+  };
+
+
   const getTimerColor = () => {
     if (timeLeft > 20) return "text-success";
     if (timeLeft > 10) return "text-warning";
@@ -470,35 +469,33 @@ export default function Quiz() {
         </div>
       </div>
       
-      <div className="flex-1 overflow-y-auto px-4 py-8 md:py-12 max-w-full lg:max-w-4xl xl:max-w-6xl mx-auto">
+      <div className="flex-1 overflow-y-auto px-4 py-6 max-w-full lg:max-w-4xl xl:max-w-6xl mx-auto">
         <div className="space-y-6">
-          <Card className="p-6 md:p-8 lg:p-10 bg-quiz-card border-primary/20 shadow-lg">
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-relaxed flex-1">
-                  {quizState.question.question}
-                </h2>
-                {quizState.question.difficulty && (
-                  <Badge 
-                    variant="outline" 
-                    className={`text-sm self-start flex-shrink-0 ${
-                      quizState.question.difficulty === "Easy" ? "border-success text-success" :
-                      quizState.question.difficulty === "Medium" ? "border-warning text-warning" :
-                      "border-destructive text-destructive"
-                    }`}
-                  >
-                    {quizState.question.difficulty}
-                  </Badge>
-                )}
-              </div>
+          <div className="px-2 py-4">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-relaxed flex-1">
+                {quizState.question.question}
+              </h2>
+              {quizState.question.difficulty && (
+                <Badge 
+                  variant="outline" 
+                  className={`text-sm self-start flex-shrink-0 ${
+                    quizState.question.difficulty === "Easy" ? "border-success text-success" :
+                    quizState.question.difficulty === "Medium" ? "border-warning text-warning" :
+                    "border-destructive text-destructive"
+                  }`}
+                >
+                  {quizState.question.difficulty}
+                </Badge>
+              )}
             </div>
-          </Card>
+          </div>
 
-          <div className="space-y-4 md:space-y-6">
+          <div className="space-y-3">
             {quizState.question.answers.map((answer, index) => (
               <Card
                 key={index}
-                className={`p-4 md:p-6 lg:p-8 transition-all duration-300 ${getOptionStyle(answer)} hover:shadow-lg relative overflow-hidden cursor-pointer`}
+                className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} hover:shadow-lg relative overflow-hidden cursor-pointer`}
                 onClick={() => !timeUp && handleAnswerSelection(answer)}
               >
                 {showExplanation && !timeUp && quizState.question.answerStats && (
@@ -508,14 +505,12 @@ export default function Quiz() {
                   />
                 )}
                 
-                <div className="flex items-start gap-4 relative z-10">
-                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 flex items-center justify-center font-semibold text-base md:text-lg lg:text-xl transition-colors flex-shrink-0 ${
-                    selectedAnswer === answer ? 'bg-current text-white' : 'border-current'
-                  }`}>
+                <div className="flex items-center gap-4 relative z-10">
+                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 flex items-center justify-center font-semibold text-base md:text-lg transition-colors flex-shrink-0 ${getLetterStyle(answer)}`}>
                     {String.fromCharCode(65 + index)}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="font-medium text-base md:text-lg lg:text-xl leading-snug break-words">
+                  <div className="flex-1 min-w-0 flex items-center">
+                    <span className="font-medium text-base md:text-lg leading-snug break-words">
                       {answer}
                     </span>
                   </div>

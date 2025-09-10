@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -50,7 +52,6 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
   const { totalQuestions, correctAnswers, incorrectAnswers, categoryName, categoryId } = results;
   const percentage = Math.round((correctAnswers / totalQuestions) * 100);
 
-  // Trigger confetti effect for good scores
   useEffect(() => {
     if (percentage >= 70) {
       setShowConfetti(true);
@@ -80,7 +81,7 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
       icon: <Zap className="h-5 w-5" />,
       title: "Speed Demon",
       description: "Completed quiz quickly",
-      unlocked: percentage >= 80 // Could be based on actual time if tracked
+      unlocked: percentage >= 80 
     },
     {
       icon: <Brain className="h-5 w-5" />,
@@ -127,13 +128,11 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-quiz-background to-background relative overflow-hidden">
-      {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
 
-      {/* Confetti Effect */}
       {showConfetti && (
         <div className="absolute inset-0 pointer-events-none z-10">
           {[...Array(50)].map((_, i) => (
@@ -152,10 +151,8 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
       )}
 
       <div className="relative z-20 px-4 py-6 max-w-4xl mx-auto">
-        {/* Main Results Card */}
         <Card className="p-6 md:p-8 mb-6 bg-gradient-to-r from-card/90 to-card/70 backdrop-blur-sm border-primary/20 shadow-2xl">
           <div className="text-center space-y-6">
-            {/* Performance Badge */}
             <div className="flex justify-center">
               <Badge className={`${performance.bg} ${performance.color} border-current text-lg px-6 py-2 animate-pulse`}>
                 <Award className="h-5 w-5 mr-2" />
@@ -163,7 +160,6 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
               </Badge>
             </div>
 
-            {/* Main Score */}
             <div className="space-y-4">
               <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                 Quiz Complete!
@@ -178,7 +174,6 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
               </p>
             </div>
 
-            {/* Score Breakdown */}
             <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
               <div className="flex items-center justify-center space-x-2 p-3 bg-success/10 rounded-lg border border-success/20">
                 <CheckCircle className="h-5 w-5 text-success" />
@@ -198,7 +193,6 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
           </div>
         </Card>
 
-        {/* Achievements Section */}
         {unlockedAchievements.length > 0 && (
           <Card className="p-4 md:p-6 mb-6 bg-gradient-to-r from-yellow-500/5 to-orange-500/5 border-yellow-500/20">
             <div className="space-y-4">
@@ -225,7 +219,6 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
           </Card>
         )}
 
-        {/* Rating Section */}
         <Card className="p-4 md:p-6 mb-6">
           <div className="text-center space-y-4">
             <h3 className="text-lg font-semibold">How was this quiz?</h3>
@@ -268,7 +261,6 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
           </div>
         </Card>
 
-        {/* Action Buttons */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Button 
             onClick={onPlayAgain}
@@ -290,7 +282,6 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
           </Button>
         </div>
 
-        {/* Fun Stats */}
         <Card className="p-4 md:p-6 mt-6 bg-gradient-to-r from-primary/5 to-secondary/5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
             <div className="space-y-2">
