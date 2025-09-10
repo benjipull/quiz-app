@@ -10,7 +10,6 @@ import { Switch } from "@/components/ui/switch";
 import GameStatsHeader from "@/components/GameStatsHeader";
 import logo from "../assets/images/QuizicleLogo.png";
 import {
-  User,
   Settings,
   Trophy,
   Users,
@@ -27,20 +26,20 @@ import {
   Clock,
   BarChart3,
   BookOpen,
-  Gift,
-  CreditCard,
-  LogOut,
-  Sun,
-  Moon,
-  ChevronRight,
   Mail,
-  Phone,
   Bug,
   Heart,
   Info,
   Download,
   Trash2,
-  Lock
+  Lock,
+  LogOut,
+  Sun,
+  Moon,
+  ChevronRight,
+  User,
+  Zap,
+  Gift
 } from "lucide-react";
 
 const Menu = () => {
@@ -54,7 +53,8 @@ const Menu = () => {
     vibration: true,
     autoPlay: false,
     dataSaver: false,
-    offlineMode: false
+    offlineMode: false,
+    analytics: true
   });
 
   useEffect(() => {
@@ -100,25 +100,7 @@ const Menu = () => {
   };
 
   const menuSections = [
-    {
-      title: "Account",
-      items: [
-        { icon: User, label: "Edit Profile", description: "Update your information", action: () => navigate("/profile") },
-        { icon: Trophy, label: "Achievements", description: "View your accomplishments", action: () => navigate("/achievements") },
-        { icon: BarChart3, label: "Statistics", description: "Quiz performance & analytics", action: () => navigate("/stats") },
-        { icon: Clock, label: "History", description: "Past quiz attempts", action: () => navigate("/history") },
-      ]
-    },
-    {
-      title: "Social",
-      items: [
-        { icon: Users, label: "Friends", description: "Manage your friends list", action: () => navigate("/friends") },
-        { icon: MessageCircle, label: "Leaderboard", description: "Global & friends ranking", action: () => navigate("/leaderboard") },
-        { icon: Share2, label: "Invite Friends", description: "Share the app with others", action: () => {} },
-        { icon: Star, label: "Rate App", description: "Rate us on the app store", action: () => {} },
-      ]
-    },
-    {
+        {
       title: "Game Settings",
       items: [
         { 
@@ -153,43 +135,33 @@ const Menu = () => {
           value: settings.vibration,
           action: (value) => updateSetting('vibration', value)
         },
-      ]
-    },
-    {
-      title: "App Preferences",
-      items: [
-        { 
-          icon: Globe, 
-          label: "Auto-play Next Quiz", 
+        {
+          icon: Settings,
+          label: "Auto-play Next Quiz",
           description: "Automatically start next quiz",
           toggle: true,
           value: settings.autoPlay,
           action: (value) => updateSetting('autoPlay', value)
         },
-        { 
-          icon: Download, 
-          label: "Data Saver Mode", 
-          description: "Reduce data usage",
-          toggle: true,
-          value: settings.dataSaver,
-          action: (value) => updateSetting('dataSaver', value)
-        },
-        { 
-          icon: BookOpen, 
-          label: "Offline Mode", 
-          description: "Download quizzes for offline play",
-          toggle: true,
-          value: settings.offlineMode,
-          action: (value) => updateSetting('offlineMode', value)
-        },
       ]
     },
     {
-      title: "Premium",
+      title: "Social",
       items: [
-        { icon: Gift, label: "Premium Features", description: "Unlock exclusive content", action: () => navigate("/premium") },
-        { icon: CreditCard, label: "Purchase History", description: "View your transactions", action: () => navigate("/purchases") },
-        { icon: Shield, label: "Restore Purchases", description: "Restore previous purchases", action: () => {} },
+        { icon: Users, label: "Friends", description: "Manage your friends list", action: () => navigate("/friends") },
+        { icon: MessageCircle, label: "Leaderboard", description: "Global & friends ranking", action: () => navigate("/leaderboard") },
+        { icon: Share2, label: "Invite Friends", description: "Share the app with others", action: () => {} },
+        { icon: Star, label: "Rate App", description: "Rate us on the app store", action: () => {} },
+      ]
+    },
+
+    {
+      title: "Privacy & Data",
+      items: [
+        { icon: Download, label: "Data Saver Mode", description: "Reduce data usage", toggle: true, value: settings.dataSaver, action: (value) => updateSetting('dataSaver', value) },
+        { icon: BookOpen, label: "Offline Mode", description: "Download quizzes for offline play", toggle: true, value: settings.offlineMode, action: (value) => updateSetting('offlineMode', value) },
+        { icon: Shield, label: "Privacy Policy", description: "How we handle your data", action: () => {} },
+        { icon: Lock, label: "Terms of Service", description: "App usage terms", action: () => {} },
       ]
     },
     {
@@ -199,12 +171,10 @@ const Menu = () => {
         { icon: Mail, label: "Contact Support", description: "Get help from our team", action: () => {} },
         { icon: Bug, label: "Report Bug", description: "Report issues or feedback", action: () => {} },
         { icon: Info, label: "About", description: "App version and info", action: () => navigate("/about") },
-        { icon: Lock, label: "Privacy Policy", description: "How we handle your data", action: () => {} },
-        { icon: BookOpen, label: "Terms of Service", description: "App usage terms", action: () => {} },
       ]
     },
     {
-      title: "Account Management",
+      title: "Account Actions",
       items: [
         { icon: Trash2, label: "Clear Cache", description: "Free up storage space", action: () => {}, destructive: true },
         { icon: Download, label: "Export Data", description: "Download your quiz data", action: () => {} },
@@ -220,9 +190,7 @@ const Menu = () => {
       key={item.label} 
       className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
       onClick={() => {
-        if (item.toggle && typeof item.action === 'function') {
-          item.action(!item.value);
-        } else if (item.action) {
+        if (!item.toggle && item.action) {
           item.action();
         }
       }}
@@ -259,33 +227,6 @@ const Menu = () => {
       <Header logoAsTitle imageSrc={logo} showNotifications />
 
       <div className="mx-auto max-w-full space-y-4 px-4 pb-4 lg:px-8 lg:pb-8">
-        {/* Game Stats Header */}
-        <div className="top-0 z-10 bg-gradient-to-br from-background to-quiz-background">
-          <GameStatsHeader />
-        </div>
-
-        {/* User Profile Section */}
-        <Card className="p-6">
-          <div className="flex items-center space-x-4">
-            <Link to="/profile" className="no-underline">
-              <Avatar className="w-16 h-16">
-                <AvatarImage src={avatar} alt={alias} />
-                <AvatarFallback className="bg-gradient-to-br from-primary/20 to-accent/20 border-4 border-primary/20 text-xl font-bold text-primary">
-                  {alias.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            </Link>
-            <div className="flex-grow">
-              <h2 className="text-xl font-bold text-foreground">{alias}</h2>
-              <p className="text-muted-foreground">Tap to view profile</p>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Heart className="w-5 h-5 text-red-500" />
-              <span className="text-sm font-medium">Premium</span>
-            </div>
-          </div>
-        </Card>
-
         {/* Menu Sections */}
         <div className="space-y-6">
           {menuSections.map((section) => (
