@@ -209,7 +209,7 @@ export default function Home() {
 
       <div className="mx-auto max-w-full space-y-4 px-4 pb-4 lg:px-8 lg:pb-8">
         {/* Game Stats Header */}
-        <div className="sticky top-0 z-10 bg-gradient-to-br from-background to-quiz-background">
+        <div className=" top-0 z-10 bg-gradient-to-br from-background to-quiz-background">
           <GameStatsHeader/>
           
           {/* User Avatar Section */}
