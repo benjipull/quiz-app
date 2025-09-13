@@ -8,7 +8,7 @@ const { populateCategory } = require("./scripts/populateCategories"); // Import 
 async function populateAllCategories() {
     try {
 
-        console.log("🔍 MONGO_URI:", process.env.MONGO_URI);
+        //console.log("🔍 MONGO_URI:", process.env.MONGO_URI);
 
         await connectDB();
         
@@ -31,16 +31,9 @@ async function populateAllCategories() {
         console.log(`🔹 Populating the categories with the lowest quesiton count.`);
 
         for (const category of categories) {
-            await populateCategory(category._id, 1);
-            await populateCategory(category._id, 1);
-            await populateCategory(category._id, 1);
-            await populateCategory(category._id, 1);
-            await populateCategory(category._id, 1);
-            await populateCategory(category._id, 1);
-            await populateCategory(category._id, 1);
-            await populateCategory(category._id, 1);
-            await populateCategory(category._id, 1);
-            await populateCategory(category._id, 1);
+            for (let i = 0; i < 20; i++) {
+                await populateCategory(category._id, 1);
+            }
         }
 
         console.log("🎉 All categories populated successfully!");
