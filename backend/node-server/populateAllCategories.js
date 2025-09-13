@@ -20,7 +20,7 @@ async function populateAllCategories() {
                 }
             },
             { $sort: { questionCount: 1 } }, // Sort by question count (ascending)
-            { $limit: 10 } // Get only the lowest
+            { $limit: 20 } // Get only the lowest
         ]);
 
         if (categories.length === 0) {
@@ -31,7 +31,7 @@ async function populateAllCategories() {
         console.log(`🔹 Populating the categories with the lowest quesiton count.`);
 
         for (const category of categories) {
-            for (let i = 0; i < 20; i++) {
+            for (let i = 0; i < 40; i++) {
                 await populateCategory(category._id, 1);
             }
         }
