@@ -1,7 +1,7 @@
+"use client";
+
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Header } from "@/components/layout/Header";
-import { QuizProgress } from "@/components/quiz/QuizProgress";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ interface Question {
   correct_answer: string;
   explanation: string;
   difficulty?: "Easy" | "Medium" | "Hard";
-  answerStats?: { [key: string]: number }; // Percentage of users who selected each answer
+  answerStats?: { [key: string]: number };
 }
 
 interface QuizState {
@@ -65,17 +65,18 @@ export default function Quiz() {
   const progress = ((quizState.currentQuestionIndex - 1) / totalQuestions) * 100;
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
 
-  // Initial quiz start
+  const correctSound = new Audio("/correct.mp3");
+  const incorrectSound = new Audio("/incorrect.mp3");
+
   useEffect(() => {
     if (categoryId && userToken) {
       startQuiz(categoryId);
     } else if (!userToken) {
-      alert("❌ You must be logged in to play.");
+      console.log("❌ You must be logged in to play.");
       navigate("/categories");
     }
   }, [categoryId, userToken]);
 
-  // Timer logic
   useEffect(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -110,7 +111,6 @@ export default function Quiz() {
     };
   }, [quizState.question, quizState.isAnswerSelected, timeUp]);
 
-  // Reset states on question change
   useEffect(() => {
     setSelectedAnswer(null);
     setShowExplanation(false);
@@ -120,7 +120,6 @@ export default function Quiz() {
     setTimeUp(false);
   }, [quizState.question, quizState.currentQuestionIndex]);
   
-  // Auto-scroll to explanation
   useEffect(() => {
     if (showExplanation && explanationRef.current) {
       const viewportHeight = window.innerHeight;
@@ -138,7 +137,6 @@ export default function Quiz() {
     }
   }, [showExplanation]);
 
-  // Scroll to top on new question
   useEffect(() => {
     if (quizState.currentQuestionIndex > 0) {
       window.scrollTo({ 
@@ -150,7 +148,7 @@ export default function Quiz() {
 
   const startQuiz = async (categoryId: string) => {
     if (!userToken) {
-      alert("❌ You must be logged in to play.");
+      console.log("❌ You must be logged in to play.");
       return;
     }
 
@@ -233,6 +231,18 @@ export default function Quiz() {
     }
   };
 
+  const handleVibration = (isCorrect: boolean) => {
+    if ("vibrate" in navigator) {
+      if (isCorrect) {
+        // A single, short vibration for a correct answer
+        navigator.vibrate(200);
+      } else {
+        // A pattern of two short vibrations for an incorrect answer
+        navigator.vibrate([200, 100, 200]);
+      }
+    }
+  };
+
   const handleAnswerSelection = (answer: string) => {
     if (selectedAnswer !== null || timeUp) return;
 
@@ -245,12 +255,21 @@ export default function Quiz() {
     setShowExplanation(true);
     const isCorrect = answer === quizState.question?.correct_answer;
     
+    // Call the new vibration handler
+    handleVibration(isCorrect);
+    
     setQuizState((prev) => ({
       ...prev,
       correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
       incorrectAnswers: prev.incorrectAnswers + (isCorrect ? 0 : 1),
       isAnswerSelected: true,
     }));
+    
+    if (isCorrect) {
+      correctSound.play();
+    } else {
+      incorrectSound.play();
+    }
   };
 
   const recordQuizCompletion = async () => {
@@ -360,6 +379,27 @@ export default function Quiz() {
     return "border-border bg-muted/30";
   };
 
+  const getLetterStyle = (answer: string) => {
+    if (timeUp) {
+      return "border-current text-muted-foreground";
+    }
+    
+    if (selectedAnswer === null) {
+      return "border-current text-current";
+    }
+    
+    if (answer === quizState.question?.correct_answer) {
+      return "bg-success text-white border-success";
+    }
+    
+    if (answer === selectedAnswer) {
+      return "bg-destructive text-white border-destructive";
+    }
+    
+    return "bg-muted text-muted-foreground border-border";
+  };
+
+
   const getTimerColor = () => {
     if (timeLeft > 20) return "text-success";
     if (timeLeft > 10) return "text-warning";
@@ -401,17 +441,17 @@ export default function Quiz() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-quiz-background to-background">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-quiz-background to-background">
       <div className="sticky top-0 z-30 bg-gradient-to-br from-quiz-background to-background border-b border-border/20 backdrop-blur-sm">
-        <div className="px-3 md:px-4 py-2 max-w-full lg:max-w-4xl xl:max-w-6xl mx-auto">
+        <div className="px-4 py-3 md:py-4 max-w-full lg:max-w-4xl xl:max-w-6xl mx-auto">
           <div className="flex items-center justify-between gap-2 mb-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => navigate("/categories")}
-              className="flex items-center gap-1 hover:bg-card/60 text-xs px-2 py-1 flex-shrink-0 min-w-0"
+              className="flex items-center gap-1 hover:bg-card/60 text-sm md:text-base px-2 py-1 flex-shrink-0 min-w-0"
             >
-              <ArrowLeft className="h-3 w-3 flex-shrink-0" />
+              <ArrowLeft className="h-4 w-4 flex-shrink-0" />
               <span className="hidden sm:inline truncate">Back</span>
             </Button>
             
@@ -425,78 +465,69 @@ export default function Quiz() {
             </div>
             
             <div className="flex items-center gap-1 bg-card/60 backdrop-blur-sm rounded-full px-2 py-1 flex-shrink-0">
-              <Clock className="h-3 w-3 text-warning flex-shrink-0" />
+              <Clock className="h-4 w-4 text-warning flex-shrink-0" />
               <Badge 
                 variant="outline" 
-                className={`border-warning bg-transparent text-xs min-w-[40px] text-center ${getTimerColor()} ${timeLeft <= 10 ? 'animate-pulse' : ''}`}
+                className={`border-warning bg-transparent text-sm min-w-[40px] text-center ${getTimerColor()} ${timeLeft <= 10 ? 'animate-pulse' : ''}`}
               >
                 {timeLeft}s
               </Badge>
             </div>
           </div>
           
-          <div className="w-full bg-secondary rounded-full h-1.5">
+          <div className="w-full bg-secondary rounded-full h-2">
             <div 
-              className="bg-primary h-1.5 rounded-full transition-all duration-300 ease-out"
+              className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
               style={{ width: `${((quizState.currentQuestionIndex - 1) / totalQuestions) * 100}%` }}
             />
           </div>
         </div>
       </div>
       
-      <div className="px-3 md:px-4 max-w-full lg:max-w-4xl xl:max-w-6xl mx-auto">
-        <div className="py-4 space-y-4">
-          <Card className="p-4 md:p-6 lg:p-8 bg-quiz-card border-primary/20 shadow-lg">
-            <div className="space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                <h2 className="text-base md:text-lg lg:text-xl font-bold text-foreground leading-relaxed flex-1">
-                  {quizState.question.question}
-                </h2>
-                {quizState.question.difficulty && (
-                  <Badge 
-                    variant="outline" 
-                    className={`text-xs self-start flex-shrink-0 ${
-                      quizState.question.difficulty === "Easy" ? "border-success text-success" :
-                      quizState.question.difficulty === "Medium" ? "border-warning text-warning" :
-                      "border-destructive text-destructive"
-                    }`}
-                  >
-                    {quizState.question.difficulty}
-                  </Badge>
-                )}
-              </div>
+      <div className="flex-1 overflow-y-auto px-4 py-6 max-w-full lg:max-w-4xl xl:max-w-6xl mx-auto">
+        <div className="space-y-6">
+          <div className="px-2 py-4">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-relaxed flex-1">
+                {quizState.question.question}
+              </h2>
+              {quizState.question.difficulty && (
+                <Badge 
+                  variant="outline" 
+                  className={`text-sm self-start flex-shrink-0 ${
+                    quizState.question.difficulty === "Easy" ? "border-success text-success" :
+                    quizState.question.difficulty === "Medium" ? "border-warning text-warning" :
+                    "border-destructive text-destructive"
+                  }`}
+                >
+                  {quizState.question.difficulty}
+                </Badge>
+              )}
             </div>
-          </Card>
+          </div>
 
-          <div className="space-y-2 md:space-y-3">
+          <div className="space-y-3">
             {quizState.question.answers.map((answer, index) => (
               <Card
                 key={index}
-                className={`p-3 md:p-4 lg:p-5 transition-all duration-300 ${getOptionStyle(answer)} hover:shadow-md relative overflow-hidden cursor-pointer`}
+                className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} hover:shadow-lg relative overflow-hidden cursor-pointer`}
                 onClick={() => !timeUp && handleAnswerSelection(answer)}
               >
                 {showExplanation && !timeUp && quizState.question.answerStats && (
                   <div 
-                    className="absolute top-0 left-0 h-full bg-primary/10 transition-all duration-700 ease-out"
+                    className="absolute top-0 left-0 h-full bg-primary/15 transition-all duration-1000 ease-out rounded-r-md"
                     style={{ width: `${quizState.question.answerStats[answer] || 0}%` }}
                   />
                 )}
                 
-                <div className="flex items-start gap-3 relative z-10">
-                  <div className={`w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 rounded-full border-2 flex items-center justify-center font-semibold text-xs md:text-sm lg:text-base transition-colors flex-shrink-0 ${
-                    selectedAnswer === answer ? 'bg-current text-white' : 'border-current'
-                  }`}>
+                <div className="flex items-center gap-4 relative z-10">
+                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 flex items-center justify-center font-semibold text-base md:text-lg transition-colors flex-shrink-0 ${getLetterStyle(answer)}`}>
                     {String.fromCharCode(65 + index)}
                   </div>
-                  <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0">
-                    <span className="font-medium text-sm md:text-base lg:text-lg leading-snug break-words">
+                  <div className="flex-1 min-w-0 flex items-center">
+                    <span className="font-medium text-base md:text-lg leading-snug break-words">
                       {answer}
                     </span>
-                    {showExplanation && !timeUp && quizState.question.answerStats && (
-                      <span className="text-xs md:text-sm text-muted-foreground font-medium flex-shrink-0">
-                        {quizState.question.answerStats[answer]}%
-                      </span>
-                    )}
                   </div>
                 </div>
               </Card>
@@ -505,20 +536,20 @@ export default function Quiz() {
 
           {timeUp && (
             <div ref={explanationRef}>
-              <Card className="p-4 md:p-6 bg-destructive/5 border-destructive/20 animate-slide-up">
-                <div className="text-center space-y-2">
-                  <p className="font-semibold text-destructive text-sm md:text-base">⏰ Time's Up!</p>
-                  <p className="text-xs md:text-sm text-muted-foreground">
+              <Card className="p-6 md:p-8 bg-destructive/5 border-destructive/20 animate-slide-up">
+                <div className="text-center space-y-3">
+                  <p className="font-semibold text-destructive text-base md:text-lg">⏰ Time's Up!</p>
+                  <p className="text-sm md:text-base text-muted-foreground">
                     You didn't answer in time. This question is marked as incorrect.
                   </p>
                 </div>
               </Card>
               
-              <div className="mt-4 pb-4">
+              <div className="mt-6 pb-4">
                 <Button 
                   variant="default" 
                   size="lg" 
-                  className="w-full h-12 md:h-14 text-sm md:text-base"
+                  className="w-full h-14 md:h-16 text-base md:text-lg"
                   onClick={handleNextQuestion}
                 >
                   {isLastQuestion ? "Finish Quiz" : "Next Question"}
@@ -529,11 +560,11 @@ export default function Quiz() {
 
           {showExplanation && !timeUp && quizState.question.explanation && (
             <div ref={explanationRef}>
-              <Card className="p-4 md:p-6 bg-primary/5 border-primary/20 animate-slide-up">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Lightbulb className="h-4 w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 text-primary flex-shrink-0" />
-                    <span className="font-semibold text-primary text-sm md:text-base lg:text-lg">
+              <Card className="p-6 md:p-8 bg-primary/5 border-primary/20 animate-slide-up">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Lightbulb className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-primary flex-shrink-0" />
+                    <span className="font-semibold text-primary text-base md:text-lg lg:text-xl">
                       {selectedAnswer === quizState.question.correct_answer ? "Correct!" : "Incorrect!"}
                     </span>
                   </div>
@@ -543,17 +574,17 @@ export default function Quiz() {
                 </div>
               </Card>
 
-              <div className="mt-4 space-y-3 animate-fade-in pb-4">
-                <Card className="p-3 md:p-4 bg-card/60">
-                  <div className="space-y-3">
+              <div className="mt-6 space-y-4 animate-fade-in pb-4">
+                <Card className="p-4 md:p-6 bg-card/60">
+                  <div className="space-y-4">
                     <p className="text-sm font-medium text-center">Did you like this question?</p>
-                    <div className="flex gap-2 md:gap-3 justify-center">
+                    <div className="flex gap-4 justify-center">
                       <Button 
                         variant="outline" 
                         size="sm"
                         onClick={() => handleFeedback("up")}
                         disabled={feedbackGiven}
-                        className={`text-xs flex-1 max-w-[120px] ${
+                        className={`text-sm flex-1 max-w-[120px] h-10 ${
                           feedbackType === "up" 
                             ? "bg-success/20 border-success text-success hover:bg-success/20 hover:text-success" 
                             : feedbackGiven 
@@ -561,7 +592,7 @@ export default function Quiz() {
                               : "hover:text-success"
                         }`}
                       >
-                        <ThumbsUp className="h-3 w-3 md:h-4 md:w-4" />
+                        <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
                         <span className="ml-1 sm:ml-2">Yes</span>
                       </Button>
                       <Button 
@@ -569,7 +600,7 @@ export default function Quiz() {
                         size="sm"
                         onClick={() => handleFeedback("down")}
                         disabled={feedbackGiven}
-                        className={`text-xs flex-1 max-w-[120px] ${
+                        className={`text-sm flex-1 max-w-[120px] h-10 ${
                           feedbackType === "down" 
                             ? "bg-destructive/20 border-destructive text-destructive hover:bg-destructive/20 hover:text-destructive" 
                             : feedbackGiven 
@@ -577,11 +608,11 @@ export default function Quiz() {
                               : "hover:text-destructive"
                         }`}
                       >
-                        <ThumbsDown className="h-3 w-3 md:h-4 md:w-4" />
+                        <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
                         <span className="ml-1 sm:ml-2">No</span>
                       </Button>
-                      <Button variant="outline" size="sm" className="text-xs flex-1 max-w-[120px]">
-                        <Flag className="h-3 w-3 md:h-4 md:w-4" />
+                      <Button variant="outline" size="sm" className="text-sm flex-1 max-w-[120px] h-10">
+                        <Flag className="h-4 w-4 md:h-5 md:w-5" />
                         <span className="ml-1 sm:ml-2 hidden sm:inline">Report</span>
                       </Button>
                     </div>
@@ -591,7 +622,7 @@ export default function Quiz() {
                 <Button 
                   variant="default" 
                   size="lg" 
-                  className="w-full h-12 md:h-14 text-sm md:text-base"
+                  className="w-full h-14 md:h-16 text-base md:text-lg"
                   onClick={handleNextQuestion}
                 >
                   {isLastQuestion ? "Finish Quiz" : "Next Question"}

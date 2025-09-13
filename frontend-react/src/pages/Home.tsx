@@ -12,14 +12,6 @@ import {
   TrendingUp,
   Award,
   Clock,
-  Star,
-  Coins,
-  Heart,
-  House as HouseIcon,
-  Target,
-  Users,
-  Gift,
-  Trophy,
 } from "lucide-react";
 import logo from "../assets/images/QuizicleLogo.png";
 import { cn } from "@/lib/utils";
@@ -60,18 +52,6 @@ const defaultStats = [
   { icon: Clock, label: "Avg. Time", value: "5.2m", color: "text-secondary" },
 ];
 
-interface Tab {
-  id: "home" | "missions" | "friends";
-  label: string;
-  icon: React.ElementType;
-}
-
-const TABS: Tab[] = [
-  { id: "home", label: "Home", icon: HouseIcon },
-  { id: "missions", label: "Quests", icon: Target },
-  { id: "friends", label: "Friends", icon: Users },
-];
-
 export default function Home() {
   const [featuredCategories, setFeaturedCategories] = useState<Category[]>([]);
   const [stats, setStats] = useState(defaultStats);
@@ -83,9 +63,6 @@ export default function Home() {
   const [userCoins, setUserCoins] = useState(500);
   const [userLives, setUserLives] = useState(5);
 
-  const [activeTab, setActiveTab] = useState<"home" | "missions" | "friends">(
-    "home"
-  );
   const userToken = localStorage.getItem("token");
 
   const [userProfile, setUserProfile] = useState<any | null>(null);
@@ -206,41 +183,6 @@ export default function Home() {
     }
   };
 
-  const TabButton = ({
-    tab,
-    isActive,
-  }: {
-    tab: Tab;
-    isActive: boolean;
-  }) => {
-    const Icon = tab.icon;
-    return (
-      <button
-        onClick={() => setActiveTab(tab.id)}
-        className={cn(
-          "flex flex-col items-center pb-1 w-full transition-all border-b-4",
-          isActive
-            ? "text-primary border-primary"
-            : "text-muted-foreground border-gray-300 hover:border-gray-400 hover:text-foreground"
-        )}
-      >
-        <Icon className="h-6 w-6" />
-        <span className="text-xs">{tab.label}</span>
-      </button>
-    );
-  };
-
-  // Determine if we need full height based on content
-  const getContainerHeight = () => {
-    if (activeTab === "missions" && featuredCategories.length > 3) {
-      return "min-h-screen";
-    }
-    if (activeTab === "home") {
-      return "min-h-screen";
-    }
-    return "min-h-fit";
-  };
-
   if (error && featuredCategories.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background">
@@ -262,179 +204,73 @@ export default function Home() {
   const avatarImage = userAvatar || undefined;
 
   return (
-    <div className={cn(
-      "bg-gradient-to-br from-background to-quiz-background",
-      getContainerHeight()
-    )}>
+    <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background">
       <Header logoAsTitle imageSrc={logo} showNotifications />
 
-      <div className="mx-auto max-w-full space-y-6 px-4 pb-4 lg:px-8 lg:pb-8">
-        {/* Conditional Layout based on active tab */}
-        {activeTab === "missions" ? (
-          /* Quests Layout - Compact header */
-          <>
-            <div className="sticky top-0 z-10 bg-gradient-to-br from-background to-quiz-background">
-              <GameStatsHeader/>
-              
-
-              <div className="py-6">
-                <Button
-                  onClick={handleQuickQuiz}
-                  disabled={loading}
-                  className="w-full h-16 bg-success hover:bg-success/90 text-white text-xl font-bold rounded-2xl"
-                >
-                  {loading ? "Loading..." : "Play"}
-                  <div className="ml-3 flex items-center bg-white/20 px-2 py-1 rounded-full">
-                    <span className="font-bold">{userLevel}</span>
-                    <span className="ml-1 text-xs">Lvl</span>
-                  </div>
-                </Button>
-              </div>
-              
-              {/* Tabs directly under play button */}
-              <div className="bg-background pt-2 -mt-2">
-                <div className="flex justify-around items-center">
-                  {TABS.map((tab) => (
-                    <TabButton
-                      key={tab.id}
-                      tab={tab}
-                      isActive={activeTab === tab.id}
-                    />
-                  ))}
-                </div>
-              </div>
+      <div className="mx-auto max-w-full space-y-4 px-4 pb-4 lg:px-8 lg:pb-8">
+        {/* Game Stats Header */}
+        <div className=" top-0 z-10 bg-gradient-to-br from-background to-quiz-background">
+          <GameStatsHeader/>
+          
+          {/* User Avatar Section */}
+          <div className="flex flex-col items-center space-y-2 py-3">
+            <div className="relative">
+              <Link to="/profile" className="no-underline">
+                <Avatar className="w-20 h-20">
+                  <AvatarImage src={avatarImage} alt={alias} />
+                  <AvatarFallback className="bg-gradient-to-br from-primary/20 to-accent/20 border-4 border-primary/20 text-2xl font-bold text-primary">
+                    {alias.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
+              <div className="absolute bottom-0 right-0 w-5 h-5 bg-success rounded-full border-2 border-background"></div>
             </div>
-          </>
-        ) : (
-          <>
-            <div className="sticky top-0 z-10 bg-gradient-to-br from-background to-quiz-background">
-              <GameStatsHeader/>
+            <h2 className="text-lg font-bold">{alias}</h2>
+          </div>
 
-              <div className="flex flex-col items-center space-y-3 py-6">
-                <div className="relative">
-                  <Link to="/profile" className="no-underline">
-                  <Avatar className="w-24 h-24">
-                    <AvatarImage src={avatarImage} alt={alias} />
-                    <AvatarFallback className="bg-gradient-to-br from-primary/20 to-accent/20 border-4 border-primary/20 text-3xl font-bold text-primary">
-                      {alias.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  </Link>
-                  <div className="absolute bottom-0 right-0 w-6 h-6 bg-success rounded-full border-2 border-background"></div>
-                </div>
-                <h2 className="text-xl font-bold">{alias}</h2>
+          {/* Play Button */}
+          <div className="pb-3">
+            <Button
+              onClick={handleQuickQuiz}
+              disabled={loading}
+              className="w-full h-12 bg-success hover:bg-success/90 text-white text-lg font-bold rounded-xl"
+            >
+              {loading ? "Loading..." : "Play"}
+              <div className="ml-2 flex items-center bg-white/20 px-2 py-0.5 rounded-full">
+                <span className="font-bold">{userLevel}</span>
+                <span className="ml-1 text-xs">Lvl</span>
               </div>
+            </Button>
+          </div>
+        </div>
 
-              <Button
-                onClick={handleQuickQuiz}
-                disabled={loading}
-                className="w-full h-16 bg-success hover:bg-success/90 text-white text-xl font-bold rounded-2xl"
-              >
-                {loading ? "Loading..." : "Play"}
-                <div className="ml-3 flex items-center bg-white/20 px-2 py-1 rounded-full">
-                  <span className="font-bold">{userLevel}</span>
-                  <span className="ml-1 text-xs">Lvl</span>
-                </div>
-              </Button>
+        {/* Featured Categories */}
+        <div className="mt-4">
+          <h3 className="text-lg font-bold mb-3">
+            Featured Categories
+          </h3>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <p className="text-muted-foreground">Loading categories...</p>
             </div>
-
-            {/* Tabs for non-quest tabs */}
-            <div className="bg-background pt-6 -mt-2">
-              <div className="flex justify-around items-center">
-                {TABS.map((tab) => (
-                  <TabButton
-                    key={tab.id}
-                    tab={tab}
-                    isActive={activeTab === tab.id}
-                  />
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Content */}
-        <div className="mt-6">
-          {activeTab === "home" && (
-            <>
-              <Card className="bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-orange-500/20 border-purple-500/30">
-                <div className="flex justify-between p-4">
-                  <div>
-                    <h3 className="font-bold text-lg">PREMIUM PACK</h3>
-                    <p className="text-sm text-muted-foreground">
-                      No ads, Unlimited lives, Boosts
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <div className="bg-red-500 text-white px-2 rounded-full text-sm mb-1">
-                      -40%
-                    </div>
-                    <div className="bg-success text-white px-4 py-1 rounded-full font-bold">
-                      R 29,99
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              <div className="grid grid-cols-2 gap-4 mt-6">
-                <Link to="/leaderboard" className="no-underline">
-                <Card className="p-6 text-center bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
-                  <Trophy className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-                  <h3 className="font-bold">Competitions</h3>
-                </Card>
-                </Link>
-                <Card className="p-6 text-center bg-gradient-to-br from-pink-500/20 to-red-500/20 relative">
-                  <Gift className="h-8 w-8 text-pink-500 mx-auto mb-2" />
-                  <h3 className="font-bold">Daily Bonus</h3>
-                  <div className="absolute top-2 right-2 w-3 h-3 bg-red-500 rounded-full"></div>
-                </Card>
-              </div>
-            </>
-          )}
-
-          {activeTab === "missions" && (
-            <div className="mt-6">
-              <h3 className="text-lg font-bold mb-4">
-                Featured Categories
-              </h3>
-              {loading ? (
-                <div className="flex justify-center py-12">
-                  <p className="text-muted-foreground">Loading categories...</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  {featuredCategories.map((cat) => (
-                    <CategoryCard
-                      key={cat._id}
-                      id={cat._id}
-                      title={cat.name}
-                      description={cat.description}
-                      difficulty={cat.difficulty || "Medium"}
-                      questionCount={cat.questionCount || 10}
-                      completions={cat.completionCount || 0}
-                      rating={cat.averageRating || 0}
-                      timeEstimate={cat.timeEstimate || "5 min"}
-                      imageUrl={cat.imageUrl || ""}
-                      createdBy={cat.createdBy || "QuizMaster"}
-                      onPlay={handlePlayQuiz}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === "friends" && (
-            <div className="flex items-center justify-center py-16">
-              <div className="text-center">
-                <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-muted-foreground mb-2">
-                  Coming Soon
-                </h3>
-                <p className="text-muted-foreground max-w-sm">
-                  Friends list, invites & leaderboards will be available in the next update!
-                </p>
-              </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {featuredCategories.map((cat) => (
+                <CategoryCard
+                  key={cat._id}
+                  id={cat._id}
+                  title={cat.name}
+                  description={cat.description}
+                  difficulty={cat.difficulty || "Medium"}
+                  questionCount={cat.questionCount || 10}
+                  completions={cat.completionCount || 0}
+                  rating={cat.averageRating || 0}
+                  timeEstimate={cat.timeEstimate || "5 min"}
+                  imageUrl={cat.imageUrl || ""}
+                  createdBy={cat.createdBy || "QuizMaster"}
+                  onPlay={handlePlayQuiz}
+                />
+              ))}
             </div>
           )}
         </div>

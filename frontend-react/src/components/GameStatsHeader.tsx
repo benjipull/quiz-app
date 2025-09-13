@@ -27,7 +27,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = () => {
   const dummyLives = 3;
 
   return (
-    <div className="sticky top-10 z-10 bg-gradient-to-br from-background to-quiz-background p-4 shadow-md">
+    <div className="sticky top-10 z-10 bg-transparent p-4 ">
       <div className="pt-4 flex justify-between items-center max-w-4xl mx-auto"> {/* Added max-w-4xl and mx-auto for centering */}
         <div className="flex gap-3">
           <div className="flex items-center bg-card rounded-full px-3 py-2 border border-border/50 shadow-sm">
