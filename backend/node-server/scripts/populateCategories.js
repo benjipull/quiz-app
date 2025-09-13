@@ -20,17 +20,18 @@ const generateQuestionHash = (questionText) => {
 };
 
 async function fetchQuestions(categoryName) {
+
     console.log(`🔹 Generating for category: "${categoryName}" from ollama`);
 
     const avoidSection = avoidedQuestions.length > 0
-        ? `Avoid generating questions semantically similar to any of these:\n${avoidedQuestions.map(q => `- ${q}`).join("\n")}\n\n`
+        ? `BANNED QUESTIONS (must never be generated):
+        \n${avoidedQuestions.map(q => `- ${q}`).join("\n")}\n\n
+        `
         : "";
 
     const systemPrompt = `
 You are an AI Quiz Generator. Output STRICT JSON only (no prose, no markdown).
-
 ${avoidSection}
-
 RUBRIC for "difficulty_level" (integer 1–10):
 1–2 Very Easy: universally known, primary-school facts.
 3–4 Easy: commonly taught basics.
@@ -62,6 +63,7 @@ SELF-CHECK (must pass all, or output {}):
 - The question is unambiguous (only one correct choice).
 - source_domain is from the allowed list above.
 - source_quote directly supports the explanation’s key fact.
+- Avoid generating questions which are semantically similar any questions in BANNED QUESTIONS.
 
 OUTPUT (object only):
 {
@@ -80,6 +82,8 @@ If any requirement fails, output {}.
 
 Category: ${categoryName}. Generate ONE question.
 `;
+
+//console.log(`🔹Prompt ${systemPrompt}`);
 
  try {
     const res = await axios.post(OLLAMA_URL, {
@@ -105,8 +109,7 @@ Category: ${categoryName}. Generate ONE question.
     }
 
     let rawResponse = String(res.data.response).trim();
-    //console.log(`🔹 Response from Ollama ${rawResponse}`);
-
+    
     // Try to parse JSON directly
     let parsed;
     try {
@@ -179,9 +182,10 @@ async function populateCategory(categoryId, numQuestions) {
             fetchedQuestions.forEach(q => {
                 const questionHash = generateQuestionHash(q.question);
 
+                avoidedQuestions.push(q.question);
+
                 if (category.questions.some(q => q.hash === questionHash)) {
                     console.log(`⚠️ Duplicate skipped: ${q.question}`);
-                    avoidedQuestions.push(q.question);
                     return;
                 }
 
