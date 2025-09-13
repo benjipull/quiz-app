@@ -449,9 +449,6 @@ const Profile = () => {
               <div className="flex items-center space-x-3">
                 <GameStatsHeader />
               </div>
-              <Button variant="destructive" onClick={handleLogout} size="sm" className="rounded-full">
-                <span className="text-xs font-semibold">Logout</span>
-              </Button>
             </div>
             
             {/* Profile Info Section */}
@@ -512,7 +509,7 @@ const Profile = () => {
               </TabsList>
               
               <TabsContent value="history" className="mt-6 space-y-4">
-                <Card className="bg-card/90 backdrop-blur-sm border-border/50 shadow-xl">
+                <Card className="bg-transparent backdrop-blur-sm border-border/50 shadow-xl">
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2 text-foreground">
                       <Award className="w-5 h-5" />
@@ -521,7 +518,7 @@ const Profile = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {achievements.map((achievement) => (
-                      <div key={achievement.id} className="flex items-center space-x-4 p-3 rounded-lg bg-accent/50 border border-border/30">
+                      <div key={achievement.id} className="flex items-center space-x-4 p-3 rounded-lg bg-transparent border border-border/40">
                         <div className="w-12 h-12 rounded-full bg-card flex items-center justify-center text-2xl border-2 border-border">
                           {achievement.icon}
                         </div>
@@ -544,7 +541,7 @@ const Profile = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-card/90 backdrop-blur-sm border-border/50 shadow-xl">
+                <Card className="bg-transparent backdrop-blur-sm border-border/50 shadow-xl">
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2 text-foreground">
                       <TrendingUp className="w-5 h-5" />
@@ -597,7 +594,7 @@ const Profile = () => {
               </TabsContent>
 
               <TabsContent value="categories" className="mt-6">
-                <Card className="bg-card/90 backdrop-blur-sm border-border/50 shadow-xl">
+                <Card className="bg-transparent backdrop-blur-sm border-border/50 shadow-xl">
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2 text-foreground">
                       <Brain className="w-5 h-5" />
@@ -674,7 +671,7 @@ const Profile = () => {
               </TabsContent>
 
               <TabsContent value="purchases" className="mt-6">
-                <Card className="bg-card/90 backdrop-blur-sm border-border/50 shadow-xl">
+                <Card className="bg-transparent backdrop-blur-sm border-border/50 shadow-xl">
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2 text-foreground">
                       <ShoppingBag className="w-5 h-5" />
@@ -690,7 +687,7 @@ const Profile = () => {
                         </div>
                       ) : (
                         purchases.map((purchase) => (
-                          <div key={purchase.id} className="flex items-center justify-between p-4 rounded-lg bg-accent/30 border border-border/30">
+                          <div key={purchase.id} className="flex items-center justify-between p-4 rounded-lg bg-inherit border border-border/30">
                             <div className="flex-1">
                               <h3 className="font-semibold text-foreground">{purchase.name}</h3>
                               <p className="text-sm text-muted-foreground">{purchase.description}</p>
