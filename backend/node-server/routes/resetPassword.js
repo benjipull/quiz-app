@@ -47,7 +47,7 @@ router.post("/", async (req, res) => {
         );
 
         // ✅ Secure reset link (frontend should verify the token)
-        const resetLink = `https://quiz-app-node-606998948537.europe-west4.run.app/reset-password.html?token=${resetToken}`;
+        const resetLink = `https://quizicle.app/reset-password?token=${resetToken}`;
 
         // ✅ Send Email using Resend
         const data = await resend.emails.send({

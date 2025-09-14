@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 
-// ✅ Schema for individual answers
 const AnswerSchema = new mongoose.Schema({
     text: { type: String, required: true },
     correctCount: { type: Number, default: 0 },
@@ -11,16 +10,24 @@ const QuestionSchema = new mongoose.Schema({
     _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
     text: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
+    
     answers: [AnswerSchema],
     correct_answer: { type: String, required: true },
     explanation: { type: String, default: "" },
+
+    source_domain: { type: String, default: "" },
+    source_title: { type: String, default: "" },
+    source_quote: { type: String, default: "" },
+
     timesLoaded: { type: Number, default: 0 },
     popularity: { type: Number, default: 0 },
     disabled: { type: Boolean, default: false },
     timesAnsweredCorrectly: { type: Number, default: 0 },
     timesAnsweredIncorrectly: { type: Number, default: 0 },
+    
     difficulty_level: { type: Number, default: 0 },
     difficulty_rationale: {type :String, default: ""},
+    
     hash: { type: String, required: true, unique: true },
     version: { type: Number, default: 1, required: true}
 });
