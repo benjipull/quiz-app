@@ -65,7 +65,16 @@ export default function Categories() {
     setLoading(true);
     
     try {
-      const response = await fetch(`${BASE_URL}/api/categories`);
+      const userToken = localStorage.getItem("token");
+      
+      const response = await fetch(`${BASE_URL}/api/categories`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
       if (!response.ok) {
         throw new Error(`Failed to fetch categories. Status: ${response.status}`);
       }
