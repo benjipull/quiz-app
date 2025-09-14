@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const axios = require("axios");
 
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://ollama-container:11440/api/generate";
+const avoidedQuestions = [];
 
 if (!OLLAMA_URL) {
     console.error("❌ OLLAMA_URL is not set! Please set it in your environment variables.");
@@ -18,11 +19,17 @@ const generateQuestionHash = (questionText) => {
     return crypto.createHash("sha256").update(questionText).digest("hex");
 };
 
-// ✅ Fetch questions from Ollama with detailed logging
-async function fetchQuestions(categoryName, numQuestions) {
-    console.log(`Generating for category: "${categoryName}" from ollama`);
+async function fetchQuestions(categoryName) {
 
-const systemPrompt = `
+    console.log(`🔹 Generating for category: "${categoryName}" from ollama`);
+
+    const avoidSection = avoidedQuestions.length > 0
+        ? `Do NOT generate any of these questions (nor semantically similar ones):
+        \n${avoidedQuestions.map(q => `- ${q}`).join("\n")}\n\n
+        `
+        : "";
+
+    const systemPrompt = `
 You are an AI Quiz Generator. Output STRICT JSON only (no prose, no markdown).
 
 RUBRIC for "difficulty_level" (integer 1–10):
@@ -73,141 +80,96 @@ OUTPUT (object only):
 If any requirement fails, output {}.
 
 Category: ${categoryName}. Generate ONE question.
+
+${avoidSection}
 `;
 
+//console.log(`🔹Prompt ${systemPrompt}`);
 
+ try {
+    const res = await axios.post(OLLAMA_URL, {
+      model: "mistral",
+      format: "json",
+      prompt: systemPrompt,
+      stream: false,
+      options: {
+        num_ctx: 4096,
+        num_keep: 200,
+        temperature: 0.2,
+        top_p: 0.7,
+        top_k: 5,
+        min_p: 0.1,
+        repeat_penalty: 1.15,
+        repeat_last_n: 128,
+        num_predict: 512
+      }
+    }, { timeout: 240_000 });
+
+    if (!res.data || !res.data.response) {
+      throw new Error("❌ Ollama response missing 'response' field.");
+    }
+
+    let rawResponse = String(res.data.response).trim();
+    
+    // Try to parse JSON directly
+    let parsed;
     try {
-        const res = await axios.post(OLLAMA_URL, {
-        model: "mistral",
-        format: "json",
-        prompt: systemPrompt,
-        stream: false,
-        options: {
-            temperature: 0.2,
-            top_p: 0.9, // nucleus sampling, avoids weird rare tokens
-            top_k: 40, // reasonable diversity cut-off
-            num_predict: 220, // enough tokens for full JSON answer
-            repeat_penalty: 1.1, // soft penalty against repeating tokens
-            repeat_last_n: 64 // memory window for penalty
-        }
-        }, { timeout: 240_000 });
-
-        if (!res.data || !res.data.response) {
-            throw new Error("❌ Ollama response missing 'response' field.");
-        }
-
-        // 1) Fast path: try direct parse (format:json should make this work)
-        let rawResponse = String(res.data.response).trim();
-
-        // 1) Try direct parse
-        let parsed;
-        try {
-            parsed = JSON.parse(rawResponse);
-        } catch {
-            // 2) Cleanup and try again
-            rawResponse = rawResponse
-                .replace(/```(\w+)?/g, "") // remove ``` and ```json
-                .replace(/\u201C|\u201D/g, '"') // smart quotes -> "
-                .replace(/\u2019/g, "'"); // curly apostrophe -> '
-
-        try {
-            parsed = JSON.parse(rawResponse);
-        } catch {
-            // 3) Last resort: slice the first JSON array if present
-            if (rawResponse.includes("[")) {
-                const sliced = extractFirstJsonArray(rawResponse);
-                parsed = JSON.parse(sliced);
-            } else {
-                throw new Error(`❌ Unable to parse JSON.\nRAW:\n${rawResponse}`);
-            }
-        }
-        }
-
-        // ✅ Normalize into an array (handles object or { data: [...] })
-        let items = [];
-        if (Array.isArray(parsed)) {
-            items = parsed;
-        } else if (parsed && typeof parsed === "object") {
-            if (Array.isArray(parsed.data)) {
-                items = parsed.data;
-            } else {
-                items = [parsed]; // single object case
-            }
-        } else if (typeof parsed === "string") {
-        // rare case: JSON string containing the array/object
-        try {
-            const again = JSON.parse(parsed);
-            items = Array.isArray(again) ? again : [again];
-        } catch {
-            console.error("RAW Ollama response (string):", rawResponse);
-            throw new Error(`❌ Not a JSON array or object: ${JSON.stringify(parsed)}`);
-        }
-        } else {
-            console.error("RAW Ollama response (unhandled):", rawResponse);
-            throw new Error(`❌ Not a JSON array: ${JSON.stringify(parsed, null, 2)}`);
-        }
-
-        const questions = items.map(normalizeQuestion);
-
-        console.log(`Successfully parsed ${questions.length} questions from Ollama.`);
-
-
-        //Self-verify each question - to remove
-        const verifiedQuestions = [];
-        for (const question of questions) {
-            const isValid = true; //= await verifyQuestion(question); //Disabled for now
-            if (isValid) {
-                verifiedQuestions.push(question);
-            } else {
-                console.log(`❌ Discarding hallucinated question: "${question.question}"`);
-            }
-        }
-
-        return verifiedQuestions;
-
-    } catch (error) {
-        console.error("⚠️ Error fetching questions from Ollama:");
-        if (error.response) {
-            console.error(`❌ HTTP ${error.response.status}:`, error.response.data);
-        } else if (error.request) {
-            console.error("❌ No response from Ollama.");
-        } else {
-            console.error("❌ Request error:", error.message);
-        }
-        return [];
+      parsed = JSON.parse(rawResponse);
+    } catch {
+      // fallback cleanup for quotes/markdown fences
+      rawResponse = rawResponse
+        .replace(/```(\w+)?/g, "")
+        .replace(/\u201C|\u201D/g, '"')
+        .replace(/\u2019/g, "'");
+      parsed = JSON.parse(rawResponse);
     }
-}
 
-// --- helpers ---
-function extractFirstJsonArray(s) {
-  const start = s.indexOf('[');
-  if (start === -1) throw new Error(`❌ No '[' found.\nRaw: ${s}`);
-  let depth = 0;
-  for (let i = start; i < s.length; i++) {
-    const ch = s[i];
-    if (ch === '[') depth++;
-    else if (ch === ']') {
-      depth--;
-      if (depth === 0) return s.slice(start, i + 1);
+    const question = normalizeQuestion(parsed);
+    //console.log(`✅ Parsed question: ${JSON.stringify(question)}`);
+
+    return [question]; // still return as array so populateCategory works
+
+  } catch (error) {
+    console.error("⚠️ Error fetching question from Ollama:");
+    if (error.response) {
+      console.error(`❌ HTTP ${error.response.status}:`, error.response.data);
+    } else if (error.request) {
+      console.error("❌ No response from Ollama.");
+    } else {
+      console.error("❌ Request error:", error.message);
     }
+    return [];
   }
-  throw new Error(`❌ Unterminated JSON array.\nRaw: ${s}`);
 }
 
 function normalizeQuestion(q) {
-  // unify field naming and types
   const difficulty = Number(q.difficulty ?? q.difficulty_level ?? 5);
   return {
     question: q.question ?? "",
     answers: Array.isArray(q.answers) ? q.answers.slice(0, 4) : [],
     correct_answer: q.correct_answer ?? "",
     explanation: q.explanation ?? "",
-    source: q.source ?? "",
-    difficulty_level: Number.isFinite(difficulty) ? Math.max(1, Math.min(10, Math.round(difficulty))) : 5,
+    source_domain: q.source_domain ?? "",
+    source_title: q.source_title ?? "",
+    source_quote: q.source_quote ?? "",
+    difficulty_level: Number.isFinite(difficulty)
+      ? Math.max(1, Math.min(10, Math.round(difficulty)))
+      : 5,
     difficulty_rationale: q.difficulty_rationale ?? ""
   };
 }
 
+async function populateCategoryLoop(categoryId, iterations) {
+    try {
+        for (let i = 0; i < iterations; i++) {
+            console.log(`\n🔄 Iteration ${i + 1}/${iterations} for category ${categoryId}`);
+            await populateCategory(categoryId, 1);
+        }
+    } finally {
+        avoidedQuestions.length = 0;
+        console.log("🧹 Cleared avoided questions list after loop.");
+    }
+}
 
 async function populateCategory(categoryId, numQuestions) {
     try {
@@ -229,39 +191,51 @@ async function populateCategory(categoryId, numQuestions) {
         const fetchedQuestions = await fetchQuestions(category.name, numQuestions);
         let newQuestionsAdded = 0;
 
-        fetchedQuestions.forEach(q => {
-            const questionHash = generateQuestionHash(q.question);
+        try {
+            fetchedQuestions.forEach(q => {
+                const questionHash = generateQuestionHash(q.question);
 
-            if (category.questions.some(q => q.hash === questionHash)) {
-                console.log(`⚠️ Duplicate skipped: ${q.question}`);
-                return;
-            }
+                avoidedQuestions.push(q.question);
 
-            if (!q.answers.includes(q.correct_answer)) {
-                console.log(`Fixed missing correct answer for question: ${q.question}`);
-                q.answers[Math.floor(Math.random() * q.answers.length)] = q.correct_answer;
-            }
+                if (category.questions.some(q => q.hash === questionHash)) {
+                    console.log(`⚠️ Duplicate skipped: ${q.question}`);
+                    return;
+                }
 
-            const newQuestion = {
-                _id: new mongoose.Types.ObjectId(),
-                text: q.question,
-                answers: q.answers.map(answer => ({ text: answer, correctCount: 0, incorrectCount: 0 })),
-                correct_answer: q.correct_answer,
-                explanation: q.explanation,
-                difficulty_level: q.difficulty_level,
-                difficulty_rationale: q.difficulty_rationale,
-                timesLoaded: 0,
-                popularity: 0,
-                disabled: false,
-                timesAnsweredCorrectly: 0,
-                timesAnsweredIncorrectly: 0,
-                hash: questionHash,
-                version: 0.12
-            };
+                if (!q.answers.includes(q.correct_answer)) {
+                    console.error("❌ No correct answer, skipping...");
+                    return;
+                    console.log(`Fixed missing correct answer for question: ${q.question}`);
+                    q.answers[Math.floor(Math.random() * q.answers.length)] = q.correct_answer;
+                }
 
-            category.questions.push(newQuestion);
-            newQuestionsAdded++;
-        });
+                const newQuestion = {
+                    _id: new mongoose.Types.ObjectId(),
+                    text: q.question,
+                    answers: q.answers.map(answer => ({ text: answer, correctCount: 0, incorrectCount: 0 })),
+                    correct_answer: q.correct_answer,
+                    explanation: q.explanation,
+                    source_domain: q.source_domain,
+                    source_title: q.source_title,
+                    source_quote: q.source_quote,
+                    difficulty_level: q.difficulty_level,
+                    difficulty_rationale: q.difficulty_rationale,
+                    timesLoaded: 0,
+                    popularity: 0,
+                    disabled: false,
+                    timesAnsweredCorrectly: 0,
+                    timesAnsweredIncorrectly: 0,
+                    hash: questionHash,
+                    version: 0.15
+                };
+
+                category.questions.push(newQuestion);
+                newQuestionsAdded++;
+            });
+        } catch (error) {
+            console.error("❌ Error fetching question:", error.message);
+            console.error(`❌ Raw Response: ${JSON.stringify(fetchedQuestions)}`)
+        }
 
         if (newQuestionsAdded > 0) {
             category.disabled = false;
@@ -274,4 +248,4 @@ async function populateCategory(categoryId, numQuestions) {
     }
 }
 
-module.exports = { populateCategory };
+module.exports = { populateCategory, populateCategoryLoop };
