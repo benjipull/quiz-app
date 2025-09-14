@@ -35,7 +35,7 @@ app.use("/api/users", require("./routes/users"));
 
 //Quiz
 app.use("/api/startQuiz", require("./routes/startQuiz")); 
-app.use("/api/categories", require("./routes/getGetegoryToPlay")); 
+app.use("/api/categogetGetegoryToPlay", require("./routes/getGetegoryToPlay")); 
 
 //Categories
 app.use("/api/categories", require("./routes/createCategory"));
