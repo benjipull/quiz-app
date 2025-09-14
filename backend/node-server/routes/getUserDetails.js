@@ -1,11 +1,10 @@
 require("dotenv").config();
 const express = require("express");
 const User = require("../models/user"); 
-const authenticateToken = require("../middleware/auth"); // Ensure you have this middleware
+const authenticateToken = require("../middleware/auth");
 
 const router = express.Router();
 
-// 📌 GET: Retrieve user details by ID
 router.get("/", authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;  

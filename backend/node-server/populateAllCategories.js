@@ -31,9 +31,7 @@ async function populateAllCategories() {
         console.log(`🔹 Populating the categories with the lowest quesiton count.`);
 
         for (const category of categories) {
-            for (let i = 0; i < 40; i++) {
-                await populateCategory(category._id, 1);
-            }
+            await populateCategoryLoop(category._id, 40);
         }
 
         console.log("🎉 All categories populated successfully!");

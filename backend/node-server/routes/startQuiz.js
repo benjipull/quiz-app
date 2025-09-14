@@ -5,10 +5,19 @@ const { userQuestions } = require("../index"); // Import shared store
 const { populateCategory } = require("../scripts/populateCategories"); // Import async question population
 
 router.post("/", async (req, res) => {
-    const { categoryId, numQuestions, userToken } = req.body;
+    const { categoryId, numQuestions } = req.body;
 
-    if (!categoryId || !numQuestions || !userToken) {
-        return res.status(400).json({ message: "❌ Missing required fields: categoryId, numQuestions, userToken." });
+    const authHeader = req.headers["authorization"]; // or req.get("authorization")
+    const userToken = authHeader && authHeader.startsWith("Bearer ")
+        ? authHeader.split(" ")[1]
+        : null;
+
+    if (!userToken) {
+        return res.status(401).json({ message: "Missing or invalid Authorization header." });
+    }
+
+    if (!categoryId || !numQuestions) {
+        return res.status(400).json({ message: "Missing required fields: categoryId, numQuestions." });
     }
 
     try {
@@ -16,7 +25,7 @@ router.post("/", async (req, res) => {
         const category = await Category.findById(categoryId);
 
         if (!category) {
-            return res.status(404).json({ message: "❌ Category not found." });
+            return res.status(404).json({ message: "Category not found." });
         }
 
         // Get the least-loaded questions (sorted by `timesLoaded`, but NOT updating it yet)
@@ -29,11 +38,8 @@ router.post("/", async (req, res) => {
             console.error(`Cannot start Quiz, no questions found. Populating category: ${category._id} (${category.name})`);
             populateCategory(category._id, 20);
 
-            return res.status(404).json({ message: "❌ No available questions in this category please try again in a few minutes." });
+            return res.status(404).json({ message: "No available questions in this category please try again in a few minutes." });
         }
-
-        // Run `populateCategory` asynchronously
-        runSequentially(category);
 
         // Store questions for user in memory for `nextQuestion.js`
         userQuestions[userToken] = selectedQuestions.map(q => ({
