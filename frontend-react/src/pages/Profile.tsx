@@ -32,6 +32,8 @@ const Profile = () => {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const userToken = localStorage.getItem("token") || "";
+
 
   const achievements = [
     {
@@ -447,7 +449,7 @@ const Profile = () => {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div className="flex items-center space-x-3">
-                <GameStatsHeader />
+        <GameStatsHeader userToken={userToken} />
               </div>
             </div>
             
