@@ -167,7 +167,11 @@ export default function Quiz() {
     });
 
     try {
-      const categoryResponse = await fetch(`${BASE_URL}/api/categories`);
+      const categoryResponse = await fetch(`${BASE_URL}/api/categories`, {
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+        },
+      });
       if (categoryResponse.ok) {
         const categories = await categoryResponse.json();
         const category = categories.find((cat: any) => cat._id === categoryId);
@@ -182,8 +186,11 @@ export default function Quiz() {
 
       const startResponse = await fetch(`${BASE_URL}/api/startQuiz`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoryId, numQuestions: 10, userToken }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({ categoryId, numQuestions: 10 }),
       });
 
       if (!startResponse.ok) throw new Error("❌ Error starting quiz session.");
@@ -201,7 +208,11 @@ export default function Quiz() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${BASE_URL}/api/nextQuestion/${userToken}`);
+      const response = await fetch(`${BASE_URL}/api/nextQuestion`, {
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+        },
+      });
       const data = await response.json();
 
       if (response.ok && data.question) {
