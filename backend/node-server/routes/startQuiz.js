@@ -62,11 +62,4 @@ router.post("/", async (req, res) => {
     }
 });
 
-async function runSequentially(category) {
-  for (let i = 0; i < 10; i++) {
-    // Fire and forget, but wait before starting the next
-    populateCategory(category._id, 1); 
-    await new Promise(resolve => setTimeout(resolve, 50)); // short pause between calls
-  }
-}
 module.exports = router;
