@@ -24,14 +24,14 @@ async function fetchQuestions(categoryName) {
     console.log(`🔹 Generating for category: "${categoryName}" from ollama`);
 
     const avoidSection = avoidedQuestions.length > 0
-        ? `BANNED QUESTIONS (must never be generated):
+        ? `Do NOT generate any of these questions (nor semantically similar ones):
         \n${avoidedQuestions.map(q => `- ${q}`).join("\n")}\n\n
         `
         : "";
 
     const systemPrompt = `
 You are an AI Quiz Generator. Output STRICT JSON only (no prose, no markdown).
-${avoidSection}
+
 RUBRIC for "difficulty_level" (integer 1–10):
 1–2 Very Easy: universally known, primary-school facts.
 3–4 Easy: commonly taught basics.
@@ -63,7 +63,6 @@ SELF-CHECK (must pass all, or output {}):
 - The question is unambiguous (only one correct choice).
 - source_domain is from the allowed list above.
 - source_quote directly supports the explanation’s key fact.
-- Avoid generating questions which are semantically similar any questions in BANNED QUESTIONS.
 
 OUTPUT (object only):
 {
@@ -81,6 +80,8 @@ OUTPUT (object only):
 If any requirement fails, output {}.
 
 Category: ${categoryName}. Generate ONE question.
+
+${avoidSection}
 `;
 
 //console.log(`🔹Prompt ${systemPrompt}`);
@@ -94,7 +95,7 @@ Category: ${categoryName}. Generate ONE question.
       options: {
         num_ctx: 4096,
         num_keep: 200,
-        temperature: 0.1,
+        temperature: 0.2,
         top_p: 0.7,
         top_k: 5,
         min_p: 0.1,
@@ -158,6 +159,18 @@ function normalizeQuestion(q) {
   };
 }
 
+async function populateCategoryLoop(categoryId, iterations) {
+    try {
+        for (let i = 0; i < iterations; i++) {
+            console.log(`\n🔄 Iteration ${i + 1}/${iterations} for category ${categoryId}`);
+            await populateCategory(categoryId, 1);
+        }
+    } finally {
+        avoidedQuestions.length = 0;
+        console.log("🧹 Cleared avoided questions list after loop.");
+    }
+}
+
 async function populateCategory(categoryId, numQuestions) {
     try {
         const category = await Category.findById(categoryId);
@@ -213,7 +226,7 @@ async function populateCategory(categoryId, numQuestions) {
                     timesAnsweredCorrectly: 0,
                     timesAnsweredIncorrectly: 0,
                     hash: questionHash,
-                    version: 0.14
+                    version: 0.15
                 };
 
                 category.questions.push(newQuestion);
@@ -235,4 +248,4 @@ async function populateCategory(categoryId, numQuestions) {
     }
 }
 
-module.exports = { populateCategory };
+module.exports = { populateCategory, populateCategoryLoop };
