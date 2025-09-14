@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const Category = require("./models/categoryModel");
 const connectDB = require("./config/db");
 
-const { populateCategory } = require("./scripts/populateCategories"); // Import the function
+const { populateCategoryLoop } = require("./scripts/populateCategories"); // Import the function
 
 async function populateAllCategories() {
     try {
