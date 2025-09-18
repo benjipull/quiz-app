@@ -80,7 +80,7 @@ export default function Quiz() {
     if (categoryId && userToken) {
       startQuiz(categoryId);
     } else if (!userToken) {
-      console.log("⚠ You must be logged in to play.");
+      console.log("⚠️ You must be logged in to play.");
       navigate("/categories");
     }
   }, [categoryId, userToken]);
@@ -127,16 +127,8 @@ export default function Quiz() {
       }
     };
   }, [quizState.question, quizState.isAnswerSelected, timeUp]);
-
-  useEffect(() => {
-    setSelectedAnswer(null);
-    setShowExplanation(false);
-    setFeedbackGiven(false);
-    setFeedbackType(null);
-    setTimeLeft(30);
-    setTimeUp(false);
-  }, [quizState.question, quizState.currentQuestionIndex]);
   
+  // This useEffect now handles the scroll logic after a delay
   useEffect(() => {
     if (showExplanation && explanationRef.current) {
       const viewportHeight = window.innerHeight;
@@ -155,6 +147,15 @@ export default function Quiz() {
   }, [showExplanation]);
 
   useEffect(() => {
+    setSelectedAnswer(null);
+    setShowExplanation(false);
+    setFeedbackGiven(false);
+    setFeedbackType(null);
+    setTimeLeft(30);
+    setTimeUp(false);
+  }, [quizState.question, quizState.currentQuestionIndex]);
+  
+  useEffect(() => {
     if (quizState.currentQuestionIndex > 0) {
       window.scrollTo({ 
         top: 0, 
@@ -165,7 +166,7 @@ export default function Quiz() {
 
   const startQuiz = async (categoryId: string) => {
     if (!userToken) {
-      console.log("⚠ You must be logged in to play.");
+      console.log("⚠️ You must be logged in to play.");
       return;
     }
 
@@ -213,7 +214,7 @@ export default function Quiz() {
         body: JSON.stringify({ categoryId, numQuestions: 10, userToken }),
       });
 
-      if (!startResponse.ok) throw new Error("⚠ Error starting quiz session.");
+      if (!startResponse.ok) throw new Error("⚠️ Error starting quiz session.");
 
       await fetchNextQuestion();
 
@@ -308,7 +309,7 @@ export default function Quiz() {
         }));
       }
       else {
-        console.error("⚠ Failed to complete quiz");
+        console.error("⚠️ Failed to complete quiz");
         setError("Failed to complete quiz. Please try again.");
       }
     } catch (error) {
@@ -341,12 +342,11 @@ export default function Quiz() {
     }
     
     setSelectedAnswer(answer);
-    setShowExplanation(true);
     const isCorrect = answer === quizState.question?.correct_answer;
     
-    // Call the new vibration handler
     handleVibration(isCorrect);
     
+    // Set isAnswerSelected immediately to stop the timer and show the bar animation
     setQuizState((prev) => ({
       ...prev,
       correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
@@ -364,10 +364,15 @@ export default function Quiz() {
     }));
     
     if (isCorrect) {
-      correctSound.play().catch(() => {}); // Ignore audio errors
+      correctSound.play().catch(() => {});
     } else {
-      incorrectSound.play().catch(() => {}); // Ignore audio errors
+      incorrectSound.play().catch(() => {});
     }
+
+    // Introduce a delay before showing the explanation and scrolling
+    setTimeout(() => {
+      setShowExplanation(true);
+    }, 1000); // 1000ms delay to allow animation to be seen
   };
 
   const handleNextQuestion = () => {
@@ -405,10 +410,10 @@ export default function Quiz() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("⚠ Failed to update popularity:", errorData.message || errorData);
+        console.error("⚠️ Failed to update popularity:", errorData.message || errorData);
       }
     } catch (err) {
-      console.error("⚠ Error updating popularity:", err);
+      console.error("⚠️ Error updating popularity:", err);
     }
   };
 
@@ -567,7 +572,7 @@ export default function Quiz() {
                 className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} hover:shadow-lg relative overflow-hidden cursor-pointer`}
                 onClick={() => !timeUp && handleAnswerSelection(answer)}
               >
-                {showExplanation && !timeUp && quizState.question.answerStats && (
+                {quizState.isAnswerSelected && !timeUp && quizState.question.answerStats && (
                   <div 
                     className="absolute top-0 left-0 h-full bg-primary/15 transition-all duration-1000 ease-out rounded-r-md"
                     style={{ width: `${quizState.question.answerStats[answer] || 0}%` }}
