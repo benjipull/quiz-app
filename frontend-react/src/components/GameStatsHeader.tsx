@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 
-// New custom SVG for Enlightenment Crystals (Diamond)
+// Enhanced Diamond icon for Enlightenment Crystals
 const EnlightenmentDiamond = () => (
   <svg 
     xmlns="http://www.w3.org/2000/svg" 
@@ -12,37 +12,39 @@ const EnlightenmentDiamond = () => (
     strokeWidth="2" 
     strokeLinecap="round" 
     strokeLinejoin="round" 
-    className="h-6 w-6 text-cyan-400"
+    className="h-5 w-5 text-cyan-400"
   >
-    <path d="M12 2L6 8l6 14 6-14-6-6zM12 2v20M6 8l-4 4 10 10 10-10-4-4z" />
+    <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
+    <path d="m6 3 6 6 6-6" />
+    <path d="m2 9 10 12 10-12" />
   </svg>
 );
 
-// New custom SVG icon for Knowledge Points (a gold coin)
-const KnowledgeCoin = () => (
+// Enhanced Knowledge Points icon (brain/lightbulb hybrid)
+const KnowledgeIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
     fill="currentColor"
-    className="h-6 w-6 text-yellow-500"
+    className="h-5 w-5 text-amber-500"
   >
-    <circle cx="12" cy="12" r="10" />
-    <path
-      fill="#fff"
-      d="M12 4.5l-2.43 5.21-5.57.81 4.04 3.94-.96 5.55 4.92-2.59 4.92 2.59-.96-5.55 4.04-3.94-5.57-.81L12 4.5z"
-    />
+    <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
+    <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
+    <circle cx="12" cy="9" r="2" fill="#fff" />
   </svg>
 );
 
-// New custom SVG for Wisdom Gems (Heart)
-const WisdomHeart = () => (
+// Enhanced Wisdom Gems icon (gem/crystal)
+const WisdomGem = () => (
   <svg 
     xmlns="http://www.w3.org/2000/svg" 
     viewBox="0 0 24 24" 
     fill="currentColor" 
-    className="h-6 w-6 text-red-500"
+    className="h-5 w-5 text-purple-500"
   >
-    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5A5.4 5.4 0 017.5 3c2.24 0 4.1.84 5.5 2.5C14.4 3.84 16.26 3 18.5 3A5.4 5.4 0 0124 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+    <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
+    <path d="m6 3 6 6 6-6" fill="#fff" fillOpacity="0.3" />
+    <path d="m2 9 10 12 10-12" fill="#fff" fillOpacity="0.2" />
   </svg>
 );
 
@@ -110,26 +112,32 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({ userToken }) => {
   if (!stats) return null;
 
   return (
-    <div className="sticky top-10 z-10 bg-transparent p-4">
-      <div className="pt-4 flex justify-between items-center max-w-4xl mx-auto">
-        <div className="flex gap-3">
-          {/* Enlightenment Crystals - now a Diamond */}
-          <div className="flex items-center bg-card rounded-full px-3 py-2 border border-border/50 shadow-sm">
+    <div className="top-0 z-10 bg-transparent">
+      <div className="pt-4 flex justify-between items-center max-w-4xl mx-auto px-4">
+        <div className="flex gap-4">
+          {/* Enlightenment Crystals */}
+          <div className="flex items-center bg-card/80 backdrop-blur-sm rounded-full px-3 py-2 border border-border/50 shadow-sm hover:bg-card/90 transition-colors">
             <EnlightenmentDiamond />
-            <span className="font-bold text-foreground ml-2">
+            <span className="font-semibold text-foreground ml-2 text-sm">
               {stats.enlightenmentCrystals}
             </span>
           </div>
-          {/* Knowledge Points - remains a Coin */}
-          <div className="flex items-center bg-card rounded-full px-3 py-2 border border-border/50 shadow-sm">
-            <KnowledgeCoin />
-            <span className="font-bold text-foreground ml-2">{stats.knowledgePoints}</span>
+          
+          {/* Knowledge Points */}
+          <div className="flex items-center bg-card/80 backdrop-blur-sm rounded-full px-3 py-2 border border-border/50 shadow-sm hover:bg-card/90 transition-colors">
+            <KnowledgeIcon />
+            <span className="font-semibold text-foreground ml-2 text-sm">
+              {stats.knowledgePoints}
+            </span>
           </div>
         </div>
-        {/* Wisdom Gems - now a Heart */}
-        <div className="flex items-center bg-card rounded-full px-3 py-2 border border-border/50 shadow-sm">
-          <WisdomHeart />
-          <span className="font-bold text-foreground ml-2">{stats.wisdomGems}</span>
+        
+        {/* Wisdom Gems */}
+        <div className="flex items-center bg-card/80 backdrop-blur-sm rounded-full px-3 py-2 border border-border/50 shadow-sm hover:bg-card/90 transition-colors">
+          <WisdomGem />
+          <span className="font-semibold text-foreground ml-2 text-sm">
+            {stats.wisdomGems}
+          </span>
         </div>
       </div>
     </div>
