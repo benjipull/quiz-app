@@ -67,6 +67,7 @@ export default function Quiz() {
   const [categoryTitle, setCategoryTitle] = useState("Quiz");
   const [timeUp, setTimeUp] = useState(false);
   const [isCompletingQuiz, setIsCompletingQuiz] = useState(false);
+  const [showBars, setShowBars] = useState(false);
 
   const userToken = localStorage.getItem("token");
   const totalQuestions = 10;
@@ -128,7 +129,7 @@ export default function Quiz() {
     };
   }, [quizState.question, quizState.isAnswerSelected, timeUp]);
   
-  // This useEffect now handles the scroll logic after a delay
+  // This useEffect handles the scroll logic after bars animation completes
   useEffect(() => {
     if (showExplanation && explanationRef.current) {
       const viewportHeight = window.innerHeight;
@@ -153,6 +154,7 @@ export default function Quiz() {
     setFeedbackType(null);
     setTimeLeft(30);
     setTimeUp(false);
+    setShowBars(false);
   }, [quizState.question, quizState.currentQuestionIndex]);
   
   useEffect(() => {
@@ -346,7 +348,7 @@ export default function Quiz() {
     
     handleVibration(isCorrect);
     
-    // Set isAnswerSelected immediately to stop the timer and show the bar animation
+    // Set isAnswerSelected immediately to stop the timer
     setQuizState((prev) => ({
       ...prev,
       correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
@@ -369,10 +371,15 @@ export default function Quiz() {
       incorrectSound.play().catch(() => {});
     }
 
-    // Introduce a delay before showing the explanation and scrolling
+    // Show bars immediately after answer selection
+    setTimeout(() => {
+      setShowBars(true);
+    }, 500);
+
+    // Show explanation after bars have finished animating (2.5s total delay)
     setTimeout(() => {
       setShowExplanation(true);
-    }, 1000); // 1000ms delay to allow animation to be seen
+    }, 2500);
   };
 
   const handleNextQuestion = () => {
@@ -572,10 +579,13 @@ export default function Quiz() {
                 className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} hover:shadow-lg relative overflow-hidden cursor-pointer`}
                 onClick={() => !timeUp && handleAnswerSelection(answer)}
               >
-                {quizState.isAnswerSelected && !timeUp && quizState.question.answerStats && (
+                {quizState.isAnswerSelected && showBars && !timeUp && quizState.question.answerStats && (
                   <div 
-                    className="absolute top-0 left-0 h-full bg-primary/15 transition-all duration-1000 ease-out rounded-r-md"
-                    style={{ width: `${quizState.question.answerStats[answer] || 0}%` }}
+                    className="absolute top-0 left-0 h-full bg-primary/15 animate-bar-fill rounded-r-md"
+                    style={{ 
+                      '--target-width': `${quizState.question.answerStats[answer] || 0}%`,
+                      animationDelay: `${index * 200}ms`
+                    } as React.CSSProperties}
                   />
                 )}
                 
@@ -583,10 +593,15 @@ export default function Quiz() {
                   <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 flex items-center justify-center font-semibold text-base md:text-lg transition-colors flex-shrink-0 ${getLetterStyle(answer)}`}>
                     {String.fromCharCode(65 + index)}
                   </div>
-                  <div className="flex-1 min-w-0 flex items-center">
+                  <div className="flex-1 min-w-0 flex items-center justify-between">
                     <span className="font-medium text-base md:text-lg leading-snug break-words">
                       {answer}
                     </span>
+                    {quizState.isAnswerSelected && showBars && !timeUp && quizState.question.answerStats && (
+                      <span className="text-sm text-muted-foreground ml-2 animate-fade-in-delayed" style={{ animationDelay: `${1800 + (index * 200)}ms` }}>
+                        {quizState.question.answerStats[answer]}%
+                      </span>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -714,6 +729,24 @@ export default function Quiz() {
             opacity: 1;
           }
         }
+
+        @keyframes bar-fill {
+          from {
+            width: 0%;
+          }
+          to {
+            width: var(--target-width);
+          }
+        }
+
+        @keyframes fade-in-delayed {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
         
         .animate-slide-up {
           animation: slide-up 0.6s ease-out forwards;
@@ -721,6 +754,16 @@ export default function Quiz() {
         
         .animate-fade-in {
           animation: fade-in 0.5s ease-out forwards;
+        }
+
+        .animate-bar-fill {
+          animation: bar-fill 1.5s ease-out forwards;
+          width: 0%;
+        }
+
+        .animate-fade-in-delayed {
+          animation: fade-in-delayed 0.3s ease-out forwards;
+          opacity: 0;
         }
       `}</style>
     </div>
