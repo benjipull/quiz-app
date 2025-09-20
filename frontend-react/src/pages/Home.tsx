@@ -55,6 +55,9 @@ export default function Home() {
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [userLevel, setUserLevel] = useState(1);
 
+  // New state to track screen size
+  const [isSmallScreen, setIsSmallScreen] = useState(false);
+
   const navigate = useNavigate();
   const userToken = localStorage.getItem("token") || "";
 
@@ -80,6 +83,21 @@ export default function Home() {
         console.error("Failed to parse user data:", e);
       }
     }
+
+    // Function to check screen size
+    const checkScreenSize = () => {
+      // You can adjust the breakpoint as needed. 768px is Tailwind's 'md' breakpoint.
+      setIsSmallScreen(window.innerWidth < 768);
+    };
+
+    // Initial check on mount
+    checkScreenSize();
+
+    // Add event listener for window resize
+    window.addEventListener("resize", checkScreenSize);
+
+    // Cleanup the event listener on component unmount
+    return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
   const fetchFeaturedCategories = async () => {
@@ -173,7 +191,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background">
-      {/* <Header logoAsTitle imageSrc={logo} showNotifications /> */}
+      {/* Conditionally render the Header based on screen size */}
+      {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
       <div className="mx-auto max-w-full space-y-4 px-4 pb-4 lg:px-8 lg:pb-8">
         {/* Game Stats Header */}
