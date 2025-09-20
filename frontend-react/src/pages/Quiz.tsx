@@ -757,8 +757,7 @@ export default function Quiz() {
         }
 
         .animate-bar-fill {
-          animation: bar-fill 1.5s ease-out forwards;
-          width: 0%;
+          animation: bar-fill 0.4s ease-out forwards;
         }
 
         .animate-fade-in-delayed {
