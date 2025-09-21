@@ -4,14 +4,14 @@ import React, { useEffect, useState } from "react";
 
 // Enhanced Diamond icon for Enlightenment Crystals
 const EnlightenmentDiamond = () => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
     className="h-5 w-5 text-cyan-400"
   >
     <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
@@ -36,10 +36,10 @@ const KnowledgeIcon = () => (
 
 // Enhanced Wisdom Gems icon (gem/crystal)
 const WisdomGem = () => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    viewBox="0 0 24 24" 
-    fill="currentColor" 
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="currentColor"
     className="h-5 w-5 text-purple-500"
   >
     <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
@@ -56,17 +56,22 @@ interface UserStats {
 
 interface GameStatsHeaderProps {
   userToken: string;
+  isParentLoading: boolean; // New prop to check parent's loading state
 }
 
-const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({ userToken }) => {
+const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({ userToken, isParentLoading }) => {
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Return early if the main Home component is still loading
+    if (isParentLoading) {
+        return;
+    }
+    
+    // Return early if the user is not logged in
     if (!userToken) {
       setError("User not logged in");
-      setLoading(false);
       return;
     }
 
@@ -99,15 +104,17 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({ userToken }) => {
       } catch (err: any) {
         console.error("Failed to fetch user stats:", err);
         setError(err.message || "Unknown error occurred");
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchUserStats();
-  }, [userToken]);
+  }, [userToken, isParentLoading]); // Add the new prop to dependencies
 
-  if (loading) return <div>Loading stats...</div>;
+  // Don't render anything if the parent is still loading or if there's no token
+  if (isParentLoading || !userToken) {
+    return null;
+  }
+  
   if (error) return <div className="text-red-500 font-bold">{error}</div>;
   if (!stats) return null;
 
@@ -122,7 +129,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({ userToken }) => {
               {stats.enlightenmentCrystals}
             </span>
           </div>
-          
+
           {/* Knowledge Points */}
           <div className="flex items-center bg-card/80 backdrop-blur-sm rounded-full px-3 py-2 border border-border/50 shadow-sm hover:bg-card/90 transition-colors">
             <KnowledgeIcon />
@@ -131,7 +138,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({ userToken }) => {
             </span>
           </div>
         </div>
-        
+
         {/* Wisdom Gems */}
         <div className="flex items-center bg-card/80 backdrop-blur-sm rounded-full px-3 py-2 border border-border/50 shadow-sm hover:bg-card/90 transition-colors">
           <WisdomGem />
