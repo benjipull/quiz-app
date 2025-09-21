@@ -14,7 +14,9 @@ import {
   Clock,
 } from "lucide-react";
 import logo from "../assets/images/QuizicleLogo.png";
-import GameStatsHeader from "@/components/GameStatsHeader";
+// Import the new components
+import SplashScreen from "../components/SplashScreen";
+import GameStatsHeader from "../components/GameStatsHeader";
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
@@ -51,6 +53,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
 
+  // Splash screen state
+  const [showSplash, setShowSplash] = useState(true);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
   const [userProfile, setUserProfile] = useState<any | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [userLevel, setUserLevel] = useState(1);
@@ -59,50 +65,82 @@ export default function Home() {
   const [isSmallScreen, setIsSmallScreen] = useState(false);
 
   const navigate = useNavigate();
-  const userToken = localStorage.getItem("token") || "";
+  const userToken = typeof window !== 'undefined' ? localStorage.getItem("token") || "" : "";
 
   useEffect(() => {
-    fetchFeaturedCategories();
+    const initializeApp = async () => {
+      const startTime = Date.now();
+      const minSplashDuration = 3000; // 3 seconds minimum splash duration, a much better value than 30s.
 
-    const storedUser = localStorage.getItem("user");
-    const storedAvatar = localStorage.getItem("userAvatar");
-
-    if (storedUser) {
       try {
-        const parsedUser = JSON.parse(storedUser);
-        setUserProfile(parsedUser);
+        // Load all data concurrently
+        await Promise.all([
+          fetchFeaturedCategories(),
+          loadUserProfile(),
+        ]);
 
-        if (storedAvatar) {
-          setUserAvatar(storedAvatar);
-        } else if (parsedUser.avatar) {
-          setUserAvatar(avatars[parsedUser.avatar - 1] || null);
-        }
+        setDataLoaded(true);
 
-        if (parsedUser.level) setUserLevel(parsedUser.level);
-      } catch (e) {
-        console.error("Failed to parse user data:", e);
+        // Calculate remaining time for splash screen
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = Math.max(0, minSplashDuration - elapsedTime);
+
+        // Wait for the remaining time before hiding splash
+        setTimeout(() => {
+          setShowSplash(false);
+          setLoading(false); // Set parent loading to false
+        }, remainingTime);
+
+      } catch (error) {
+        console.error("Error during app initialization:", error);
+        // Even if there's an error, show the app after minimum duration
+        setTimeout(() => {
+          setShowSplash(false);
+          setLoading(false); // Set parent loading to false
+        }, minSplashDuration);
       }
-    }
+    };
+
+    initializeApp();
 
     // Function to check screen size
     const checkScreenSize = () => {
-      // You can adjust the breakpoint as needed. 768px is Tailwind's 'md' breakpoint.
       setIsSmallScreen(window.innerWidth < 768);
     };
 
-    // Initial check on mount
     checkScreenSize();
-
-    // Add event listener for window resize
     window.addEventListener("resize", checkScreenSize);
 
-    // Cleanup the event listener on component unmount
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
+  const loadUserProfile = () => {
+    return new Promise<void>((resolve) => {
+      const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+      const storedAvatar = typeof window !== 'undefined' ? localStorage.getItem("userAvatar") : null;
+
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setUserProfile(parsedUser);
+
+          if (storedAvatar) {
+            setUserAvatar(storedAvatar);
+          } else if (parsedUser.avatar) {
+            setUserAvatar(avatars[parsedUser.avatar - 1] || null);
+          }
+
+          if (parsedUser.level) setUserLevel(parsedUser.level);
+        } catch (e) {
+          console.error("Failed to parse user data:", e);
+        }
+      }
+      resolve();
+    });
+  };
+
   const fetchFeaturedCategories = async () => {
     setError(null);
-    setLoading(true);
 
     try {
       const response = await fetch(`${BASE_URL}/api/categories`, {
@@ -131,14 +169,13 @@ export default function Home() {
       setFeaturedCategories(transformed.slice(0, 9));
     } catch (e: any) {
       setError(e.message);
-    } finally {
-      setLoading(false);
     }
   };
 
   const handlePlayQuiz = (categoryId: string) => {
     if (!userToken) {
-      alert("⚠ You must be logged in to play.");
+      // Use a custom message box instead of alert()
+      console.log("⚠️ You must be logged in to play.");
       return;
     }
     navigate(`/quiz/${categoryId}`);
@@ -146,7 +183,8 @@ export default function Home() {
 
   const handleQuickQuiz = async () => {
     if (!userToken) {
-      alert("⚠ You must be logged in to play.");
+      // Use a custom message box instead of alert()
+      console.log("⚠️ You must be logged in to play.");
       return;
     }
 
@@ -179,12 +217,17 @@ export default function Home() {
       if (featuredCategories.length > 0) {
         navigate(`/quiz/${featuredCategories[0]._id}`);
       } else {
-        alert("❌ Unable to start quiz. Please try again later.");
+        console.log("❌ Unable to start quiz. Please try again later.");
       }
     } finally {
       setPlayButtonLoading(false);
     }
   };
+
+  // Conditionally render the splash screen
+  if (showSplash) {
+    return <SplashScreen dataLoaded={dataLoaded} />;
+  }
 
   const alias = userProfile?.alias || userProfile?.name || "Guest";
   const avatarImage = userAvatar || undefined;
@@ -195,8 +238,8 @@ export default function Home() {
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
       <div className="mx-auto max-w-full space-y-4 px-4 pb-4 lg:px-8 lg:pb-8">
-        {/* Game Stats Header */}
-        <GameStatsHeader userToken={userToken} />
+        {/* Game Stats Header - It will now wait for isParentLoading to be false */}
+        <GameStatsHeader userToken={userToken} isParentLoading={loading} />
 
         {/* User Avatar Section */}
         <div className="flex flex-col items-center space-y-2 py-3">
@@ -241,9 +284,9 @@ export default function Home() {
         {/* Featured Categories */}
         <div className="mt-4">
           <h3 className="text-lg font-bold mb-3">Featured Categories</h3>
-          {loading ? (
+          {error ? (
             <div className="flex justify-center py-12">
-              <p className="text-muted-foreground">Loading categories...</p>
+              <p className="text-red-500">Error: {error}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
