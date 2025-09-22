@@ -64,13 +64,15 @@ router.post("/:categoryId/completion", authenticateToken, async (req, res) => {
             results: {
                 correctAnswers,
                 incorrectAnswers,
-                percentageCorrect: percentageCorrect.toFixed(2) + "%",
+                percentageCorrect: Math.round(percentageCorrect), // integer only
                 knowledgeGained: knowledgePointsEarned,
                 totalKnowledge: user.knowledgePoints,
                 previousLevel,
                 currentLevel: user.level
             }
         });
+
+
     } catch (error) {
         console.error("❌ Server Error:", error);
         res.status(500).json({ message: "⚠️ Server error", error: error.message });
