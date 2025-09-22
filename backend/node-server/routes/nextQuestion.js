@@ -3,34 +3,41 @@ const router = express.Router();
 const Category = require("../models/categoryModel");
 const { userQuestions } = require("../index");
 
-// Route: Get Next Question for User Token
+// Route: Get Current or Next Question for User Token
 router.get("/:userToken", async (req, res) => {
     try {
         const { userToken } = req.params;
 
-        if (!userToken) {
-            console.error("❌ Invalid request: Missing user token.");
-            return res.status(400).json({ message: "❌ User token is required." });
-        }
-
-        // Check if questions exist for this user token
+        // Ensure structure exists
         if (!userQuestions[userToken] || userQuestions[userToken].length === 0) {
             console.warn(`⚠️ No more questions available for token: ${userToken}`);
             return res.status(404).json({ message: "❌ No more questions available for this token." });
         }
 
-        // Retrieve the next question from memory
-        const nextQuestion = userQuestions[userToken].shift(); // Removes & returns the first question
+        // If user already has a current question, return it
+        if (userQuestions[userToken].current) {
+            return res.status(200).json({
+                question: userQuestions[userToken].current,
+                remaining: userQuestions[userToken].queue.length
+            });
+        }
 
-        // Find the category and update the `timesLoaded` value for this question in MongoDB
+        // Otherwise, set the first one in queue as current (but don't remove it yet)
+        const nextQuestion = userQuestions[userToken].queue[0];
+        userQuestions[userToken].current = nextQuestion;
+
+        // Increment timesLoaded in DB
         await Category.findOneAndUpdate(
-            { "questions._id": nextQuestion._id }, // Find the question by ID
-            { $inc: { "questions.$.timesLoaded": 1 } }, // Increment `timesLoaded`
-            { new: true } // Return updated document
+            { "questions._id": nextQuestion._id },
+            { $inc: { "questions.$.timesLoaded": 1 } },
+            { new: true }
         );
 
-        // Send the next question
-        return res.status(200).json({ question: nextQuestion, remaining: userQuestions[userToken].length });
+        return res.status(200).json({
+            question: nextQuestion,
+            timerInSeconds: 15,
+            remaining: userQuestions[userToken].queue.length
+        });
 
     } catch (error) {
         console.error("⚠️ Error processing next question request:", error.message);
