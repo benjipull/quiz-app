@@ -30,6 +30,12 @@ interface QuizState {
   incorrectAnswers: number;
   results: any;
   isAnswerSelected: boolean;
+  userAnswers: Array<{
+    questionId: string;
+    selectedAnswer: string;
+    correctAnswer: string;
+    isCorrect: boolean;
+  }>;
 }
 
 export default function Quiz() {
@@ -48,6 +54,7 @@ export default function Quiz() {
     incorrectAnswers: 0,
     results: null,
     isAnswerSelected: false,
+    userAnswers: [],
   });
 
   const [loading, setLoading] = useState(false);
@@ -59,6 +66,8 @@ export default function Quiz() {
   const [timeLeft, setTimeLeft] = useState(30);
   const [categoryTitle, setCategoryTitle] = useState("Quiz");
   const [timeUp, setTimeUp] = useState(false);
+  const [isCompletingQuiz, setIsCompletingQuiz] = useState(false);
+  const [showBars, setShowBars] = useState(false);
 
   const userToken = localStorage.getItem("token");
   const totalQuestions = 10;
@@ -72,7 +81,7 @@ export default function Quiz() {
     if (categoryId && userToken) {
       startQuiz(categoryId);
     } else if (!userToken) {
-      console.log("❌ You must be logged in to play.");
+      console.log("⚠️ You must be logged in to play.");
       navigate("/categories");
     }
   }, [categoryId, userToken]);
@@ -91,6 +100,15 @@ export default function Quiz() {
               ...prevState,
               incorrectAnswers: prevState.incorrectAnswers + 1,
               isAnswerSelected: true,
+              userAnswers: [
+                ...prevState.userAnswers,
+                {
+                  questionId: prevState.question?._id || "",
+                  selectedAnswer: "",
+                  correctAnswer: prevState.question?.correct_answer || "",
+                  isCorrect: false,
+                }
+              ]
             }));
             if (timerRef.current) {
               clearInterval(timerRef.current);
@@ -110,16 +128,8 @@ export default function Quiz() {
       }
     };
   }, [quizState.question, quizState.isAnswerSelected, timeUp]);
-
-  useEffect(() => {
-    setSelectedAnswer(null);
-    setShowExplanation(false);
-    setFeedbackGiven(false);
-    setFeedbackType(null);
-    setTimeLeft(30);
-    setTimeUp(false);
-  }, [quizState.question, quizState.currentQuestionIndex]);
   
+  // This useEffect handles the scroll logic after bars animation completes
   useEffect(() => {
     if (showExplanation && explanationRef.current) {
       const viewportHeight = window.innerHeight;
@@ -138,6 +148,16 @@ export default function Quiz() {
   }, [showExplanation]);
 
   useEffect(() => {
+    setSelectedAnswer(null);
+    setShowExplanation(false);
+    setFeedbackGiven(false);
+    setFeedbackType(null);
+    setTimeLeft(30);
+    setTimeUp(false);
+    setShowBars(false);
+  }, [quizState.question, quizState.currentQuestionIndex]);
+  
+  useEffect(() => {
     if (quizState.currentQuestionIndex > 0) {
       window.scrollTo({ 
         top: 0, 
@@ -148,12 +168,13 @@ export default function Quiz() {
 
   const startQuiz = async (categoryId: string) => {
     if (!userToken) {
-      console.log("❌ You must be logged in to play.");
+      console.log("⚠️ You must be logged in to play.");
       return;
     }
 
     setLoading(true);
     setError(null);
+    setIsCompletingQuiz(false);
     setQuizState({
       started: true,
       completed: false,
@@ -164,12 +185,14 @@ export default function Quiz() {
       incorrectAnswers: 0,
       results: null,
       isAnswerSelected: false,
+      userAnswers: [],
     });
 
     try {
       const categoryResponse = await fetch(`${BASE_URL}/api/categories`, {
         headers: {
-          Authorization: `Bearer ${userToken}`,
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${userToken}`,
         },
       });
       if (categoryResponse.ok) {
@@ -188,12 +211,12 @@ export default function Quiz() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${userToken}`,
+          "Authorization": `Bearer ${userToken}`,
         },
-        body: JSON.stringify({ categoryId, numQuestions: 10 }),
+        body: JSON.stringify({ categoryId, numQuestions: 10, userToken }),
       });
 
-      if (!startResponse.ok) throw new Error("❌ Error starting quiz session.");
+      if (!startResponse.ok) throw new Error("⚠️ Error starting quiz session.");
 
       await fetchNextQuestion();
 
@@ -204,13 +227,14 @@ export default function Quiz() {
   };
 
   const fetchNextQuestion = async () => {
-    if (!userToken || quizState.completed) return;
+    if (!userToken || quizState.completed || isCompletingQuiz) return;
 
     setLoading(true);
     try {
-      const response = await fetch(`${BASE_URL}/api/nextQuestion`, {
+      const response = await fetch(`${BASE_URL}/api/nextQuestion/${userToken}`, {
         headers: {
-          Authorization: `Bearer ${userToken}`,
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${userToken}`,
         },
       });
       const data = await response.json();
@@ -228,17 +252,74 @@ export default function Quiz() {
           isAnswerSelected: false,
         }));
       } else {
-        await recordQuizCompletion();
-        setQuizState((prev) => ({
-          ...prev,
-          completed: true,
-          started: false,
-        }));
+        // No more questions - complete the quiz
+        await completeQuiz();
       }
     } catch (error) {
       setError("Error fetching the next question.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const completeQuiz = async () => {
+    if (!userToken || !quizState.selectedCategory || isCompletingQuiz) return;
+
+    setIsCompletingQuiz(true);
+    setLoading(true);
+
+    try {
+      const { correctAnswers, incorrectAnswers, userAnswers } = quizState;
+      
+      const completionPayload = {
+        answers: userAnswers,
+        score: correctAnswers,
+        totalQuestions: totalQuestions,
+        questionsAttempted: totalQuestions,
+        correctAnswers,
+        incorrectAnswers,
+      };
+
+      const response = await fetch(
+        `${BASE_URL}/api/categories/${quizState.selectedCategory.id}/completion`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${userToken}`,
+          },
+          body: JSON.stringify(completionPayload),
+        }
+      );
+
+      if (response.ok) {
+        const completionData = await response.json();
+        
+        setQuizState((prev) => ({
+          ...prev,
+          completed: true,
+          started: false,
+          results: {
+            totalQuestions: totalQuestions,
+            correctAnswers,
+            incorrectAnswers,
+            categoryName: prev.selectedCategory?.name,
+            categoryId: prev.selectedCategory?.id,
+            answers: userAnswers,
+            completionData: completionData.results, 
+          },
+        }));
+      }
+      else {
+        console.error("⚠️ Failed to complete quiz");
+        setError("Failed to complete quiz. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error completing quiz:", error);
+      setError("Error completing quiz. Please try again.");
+    } finally {
+      setLoading(false);
+      setIsCompletingQuiz(false);
     }
   };
 
@@ -263,74 +344,47 @@ export default function Quiz() {
     }
     
     setSelectedAnswer(answer);
-    setShowExplanation(true);
     const isCorrect = answer === quizState.question?.correct_answer;
     
-    // Call the new vibration handler
     handleVibration(isCorrect);
     
+    // Set isAnswerSelected immediately to stop the timer
     setQuizState((prev) => ({
       ...prev,
       correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
       incorrectAnswers: prev.incorrectAnswers + (isCorrect ? 0 : 1),
       isAnswerSelected: true,
+      userAnswers: [
+        ...prev.userAnswers,
+        {
+          questionId: prev.question?._id || "",
+          selectedAnswer: answer,
+          correctAnswer: prev.question?.correct_answer || "",
+          isCorrect,
+        }
+      ]
     }));
     
     if (isCorrect) {
-      correctSound.play();
+      correctSound.play().catch(() => {});
     } else {
-      incorrectSound.play();
+      incorrectSound.play().catch(() => {});
     }
-  };
 
-  const recordQuizCompletion = async () => {
-    if (!userToken || !quizState.selectedCategory) return;
+    // Show bars immediately after answer selection
+    setTimeout(() => {
+      setShowBars(true);
+    }, 500);
 
-    try {
-      const { correctAnswers, incorrectAnswers } = quizState;
-      const response = await fetch(
-        `${BASE_URL}/api/categories/${quizState.selectedCategory.id}/completion`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userToken}`,
-          },
-          body: JSON.stringify({
-            questionsAttempted: 10,
-            correctAnswers,
-            incorrectAnswers,
-          }),
-        }
-      );
-
-      if (response.ok) {
-        setQuizState((prev) => ({
-          ...prev,
-          results: {
-            totalQuestions: 10,
-            correctAnswers,
-            incorrectAnswers,
-            categoryName: prev.selectedCategory?.name,
-            categoryId: prev.selectedCategory?.id,
-          },
-        }));
-      } else {
-        console.error("❌ Failed to record completion");
-      }
-    } catch (error) {
-      setError("Error recording quiz completion.");
-    }
+    // Show explanation after bars have finished animating (2.5s total delay)
+    setTimeout(() => {
+      setShowExplanation(true);
+    }, 2500);
   };
 
   const handleNextQuestion = () => {
     if (isLastQuestion) {
-      recordQuizCompletion();
-      setQuizState((prev) => ({
-        ...prev,
-        completed: true,
-        started: false,
-      }));
+      completeQuiz();
       return;
     }
     fetchNextQuestion();
@@ -363,7 +417,7 @@ export default function Quiz() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("❌ Failed to update popularity:", errorData.message || errorData);
+        console.error("⚠️ Failed to update popularity:", errorData.message || errorData);
       }
     } catch (err) {
       console.error("⚠️ Error updating popularity:", err);
@@ -410,7 +464,6 @@ export default function Quiz() {
     return "bg-muted text-muted-foreground border-border";
   };
 
-
   const getTimerColor = () => {
     if (timeLeft > 20) return "text-success";
     if (timeLeft > 10) return "text-warning";
@@ -431,12 +484,14 @@ export default function Quiz() {
     );
   }
 
-  if (loading || !quizState.question) {
+  if (loading || (!quizState.question && !quizState.completed)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-quiz-background to-background flex items-center justify-center px-4">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 md:h-12 md:w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-sm md:text-base text-muted-foreground">Loading quiz questions...</p>
+          <p className="text-sm md:text-base text-muted-foreground">
+            {isCompletingQuiz ? "Completing quiz..." : "Loading quiz questions..."}
+          </p>
         </div>
       </div>
     );
@@ -500,9 +555,9 @@ export default function Quiz() {
           <div className="px-2 py-4">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
               <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-relaxed flex-1">
-                {quizState.question.question}
+                {quizState.question?.question}
               </h2>
-              {quizState.question.difficulty && (
+              {quizState.question?.difficulty && (
                 <Badge 
                   variant="outline" 
                   className={`text-sm self-start flex-shrink-0 ${
@@ -518,16 +573,19 @@ export default function Quiz() {
           </div>
 
           <div className="space-y-3">
-            {quizState.question.answers.map((answer, index) => (
+            {quizState.question?.answers.map((answer, index) => (
               <Card
                 key={index}
                 className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} hover:shadow-lg relative overflow-hidden cursor-pointer`}
                 onClick={() => !timeUp && handleAnswerSelection(answer)}
               >
-                {showExplanation && !timeUp && quizState.question.answerStats && (
+                {quizState.isAnswerSelected && showBars && !timeUp && quizState.question.answerStats && (
                   <div 
-                    className="absolute top-0 left-0 h-full bg-primary/15 transition-all duration-1000 ease-out rounded-r-md"
-                    style={{ width: `${quizState.question.answerStats[answer] || 0}%` }}
+                    className="absolute top-0 left-0 h-full bg-primary/15 animate-bar-fill rounded-r-md"
+                    style={{ 
+                      '--target-width': `${quizState.question.answerStats[answer] || 0}%`,
+                      animationDelay: `${index * 200}ms`
+                    } as React.CSSProperties}
                   />
                 )}
                 
@@ -535,10 +593,15 @@ export default function Quiz() {
                   <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 flex items-center justify-center font-semibold text-base md:text-lg transition-colors flex-shrink-0 ${getLetterStyle(answer)}`}>
                     {String.fromCharCode(65 + index)}
                   </div>
-                  <div className="flex-1 min-w-0 flex items-center">
+                  <div className="flex-1 min-w-0 flex items-center justify-between">
                     <span className="font-medium text-base md:text-lg leading-snug break-words">
                       {answer}
                     </span>
+                    {quizState.isAnswerSelected && showBars && !timeUp && quizState.question.answerStats && (
+                      <span className="text-sm text-muted-foreground ml-2 animate-fade-in-delayed" style={{ animationDelay: `${1800 + (index * 200)}ms` }}>
+                        {quizState.question.answerStats[answer]}%
+                      </span>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -562,14 +625,15 @@ export default function Quiz() {
                   size="lg" 
                   className="w-full h-14 md:h-16 text-base md:text-lg"
                   onClick={handleNextQuestion}
+                  disabled={isCompletingQuiz}
                 >
-                  {isLastQuestion ? "Finish Quiz" : "Next Question"}
+                  {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
                 </Button>
               </div>
             </div>
           )}
 
-          {showExplanation && !timeUp && quizState.question.explanation && (
+          {showExplanation && !timeUp && quizState.question?.explanation && (
             <div ref={explanationRef}>
               <Card className="p-6 md:p-8 bg-primary/5 border-primary/20 animate-slide-up">
                 <div className="space-y-4">
@@ -635,14 +699,72 @@ export default function Quiz() {
                   size="lg" 
                   className="w-full h-14 md:h-16 text-base md:text-lg"
                   onClick={handleNextQuestion}
+                  disabled={isCompletingQuiz}
                 >
-                  {isLastQuestion ? "Finish Quiz" : "Next Question"}
+                  {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
                 </Button>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      <style>{`
+        @keyframes slide-up {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes bar-fill {
+          from {
+            width: 0%;
+          }
+          to {
+            width: var(--target-width);
+          }
+        }
+
+        @keyframes fade-in-delayed {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        
+        .animate-slide-up {
+          animation: slide-up 0.6s ease-out forwards;
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 0.5s ease-out forwards;
+        }
+
+        .animate-bar-fill {
+          animation: bar-fill 0.4s ease-out forwards;
+        }
+
+        .animate-fade-in-delayed {
+          animation: fade-in-delayed 0.3s ease-out forwards;
+          opacity: 0;
+        }
+      `}</style>
     </div>
   );
 }

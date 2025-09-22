@@ -14,14 +14,9 @@ const tabs = [
 export const BottomTabs = () => {
   const location = useLocation();
   const isMobile = useIsMobile();
-
-  // Only show bottom tabs on mobile
-  if (!isMobile) {
-    return null;
-  }
-
+  
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-card/95 to-card/80 backdrop-blur-lg border-t border-border z-50">
+    <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-card/95 to-card/80 backdrop-blur-lg border-t border-border z-50 md:hidden">
       <div className="flex items-center justify-between h-20 px-6 max-w-full mx-auto">
         {tabs.map((tab, index) => {
           const isActive = location.pathname === tab.path;

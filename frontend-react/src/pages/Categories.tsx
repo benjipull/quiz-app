@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Search, Filter, Plus, TrendingUp, Star, Clock, Users } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import AddCategory from "@/components/AddCategory";
 
 interface Category {
@@ -27,14 +27,6 @@ interface Category {
   timeEstimate?: string;
 }
 
-const filterTabs = [
-  { id: "all", label: "All", icon: null },
-  { id: "trending", label: "Trending", icon: TrendingUp },
-  { id: "popular", label: "Popular", icon: Users },
-  { id: "new", label: "New", icon: Star },
-  { id: "highest-rated", label: "Top Rated", icon: Clock },
-];
-
 export default function Categories() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -43,7 +35,6 @@ export default function Categories() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState("all");
 
   const searchQueryFromParams = searchParams.get("search") || "";
 
@@ -63,10 +54,10 @@ export default function Categories() {
   const fetchCategories = async () => {
     setError(null);
     setLoading(true);
-    
+
     try {
       const userToken = localStorage.getItem("token");
-      
+
       const response = await fetch(`${BASE_URL}/api/categories`, {
         method: "GET",
         headers: {
@@ -78,7 +69,7 @@ export default function Categories() {
       if (!response.ok) {
         throw new Error(`Failed to fetch categories. Status: ${response.status}`);
       }
-      
+
       const data = await response.json();
 
       // Transform API data to match interface
@@ -110,46 +101,14 @@ export default function Categories() {
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    filterCategories(query, activeFilter);
-  };
-
-  const handleFilterChange = (filter: string) => {
-    setActiveFilter(filter);
-    filterCategories(searchQuery, filter);
-  };
-
-  const filterCategories = (query: string, filter: string) => {
-    let currentCategories = categories;
-
-    // Apply search filter
     if (query) {
-      currentCategories = categories.filter(category =>
+      const currentCategories = categories.filter(category =>
         category.name.toLowerCase().includes(query.toLowerCase()) ||
         category.description?.toLowerCase().includes(query.toLowerCase())
       );
-    }
-
-    // Apply tab filter
-    switch (filter) {
-      case "popular":
-        setFilteredCategories([...currentCategories].sort((a, b) => {
-          const aCount = (b.completionCount || b.completionsCount) || 0;
-          const bCount = (a.completionCount || a.completionsCount) || 0;
-          return aCount - bCount;
-        }));
-        break;
-      case "highest-rated":
-        setFilteredCategories([...currentCategories].sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0)));
-        break;
-      case "new":
-        setFilteredCategories(currentCategories.filter(cat => cat.isNew));
-        break;
-      case "trending":
-        setFilteredCategories(currentCategories.filter(cat => cat.trending));
-        break;
-      default:
-        setFilteredCategories(currentCategories);
-        break;
+      setFilteredCategories(currentCategories);
+    } else {
+      setFilteredCategories(categories);
     }
   };
 
@@ -179,7 +138,7 @@ export default function Categories() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background pb-20">
       <Header title="Categories" showSearch />
-      
+
       <div className="px-4 lg:px-8 space-y-6 max-w-full mx-auto">
         {/* Search Bar */}
         <div className="pt-4 space-y-4">
@@ -193,37 +152,17 @@ export default function Categories() {
             />
           </div>
 
-       <AddCategory/>
+          <AddCategory />
         </div>
-
-        {/* Filter Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {filterTabs.map((tab) => (
-            <Button
-              key={tab.id}
-              variant={activeFilter === tab.id ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleFilterChange(tab.id)}
-              className="shrink-0"
-            >
-              {tab.icon && <tab.icon className="h-4 w-4" />}
-              {tab.label}
-            </Button>
-          ))}
-        </div>
-
+        
         {/* Categories Grid */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-foreground">
               {loading ? "Loading..." : `${filteredCategories.length} Categories`}
             </h3>
-            <Button variant="ghost" size="sm">
-              <Filter className="h-4 w-4" />
-              Filter
-            </Button>
           </div>
-          
+
           {loading ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -251,7 +190,7 @@ export default function Categories() {
                   rating={category.averageRating || 0}
                   timeEstimate={category.timeEstimate || "5 min"}
                   imageUrl={category.imageUrl || category.image || `coming soon`}
-                  createdBy={category.createdBy || "QuizMaster"}
+                  createdBy={category.createdBy || "Quizicle"}
                   onPlay={handlePlayQuiz}
                 />
               ))}

@@ -14,8 +14,9 @@ import {
   Clock,
 } from "lucide-react";
 import logo from "../assets/images/QuizicleLogo.png";
-import { cn } from "@/lib/utils";
-import GameStatsHeader from "@/components/GameStatsHeader";
+// Import the new components
+import SplashScreen from "../components/SplashScreen";
+import GameStatsHeader from "../components/GameStatsHeader";
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
@@ -23,8 +24,7 @@ const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
 });
 const avatars: string[] = Object.values(avatarImages) as string[];
 
-const BASE_URL =
-  "https://quiz-app-node-606998948537.europe-west4.run.app";
+const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
 interface Category {
   _id: string;
@@ -32,178 +32,220 @@ interface Category {
   description?: string;
   createdBy?: string;
   completionCount?: number;
-  completionsCount?: number;
   questionCount?: number;
   averageRating?: number;
   difficulty?: "Easy" | "Medium" | "Hard";
-  image?: string;
   imageUrl?: string;
-  trending?: boolean;
-  isNew?: boolean;
   createdAt?: string;
-  timeEstimate?: string;
-  gradient?: string;
 }
 
-const defaultStats = [
-  { icon: Zap, label: "Quizzes Played", value: "0", color: "text-primary" },
-  { icon: TrendingUp, label: "Active Users", value: "0", color: "text-success" },
-  { icon: Award, label: "Categories", value: "0", color: "text-warning" },
-  { icon: Clock, label: "Avg. Time", value: "5.2m", color: "text-secondary" },
-];
+interface CategoryToPlayResponse {
+  message: string;
+  categoryId: string;
+  name: string;
+  averageRating: number;
+  questionsCount: number;
+}
 
 export default function Home() {
   const [featuredCategories, setFeaturedCategories] = useState<Category[]>([]);
-  const [stats, setStats] = useState(defaultStats);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [playButtonLoading, setPlayButtonLoading] = useState(false);
 
-  const [userLevel, setUserLevel] = useState(1);
-  const [userScore, setUserScore] = useState(36);
-  const [userCoins, setUserCoins] = useState(500);
-  const [userLives, setUserLives] = useState(5);
-
-  const userToken = localStorage.getItem("token");
+  // Splash screen state - only show on initial app load
+  const [showSplash, setShowSplash] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   const [userProfile, setUserProfile] = useState<any | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [userLevel, setUserLevel] = useState(1);
+
+  // New state to track screen size
+  const [isSmallScreen, setIsSmallScreen] = useState(false);
+
   const navigate = useNavigate();
+  const userToken = typeof window !== 'undefined' ? localStorage.getItem("token") || "" : "";
 
   useEffect(() => {
-    fetchFeaturedCategories();
-    loadUserStats();
-
-    const storedUser = localStorage.getItem("user");
-    const storedAvatar = localStorage.getItem("userAvatar");
-
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUserProfile(parsedUser);
-
-        if (storedAvatar) {
-          setUserAvatar(storedAvatar);
-        } else if (parsedUser.avatar) {
-          setUserAvatar(avatars[parsedUser.avatar - 1] || null);
+    const initializeApp = async () => {
+      // Check if this is the first time loading the app in this session
+      const hasShownSplash = typeof window !== 'undefined' ? sessionStorage.getItem("splashShown") : null;
+      const shouldShowSplash = !hasShownSplash;
+      
+      if (shouldShowSplash) {
+        setShowSplash(true);
+        // Mark that we've shown the splash screen for this session
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem("splashShown", "true");
         }
-      } catch (e) {
-        console.error("Failed to parse user data from localStorage:", e);
       }
-    }
+
+      const startTime = Date.now();
+      const minSplashDuration = shouldShowSplash ? 2500 : 0; // 2.5 seconds for gaming vibes, 0 if not showing splash
+
+      try {
+        // Load all data concurrently
+        await Promise.all([
+          fetchFeaturedCategories(),
+          loadUserProfile(),
+        ]);
+
+        setDataLoaded(true);
+
+        if (shouldShowSplash) {
+          // Calculate remaining time for splash screen
+          const elapsedTime = Date.now() - startTime;
+          const remainingTime = Math.max(0, minSplashDuration - elapsedTime);
+
+          // Wait for the remaining time before hiding splash
+          setTimeout(() => {
+            setShowSplash(false);
+            setLoading(false);
+          }, remainingTime);
+        } else {
+          // No splash screen, just set loading to false
+          setLoading(false);
+        }
+
+      } catch (error) {
+        console.error("Error during app initialization:", error);
+        if (shouldShowSplash) {
+          // Even if there's an error, show the app after minimum duration
+          setTimeout(() => {
+            setShowSplash(false);
+            setLoading(false);
+          }, minSplashDuration);
+        } else {
+          setLoading(false);
+        }
+      }
+    };
+
+    initializeApp();
+
+    // Function to check screen size
+    const checkScreenSize = () => {
+      setIsSmallScreen(window.innerWidth < 768);
+    };
+
+    checkScreenSize();
+    window.addEventListener("resize", checkScreenSize);
+
+    return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
-  const loadUserStats = () => {
-    const savedLevel = localStorage.getItem("userLevel");
-    const savedScore = localStorage.getItem("userScore");
-    const savedCoins = localStorage.getItem("userCoins");
-    const savedLives = localStorage.getItem("userLives");
+  const loadUserProfile = () => {
+    return new Promise<void>((resolve) => {
+      const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+      const storedAvatar = typeof window !== 'undefined' ? localStorage.getItem("userAvatar") : null;
 
-    if (savedLevel) setUserLevel(parseInt(savedLevel));
-    if (savedScore) setUserScore(parseInt(savedScore));
-    if (savedCoins) setUserCoins(parseInt(savedCoins));
-    if (savedLives) setUserLives(parseInt(savedLives));
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setUserProfile(parsedUser);
+
+          if (storedAvatar) {
+            setUserAvatar(storedAvatar);
+          } else if (parsedUser.avatar) {
+            setUserAvatar(avatars[parsedUser.avatar - 1] || null);
+          }
+
+          if (parsedUser.level) setUserLevel(parsedUser.level);
+        } catch (e) {
+          console.error("Failed to parse user data:", e);
+        }
+      }
+      resolve();
+    });
   };
 
   const fetchFeaturedCategories = async () => {
     setError(null);
-    setLoading(true);
 
     try {
       const response = await fetch(`${BASE_URL}/api/categories`, {
-        method: "GET",
         headers: {
-          Authorization: `Bearer ${userToken}`,
           "Content-Type": "application/json",
+          ...(userToken && { Authorization: `Bearer ${userToken}` }),
         },
       });
-      if (!response.ok) throw new Error(`Failed to fetch categories`);
+
+      if (!response.ok) throw new Error("Failed to fetch categories");
+
       const data = await response.json();
+      const transformed: Category[] = data.map((category: any) => ({
+        _id: category._id,
+        name: category.name,
+        description: category.description || `Test your knowledge in ${category.name}`,
+        createdBy: category.createdBy || "QuizMaster",
+        completionCount: category.completionsCount || category.completionCount || 0,
+        questionCount: category.questionCount || 10,
+        averageRating: category.averageRating || 3,
+        difficulty: category.difficulty || "Medium",
+        imageUrl: category.imageUrl || category.image,
+        createdAt: category.createdAt,
+      }));
 
-      const transformed: Category[] = data.map(
-        (category: any, index: number) => ({
-          _id: category._id,
-          name: category.name,
-          description:
-            category.description ||
-            `Test your knowledge in ${category.name}`,
-          createdBy: category.createdBy || "QuizMaster",
-          completionCount:
-            category.completionsCount || category.completionCount || 0,
-          completionsCount:
-            category.completionsCount || category.completionCount || 0,
-          questionCount: category.questionCount || 10,
-          averageRating: category.averageRating || 3 + Math.random() * 2,
-          difficulty:
-            category.difficulty ||
-            (index % 3 === 0
-              ? "Easy"
-              : index % 3 === 1
-              ? "Medium"
-              : "Hard"),
-          image: category.imageUrl || category.image,
-          imageUrl: category.imageUrl || category.image,
-          trending:
-            (category.completionsCount || category.completionCount || 0) > 50,
-          isNew:
-            index < 2 ||
-            new Date().getTime() -
-              new Date(category.createdAt || 0).getTime() <
-              7 * 24 * 60 * 60 * 1000,
-          timeEstimate: `${Math.ceil(
-            (category.questionCount || 10) * 0.6
-          )} min`,
-          gradient:
-            index % 3 === 0
-              ? "from-primary/20 to-accent/20"
-              : index % 3 === 1
-              ? "from-success/20 to-secondary/20"
-              : "from-warning/20 to-primary/20",
-        })
-      );
-
-      setFeaturedCategories(
-        transformed
-          .sort(
-            (a, b) => (b.completionCount || 0) - (a.completionCount || 0)
-          )
-          .slice(0, 9)
-      );
+      setFeaturedCategories(transformed.slice(0, 9));
     } catch (e: any) {
       setError(e.message);
-    } finally {
-      setLoading(false);
     }
   };
 
   const handlePlayQuiz = (categoryId: string) => {
-    if (!userToken) return alert("❌ You must be logged in to play.");
+    if (!userToken) {
+      console.log("⚠️ You must be logged in to play.");
+      return;
+    }
     navigate(`/quiz/${categoryId}`);
   };
 
-  const handleQuickQuiz = () => {
-    if (!userToken) return alert("❌ You must be logged in to play.");
-    if (featuredCategories.length > 0) {
-      navigate(`/quiz/${featuredCategories[0]._id}`);
-    } else {
-      alert("No categories available to start a quick quiz.");
+  const handleQuickQuiz = async () => {
+    if (!userToken) {
+      console.log("⚠️ You must be logged in to play.");
+      return;
+    }
+
+    setPlayButtonLoading(true);
+
+    try {
+      const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get category to play: ${response.status}`);
+      }
+
+      const data: CategoryToPlayResponse = await response.json();
+
+      if (data.categoryId) {
+        console.log(`🎮 Starting quiz with category: ${data.name} (${data.categoryId})`);
+        navigate(`/quiz/${data.categoryId}`);
+      } else {
+        throw new Error("No category ID returned from server");
+      }
+    } catch (error: any) {
+      console.error("Error getting category to play:", error);
+      // fallback to first featured category
+      if (featuredCategories.length > 0) {
+        navigate(`/quiz/${featuredCategories[0]._id}`);
+      } else {
+        console.log("❌ Unable to start quiz. Please try again later.");
+      }
+    } finally {
+      setPlayButtonLoading(false);
     }
   };
 
-  if (error && featuredCategories.length === 0) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background">
-        <Header logoAsTitle imageSrc={logo} showNotifications />
-        <div className="mx-auto max-w-full space-y-6 px-4 pb-8 lg:px-8">
-          <Card className="p-8 text-center mt-12">
-            <h2 className="text-2xl font-bold text-red-500 mb-2">
-              Error Loading
-            </h2>
-            <p className="text-gray-400 mb-4">{error}</p>
-            <Button onClick={fetchFeaturedCategories}>Retry</Button>
-          </Card>
-        </div>
-      </div>
-    );
+  // Conditionally render the splash screen only on initial load
+  if (showSplash) {
+    return <SplashScreen dataLoaded={dataLoaded} />;
   }
 
   const alias = userProfile?.alias || userProfile?.name || "Guest";
@@ -211,53 +253,59 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background">
-      <Header logoAsTitle imageSrc={logo} showNotifications />
+      {/* Conditionally render the Header based on screen size */}
+      {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
       <div className="mx-auto max-w-full space-y-4 px-4 pb-4 lg:px-8 lg:pb-8">
-        {/* Game Stats Header */}
-        <div className=" top-0 z-10 bg-gradient-to-br from-background to-quiz-background">
-          <GameStatsHeader/>
-          
-          {/* User Avatar Section */}
-          <div className="flex flex-col items-center space-y-2 py-3">
-            <div className="relative">
-              <Link to="/profile" className="no-underline">
-                <Avatar className="w-20 h-20">
-                  <AvatarImage src={avatarImage} alt={alias} />
-                  <AvatarFallback className="bg-gradient-to-br from-primary/20 to-accent/20 border-4 border-primary/20 text-2xl font-bold text-primary">
-                    {alias.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              </Link>
-              <div className="absolute bottom-0 right-0 w-5 h-5 bg-success rounded-full border-2 border-background"></div>
-            </div>
-            <h2 className="text-lg font-bold">{alias}</h2>
-          </div>
+        {/* Game Stats Header - It will now wait for isParentLoading to be false */}
+        <GameStatsHeader userToken={userToken} isParentLoading={loading} />
 
-          {/* Play Button */}
-          <div className="pb-3">
-            <Button
-              onClick={handleQuickQuiz}
-              disabled={loading}
-              className="w-full h-12 bg-success hover:bg-success/90 text-white text-lg font-bold rounded-xl"
-            >
-              {loading ? "Loading..." : "Play"}
-              <div className="ml-2 flex items-center bg-white/20 px-2 py-0.5 rounded-full">
-                <span className="font-bold">{userLevel}</span>
-                <span className="ml-1 text-xs">Lvl</span>
-              </div>
-            </Button>
+        {/* User Avatar Section */}
+        <div className="flex flex-col items-center space-y-2 py-3">
+          <div className="relative">
+            <Link to="/profile" className="no-underline">
+              <Avatar className="w-20 h-20">
+                <AvatarImage src={avatarImage} alt={alias} />
+                <AvatarFallback className="bg-gradient-to-br from-primary/20 to-accent/20 border-4 border-primary/20 text-2xl font-bold text-primary">
+                  {alias.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </Link>
+            <div className="absolute bottom-0 right-0 w-5 h-5 bg-success rounded-full border-2 border-background"></div>
           </div>
+          <h2 className="text-lg font-bold">{alias}</h2>
+        </div>
+
+        {/* Play Button */}
+        <div className="pb-3">
+          <Button
+            onClick={handleQuickQuiz}
+            disabled={loading || playButtonLoading}
+            className="w-full h-12 bg-success hover:bg-success/90 text-white text-lg font-bold rounded-xl disabled:opacity-50"
+          >
+            {playButtonLoading ? (
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Starting Quiz...
+              </div>
+            ) : (
+              <>
+                Play
+                <div className="ml-2 flex items-center bg-white/20 px-2 py-0.5 rounded-full">
+                  <span className="font-bold">{userLevel}</span>
+                  <span className="ml-1 text-xs">Lvl</span>
+                </div>
+              </>
+            )}
+          </Button>
         </div>
 
         {/* Featured Categories */}
         <div className="mt-4">
-          <h3 className="text-lg font-bold mb-3">
-            Featured Categories
-          </h3>
-          {loading ? (
+          <h3 className="text-lg font-bold mb-3">Featured Categories</h3>
+          {error ? (
             <div className="flex justify-center py-12">
-              <p className="text-muted-foreground">Loading categories...</p>
+              <p className="text-red-500">Error: {error}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -271,7 +319,6 @@ export default function Home() {
                   questionCount={cat.questionCount || 10}
                   completions={cat.completionCount || 0}
                   rating={cat.averageRating || 0}
-                  timeEstimate={cat.timeEstimate || "5 min"}
                   imageUrl={cat.imageUrl || ""}
                   createdBy={cat.createdBy || "QuizMaster"}
                   onPlay={handlePlayQuiz}
