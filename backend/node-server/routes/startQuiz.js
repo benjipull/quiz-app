@@ -4,10 +4,24 @@ const Category = require("../models/categoryModel");
 const { userQuestions } = require("../index"); // Import shared store
 const { populateCategory } = require("../scripts/populateCategories"); // Import async question population
 
+// Difficulty name mapping
+const difficultyNames = {
+    1: "Trivial",
+    2: "Simple",
+    3: "Basic",
+    4: "Standard",
+    5: "Challenging",
+    6: "Tough",
+    7: "Advanced",
+    8: "Expert",
+    9: "Master",
+    10: "Legendary"
+};
+
 router.post("/", async (req, res) => {
     const { categoryId, numQuestions } = req.body;
 
-    const authHeader = req.headers["authorization"]; // or req.get("authorization")
+    const authHeader = req.headers["authorization"];
     const userToken = authHeader && authHeader.startsWith("Bearer ")
         ? authHeader.split(" ")[1]
         : null;
@@ -21,36 +35,38 @@ router.post("/", async (req, res) => {
     }
 
     try {
-        // Fetch category and select the 10 questions with the lowest `timesLoaded`
         const category = await Category.findById(categoryId);
 
         if (!category) {
             return res.status(404).json({ message: "Category not found." });
         }
 
-        // Get the least-loaded questions (sorted by `timesLoaded`, but NOT updating it yet)
         const selectedQuestions = category.questions
-            .sort((a, b) => a.timesLoaded - b.timesLoaded) // Sort by lowest `timesLoaded`
-            .slice(0, numQuestions); // Get the top `numQuestions`
+            .sort((a, b) => a.timesLoaded - b.timesLoaded)
+            .slice(0, numQuestions);
 
         if (selectedQuestions.length === 0) {
-            // Run `populateCategory` asynchronously
             console.error(`Cannot start Quiz, no questions found. Populating category: ${category._id} (${category.name})`);
             populateCategory(category._id, 20);
 
             return res.status(404).json({ message: "No available questions in this category please try again in a few minutes." });
         }
 
-        // Store questions for user in memory for `nextQuestion.js`
-        userQuestions[userToken] = selectedQuestions.map(q => ({
-            _id: q._id,
-            question: q.text,
-            answers: q.answers.map(a => a.text),
-            correct_answer: q.correct_answer,
-            explanation: q.explanation,
-            timesAnsweredCorrectly: q.timesAnsweredCorrectly,
-            timesAnsweredIncorrectly: q.timesAnsweredIncorrectly
-        }));
+        // Store questions for user in memory
+        userQuestions[userToken] = {
+            queue: selectedQuestions.map(q => ({
+                _id: q._id,
+                question: q.text,
+                answers: q.answers.map(a => a.text),
+                correct_answer: q.correct_answer,
+                explanation: q.explanation,
+                timesAnsweredCorrectly: q.timesAnsweredCorrectly,
+                timesAnsweredIncorrectly: q.timesAnsweredIncorrectly,
+                difficultyLevel: q.difficulty_level,
+                difficultyName: difficultyNames[q.difficulty_level] || "Unknown"
+            })),
+            current: null
+        };
 
         console.log(`Loaded ${selectedQuestions.length} questions for user ${userToken}`);
 
