@@ -537,20 +537,50 @@ export default function Quiz() {
     if (timeLeft > 10) return "text-warning";
     return "text-destructive";
   };
-
-  // Calculate answer percentages for display
-  const getAnswerPercentage = (answer: string, correct: boolean) => {
-    if (!answerResponse?.answerStats) {
-      // Dummy data logic
-      if (answer === quizState.question?.correct_answer) {
-        return Math.floor(Math.random() * (90 - 40 + 1)) + 40; // Correct answer gets a higher percentage
-      } else {
-        return Math.floor(Math.random() * 30) + 5; // Incorrect answers get a lower percentage
+  
+  // New state to hold dummy percentages for the current question
+  const [dummyPercentages, setDummyPercentages] = useState<{ [key: string]: number }>({});
+  
+  // This useEffect generates dummy percentages when a new question loads
+  useEffect(() => {
+    if (quizState.question) {
+      const percentages: { [key: string]: number } = {};
+      const correct_answer = quizState.question.correct_answer;
+      
+      let sumOfOthers = 0;
+      const otherAnswers = quizState.question.answers.filter(a => a !== correct_answer);
+      
+      // Generate random percentages for incorrect answers
+      otherAnswers.forEach(answer => {
+        const percentage = Math.floor(Math.random() * (20 - 5 + 1)) + 5;
+        percentages[answer] = percentage;
+        sumOfOthers += percentage;
+      });
+      
+      // Calculate the remaining percentage for the correct answer
+      const correctPercentage = Math.max(0, 100 - sumOfOthers);
+      percentages[correct_answer] = correctPercentage;
+      
+      // If the sum is slightly over 100 due to rounding, adjust the largest one down
+      const total = Object.values(percentages).reduce((sum, p) => sum + p, 0);
+      if (total > 100) {
+        const largestKey = Object.keys(percentages).reduce((a, b) => percentages[a] > percentages[b] ? a : b);
+        percentages[largestKey] -= (total - 100);
       }
+      
+      setDummyPercentages(percentages);
     }
-    const stat = answerResponse.answerStats.find(s => s.text === answer);
-    if (!stat) return 0;
-    return correct ? stat.correctPercentage : stat.incorrectPercentage;
+  }, [quizState.question]);
+  
+  // Calculate answer percentages for display using the dummy data
+  const getAnswerPercentage = (answer: string) => {
+    // If the API response has stats, use them. Otherwise, use our dummy data.
+    if (answerResponse?.answerStats) {
+      const stat = answerResponse.answerStats.find(s => s.text === answer);
+      return stat?.correctPercentage ?? 0;
+    }
+    
+    return dummyPercentages[answer] || 0;
   };
 
   if (error) {
@@ -667,7 +697,7 @@ export default function Quiz() {
                   <div 
                     className="absolute top-0 left-0 h-full bg-primary/15 animate-bar-fill rounded-r-md"
                     style={{ 
-                      '--target-width': `${getAnswerPercentage(answer, answer === quizState.question?.correct_answer)}%`,
+                      '--target-width': `${getAnswerPercentage(answer)}%`,
                       animationDelay: `${index * 200}ms`
                     } as React.CSSProperties}
                   />
@@ -683,7 +713,7 @@ export default function Quiz() {
                     </span>
                     {quizState.isAnswerSelected && showBars && !timeUp && (
                       <span className="text-sm text-muted-foreground ml-2 animate-fade-in-delayed" style={{ animationDelay: `${1800 + (index * 200)}ms` }}>
-                        {getAnswerPercentage(answer, answer === quizState.question?.correct_answer)}%
+                        {getAnswerPercentage(answer)}%
                       </span>
                     )}
                   </div>
@@ -735,11 +765,6 @@ export default function Quiz() {
                   <p className="text-sm md:text-base text-foreground leading-relaxed">
                     {answerResponse.explanation}
                   </p>
-                  {!answerResponse.isCorrect && (
-                    <p className="text-sm md:text-base text-muted-foreground">
-                      The correct answer was: <span className="font-semibold text-success">{answerResponse.correctAnswer}</span>
-                    </p>
-                  )}
                 </div>
               </Card>
 
