@@ -53,8 +53,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
 
-  // Splash screen state
-  const [showSplash, setShowSplash] = useState(true);
+  // Splash screen state - only show on initial app load
+  const [showSplash, setShowSplash] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
 
   const [userProfile, setUserProfile] = useState<any | null>(null);
@@ -69,8 +69,20 @@ export default function Home() {
 
   useEffect(() => {
     const initializeApp = async () => {
+      // Check if this is the first time loading the app in this session
+      const hasShownSplash = typeof window !== 'undefined' ? sessionStorage.getItem("splashShown") : null;
+      const shouldShowSplash = !hasShownSplash;
+      
+      if (shouldShowSplash) {
+        setShowSplash(true);
+        // Mark that we've shown the splash screen for this session
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem("splashShown", "true");
+        }
+      }
+
       const startTime = Date.now();
-      const minSplashDuration = 3000; // 3 seconds minimum splash duration, a much better value than 30s.
+      const minSplashDuration = shouldShowSplash ? 2500 : 0; // 2.5 seconds for gaming vibes, 0 if not showing splash
 
       try {
         // Load all data concurrently
@@ -81,23 +93,32 @@ export default function Home() {
 
         setDataLoaded(true);
 
-        // Calculate remaining time for splash screen
-        const elapsedTime = Date.now() - startTime;
-        const remainingTime = Math.max(0, minSplashDuration - elapsedTime);
+        if (shouldShowSplash) {
+          // Calculate remaining time for splash screen
+          const elapsedTime = Date.now() - startTime;
+          const remainingTime = Math.max(0, minSplashDuration - elapsedTime);
 
-        // Wait for the remaining time before hiding splash
-        setTimeout(() => {
-          setShowSplash(false);
-          setLoading(false); // Set parent loading to false
-        }, remainingTime);
+          // Wait for the remaining time before hiding splash
+          setTimeout(() => {
+            setShowSplash(false);
+            setLoading(false);
+          }, remainingTime);
+        } else {
+          // No splash screen, just set loading to false
+          setLoading(false);
+        }
 
       } catch (error) {
         console.error("Error during app initialization:", error);
-        // Even if there's an error, show the app after minimum duration
-        setTimeout(() => {
-          setShowSplash(false);
-          setLoading(false); // Set parent loading to false
-        }, minSplashDuration);
+        if (shouldShowSplash) {
+          // Even if there's an error, show the app after minimum duration
+          setTimeout(() => {
+            setShowSplash(false);
+            setLoading(false);
+          }, minSplashDuration);
+        } else {
+          setLoading(false);
+        }
       }
     };
 
@@ -174,7 +195,6 @@ export default function Home() {
 
   const handlePlayQuiz = (categoryId: string) => {
     if (!userToken) {
-      // Use a custom message box instead of alert()
       console.log("⚠️ You must be logged in to play.");
       return;
     }
@@ -183,7 +203,6 @@ export default function Home() {
 
   const handleQuickQuiz = async () => {
     if (!userToken) {
-      // Use a custom message box instead of alert()
       console.log("⚠️ You must be logged in to play.");
       return;
     }
@@ -224,7 +243,7 @@ export default function Home() {
     }
   };
 
-  // Conditionally render the splash screen
+  // Conditionally render the splash screen only on initial load
   if (showSplash) {
     return <SplashScreen dataLoaded={dataLoaded} />;
   }
