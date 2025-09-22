@@ -1,24 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Trophy, 
-  Star, 
-  Target, 
-  Zap, 
-  Brain, 
-  Award, 
-  RefreshCw, 
-  Home,
-  TrendingUp,
-  Clock,
+import {
   CheckCircle,
-  XCircle
+  XCircle,
+  TrendingUp,
+  Star as StarIcon,
+  Home,
+  RefreshCw,
+  Award,
 } from "lucide-react";
+
+// Assuming a custom component for cool effects
+import Confetti from "react-confetti";
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
@@ -29,307 +28,324 @@ interface QuizResultsProps {
     incorrectAnswers: number;
     categoryName: string;
     categoryId: string;
+    completionData: {
+      percentageCorrect: string;
+      knowledgeGained: number;
+      totalKnowledge: number;
+      previousLevel: number;
+      currentLevel: number;
+    };
   };
   onPlayAgain: () => void;
 }
 
-interface Achievement {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  unlocked: boolean;
-}
-
 export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) {
   const navigate = useNavigate();
+  const userToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
+  const {
+    correctAnswers,
+    incorrectAnswers,
+    categoryName,
+    categoryId,
+    totalQuestions,
+    completionData,
+  } = results;
+
+  const {
+    percentageCorrect,
+    knowledgeGained,
+    totalKnowledge,
+    previousLevel,
+    currentLevel,
+  } = completionData;
+
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
-  const [hasRated, setHasRated] = useState(false);
-  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
+  const [hasRated, setHasRated] = useState<boolean>(false);
+  const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
+  const [ratingMessage, setRatingMessage] = useState<string | null>(null);
 
-  const userToken = localStorage.getItem("token");
-  const { totalQuestions, correctAnswers, incorrectAnswers, categoryName, categoryId } = results;
-  const percentage = Math.round((correctAnswers / totalQuestions) * 100);
-
-  useEffect(() => {
-    if (percentage >= 70) {
-      setShowConfetti(true);
-      const timer = setTimeout(() => setShowConfetti(false), 3000);
-      return () => clearTimeout(timer);
+  const handleRatingSubmit = async (value: number) => {
+    if (!userToken) {
+      setRatingMessage("You must be logged in to submit a rating.");
+      return;
     }
-  }, [percentage]);
-
-  const getPerformanceLevel = () => {
-    if (percentage >= 90) return { level: "Excellent", color: "text-yellow-500", bg: "bg-yellow-500/10" };
-    if (percentage >= 80) return { level: "Great", color: "text-green-500", bg: "bg-green-500/10" };
-    if (percentage >= 70) return { level: "Good", color: "text-blue-500", bg: "bg-blue-500/10" };
-    if (percentage >= 60) return { level: "Fair", color: "text-orange-500", bg: "bg-orange-500/10" };
-    return { level: "Keep Practicing", color: "text-red-500", bg: "bg-red-500/10" };
-  };
-
-  const performance = getPerformanceLevel();
-
-  const achievements: Achievement[] = [
-    {
-      icon: <Trophy className="h-5 w-5" />,
-      title: "Perfect Score!",
-      description: "Answered all questions correctly",
-      unlocked: percentage === 100
-    },
-    {
-      icon: <Zap className="h-5 w-5" />,
-      title: "Speed Demon",
-      description: "Completed quiz quickly",
-      unlocked: percentage >= 80 
-    },
-    {
-      icon: <Brain className="h-5 w-5" />,
-      title: "Knowledge Master",
-      description: "Scored 90% or higher",
-      unlocked: percentage >= 90
-    },
-    {
-      icon: <Target className="h-5 w-5" />,
-      title: "Sharp Shooter",
-      description: "Great accuracy on tough questions",
-      unlocked: percentage >= 75
-    }
-  ];
-
-  const unlockedAchievements = achievements.filter(a => a.unlocked);
-
-  const handleRatingSubmit = async (selectedRating: number) => {
-    if (!userToken || hasRated || isSubmittingRating) return;
+    if (hasRated || isSubmittingRating) return;
 
     setIsSubmittingRating(true);
+    setRatingMessage(null);
+
     try {
-      const response = await fetch(`${BASE_URL}/api/categories/${categoryId}/rate`, {
+      const res = await fetch(`${BASE_URL}/api/categories/${categoryId}/rate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${userToken}`,
+          Authorization: `Bearer ${userToken}`,
         },
-        body: JSON.stringify({ rating: selectedRating }),
+        body: JSON.stringify({ rating: value }),
       });
 
-      if (response.ok) {
-        setRating(selectedRating);
+      if (res.ok) {
+        setRating(value);
         setHasRated(true);
+        setRatingMessage("Thanks for your feedback! It helps us improve.");
       } else {
-        console.error("Failed to submit rating");
+        const err = await res.json().catch(() => ({}));
+        setRatingMessage(err?.message || "Failed to submit rating.");
+        console.error("Rating error:", err);
       }
     } catch (error) {
       console.error("Error submitting rating:", error);
+      setRatingMessage("Network error while submitting rating.");
     } finally {
       setIsSubmittingRating(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-quiz-background to-background relative overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      </div>
+  const percentage = parseInt(percentageCorrect.replace('%', ''), 10);
+  let performanceMessage = "Good effort! Keep practicing to improve.";
+  if (percentage === 100) {
+    performanceMessage = "🌟 Perfect score! You're a true master!";
+  } else if (percentage >= 80) {
+    performanceMessage = "🎉 Excellent job! You're almost at the top!";
+  } else if (percentage >= 50) {
+    performanceMessage = "👍 Solid performance! You're on the right track.";
+  }
 
-      {showConfetti && (
-        <div className="absolute inset-0 pointer-events-none z-10">
-          {[...Array(50)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-2 h-2 bg-primary opacity-80 animate-bounce"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 2}s`,
-                animationDuration: `${2 + Math.random() * 2}s`
-              }}
-            />
-          ))}
-        </div>
+  const hasLeveledUp = currentLevel > previousLevel;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-quiz-background to-background flex items-center justify-center p-6 font-display overflow-hidden relative">
+      {/* Confetti effect for perfect score or level up */}
+      {(percentage === 100 || hasLeveledUp) && (
+        <Confetti
+          width={window.innerWidth}
+          height={window.innerHeight}
+          recycle={false}
+          numberOfPieces={percentage === 100 ? 500 : 200}
+          gravity={0.05}
+        />
       )}
 
-      <div className="relative z-20 px-4 py-6 max-w-4xl mx-auto">
-        <Card className="p-6 md:p-8 mb-6 bg-gradient-to-r from-card/90 to-card/70 backdrop-blur-sm border-primary/20 shadow-2xl">
-          <div className="text-center space-y-6">
-            <div className="flex justify-center">
-              <Badge className={`${performance.bg} ${performance.color} border-current text-lg px-6 py-2 animate-pulse`}>
-                <Award className="h-5 w-5 mr-2" />
-                {performance.level}
-              </Badge>
+      {/* Background grid/pattern for a gaming vibe */}
+      <div className="absolute inset-0 z-0 opacity-10" style={{ backgroundImage: "url('/path/to/gaming-grid.svg')" }}></div>
+      <div className="absolute inset-0 z-0 bg-black/50 backdrop-blur-sm"></div>
+
+      <Card className="z-10 p-8 w-full max-w-xl space-y-6 text-center shadow-[0_20px_50px_rgba(8,_112,_184,_0.7)] border-4 border-primary/50 transform transition-transform duration-500 animate-fade-in-up bg-background-light dark:bg-background-dark">
+        {/* Animated Header with Icon */}
+        <div className="flex flex-col items-center space-y-2">
+          {percentage === 100 ? (
+            <Award className="h-16 w-16 text-yellow-400 animate-award-spin drop-shadow-lg" />
+          ) : hasLeveledUp ? (
+            <TrendingUp className="h-16 w-16 text-purple-500 animate-pulse-slow drop-shadow-lg" />
+          ) : (
+            <TrendingUp className="h-16 w-16 text-blue-500 animate-pulse-slow drop-shadow-lg" />
+          )}
+          <h1 className="text-4xl md:text-5xl font-extrabold text-primary tracking-wide leading-tight">
+            MISSION COMPLETE!
+          </h1>
+          <p className="text-xl text-muted-foreground font-semibold italic">
+            {performanceMessage}
+          </p>
+        </div>
+
+        {/* --- */}
+
+        {/* Results Summary Card with a more defined style */}
+        <Card className="bg-card/90 border border-border-card rounded-xl p-4 transform transition-transform duration-300 hover:scale-[1.02] shadow-inner-strong">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-2xl font-bold text-accent">{categoryName}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Animated Progress Bar for Accuracy */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                <span>Accuracy</span>
+                <Badge variant="default" className="text-lg font-bold bg-primary text-primary-foreground animate-pulse-fast">
+                  {percentageCorrect}
+                </Badge>
+              </div>
+              <Progress value={percentage} className="h-5 bg-gray-700 dark:bg-gray-800 animate-progress-fill" />
             </div>
 
-            <div className="space-y-4">
-              <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                Quiz Complete!
-              </h1>
-              <div className="text-6xl md:text-8xl font-black text-primary animate-bounce">
-                {percentage}%
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div className="flex flex-col items-center space-y-1 p-2 bg-green-900/20 rounded-lg animate-slide-in-left">
+                <CheckCircle className="h-8 w-8 text-green-400" />
+                <div className="font-bold text-2xl text-green-300">{correctAnswers}</div>
+                <div className="text-xs text-muted-foreground uppercase">Correct</div>
               </div>
-              <p className="text-lg text-muted-foreground">
-                You scored <span className="font-bold text-foreground">{correctAnswers}</span> out of{" "}
-                <span className="font-bold text-foreground">{totalQuestions}</span> questions in{" "}
-                <span className="font-bold text-primary">{categoryName}</span>
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
-              <div className="flex items-center justify-center space-x-2 p-3 bg-success/10 rounded-lg border border-success/20">
-                <CheckCircle className="h-5 w-5 text-success" />
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-success">{correctAnswers}</div>
-                  <div className="text-xs text-success/80">Correct</div>
-                </div>
-              </div>
-              <div className="flex items-center justify-center space-x-2 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
-                <XCircle className="h-5 w-5 text-destructive" />
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-destructive">{incorrectAnswers}</div>
-                  <div className="text-xs text-destructive/80">Incorrect</div>
-                </div>
+              <div className="flex flex-col items-center space-y-1 p-2 bg-red-900/20 rounded-lg animate-slide-in-right">
+                <XCircle className="h-8 w-8 text-red-400" />
+                <div className="font-bold text-2xl text-red-300">{incorrectAnswers}</div>
+                <div className="text-xs text-muted-foreground uppercase">Incorrect</div>
               </div>
             </div>
-          </div>
+          </CardContent>
         </Card>
 
-        {unlockedAchievements.length > 0 && (
-          <Card className="p-4 md:p-6 mb-6 bg-gradient-to-r from-yellow-500/5 to-orange-500/5 border-yellow-500/20">
-            <div className="space-y-4">
-              <h2 className="text-xl font-bold text-center flex items-center justify-center gap-2">
-                <Trophy className="h-6 w-6 text-yellow-500" />
-                Achievements Unlocked!
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {unlockedAchievements.map((achievement, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center space-x-3 p-3 bg-card/60 rounded-lg border border-primary/20 animate-slide-in"
-                    style={{ animationDelay: `${index * 0.2}s` }}
-                  >
-                    <div className="text-yellow-500">{achievement.icon}</div>
-                    <div>
-                      <div className="font-semibold text-sm">{achievement.title}</div>
-                      <div className="text-xs text-muted-foreground">{achievement.description}</div>
-                    </div>
-                  </div>
-                ))}
+        {/* --- */}
+
+        {/* Animated Level and Knowledge Section */}
+        <div className="space-y-4 pt-4">
+          <Card className="p-4 bg-card/60 border border-accent/20 rounded-lg animate-fade-in-fast">
+            <div className="flex justify-between items-center text-left">
+              <div className="flex items-center space-x-2">
+                <TrendingUp className="h-6 w-6 text-blue-400 animate-scale-up" />
+                <div>
+                  <div className="font-bold text-lg text-blue-300">Knowledge Gained</div>
+                  <div className="text-sm text-muted-foreground">Your total knowledge score is now <span className="text-blue-300 font-bold">{totalKnowledge}</span>!</div>
+                </div>
               </div>
+              <Badge variant="outline" className="text-lg font-bold border-blue-400 text-blue-400 animate-bounce-in">
+                +{knowledgeGained}
+              </Badge>
             </div>
           </Card>
-        )}
 
-        <Card className="p-4 md:p-6 mb-6">
-          <div className="text-center space-y-4">
-            <h3 className="text-lg font-semibold">How was this quiz?</h3>
-            <p className="text-sm text-muted-foreground">Rate your experience to help us improve</p>
-            
-            <div className="flex justify-center space-x-2">
-              {[1, 2, 3, 4, 5].map((star) => (
+          {hasLeveledUp && (
+            <Card className="p-4 bg-card/60 border border-purple-500/20 rounded-lg animate-fade-in-fast delay-200">
+              <div className="flex justify-between items-center text-left">
+                <div className="flex items-center space-x-2">
+                  <Award className="h-6 w-6 text-purple-400 animate-level-up" />
+                  <div>
+                    <div className="font-bold text-lg text-purple-300">LEVEL UP!</div>
+                    <div className="text-sm text-muted-foreground">You moved from <span className="text-purple-300 font-bold">Level {previousLevel}</span> to <span className="text-purple-300 font-bold">Level {currentLevel}</span>!</div>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-lg font-bold border-purple-400 text-purple-400 animate-bounce-in">
+                  +{currentLevel - previousLevel}
+                </Badge>
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* --- */}
+
+        {/* Rating Section with a more interactive feel */}
+        <Card className="p-4 bg-card/60 animate-fade-in">
+          <div className="text-center space-y-3">
+            <div className="text-sm font-medium text-accent">Rate this mission!</div>
+            <div className="flex items-center justify-center gap-2">
+              {[1, 2, 3, 4, 5].map((s) => (
                 <button
-                  key={star}
+                  key={s}
+                  type="button"
                   disabled={hasRated || isSubmittingRating}
-                  onClick={() => handleRatingSubmit(star)}
-                  onMouseEnter={() => !hasRated && setHoveredRating(star)}
+                  onClick={() => handleRatingSubmit(s)}
+                  onMouseEnter={() => !hasRated && setHoveredRating(s)}
                   onMouseLeave={() => !hasRated && setHoveredRating(0)}
-                  className={`p-2 transition-all duration-200 ${
-                    hasRated || isSubmittingRating 
-                      ? 'cursor-default' 
-                      : 'cursor-pointer hover:scale-110'
-                  }`}
+                  className={`p-1 transition-transform transform ${
+                    hasRated || isSubmittingRating ? "cursor-default" : "cursor-pointer hover:scale-125"
+                  } ${isSubmittingRating ? "opacity-50 animate-pulse" : ""}`}
+                  aria-label={`Rate ${s} star${s > 1 ? "s" : ""}`}
                 >
-                  <Star
+                  <StarIcon
                     className={`h-8 w-8 transition-colors duration-200 ${
-                      star <= (hoveredRating || rating)
-                        ? 'fill-yellow-400 text-yellow-400'
-                        : 'text-muted-foreground hover:text-yellow-400'
+                      s <= (hoveredRating || rating) ? "fill-yellow-400 text-yellow-400 drop-shadow-lg" : "text-gray-500 hover:text-yellow-400"
                     }`}
                   />
                 </button>
               ))}
             </div>
-            
-            {isSubmittingRating && (
-              <p className="text-sm text-muted-foreground">Submitting rating...</p>
-            )}
-            
-            {hasRated && (
-              <p className="text-sm text-success animate-fade-in">
-                Thanks for your feedback! ⭐
-              </p>
-            )}
+
+            {isSubmittingRating && <div className="text-sm text-muted-foreground">Submitting rating...</div>}
+            {ratingMessage && <div className={`text-sm font-bold ${ratingMessage.includes('Thanks') ? 'text-green-500 animate-fade-in' : 'text-red-500 animate-shake'}`}>{ratingMessage}</div>}
           </div>
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Button 
+        {/* --- */}
+
+        {/* Action Buttons with glowing effects */}
+        <div className="grid grid-cols-2 gap-4 pt-4">
+          <Button
             onClick={onPlayAgain}
-            size="lg" 
-            className="h-14 text-lg font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transform hover:scale-105 transition-all duration-200"
+            size="lg"
+            className="h-12 text-base font-semibold bg-primary text-primary-foreground transform transition-transform hover:scale-105 border-2 border-primary-light glow-effect"
           >
-            <RefreshCw className="h-5 w-5 mr-2" />
-            Play Again
+            <RefreshCw className="h-5 w-5 mr-2 animate-spin-slow" />
+            REPLAY MISSION
           </Button>
-          
-          <Button 
+
+          <Button
             onClick={() => navigate("/categories")}
-            variant="outline" 
-            size="lg" 
-            className="h-14 text-lg font-semibold hover:bg-primary/10 transform hover:scale-105 transition-all duration-200"
+            variant="outline"
+            size="lg"
+            className="h-12 text-base font-semibold border-2 border-gray-400 text-gray-200 hover:bg-gray-800 glow-effect"
           >
             <Home className="h-5 w-5 mr-2" />
-            Back to Categories
+            BACK TO HQ
           </Button>
         </div>
+      </Card>
 
-        <Card className="p-4 md:p-6 mt-6 bg-gradient-to-r from-primary/5 to-secondary/5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-            <div className="space-y-2">
-              <TrendingUp className="h-8 w-8 mx-auto text-primary" />
-              <div className="text-2xl font-bold">{percentage}%</div>
-              <div className="text-sm text-muted-foreground">Accuracy</div>
-            </div>
-            <div className="space-y-2">
-              <Brain className="h-8 w-8 mx-auto text-secondary" />
-              <div className="text-2xl font-bold">{unlockedAchievements.length}</div>
-              <div className="text-sm text-muted-foreground">Achievements</div>
-            </div>
-            <div className="space-y-2">
-              <Clock className="h-8 w-8 mx-auto text-accent" />
-              <div className="text-2xl font-bold">~3m</div>
-              <div className="text-sm text-muted-foreground">Time Spent</div>
-            </div>
-          </div>
-        </Card>
-      </div>
-
+      {/* Tailwind CSS keyframes for custom animations */}
       <style>{`
-        @keyframes slide-in {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        
-        @keyframes fade-in {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+        .animate-fade-in-up {
+          animation: fadeIn 1s ease-out;
         }
-        
-        .animate-slide-in {
-          animation: slide-in 0.6s ease-out forwards;
+
+        @keyframes pulse-slow {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
         }
-        
-        .animate-fade-in {
-          animation: fade-in 0.5s ease-out forwards;
+        .animate-pulse-slow {
+          animation: pulse-slow 3s infinite;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+          animation: spin 5s linear infinite;
+        }
+
+        @keyframes progress-fill {
+          from { width: 0%; }
+          to { width: var(--progress-width, 100%); }
+        }
+        .animate-progress-fill {
+          --progress-width: ${percentage}%;
+          animation: progress-fill 1s ease-out forwards;
+        }
+
+        @keyframes slide-in-left {
+          from { opacity: 0; transform: translateX(-20px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        .animate-slide-in-left {
+          animation: slide-in-left 0.7s ease-out;
+        }
+
+        @keyframes slide-in-right {
+          from { opacity: 0; transform: translateX(20px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        .animate-slide-in-right {
+          animation: slide-in-right 0.7s ease-out;
+        }
+
+        @keyframes level-up {
+          0% { transform: scale(0.5) rotate(-30deg); opacity: 0; }
+          50% { transform: scale(1.2) rotate(10deg); opacity: 1; }
+          100% { transform: scale(1) rotate(0deg); }
+        }
+        .animate-level-up {
+          animation: level-up 1s ease-out;
+        }
+
+        .glow-effect {
+          box-shadow: 0 0 10px var(--primary-color), 0 0 20px var(--primary-color);
+        }
+
+        .glow-effect:hover {
+          box-shadow: 0 0 15px var(--primary-color), 0 0 30px var(--primary-color), 0 0 50px var(--primary-color);
         }
       `}</style>
     </div>
