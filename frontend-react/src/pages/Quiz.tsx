@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -17,7 +15,22 @@ interface Question {
   correct_answer: string;
   explanation: string;
   difficulty?: "Easy" | "Medium" | "Hard";
-  answerStats?: { [key: string]: number };
+}
+
+interface AnswerStats {
+  text: string;
+  correctPercentage: number;
+  incorrectPercentage: number;
+}
+
+interface AnswerResponse {
+  question: string;
+  correctAnswer: string;
+  explanation: string;
+  isCorrect: boolean;
+  answerStats: AnswerStats[];
+  earnedItems: any[];
+  remaining: number;
 }
 
 interface QuizState {
@@ -68,6 +81,7 @@ export default function Quiz() {
   const [timeUp, setTimeUp] = useState(false);
   const [isCompletingQuiz, setIsCompletingQuiz] = useState(false);
   const [showBars, setShowBars] = useState(false);
+  const [answerResponse, setAnswerResponse] = useState<AnswerResponse | null>(null);
 
   const userToken = localStorage.getItem("token");
   const totalQuestions = 10;
@@ -96,20 +110,7 @@ export default function Quiz() {
         setTimeLeft((prev) => {
           if (prev <= 1) {
             setTimeUp(true);
-            setQuizState((prevState) => ({
-              ...prevState,
-              incorrectAnswers: prevState.incorrectAnswers + 1,
-              isAnswerSelected: true,
-              userAnswers: [
-                ...prevState.userAnswers,
-                {
-                  questionId: prevState.question?._id || "",
-                  selectedAnswer: "",
-                  correctAnswer: prevState.question?.correct_answer || "",
-                  isCorrect: false,
-                }
-              ]
-            }));
+            handleTimeUp();
             if (timerRef.current) {
               clearInterval(timerRef.current);
               timerRef.current = null;
@@ -155,6 +156,7 @@ export default function Quiz() {
     setTimeLeft(30);
     setTimeUp(false);
     setShowBars(false);
+    setAnswerResponse(null);
   }, [quizState.question, quizState.currentQuestionIndex]);
   
   useEffect(() => {
@@ -240,14 +242,9 @@ export default function Quiz() {
       const data = await response.json();
 
       if (response.ok && data.question) {
-        const mockStats = data.question.answers.reduce((acc: any, answer: string, index: number) => {
-          acc[answer] = Math.floor(Math.random() * 40) + 10;
-          return acc;
-        }, {});
-
         setQuizState((prev) => ({
           ...prev,
-          question: { ...data.question, answerStats: mockStats },
+          question: data.question,
           currentQuestionIndex: prev.currentQuestionIndex + 1,
           isAnswerSelected: false,
         }));
@@ -259,6 +256,44 @@ export default function Quiz() {
       setError("Error fetching the next question.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTimeUp = async () => {
+    if (!userToken || !quizState.question) return;
+
+    try {
+      // Call answerQuestion API with empty answer for timeout
+      const response = await fetch(`${BASE_URL}/api/answerQuestion/${userToken}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({ answer: "" }), // Empty answer for timeout
+      });
+
+      if (response.ok) {
+        const answerData: AnswerResponse = await response.json();
+        setAnswerResponse(answerData);
+        
+        setQuizState((prevState) => ({
+          ...prevState,
+          incorrectAnswers: prevState.incorrectAnswers + 1,
+          isAnswerSelected: true,
+          userAnswers: [
+            ...prevState.userAnswers,
+            {
+              questionId: prevState.question?._id || "",
+              selectedAnswer: "",
+              correctAnswer: answerData.correctAnswer,
+              isCorrect: false,
+            }
+          ]
+        }));
+      }
+    } catch (error) {
+      console.error("Error handling timeout:", error);
     }
   };
 
@@ -335,8 +370,8 @@ export default function Quiz() {
     }
   };
 
-  const handleAnswerSelection = (answer: string) => {
-    if (selectedAnswer !== null || timeUp) return;
+  const handleAnswerSelection = async (answer: string) => {
+    if (selectedAnswer !== null || timeUp || !userToken) return;
 
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -344,42 +379,69 @@ export default function Quiz() {
     }
     
     setSelectedAnswer(answer);
-    const isCorrect = answer === quizState.question?.correct_answer;
-    
-    handleVibration(isCorrect);
-    
-    // Set isAnswerSelected immediately to stop the timer
     setQuizState((prev) => ({
       ...prev,
-      correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
-      incorrectAnswers: prev.incorrectAnswers + (isCorrect ? 0 : 1),
       isAnswerSelected: true,
-      userAnswers: [
-        ...prev.userAnswers,
-        {
-          questionId: prev.question?._id || "",
-          selectedAnswer: answer,
-          correctAnswer: prev.question?.correct_answer || "",
-          isCorrect,
-        }
-      ]
     }));
-    
-    if (isCorrect) {
-      correctSound.play().catch(() => {});
-    } else {
-      incorrectSound.play().catch(() => {});
+
+    try {
+      // Call the answerQuestion API
+      const response = await fetch(`${BASE_URL}/api/answerQuestion/${userToken}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({ answer }),
+      });
+
+      if (response.ok) {
+        const answerData: AnswerResponse = await response.json();
+        setAnswerResponse(answerData);
+        
+        const isCorrect = answerData.isCorrect;
+        
+        handleVibration(isCorrect);
+        
+        setQuizState((prev) => ({
+          ...prev,
+          correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
+          incorrectAnswers: prev.incorrectAnswers + (isCorrect ? 0 : 1),
+          userAnswers: [
+            ...prev.userAnswers,
+            {
+              questionId: prev.question?._id || "",
+              selectedAnswer: answer,
+              correctAnswer: answerData.correctAnswer,
+              isCorrect,
+            }
+          ]
+        }));
+        
+        if (isCorrect) {
+          correctSound.play().catch(() => {});
+        } else {
+          incorrectSound.play().catch(() => {});
+        }
+
+        // Show bars immediately after answer selection
+        setTimeout(() => {
+          setShowBars(true);
+        }, 500);
+
+        // Show explanation after bars have finished animating (2.5s total delay)
+        setTimeout(() => {
+          setShowExplanation(true);
+        }, 2500);
+      } else {
+        setError("Failed to submit answer. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error submitting answer:", error);
+      setError("Error submitting answer. Please try again.");
+    } finally {
+      // No longer using `setLoading` here as we're handling the UI state differently
     }
-
-    // Show bars immediately after answer selection
-    setTimeout(() => {
-      setShowBars(true);
-    }, 500);
-
-    // Show explanation after bars have finished animating (2.5s total delay)
-    setTimeout(() => {
-      setShowExplanation(true);
-    }, 2500);
   };
 
   const handleNextQuestion = () => {
@@ -433,11 +495,14 @@ export default function Quiz() {
       return "border-border hover:border-primary hover:bg-primary/5 cursor-pointer";
     }
     
-    if (answer === quizState.question?.correct_answer) {
+    // Use the correct answer from API response if available
+    const correctAnswer = answerResponse?.correctAnswer || quizState.question?.correct_answer;
+    
+    if (answer === correctAnswer) {
       return "border-success bg-success/10 text-success";
     }
     
-    if (answer === selectedAnswer && answer !== quizState.question?.correct_answer) {
+    if (answer === selectedAnswer && answer !== correctAnswer) {
       return "border-destructive bg-destructive/10 text-destructive";
     }
     
@@ -453,7 +518,10 @@ export default function Quiz() {
       return "border-current text-current";
     }
     
-    if (answer === quizState.question?.correct_answer) {
+    // Use the correct answer from API response if available
+    const correctAnswer = answerResponse?.correctAnswer || quizState.question?.correct_answer;
+    
+    if (answer === correctAnswer) {
       return "bg-success text-white border-success";
     }
     
@@ -470,6 +538,21 @@ export default function Quiz() {
     return "text-destructive";
   };
 
+  // Calculate answer percentages for display
+  const getAnswerPercentage = (answer: string, correct: boolean) => {
+    if (!answerResponse?.answerStats) {
+      // Dummy data logic
+      if (answer === quizState.question?.correct_answer) {
+        return Math.floor(Math.random() * (90 - 40 + 1)) + 40; // Correct answer gets a higher percentage
+      } else {
+        return Math.floor(Math.random() * 30) + 5; // Incorrect answers get a lower percentage
+      }
+    }
+    const stat = answerResponse.answerStats.find(s => s.text === answer);
+    if (!stat) return 0;
+    return correct ? stat.correctPercentage : stat.incorrectPercentage;
+  };
+
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-quiz-background to-background flex items-center justify-center px-4">
@@ -484,6 +567,7 @@ export default function Quiz() {
     );
   }
 
+  // The main loading state is only for initial load and fetching next questions
   if (loading || (!quizState.question && !quizState.completed)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-quiz-background to-background flex items-center justify-center px-4">
@@ -576,14 +660,14 @@ export default function Quiz() {
             {quizState.question?.answers.map((answer, index) => (
               <Card
                 key={index}
-                className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} hover:shadow-lg relative overflow-hidden cursor-pointer`}
-                onClick={() => !timeUp && handleAnswerSelection(answer)}
+                className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-lg'} relative overflow-hidden cursor-pointer`}
+                onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
               >
-                {quizState.isAnswerSelected && showBars && !timeUp && quizState.question.answerStats && (
+                {quizState.isAnswerSelected && showBars && !timeUp && (
                   <div 
                     className="absolute top-0 left-0 h-full bg-primary/15 animate-bar-fill rounded-r-md"
                     style={{ 
-                      '--target-width': `${quizState.question.answerStats[answer] || 0}%`,
+                      '--target-width': `${getAnswerPercentage(answer, answer === quizState.question?.correct_answer)}%`,
                       animationDelay: `${index * 200}ms`
                     } as React.CSSProperties}
                   />
@@ -597,9 +681,9 @@ export default function Quiz() {
                     <span className="font-medium text-base md:text-lg leading-snug break-words">
                       {answer}
                     </span>
-                    {quizState.isAnswerSelected && showBars && !timeUp && quizState.question.answerStats && (
+                    {quizState.isAnswerSelected && showBars && !timeUp && (
                       <span className="text-sm text-muted-foreground ml-2 animate-fade-in-delayed" style={{ animationDelay: `${1800 + (index * 200)}ms` }}>
-                        {quizState.question.answerStats[answer]}%
+                        {getAnswerPercentage(answer, answer === quizState.question?.correct_answer)}%
                       </span>
                     )}
                   </div>
@@ -616,6 +700,11 @@ export default function Quiz() {
                   <p className="text-sm md:text-base text-muted-foreground">
                     You didn't answer in time. This question is marked as incorrect.
                   </p>
+                  {answerResponse?.correctAnswer && (
+                    <p className="text-sm md:text-base text-muted-foreground">
+                      The correct answer was: <span className="font-semibold text-success">{answerResponse.correctAnswer}</span>
+                    </p>
+                  )}
                 </div>
               </Card>
               
@@ -633,19 +722,24 @@ export default function Quiz() {
             </div>
           )}
 
-          {showExplanation && !timeUp && quizState.question?.explanation && (
+          {showExplanation && !timeUp && answerResponse && (
             <div ref={explanationRef}>
               <Card className="p-6 md:p-8 bg-primary/5 border-primary/20 animate-slide-up">
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <Lightbulb className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-primary flex-shrink-0" />
                     <span className="font-semibold text-primary text-base md:text-lg lg:text-xl">
-                      {selectedAnswer === quizState.question.correct_answer ? "Correct!" : "Incorrect!"}
+                      {answerResponse.isCorrect ? "Correct!" : "Incorrect!"}
                     </span>
                   </div>
                   <p className="text-sm md:text-base text-foreground leading-relaxed">
-                    {quizState.question.explanation}
+                    {answerResponse.explanation}
                   </p>
+                  {!answerResponse.isCorrect && (
+                    <p className="text-sm md:text-base text-muted-foreground">
+                      The correct answer was: <span className="font-semibold text-success">{answerResponse.correctAnswer}</span>
+                    </p>
+                  )}
                 </div>
               </Card>
 
