@@ -559,27 +559,58 @@ export default function Quiz() {
     if (quizState.question) {
       const percentages: { [key: string]: number } = {};
       const correct_answer = quizState.question.correct_answer;
+      const answers = quizState.question.answers;
       
       // Generate realistic percentages that favor the correct answer
-      const correctPercentage = Math.floor(Math.random() * (65 - 40 + 1)) + 40; // 40-65%
+      const correctPercentage = Math.floor(Math.random() * (60 - 35 + 1)) + 35; // 35-60%
       percentages[correct_answer] = correctPercentage;
       
       const remainingPercentage = 100 - correctPercentage;
-      const otherAnswers = quizState.question.answers.filter(a => a !== correct_answer);
+      const otherAnswers = answers.filter(a => a !== correct_answer);
       
-      // Distribute remaining percentage among incorrect answers
+      // Ensure minimum percentages and better distribution
+      const minPercentage = 5;
+      const maxPercentage = Math.floor(remainingPercentage / 2); // Prevent any single wrong answer from being too high
+      
       let remainingToDistribute = remainingPercentage;
+      
+      // First pass: assign minimum percentages
+      otherAnswers.forEach(answer => {
+        percentages[answer] = minPercentage;
+        remainingToDistribute -= minPercentage;
+      });
+      
+      // Second pass: distribute remaining percentage randomly
       otherAnswers.forEach((answer, index) => {
-        if (index === otherAnswers.length - 1) {
-          // Last answer gets whatever is left
-          percentages[answer] = Math.max(0, remainingToDistribute);
-        } else {
-          const maxForThis = Math.min(25, remainingToDistribute - (otherAnswers.length - index - 1) * 5);
-          const percentage = Math.floor(Math.random() * (maxForThis - 5 + 1)) + 5;
-          percentages[answer] = percentage;
-          remainingToDistribute -= percentage;
+        if (remainingToDistribute > 0) {
+          if (index === otherAnswers.length - 1) {
+            // Last answer gets whatever is left
+            percentages[answer] += remainingToDistribute;
+          } else {
+            const maxAdditional = Math.min(
+              maxPercentage - minPercentage, 
+              remainingToDistribute - (otherAnswers.length - index - 1) * 2
+            );
+            const additional = maxAdditional > 0 ? Math.floor(Math.random() * maxAdditional) : 0;
+            percentages[answer] += additional;
+            remainingToDistribute -= additional;
+          }
         }
       });
+      
+      // Ensure all percentages are at least 1%
+      answers.forEach(answer => {
+        if (percentages[answer] < 1) {
+          percentages[answer] = 1;
+        }
+      });
+      
+      // Normalize to ensure total is exactly 100%
+      const total = Object.values(percentages).reduce((sum, val) => sum + val, 0);
+      if (total !== 100) {
+        const difference = 100 - total;
+        percentages[correct_answer] += difference;
+      }
       
       setDummyPercentages(percentages);
     }
@@ -587,12 +618,7 @@ export default function Quiz() {
   
   // Calculate answer percentages for display using the dummy data
   const getAnswerPercentage = (answer: string) => {
-    // If the API response has stats, use them. Otherwise, use our dummy data.
-    if (answerResponse?.answerStats) {
-      const stat = answerResponse.answerStats.find(s => s.text === answer);
-      return stat?.correctPercentage ?? 0;
-    }
-    
+    // For now, always use dummy data. Later you can switch to API data when available.
     return dummyPercentages[answer] || 0;
   };
 
@@ -708,9 +734,16 @@ export default function Quiz() {
                 className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer`}
                 onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
               >
+                {/* Background percentage bar */}
                 {quizState.isAnswerSelected && showBars && !timeUp && (
                   <div 
-                    className="absolute top-0 left-0 h-full bg-primary/15 animate-bar-fill rounded-r-md"
+                    className={`absolute top-0 left-0 h-full animate-bar-fill rounded-r-md ${
+                      answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
+                        ? 'bg-success/25 border-l-4 border-success' 
+                        : answer === selectedAnswer 
+                          ? 'bg-destructive/25 border-l-4 border-destructive' 
+                          : 'bg-primary/15'
+                    }`}
                     style={{ 
                       '--target-width': `${getAnswerPercentage(answer)}%`,
                       animationDelay: `${index * 150}ms`,
@@ -770,7 +803,6 @@ export default function Quiz() {
               </div>
             </div>
           )}
-
           {showExplanation && !timeUp && answerResponse && (
             <div ref={explanationRef}>
               <Card className="p-6 md:p-8 bg-primary/5 animate-slide-up">
