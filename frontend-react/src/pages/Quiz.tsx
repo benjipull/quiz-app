@@ -15,6 +15,8 @@ interface Question {
   correct_answer: string;
   explanation: string;
   difficulty?: "Easy" | "Medium" | "Hard";
+  difficultyName?: string;
+  timer?: number;
 }
 
 interface AnswerStats {
@@ -105,6 +107,12 @@ export default function Quiz() {
       clearInterval(timerRef.current);
     }
 
+    // Use timer value from API if available, otherwise default to 30
+    const initialTime = quizState.question?.timer || 30;
+    if (timeLeft !== initialTime && quizState.question && !quizState.isAnswerSelected && !timeUp) {
+      setTimeLeft(initialTime);
+    }
+
     if (quizState.question && !quizState.isAnswerSelected && !timeUp) {
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
@@ -133,18 +141,23 @@ export default function Quiz() {
   // This useEffect handles the scroll logic after bars animation completes
   useEffect(() => {
     if (showExplanation && explanationRef.current) {
-      const viewportHeight = window.innerHeight;
-      const elementRect = explanationRef.current.getBoundingClientRect();
-      const isElementBelowFold = elementRect.top > viewportHeight * 0.8;
-      const isElementCutOff = elementRect.bottom > viewportHeight;
-      
-      if (isElementBelowFold || isElementCutOff) {
-        explanationRef.current.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'start',
-          inline: 'nearest'
-        });
-      }
+      // Delay scroll to allow bars to finish animating first
+      setTimeout(() => {
+        if (explanationRef.current) {
+          const viewportHeight = window.innerHeight;
+          const elementRect = explanationRef.current.getBoundingClientRect();
+          const isElementBelowFold = elementRect.top > viewportHeight * 0.8;
+          const isElementCutOff = elementRect.bottom > viewportHeight;
+          
+          if (isElementBelowFold || isElementCutOff) {
+            explanationRef.current.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'start',
+              inline: 'nearest'
+            });
+          }
+        }
+      }, 500); // Delay to let bars finish animating
     }
   }, [showExplanation]);
 
@@ -153,7 +166,7 @@ export default function Quiz() {
     setShowExplanation(false);
     setFeedbackGiven(false);
     setFeedbackType(null);
-    setTimeLeft(30);
+    setTimeLeft(quizState.question?.timer || 30);
     setTimeUp(false);
     setShowBars(false);
     setAnswerResponse(null);
@@ -424,15 +437,15 @@ export default function Quiz() {
           incorrectSound.play().catch(() => {});
         }
 
-        // Show bars immediately after answer selection
+        // Show bars immediately after answer selection with staggered animation
         setTimeout(() => {
           setShowBars(true);
-        }, 500);
+        }, 300);
 
-        // Show explanation after bars have finished animating (2.5s total delay)
+        // Show explanation after bars have finished animating
         setTimeout(() => {
           setShowExplanation(true);
-        }, 2500);
+        }, 1800); // Reduced time for better flow
       } else {
         setError("Failed to submit answer. Please try again.");
       }
@@ -488,48 +501,48 @@ export default function Quiz() {
 
   const getOptionStyle = (answer: string) => {
     if (timeUp) {
-      return "border-border bg-muted/30 cursor-not-allowed opacity-50";
+      return "bg-muted/30 cursor-not-allowed opacity-50";
     }
     
     if (selectedAnswer === null) {
-      return "border-border hover:border-primary hover:bg-primary/5 cursor-pointer";
+      return "hover:bg-primary/5 cursor-pointer transition-colors";
     }
     
     // Use the correct answer from API response if available
     const correctAnswer = answerResponse?.correctAnswer || quizState.question?.correct_answer;
     
     if (answer === correctAnswer) {
-      return "border-success bg-success/10 text-success";
+      return "bg-success/10 text-success";
     }
     
     if (answer === selectedAnswer && answer !== correctAnswer) {
-      return "border-destructive bg-destructive/10 text-destructive";
+      return "bg-destructive/10 text-destructive";
     }
     
-    return "border-border bg-muted/30";
+    return "bg-muted/30";
   };
 
   const getLetterStyle = (answer: string) => {
     if (timeUp) {
-      return "border-current text-muted-foreground";
+      return "text-muted-foreground";
     }
     
     if (selectedAnswer === null) {
-      return "border-current text-current";
+      return "text-current";
     }
     
     // Use the correct answer from API response if available
     const correctAnswer = answerResponse?.correctAnswer || quizState.question?.correct_answer;
     
     if (answer === correctAnswer) {
-      return "bg-success text-white border-success";
+      return "bg-success text-white";
     }
     
     if (answer === selectedAnswer) {
-      return "bg-destructive text-white border-destructive";
+      return "bg-destructive text-white";
     }
     
-    return "bg-muted text-muted-foreground border-border";
+    return "bg-muted text-muted-foreground";
   };
 
   const getTimerColor = () => {
@@ -547,26 +560,26 @@ export default function Quiz() {
       const percentages: { [key: string]: number } = {};
       const correct_answer = quizState.question.correct_answer;
       
-      let sumOfOthers = 0;
-      const otherAnswers = quizState.question.answers.filter(a => a !== correct_answer);
-      
-      // Generate random percentages for incorrect answers
-      otherAnswers.forEach(answer => {
-        const percentage = Math.floor(Math.random() * (20 - 5 + 1)) + 5;
-        percentages[answer] = percentage;
-        sumOfOthers += percentage;
-      });
-      
-      // Calculate the remaining percentage for the correct answer
-      const correctPercentage = Math.max(0, 100 - sumOfOthers);
+      // Generate realistic percentages that favor the correct answer
+      const correctPercentage = Math.floor(Math.random() * (65 - 40 + 1)) + 40; // 40-65%
       percentages[correct_answer] = correctPercentage;
       
-      // If the sum is slightly over 100 due to rounding, adjust the largest one down
-      const total = Object.values(percentages).reduce((sum, p) => sum + p, 0);
-      if (total > 100) {
-        const largestKey = Object.keys(percentages).reduce((a, b) => percentages[a] > percentages[b] ? a : b);
-        percentages[largestKey] -= (total - 100);
-      }
+      const remainingPercentage = 100 - correctPercentage;
+      const otherAnswers = quizState.question.answers.filter(a => a !== correct_answer);
+      
+      // Distribute remaining percentage among incorrect answers
+      let remainingToDistribute = remainingPercentage;
+      otherAnswers.forEach((answer, index) => {
+        if (index === otherAnswers.length - 1) {
+          // Last answer gets whatever is left
+          percentages[answer] = Math.max(0, remainingToDistribute);
+        } else {
+          const maxForThis = Math.min(25, remainingToDistribute - (otherAnswers.length - index - 1) * 5);
+          const percentage = Math.floor(Math.random() * (maxForThis - 5 + 1)) + 5;
+          percentages[answer] = percentage;
+          remainingToDistribute -= percentage;
+        }
+      });
       
       setDummyPercentages(percentages);
     }
@@ -622,9 +635,9 @@ export default function Quiz() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-quiz-background to-background">
-      <div className="sticky top-0 z-30 bg-gradient-to-br from-quiz-background to-background border-b border-border/20 backdrop-blur-sm">
+      <div className="sticky top-0 z-30 bg-gradient-to-br from-quiz-background to-background border-b border-border/10 backdrop-blur-sm">
         <div className="px-4 py-3 md:py-4 max-w-full lg:max-w-4xl xl:max-w-6xl mx-auto">
-          <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center justify-between gap-2 mb-3">
             <Button
               variant="ghost"
               size="sm"
@@ -655,42 +668,44 @@ export default function Quiz() {
             </div>
           </div>
           
-          <div className="w-full bg-secondary rounded-full h-2">
+          <div className="w-full bg-secondary rounded-full h-2 mb-2">
             <div 
               className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
               style={{ width: `${((quizState.currentQuestionIndex - 1) / totalQuestions) * 100}%` }}
             />
           </div>
+
+          {/* Difficulty Display */}
+          {(quizState.question?.difficultyName || quizState.question?.difficulty) && (
+            <div className="flex justify-center">
+              <Badge 
+                variant="outline" 
+                className={`text-xs ${
+                  (quizState.question?.difficultyName || quizState.question?.difficulty) === "Easy" ? "border-success text-success bg-success/5" :
+                  (quizState.question?.difficultyName || quizState.question?.difficulty) === "Medium" ? "border-warning text-warning bg-warning/5" :
+                  "border-destructive text-destructive bg-destructive/5"
+                }`}
+              >
+                {quizState.question?.difficultyName || quizState.question?.difficulty}
+              </Badge>
+            </div>
+          )}
         </div>
       </div>
       
       <div className="flex-1 overflow-y-auto px-4 py-6 max-w-full lg:max-w-4xl xl:max-w-6xl mx-auto">
         <div className="space-y-6">
           <div className="px-2 py-4">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-              <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-relaxed flex-1">
-                {quizState.question?.question}
-              </h2>
-              {quizState.question?.difficulty && (
-                <Badge 
-                  variant="outline" 
-                  className={`text-sm self-start flex-shrink-0 ${
-                    quizState.question.difficulty === "Easy" ? "border-success text-success" :
-                    quizState.question.difficulty === "Medium" ? "border-warning text-warning" :
-                    "border-destructive text-destructive"
-                  }`}
-                >
-                  {quizState.question.difficulty}
-                </Badge>
-              )}
-            </div>
+            <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-relaxed">
+              {quizState.question?.question}
+            </h2>
           </div>
 
           <div className="space-y-3">
             {quizState.question?.answers.map((answer, index) => (
               <Card
                 key={index}
-                className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-lg'} relative overflow-hidden cursor-pointer`}
+                className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer`}
                 onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
               >
                 {quizState.isAnswerSelected && showBars && !timeUp && (
@@ -698,13 +713,14 @@ export default function Quiz() {
                     className="absolute top-0 left-0 h-full bg-primary/15 animate-bar-fill rounded-r-md"
                     style={{ 
                       '--target-width': `${getAnswerPercentage(answer)}%`,
-                      animationDelay: `${index * 200}ms`
+                      animationDelay: `${index * 150}ms`,
+                      animationDuration: '0.8s'
                     } as React.CSSProperties}
                   />
                 )}
                 
                 <div className="flex items-center gap-4 relative z-10">
-                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 flex items-center justify-center font-semibold text-base md:text-lg transition-colors flex-shrink-0 ${getLetterStyle(answer)}`}>
+                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-semibold text-base md:text-lg transition-all duration-300 flex-shrink-0 ${getLetterStyle(answer)}`}>
                     {String.fromCharCode(65 + index)}
                   </div>
                   <div className="flex-1 min-w-0 flex items-center justify-between">
@@ -712,7 +728,10 @@ export default function Quiz() {
                       {answer}
                     </span>
                     {quizState.isAnswerSelected && showBars && !timeUp && (
-                      <span className="text-sm text-muted-foreground ml-2 animate-fade-in-delayed" style={{ animationDelay: `${1800 + (index * 200)}ms` }}>
+                      <span 
+                        className="text-sm font-semibold text-foreground ml-2 animate-fade-in-delayed" 
+                        style={{ animationDelay: `${1000 + (index * 150)}ms` }}
+                      >
                         {getAnswerPercentage(answer)}%
                       </span>
                     )}
@@ -724,7 +743,7 @@ export default function Quiz() {
 
           {timeUp && (
             <div ref={explanationRef}>
-              <Card className="p-6 md:p-8 bg-destructive/5 border-destructive/20 animate-slide-up">
+              <Card className="p-6 md:p-8 bg-destructive/5 animate-slide-up">
                 <div className="text-center space-y-3">
                   <p className="font-semibold text-destructive text-base md:text-lg">⏰ Time's Up!</p>
                   <p className="text-sm md:text-base text-muted-foreground">
@@ -754,7 +773,7 @@ export default function Quiz() {
 
           {showExplanation && !timeUp && answerResponse && (
             <div ref={explanationRef}>
-              <Card className="p-6 md:p-8 bg-primary/5 border-primary/20 animate-slide-up">
+              <Card className="p-6 md:p-8 bg-primary/5 animate-slide-up">
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <Lightbulb className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-primary flex-shrink-0" />
@@ -769,7 +788,7 @@ export default function Quiz() {
               </Card>
 
               <div className="mt-6 space-y-4 animate-fade-in pb-4">
-                <Card className="p-4 md:p-6 bg-card/60">
+                <Card className="p-4 md:p-6 bg-card/40">
                   <div className="space-y-4">
                     <p className="text-sm font-medium text-center">Did you like this question?</p>
                     <div className="flex gap-4 justify-center">
@@ -861,9 +880,11 @@ export default function Quiz() {
         @keyframes fade-in-delayed {
           from {
             opacity: 0;
+            transform: translateX(10px);
           }
           to {
             opacity: 1;
+            transform: translateX(0);
           }
         }
         
@@ -876,11 +897,11 @@ export default function Quiz() {
         }
 
         .animate-bar-fill {
-          animation: bar-fill 0.4s ease-out forwards;
+          animation: bar-fill ease-out forwards;
         }
 
         .animate-fade-in-delayed {
-          animation: fade-in-delayed 0.3s ease-out forwards;
+          animation: fade-in-delayed 0.4s ease-out forwards;
           opacity: 0;
         }
       `}</style>
