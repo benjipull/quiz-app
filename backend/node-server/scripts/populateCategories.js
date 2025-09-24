@@ -14,7 +14,7 @@ if (!OLLAMA_URL) {
 
 console.log(`🚀 Ollama API set to: ${OLLAMA_URL}`);
 
-// ✅ Generate a unique hash for each question
+// Generate a unique hash for each question
 const generateQuestionHash = (questionText) => {
     return crypto.createHash("sha256").update(questionText).digest("hex");
 };
