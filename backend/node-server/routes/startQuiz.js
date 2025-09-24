@@ -4,17 +4,17 @@ const Category = require("../models/categoryModel");
 const { userQuestions } = require("../index"); // Import shared store
 const { populateCategory } = require("../scripts/populateCategories"); // Import async question population
 
-// Difficulty name mapping
+
 const difficultyNames = {
-    1: "Trivial",
-    2: "Simple",
-    3: "Basic",
-    4: "Standard",
+    1: "Very Easy",
+    2: "Easy",
+    3: "Fairly Easy",
+    4: "Moderate",
     5: "Challenging",
-    6: "Tough",
-    7: "Advanced",
+    6: "Hard",
+    7: "Very Hard",
     8: "Expert",
-    9: "Master",
+    9: "Extremely Hard",
     10: "Legendary"
 };
 

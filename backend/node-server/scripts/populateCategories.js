@@ -19,9 +19,13 @@ const generateQuestionHash = (questionText) => {
     return crypto.createHash("sha256").update(questionText).digest("hex");
 };
 
-async function fetchQuestions(categoryName) {
+async function fetchQuestions(categoryName, difficultyHint = "") {
 
     console.log(`🔹 Generating for category: "${categoryName}" from ollama`);
+
+    const difficultySection = difficultyHint
+  ? `\nDifficulty requested: ${difficultyHint}. Generate the question at this difficulty.\n`
+  : "";
 
     const avoidSection = avoidedQuestions.length > 0
         ? `Do NOT generate any of these questions (nor semantically similar ones):
@@ -80,7 +84,7 @@ OUTPUT (object only):
 If any requirement fails, output {}.
 
 Category: ${categoryName}. Generate ONE question.
-
+${difficultySection}
 ${avoidSection}
 `;
 
@@ -159,11 +163,11 @@ function normalizeQuestion(q) {
   };
 }
 
-async function populateCategoryLoop(categoryId, iterations) {
+async function populateCategoryLoop(categoryId, iterations, difficultyHint = "") {
     try {
         for (let i = 0; i < iterations; i++) {
             console.log(`\n🔄 Iteration ${i + 1}/${iterations} for category ${categoryId}`);
-            await populateCategory(categoryId, 1);
+            await populateCategory(categoryId, difficultyHint);
         }
     } finally {
         avoidedQuestions.length = 0;
@@ -171,7 +175,7 @@ async function populateCategoryLoop(categoryId, iterations) {
     }
 }
 
-async function populateCategory(categoryId, numQuestions) {
+async function populateCategory(categoryId, difficultyHint = "") {
     try {
         const category = await Category.findById(categoryId);
         if (!category) {
@@ -186,9 +190,9 @@ async function populateCategory(categoryId, numQuestions) {
             return;
         }
 
-        console.log(`🔹 ${category.name}: ${nonDisabledCount} questions. Fetching ${numQuestions} more.`);
+        console.log(`🔹 ${category.name}: ${nonDisabledCount} questions. Fetching a ${difficultyHint} one.`);
 
-        const fetchedQuestions = await fetchQuestions(category.name, numQuestions);
+        const fetchedQuestions = await fetchQuestions(category.name, difficultyHint);
         let newQuestionsAdded = 0;
 
         try {
@@ -226,7 +230,7 @@ async function populateCategory(categoryId, numQuestions) {
                     timesAnsweredCorrectly: 0,
                     timesAnsweredIncorrectly: 0,
                     hash: questionHash,
-                    version: 0.15
+                    version: 0.16
                 };
 
                 category.questions.push(newQuestion);
