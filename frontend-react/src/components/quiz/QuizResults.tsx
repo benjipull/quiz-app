@@ -14,6 +14,10 @@ import {
   Home,
   RefreshCw,
   Award,
+  Trophy,
+  Target,
+  Zap,
+  Crown,
 } from "lucide-react";
 import Confetti from "react-confetti";
 
@@ -27,7 +31,7 @@ interface QuizResultsProps {
     categoryName: string;
     categoryId: string;
     completionData: {
-      percentageCorrect: number; // number now
+      percentageCorrect: number;
       knowledgeGained: number;
       totalKnowledge: number;
       previousLevel: number;
@@ -62,8 +66,16 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
   const hasLeveledUp = currentLevel > previousLevel;
 
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
-    setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    setMounted(true);
+    const updateSize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
   }, []);
 
   const [rating, setRating] = useState<number>(0);
@@ -109,200 +121,480 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
     }
   };
 
-  let performanceMessage = "Good effort! Keep practicing to improve.";
-  if (percentage === 100) {
-    performanceMessage = "🌟 Perfect score! You're a true master!";
-  } else if (percentage >= 80) {
-    performanceMessage = "🎉 Excellent job! You're almost at the top!";
-  } else if (percentage >= 50) {
-    performanceMessage = "👍 Solid performance! You're on the right track.";
+  // Performance data with theme-aware colors
+  const getPerformanceData = (score: number) => {
+    if (score === 100) {
+      return {
+        message: "🏆 LEGENDARY! FLAWLESS VICTORY!",
+        rank: "LEGENDARY",
+        icon: <Crown className="h-6 w-6 sm:h-8 sm:w-8 animate-spin-slow text-accent" />,
+        rankColor: "text-accent",
+        bgColor: "from-accent/10 to-accent/5",
+        borderColor: "border-accent/30",
+        badgeColor: "bg-accent text-accent-foreground"
+      };
+    } else if (score >= 90) {
+      return {
+        message: "💎 DIAMOND RANK! Nearly Perfect!",
+        rank: "DIAMOND",
+        icon: <Trophy className="h-6 w-6 sm:h-8 sm:w-8 animate-bounce-slow text-primary" />,
+        rankColor: "text-primary",
+        bgColor: "from-primary/10 to-primary/5",
+        borderColor: "border-primary/30",
+        badgeColor: "bg-primary text-primary-foreground"
+      };
+    } else if (score >= 80) {
+      return {
+        message: "🔥 GOLD TIER! Excellent Performance!",
+        rank: "GOLD",
+        icon: <Award className="h-6 w-6 sm:h-8 sm:w-8 animate-pulse-slow text-success" />,
+        rankColor: "text-success",
+        bgColor: "from-success/10 to-success/5",
+        borderColor: "border-success/30",
+        badgeColor: "bg-success text-white"
+      };
+    } else if (score >= 70) {
+      return {
+        message: "⚡ SILVER RANK! Great Job!",
+        rank: "SILVER",
+        icon: <Zap className="h-6 w-6 sm:h-8 sm:w-8 animate-pulse text-muted-foreground" />,
+        rankColor: "text-muted-foreground",
+        bgColor: "from-muted/20 to-muted/10",
+        borderColor: "border-muted/30",
+        badgeColor: "bg-muted text-muted-foreground"
+      };
+    } else if (score >= 50) {
+      return {
+        message: "🎯 BRONZE LEVEL! Keep Pushing!",
+        rank: "BRONZE",
+        icon: <Target className="h-6 w-6 sm:h-8 sm:w-8 animate-pulse text-warning" />,
+        rankColor: "text-warning",
+        bgColor: "from-warning/10 to-warning/5",
+        borderColor: "border-warning/30",
+        badgeColor: "bg-warning text-warning-foreground"
+      };
+    } else {
+      return {
+        message: "🛡️ ROOKIE TIER! Training Mode!",
+        rank: "ROOKIE",
+        icon: <RefreshCw className="h-6 w-6 sm:h-8 sm:w-8 animate-spin-slow text-destructive" />,
+        rankColor: "text-destructive",
+        bgColor: "from-destructive/10 to-destructive/5",
+        borderColor: "border-destructive/30",
+        badgeColor: "bg-destructive text-destructive-foreground"
+      };
+    }
+  };
+
+  const performanceData = getPerformanceData(percentage);
+
+  if (!mounted) {
+    return null;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-quiz-background to-background flex items-center justify-center p-6 font-display overflow-hidden relative">
-      {/* Confetti for perfect score or level up */}
+    <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background flex items-center justify-center p-2 sm:p-4 lg:p-6 font-sans overflow-hidden relative">
+      
+      {/* Subtle background pattern */}
+      <div className="absolute inset-0 opacity-5 dark:opacity-10">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `
+            linear-gradient(rgba(var(--foreground-rgb), 0.1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(var(--foreground-rgb), 0.1) 1px, transparent 1px)
+          `,
+          backgroundSize: '30px 30px'
+        }} />
+      </div>
+
+      {/* Floating elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-10 left-10 w-16 h-16 bg-primary/10 rounded-full blur-xl animate-floating" />
+        <div className="absolute top-32 right-20 w-24 h-24 bg-accent/10 rounded-full blur-2xl animate-floating-delayed" />
+        <div className="absolute bottom-20 left-32 w-20 h-20 bg-success/10 rounded-full blur-xl animate-floating-slow" />
+        <div className="absolute bottom-32 right-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl animate-floating" />
+      </div>
+
+      {/* Confetti for achievements */}
       {(percentage === 100 || hasLeveledUp) && windowSize.width > 0 && (
         <Confetti
           width={windowSize.width}
           height={windowSize.height}
           recycle={false}
-          numberOfPieces={percentage === 100 ? 500 : 200}
-          gravity={0.05}
+          numberOfPieces={percentage === 100 ? 400 : 200}
+          gravity={0.06}
+          colors={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']}
         />
       )}
 
-      {/* Background pattern */}
-      <div className="absolute inset-0 z-0 opacity-10 bg-[url('/path/to/gaming-grid.svg')]"></div>
-      <div className="absolute inset-0 z-0 bg-black/50 backdrop-blur-sm"></div>
-
-      <Card className="z-10 p-8 w-full max-w-xl space-y-6 text-center shadow-[0_20px_50px_rgba(8,_112,_184,_0.7)] border-4 border-primary/50 transform transition-transform duration-500 animate-fade-in-up bg-background-light dark:bg-background-dark">
-        {/* Header */}
-        <div className="flex flex-col items-center space-y-2">
-          {percentage === 100 ? (
-            <Award className="h-16 w-16 text-yellow-400 animate-award-spin drop-shadow-lg" />
-          ) : hasLeveledUp ? (
-            <TrendingUp className="h-16 w-16 text-purple-500 animate-pulse-slow drop-shadow-lg" />
-          ) : (
-            <TrendingUp className="h-16 w-16 text-blue-500 animate-pulse-slow drop-shadow-lg" />
-          )}
-          <h1 className="text-4xl md:text-5xl font-extrabold text-primary tracking-wide leading-tight">
-            MISSION COMPLETE!
-          </h1>
-          <p className="text-xl text-muted-foreground font-semibold italic">{performanceMessage}</p>
-        </div>
-
-        {/* Results Summary */}
-        <Card className="bg-card/90 border border-border-card rounded-xl p-4 transform transition-transform duration-300 hover:scale-[1.02] shadow-inner-strong">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-2xl font-bold text-accent">{categoryName}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                <span>Accuracy</span>
-                <Badge
-                  variant="default"
-                  className="text-lg font-bold bg-primary text-primary-foreground animate-pulse-fast"
-                >
-                  {percentage}%
-                </Badge>
-              </div>
-              <Progress value={percentage} className="h-5 bg-gray-700 dark:bg-gray-800 transition-[width] duration-700 ease-out" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 text-center">
-              <div className="flex flex-col items-center space-y-1 p-2 bg-green-900/20 rounded-lg animate-slide-in-left">
-                <CheckCircle className="h-8 w-8 text-green-400" />
-                <div className="font-bold text-2xl text-green-300">{correctAnswers}</div>
-                <div className="text-xs text-muted-foreground uppercase">Correct</div>
-              </div>
-              <div className="flex flex-col items-center space-y-1 p-2 bg-red-900/20 rounded-lg animate-slide-in-right">
-                <XCircle className="h-8 w-8 text-red-400" />
-                <div className="font-bold text-2xl text-red-300">{incorrectAnswers}</div>
-                <div className="text-xs text-muted-foreground uppercase">Incorrect</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Knowledge & Level */}
-        <div className="space-y-4 pt-4">
-          <Card className="p-4 bg-card/60 border border-accent/20 rounded-lg animate-fade-in-fast">
-            <div className="flex justify-between items-center text-left">
-              <div className="flex items-center space-x-2">
-                <TrendingUp className="h-6 w-6 text-blue-400 animate-scale-up" />
-                <div>
-                  <div className="font-bold text-lg text-blue-300">Knowledge Gained</div>
-                  <div className="text-sm text-muted-foreground">
-                    Your total knowledge score is now <span className="text-blue-300 font-bold">{totalKnowledge}</span>!
+      <div className="relative z-10 w-full max-w-4xl mx-auto">
+        {/* Main Results Card */}
+        <Card className={`
+          relative overflow-hidden bg-card/95 backdrop-blur-sm border-2 ${performanceData.borderColor}
+          shadow-lg hover:shadow-xl transition-all duration-700 animate-scale-in
+        `}>
+          
+          {/* Subtle gradient overlay */}
+          <div className={`absolute inset-0 bg-gradient-to-br ${performanceData.bgColor} opacity-50`} />
+          
+          <div className="relative z-10 p-4 sm:p-6 lg:p-8 space-y-6">
+            
+            {/* Header Section */}
+            <div className="text-center space-y-4 animate-fade-in-up">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+                {performanceData.icon}
+                <div className="text-center sm:text-left">
+                  <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-foreground tracking-wider">
+                    MISSION COMPLETE!
+                  </h1>
+                  <div className={`inline-block px-3 py-1 rounded-full text-xs sm:text-sm font-bold ${performanceData.badgeColor} animate-pulse-fast mt-2`}>
+                    {performanceData.rank} RANK
                   </div>
                 </div>
               </div>
-              <Badge variant="outline" className="text-lg font-bold border-blue-400 text-blue-400 animate-bounce-in">
-                +{knowledgeGained}
-              </Badge>
+              
+              <p className="text-lg sm:text-xl lg:text-2xl text-muted-foreground font-bold">
+                {performanceData.message}
+              </p>
+              
+              <h2 className="text-xl sm:text-2xl font-bold text-primary">
+                {categoryName}
+              </h2>
             </div>
-          </Card>
 
-          {hasLeveledUp && (
-            <Card className="p-4 bg-card/60 border border-purple-500/20 rounded-lg animate-fade-in-fast delay-200">
-              <div className="flex justify-between items-center text-left">
-                <div className="flex items-center space-x-2">
-                  <Award className="h-6 w-6 text-purple-400 animate-level-up" />
-                  <div>
-                    <div className="font-bold text-lg text-purple-300">LEVEL UP!</div>
-                    <div className="text-sm text-muted-foreground">
-                      You moved from <span className="text-purple-300 font-bold">Level {previousLevel}</span> to <span className="text-purple-300 font-bold">Level {currentLevel}</span>!
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              
+              {/* Score Section */}
+              <Card className="bg-card border border-border p-4 sm:p-6 animate-slide-in-left">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-foreground">ACCURACY SCORE</h3>
+                    <Badge className={`text-lg sm:text-xl font-black px-3 py-1 ${performanceData.badgeColor} animate-number-count`}>
+                      {percentage}%
+                    </Badge>
+                  </div>
+                  
+                  <div className="relative">
+                    <Progress 
+                      value={percentage} 
+                      className="h-4 bg-muted border border-border overflow-hidden"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-foreground/10 to-transparent animate-shimmer" />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-success/10 border border-success/20 rounded-lg p-3 text-center animate-slide-in-left delay-200">
+                      <CheckCircle className="h-6 w-6 text-success mx-auto mb-2 animate-check-mark" />
+                      <div className="text-2xl font-black text-success animate-number-count">{correctAnswers}</div>
+                      <div className="text-xs text-success/80 font-semibold">CORRECT</div>
+                    </div>
+                    
+                    <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-center animate-slide-in-right delay-200">
+                      <XCircle className="h-6 w-6 text-destructive mx-auto mb-2 animate-x-mark" />
+                      <div className="text-2xl font-black text-destructive animate-number-count">{incorrectAnswers}</div>
+                      <div className="text-xs text-destructive/80 font-semibold">INCORRECT</div>
                     </div>
                   </div>
                 </div>
-                <Badge variant="outline" className="text-lg font-bold border-purple-400 text-purple-400 animate-bounce-in">
-                  +{currentLevel - previousLevel}
-                </Badge>
-              </div>
-            </Card>
-          )}
-        </div>
+              </Card>
 
-        {/* Rating Section */}
-        <Card className="p-4 bg-card/60 animate-fade-in">
-          <div className="text-center space-y-3">
-            <div className="text-sm font-medium text-accent">Rate this mission!</div>
-            <div className="flex items-center justify-center gap-2">
-              {[1, 2, 3, 4, 5].map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  disabled={hasRated || isSubmittingRating}
-                  onClick={() => handleRatingSubmit(s)}
-                  onMouseEnter={() => !hasRated && setHoveredRating(s)}
-                  onMouseLeave={() => !hasRated && setHoveredRating(0)}
-                  className={`p-1 transition-transform transform ${hasRated || isSubmittingRating ? "cursor-default" : "cursor-pointer hover:scale-125"} ${isSubmittingRating ? "opacity-50 animate-pulse" : ""}`}
-                  aria-label={`Rate ${s} star${s > 1 ? "s" : ""}`}
-                >
-                  <StarIcon
-                    className={`h-8 w-8 transition-colors duration-200 ${
-                      s <= (hoveredRating || rating) ? "fill-yellow-400 text-yellow-400 drop-shadow-lg" : "text-gray-500 hover:text-yellow-400"
-                    }`}
-                  />
-                </button>
-              ))}
+              {/* Progress & Achievements */}
+              <div className="space-y-4 animate-slide-in-right">
+                
+                {/* Knowledge Gained */}
+                <Card className="bg-card border border-primary/20 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <TrendingUp className="h-6 w-6 text-primary animate-trend-up" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-primary">KNOWLEDGE GAINED</div>
+                        <div className="text-sm text-muted-foreground">
+                          Total: <span className="text-primary font-bold">{totalKnowledge}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Badge className="text-lg font-black bg-primary text-primary-foreground animate-bounce-in px-3 py-1">
+                      +{knowledgeGained}
+                    </Badge>
+                  </div>
+                </Card>
+
+                {/* Level Up Achievement */}
+                {hasLeveledUp && (
+                  <Card className="bg-gradient-to-r from-accent/10 to-accent/5 border-2 border-accent/30 p-4 animate-level-up-card">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-accent/20 rounded-lg">
+                          <Crown className="h-6 w-6 text-accent animate-crown-float" />
+                        </div>
+                        <div>
+                          <div className="font-black text-accent text-lg animate-neon-glow">
+                            LEVEL UP!
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Level {previousLevel} → <span className="text-accent font-bold">Level {currentLevel}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <Badge className="text-lg font-black bg-accent text-accent-foreground animate-level-badge px-3 py-1">
+                        +{currentLevel - previousLevel}
+                      </Badge>
+                    </div>
+                  </Card>
+                )}
+              </div>
             </div>
 
-            {isSubmittingRating && <div className="text-sm text-muted-foreground">Submitting rating...</div>}
-            {ratingMessage && (
-              <div className={`text-sm font-bold ${ratingMessage.includes("Thanks") ? "text-green-500 animate-fade-in" : "text-red-500 animate-shake"}`}>
-                {ratingMessage}
+            {/* Rating Section */}
+            <Card className="bg-card border border-border p-4 animate-fade-in delay-500">
+              <div className="text-center space-y-4">
+                <h3 className="text-lg font-bold text-foreground">
+                  ⭐ RATE THIS MISSION ⭐
+                </h3>
+                
+                <div className="flex items-center justify-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      disabled={hasRated || isSubmittingRating}
+                      onClick={() => handleRatingSubmit(star)}
+                      onMouseEnter={() => !hasRated && setHoveredRating(star)}
+                      onMouseLeave={() => !hasRated && setHoveredRating(0)}
+                      className={`
+                        p-2 transition-all duration-200 transform
+                        ${hasRated || isSubmittingRating ? "cursor-default" : "cursor-pointer hover:scale-125 hover:rotate-12"}
+                        ${isSubmittingRating ? "animate-pulse" : ""}
+                      `}
+                    >
+                      <StarIcon
+                        className={`h-6 w-6 sm:h-8 sm:w-8 transition-all duration-200 ${
+                          star <= (hoveredRating || rating)
+                            ? "fill-accent text-accent animate-star-glow"
+                            : "text-muted-foreground hover:text-accent/60"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+
+                {isSubmittingRating && (
+                  <div className="text-sm text-muted-foreground animate-pulse">Transmitting feedback...</div>
+                )}
+                
+                {ratingMessage && (
+                  <div className={`text-sm font-bold animate-message ${
+                    ratingMessage.includes("Thanks") 
+                      ? "text-success animate-success-message" 
+                      : "text-destructive animate-error-shake"
+                  }`}>
+                    {ratingMessage}
+                  </div>
+                )}
               </div>
-            )}
+            </Card>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+              <Button
+                onClick={onPlayAgain}
+                size="lg"
+                className="h-12 sm:h-14 text-base font-black bg-success hover:bg-success/90 text-white transform transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl animate-button-glow"
+              >
+                <RefreshCw className="h-5 w-5 mr-2 group-hover:animate-spin" />
+                REPLAY MISSION
+              </Button>
+
+              <Button
+                onClick={() => navigate("/categories")}
+                variant="outline"
+                size="lg"
+                className="h-12 sm:h-14 text-base font-black border-2 border-border text-foreground bg-background hover:bg-muted transform transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
+              >
+                <Home className="h-5 w-5 mr-2" />
+                BACK TO CATEGORIES
+              </Button>
+            </div>
           </div>
         </Card>
+      </div>
 
-        {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-4 pt-4">
-          <Button
-            onClick={onPlayAgain}
-            size="lg"
-            className="h-12 text-base font-semibold bg-primary text-primary-foreground transform transition-transform hover:scale-105 border-2 border-primary-light glow-effect"
-          >
-            <RefreshCw className="h-5 w-5 mr-2 animate-spin-slow" />
-            REPLAY MISSION
-          </Button>
-
-          <Button
-            onClick={() => navigate("/categories")}
-            variant="outline"
-            size="lg"
-            className="h-12 text-base font-semibold border-2 border-gray-400 text-gray-200 hover:bg-gray-800 glow-effect"
-          >
-            <Home className="h-5 w-5 mr-2" />
-            BACK TO HQ
-          </Button>
-        </div>
-      </Card>
-
-      {/* Keyframes */}
+      {/* Enhanced CSS Animations */}
       <style>{`
-        @keyframes fadeIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-        .animate-fade-in-up { animation: fadeIn 1s ease-out; }
-
-        @keyframes pulse-slow { 0%,100%{transform:scale(1);}50%{transform:scale(1.05);} }
-        .animate-pulse-slow { animation: pulse-slow 3s infinite; }
-
-        @keyframes spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
-        .animate-spin-slow { animation: spin 5s linear infinite; }
-
-        @keyframes slide-in-left { from{opacity:0; transform:translateX(-20px);} to{opacity:1; transform:translateX(0);} }
-        .animate-slide-in-left { animation: slide-in-left 0.7s ease-out; }
-
-        @keyframes slide-in-right { from{opacity:0; transform:translateX(20px);} to{opacity:1; transform:translateX(0);} }
-        .animate-slide-in-right { animation: slide-in-right 0.7s ease-out; }
-
-        @keyframes level-up { 0%{transform:scale(0.5) rotate(-30deg);opacity:0;}50%{transform:scale(1.2) rotate(10deg);opacity:1;}100%{transform:scale(1) rotate(0deg);} }
-        .animate-level-up { animation: level-up 1s ease-out; }
-
-        .glow-effect { box-shadow:0 0 10px var(--primary-color),0 0 20px var(--primary-color); }
-        .glow-effect:hover { box-shadow:0 0 15px var(--primary-color),0 0 30px var(--primary-color),0 0 50px var(--primary-color); }
+        @keyframes scale-in {
+          0% { transform: scale(0.9) rotateY(-5deg); opacity: 0; }
+          100% { transform: scale(1) rotateY(0deg); opacity: 1; }
+        }
+        
+        @keyframes fade-in-up {
+          0% { transform: translateY(30px); opacity: 0; }
+          100% { transform: translateY(0); opacity: 1; }
+        }
+        
+        @keyframes slide-in-left {
+          0% { transform: translateX(-30px); opacity: 0; }
+          100% { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slide-in-right {
+          0% { transform: translateX(30px); opacity: 0; }
+          100% { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes floating {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-15px) rotate(180deg); }
+        }
+        
+        @keyframes floating-delayed {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-20px) rotate(-180deg); }
+        }
+        
+        @keyframes floating-slow {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-10px) rotate(90deg); }
+        }
+        
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        
+        @keyframes neon-glow {
+          0%, 100% { text-shadow: 0 0 5px currentColor; }
+          50% { text-shadow: 0 0 10px currentColor, 0 0 15px currentColor; }
+        }
+        
+        @keyframes bounce-slow {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+        
+        @keyframes spin-slow {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse-fast {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.8; }
+        }
+        
+        @keyframes pulse-slow {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.05); opacity: 0.9; }
+        }
+        
+        @keyframes level-up-card {
+          0% { transform: scale(0.95); opacity: 0; }
+          50% { transform: scale(1.02); opacity: 0.8; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes crown-float {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          25% { transform: translateY(-3px) rotate(3deg); }
+          75% { transform: translateY(3px) rotate(-3deg); }
+        }
+        
+        @keyframes star-glow {
+          0%, 100% { filter: drop-shadow(0 0 3px currentColor); }
+          50% { filter: drop-shadow(0 0 8px currentColor); }
+        }
+        
+        @keyframes check-mark {
+          0% { transform: scale(0.8); opacity: 0; }
+          50% { transform: scale(1.1); opacity: 0.8; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes x-mark {
+          0% { transform: scale(0.8); opacity: 0; }
+          50% { transform: scale(1.1); opacity: 0.8; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes trend-up {
+          0% { transform: translateY(2px); }
+          50% { transform: translateY(-2px); }
+          100% { transform: translateY(0px); }
+        }
+        
+        @keyframes bounce-in {
+          0% { transform: scale(0.8); }
+          50% { transform: scale(1.1); }
+          100% { transform: scale(1); }
+        }
+        
+        @keyframes level-badge {
+          0% { transform: scale(0.8) rotateZ(90deg); opacity: 0; }
+          50% { transform: scale(1.1) rotateZ(0deg); opacity: 0.8; }
+          100% { transform: scale(1) rotateZ(0deg); opacity: 1; }
+        }
+        
+        @keyframes number-count {
+          0% { transform: scale(0.8); opacity: 0; }
+          50% { transform: scale(1.1); opacity: 0.8; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes button-glow {
+          0%, 100% { box-shadow: 0 4px 15px rgba(var(--success-rgb), 0.3); }
+          50% { box-shadow: 0 6px 20px rgba(var(--success-rgb), 0.4); }
+        }
+        
+        @keyframes success-message {
+          0% { transform: translateY(-5px); opacity: 0; }
+          100% { transform: translateY(0); opacity: 1; }
+        }
+        
+        @keyframes error-shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-3px); }
+          75% { transform: translateX(3px); }
+        }
+        
+        .animate-scale-in { animation: scale-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .animate-fade-in-up { animation: fade-in-up 0.5s ease-out; }
+        .animate-slide-in-left { animation: slide-in-left 0.6s ease-out; }
+        .animate-slide-in-right { animation: slide-in-right 0.6s ease-out; }
+        .animate-floating { animation: floating 6s ease-in-out infinite; }
+        .animate-floating-delayed { animation: floating-delayed 8s ease-in-out infinite; }
+        .animate-floating-slow { animation: floating-slow 10s ease-in-out infinite; }
+        .animate-shimmer { animation: shimmer 2s infinite; }
+        .animate-neon-glow { animation: neon-glow 2s ease-in-out infinite; }
+        .animate-bounce-slow { animation: bounce-slow 2s ease-in-out infinite; }
+        .animate-spin-slow { animation: spin-slow 8s linear infinite; }
+        .animate-pulse-fast { animation: pulse-fast 1.5s ease-in-out infinite; }
+        .animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }
+        .animate-level-up-card { animation: level-up-card 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .animate-crown-float { animation: crown-float 2s ease-in-out infinite; }
+        .animate-star-glow { animation: star-glow 1.5s ease-in-out infinite; }
+        .animate-check-mark { animation: check-mark 0.5s ease-out 0.2s both; }
+        .animate-x-mark { animation: x-mark 0.5s ease-out 0.2s both; }
+        .animate-trend-up { animation: trend-up 1s ease-in-out infinite; }
+        .animate-bounce-in { animation: bounce-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both; }
+        .animate-level-badge { animation: level-badge 1s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s both; }
+        .animate-number-count { animation: number-count 0.6s ease-out 0.2s both; }
+        .animate-button-glow { animation: button-glow 2s ease-in-out infinite; }
+        .animate-success-message { animation: success-message 0.4s ease-out; }
+        .animate-error-shake { animation: error-shake 0.4s ease-in-out; }
+        .animate-fade-in { animation: fade-in-up 0.5s ease-out; }
+        .animate-message { animation: fade-in-up 0.4s ease-out; }
+        
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-500 { animation-delay: 0.5s; }
+        
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+          .animate-scale-in { animation-duration: 0.4s; }
+          .animate-floating, .animate-floating-delayed, .animate-floating-slow {
+            animation-duration: 4s;
+          }
+        }
       `}</style>
     </div>
   );

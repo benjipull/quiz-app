@@ -21,8 +21,7 @@ interface Question {
 
 interface AnswerStats {
   text: string;
-  correctPercentage: number;
-  incorrectPercentage: number;
+  percentage: number;
 }
 
 interface AnswerResponse {
@@ -551,75 +550,12 @@ export default function Quiz() {
     return "text-destructive";
   };
   
-  // New state to hold dummy percentages for the current question
-  const [dummyPercentages, setDummyPercentages] = useState<{ [key: string]: number }>({});
-  
-  // This useEffect generates dummy percentages when a new question loads
-  useEffect(() => {
-    if (quizState.question) {
-      const percentages: { [key: string]: number } = {};
-      const correct_answer = quizState.question.correct_answer;
-      const answers = quizState.question.answers;
-      
-      // Generate realistic percentages that favor the correct answer
-      const correctPercentage = Math.floor(Math.random() * (60 - 35 + 1)) + 35; // 35-60%
-      percentages[correct_answer] = correctPercentage;
-      
-      const remainingPercentage = 100 - correctPercentage;
-      const otherAnswers = answers.filter(a => a !== correct_answer);
-      
-      // Ensure minimum percentages and better distribution
-      const minPercentage = 5;
-      const maxPercentage = Math.floor(remainingPercentage / 2); // Prevent any single wrong answer from being too high
-      
-      let remainingToDistribute = remainingPercentage;
-      
-      // First pass: assign minimum percentages
-      otherAnswers.forEach(answer => {
-        percentages[answer] = minPercentage;
-        remainingToDistribute -= minPercentage;
-      });
-      
-      // Second pass: distribute remaining percentage randomly
-      otherAnswers.forEach((answer, index) => {
-        if (remainingToDistribute > 0) {
-          if (index === otherAnswers.length - 1) {
-            // Last answer gets whatever is left
-            percentages[answer] += remainingToDistribute;
-          } else {
-            const maxAdditional = Math.min(
-              maxPercentage - minPercentage, 
-              remainingToDistribute - (otherAnswers.length - index - 1) * 2
-            );
-            const additional = maxAdditional > 0 ? Math.floor(Math.random() * maxAdditional) : 0;
-            percentages[answer] += additional;
-            remainingToDistribute -= additional;
-          }
-        }
-      });
-      
-      // Ensure all percentages are at least 1%
-      answers.forEach(answer => {
-        if (percentages[answer] < 1) {
-          percentages[answer] = 1;
-        }
-      });
-      
-      // Normalize to ensure total is exactly 100%
-      const total = Object.values(percentages).reduce((sum, val) => sum + val, 0);
-      if (total !== 100) {
-        const difference = 100 - total;
-        percentages[correct_answer] += difference;
-      }
-      
-      setDummyPercentages(percentages);
-    }
-  }, [quizState.question]);
-  
-  // Calculate answer percentages for display using the dummy data
+  // Calculate answer percentages for display using API data
   const getAnswerPercentage = (answer: string) => {
-    // For now, always use dummy data. Later you can switch to API data when available.
-    return dummyPercentages[answer] || 0;
+    if (!answerResponse?.answerStats) return 0;
+    
+    const answerStat = answerResponse.answerStats.find(stat => stat.text === answer);
+    return answerStat ? answerStat.percentage : 0;
   };
 
   if (error) {
@@ -735,7 +671,7 @@ export default function Quiz() {
                 onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
               >
                 {/* Background percentage bar */}
-                {quizState.isAnswerSelected && showBars && !timeUp && (
+                {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
                   <div 
                     className={`absolute top-0 left-0 h-full animate-bar-fill rounded-r-md ${
                       answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
@@ -760,7 +696,7 @@ export default function Quiz() {
                     <span className="font-medium text-base md:text-lg leading-snug break-words">
                       {answer}
                     </span>
-                    {quizState.isAnswerSelected && showBars && !timeUp && (
+                    {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
                       <span 
                         className="text-sm font-semibold text-foreground ml-2 animate-fade-in-delayed" 
                         style={{ animationDelay: `${1000 + (index * 150)}ms` }}
