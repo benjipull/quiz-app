@@ -9,7 +9,8 @@ const UserSchema = new mongoose.Schema({
     knowledgePoints: { type: Number, required: true, default: 0 },
     wisdomGems: { type: Number, required: true, default: 0 },
     enlightenmentCrystals: { type: Number, required: true, default: 0 },
-    level: { type: Number, required: true, default: 1 }, // 👈 start from level 1
+    coins: { type: Number, required: true, default: 0 },
+    level: { type: Number, required: true, default: 1 },
     
     password: { type: String, required: true },
     age: { type: Number, required: true, min: 1 },
