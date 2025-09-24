@@ -2,8 +2,7 @@ const mongoose = require("mongoose");
 
 const AnswerSchema = new mongoose.Schema({
     text: { type: String, required: true },
-    correctCount: { type: Number, default: 0 },
-    incorrectCount: { type: Number, default: 0 } 
+    correctCount: { type: Number, default: 0 }
 });
 
 const QuestionSchema = new mongoose.Schema({
@@ -27,7 +26,8 @@ const QuestionSchema = new mongoose.Schema({
     
     difficulty_level: { type: Number, default: 0 },
     difficulty_rationale: {type :String, default: ""},
-    
+    difficultyConfirmedVersion: { type: Number, default: 0 },
+
     hash: { type: String, required: true, unique: true },
     version: { type: Number, default: 1, required: true}
 });
