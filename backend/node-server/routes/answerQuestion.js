@@ -17,28 +17,15 @@ router.post("/:userToken", async (req, res) => {
         const currentQuestion = userQuestions[userToken].current;
         const isCorrect = currentQuestion.correct_answer === answer;
 
-        // --- 1. Update question-level counters ---
-        const questionUpdate = isCorrect
-            ? { $inc: { "questions.$.timesAnsweredCorrectly": 1 } }
-            : { $inc: { "questions.$.timesAnsweredIncorrectly": 1 } };
-
+        // --- 1. Increment selected answer counter ---
         await Category.findOneAndUpdate(
             { "questions._id": currentQuestion._id },
-            questionUpdate
+            { $inc: { "questions.$.answers.$[ans].correctCount": 1 } },
+            { arrayFilters: [{ "ans.text": answer.trim() }], new: true }
         );
 
-        // --- 2. Update per-answer counters ---
-        const answerUpdate = isCorrect
-            ? { $inc: { "questions.$.answers.$[ans].correctCount": 1 } }
-            : { $inc: { "questions.$.answers.$[ans].incorrectCount": 1 } };
 
-        await Category.findOneAndUpdate(
-            { "questions._id": currentQuestion._id },
-            answerUpdate,
-            { arrayFilters: [{ "ans.text": answer }] }
-        );
-
-        // --- 3. Fetch updated question ---
+        // --- 2. Fetch updated question ---
         const updatedCategory = await Category.findOne(
             { "questions._id": currentQuestion._id },
             { "questions.$": 1 }
@@ -50,15 +37,19 @@ router.post("/:userToken", async (req, res) => {
 
         const updatedQuestion = updatedCategory.questions[0];
 
-        // --- 4. Build per-answer stats ---
-        const answerStats = updatedQuestion.answers.map(ans => {
-            const total = (ans.correctCount || 0) + (ans.incorrectCount || 0);
-            return {
-                text: ans.text,
-                correctPercentage: total > 0 ? Math.round((ans.correctCount / total) * 100) : 0,
-                incorrectPercentage: total > 0 ? Math.round((ans.incorrectCount / total) * 100) : 0
-            };
-        });
+        // --- 3. Build per-answer stats ---
+        const totalSelections = updatedQuestion.answers.reduce(
+            (sum, ans) => sum + (ans.correctCount || 0),
+            0
+        );
+
+        const answerStats = updatedQuestion.answers.map(ans => ({
+            text: ans.text,
+            percentage:
+                totalSelections > 0
+                    ? Math.round(((ans.correctCount || 0) / totalSelections) * 100)
+                    : 0
+        }));
 
         // --- 5. Remove question from queue & reset current ---
         userQuestions[userToken].queue.shift();
