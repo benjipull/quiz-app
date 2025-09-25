@@ -12,11 +12,14 @@ import {
   TrendingUp,
   Award,
   Clock,
+  Plus,
+  Brain,
 } from "lucide-react";
 import logo from "../assets/images/QuizicleLogo.png";
 // Import the new components
 import SplashScreen from "../components/SplashScreen";
 import GameStatsHeader from "../components/GameStatsHeader";
+import AddCategory from "@/components/AddCategory";
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
@@ -32,11 +35,13 @@ interface Category {
   description?: string;
   createdBy?: string;
   completionCount?: number;
+  completionsCount?: number;
   questionCount?: number;
   averageRating?: number;
   difficulty?: "Easy" | "Medium" | "Hard";
   imageUrl?: string;
   createdAt?: string;
+  timeEstimate?: string;
 }
 
 interface CategoryToPlayResponse {
@@ -48,10 +53,11 @@ interface CategoryToPlayResponse {
 }
 
 export default function Home() {
-  const [featuredCategories, setFeaturedCategories] = useState<Category[]>([]);
+  const [userCategories, setUserCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
 
   // Splash screen state - only show on initial app load
   const [showSplash, setShowSplash] = useState(false);
@@ -63,6 +69,9 @@ export default function Home() {
 
   // New state to track screen size
   const [isSmallScreen, setIsSmallScreen] = useState(false);
+
+  // State to control AddCategory component visibility
+  const [showAddCategory, setShowAddCategory] = useState(false);
 
   const navigate = useNavigate();
   const userToken = typeof window !== 'undefined' ? localStorage.getItem("token") || "" : "";
@@ -87,7 +96,6 @@ export default function Home() {
       try {
         // Load all data concurrently
         await Promise.all([
-          fetchFeaturedCategories(),
           loadUserProfile(),
         ]);
 
@@ -135,6 +143,13 @@ export default function Home() {
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
+  // Fetch user categories when user profile is loaded
+  useEffect(() => {
+    if (userProfile && userToken) {
+      fetchUserCategories();
+    }
+  }, [userProfile, userToken]);
+
   const loadUserProfile = () => {
     return new Promise<void>((resolve) => {
       const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
@@ -160,36 +175,53 @@ export default function Home() {
     });
   };
 
-  const fetchFeaturedCategories = async () => {
+  const fetchUserCategories = async () => {
+    setCategoriesLoading(true);
     setError(null);
 
     try {
       const response = await fetch(`${BASE_URL}/api/categories`, {
+        method: "GET",
         headers: {
+          Authorization: `Bearer ${userToken}`,
           "Content-Type": "application/json",
-          ...(userToken && { Authorization: `Bearer ${userToken}` }),
         },
       });
 
-      if (!response.ok) throw new Error("Failed to fetch categories");
+      if (!response.ok) {
+        throw new Error(`Failed to fetch categories. Status: ${response.status}`);
+      }
 
       const data = await response.json();
-      const transformed: Category[] = data.map((category: any) => ({
+
+      // Filter categories by the logged-in user's alias
+      const userAlias = userProfile?.alias;
+      const filteredCategories = Array.isArray(data)
+        ? data.filter((category) => category.createdBy === userAlias)
+        : [];
+
+      // Transform API data to match interface
+      const transformedCategories: Category[] = filteredCategories.map((category: any, index: number) => ({
         _id: category._id,
         name: category.name,
         description: category.description || `Test your knowledge in ${category.name}`,
         createdBy: category.createdBy || "QuizMaster",
         completionCount: category.completionsCount || category.completionCount || 0,
+        completionsCount: category.completionsCount || category.completionCount || 0,
         questionCount: category.questionCount || 10,
-        averageRating: category.averageRating || 3,
-        difficulty: category.difficulty || "Medium",
+        averageRating: category.averageRating ?? (3 + Math.random() * 2),
+        difficulty: category.difficulty || (index % 3 === 0 ? "Easy" : index % 3 === 1 ? "Medium" : "Hard"),
         imageUrl: category.imageUrl || category.image,
-        createdAt: category.createdAt,
+        trending: (category.completionsCount || category.completionCount || 0) > 50,
+        isNew: index < 2 || (new Date().getTime() - new Date(category.createdAt || 0).getTime()) < (7 * 24 * 60 * 60 * 1000),
+        timeEstimate: `${Math.ceil((category.questionCount || 10) * 0.6)} min`
       }));
 
-      setFeaturedCategories(transformed.slice(0, 9));
-    } catch (e: any) {
-      setError(e.message);
+      setUserCategories(transformedCategories);
+    } catch (error: any) {
+      setError(error.message);
+    } finally {
+      setCategoriesLoading(false);
     }
   };
 
@@ -232,15 +264,24 @@ export default function Home() {
       }
     } catch (error: any) {
       console.error("Error getting category to play:", error);
-      // fallback to first featured category
-      if (featuredCategories.length > 0) {
-        navigate(`/quiz/${featuredCategories[0]._id}`);
+      // fallback to first user category
+      if (userCategories.length > 0) {
+        navigate(`/quiz/${userCategories[0]._id}`);
       } else {
         console.log("❌ Unable to start quiz. Please try again later.");
       }
     } finally {
       setPlayButtonLoading(false);
     }
+  };
+
+  const handleCreateFirstCategory = () => {
+    setShowAddCategory(true);
+  };
+
+  const handleCategoryCreated = () => {
+    // Refresh categories after creating a new one
+    fetchUserCategories();
   };
 
   // Conditionally render the splash screen only on initial load
@@ -300,30 +341,97 @@ export default function Home() {
           </Button>
         </div>
 
-        {/* Featured Categories */}
+        {/* My Categories */}
         <div className="mt-4">
-          <h3 className="text-lg font-bold mb-3">Featured Categories</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-bold flex items-center">
+              <Brain className="w-5 h-5 mr-2" />
+              Categories Created by You
+            </h3>
+            <Button
+              onClick={() => navigate("/categories")}
+              variant="outline"
+              size="sm"
+              className="text-xs"
+            >
+              View All Categories
+            </Button>
+          </div>
+
           {error ? (
-            <div className="flex justify-center py-12">
-              <p className="text-red-500">Error: {error}</p>
+            <Card className="p-8 text-center">
+              <div className="space-y-3">
+                <p className="text-red-500">Error: {error}</p>
+                <Button onClick={fetchUserCategories} variant="outline" size="sm">
+                  Try Again
+                </Button>
+              </div>
+            </Card>
+          ) : categoriesLoading ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i} className="p-4 animate-pulse">
+                  <div className="h-32 bg-muted/20 rounded mb-4" />
+                  <div className="space-y-2">
+                    <div className="h-4 bg-muted/20 rounded w-3/4" />
+                    <div className="h-3 bg-muted/20 rounded w-1/2" />
+                    <div className="h-3 bg-muted/20 rounded w-1/2" />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : userCategories.length === 0 ? (
+            // Show AddCategory component when no categories exist
+            <div className="space-y-4">
+              {!showAddCategory ? (
+                <Card className="p-8 text-center">
+                  <div className="space-y-3">
+                    <Brain className="h-12 w-12 mx-auto text-muted-foreground" />
+                    <h4 className="font-semibold text-foreground">No categories yet</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Create your first quiz category to get started
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-2"
+                      onClick={handleCreateFirstCategory}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Your First Category
+                    </Button>
+                  </div>
+                </Card>
+              ) : (
+                <AddCategory fetchCategories={handleCategoryCreated} />
+              )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {featuredCategories.map((cat) => (
-                <CategoryCard
-                  key={cat._id}
-                  id={cat._id}
-                  title={cat.name}
-                  description={cat.description}
-                  difficulty={cat.difficulty || "Medium"}
-                  questionCount={cat.questionCount || 10}
-                  completions={cat.completionCount || 0}
-                  rating={cat.averageRating || 0}
-                  imageUrl={cat.imageUrl || ""}
-                  createdBy={cat.createdBy || "QuizMaster"}
-                  onPlay={handlePlayQuiz}
-                />
-              ))}
+            // Show categories list and AddCategory component after
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {userCategories.map((cat) => (
+                  <CategoryCard
+                    key={cat._id}
+                    id={cat._id}
+                    title={cat.name}
+                    description={cat.description}
+                    difficulty={cat.difficulty || "Medium"}
+                    questionCount={cat.questionCount || 10}
+                    completions={cat.completionCount || cat.completionsCount || 0}
+                    rating={cat.averageRating || 0}
+                    timeEstimate={cat.timeEstimate || "5 min"}
+                    imageUrl={cat.imageUrl || `coming soon`}
+                    createdBy={cat.createdBy || "You"}
+                    onPlay={handlePlayQuiz}
+                  />
+                ))}
+              </div>
+              
+              {/* Add Category Section - Always show after categories */}
+              <div className="mt-6">
+                <AddCategory fetchCategories={fetchUserCategories} />
+              </div>
             </div>
           )}
         </div>

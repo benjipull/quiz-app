@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Clock, ThumbsUp, ThumbsDown, Flag, Lightbulb } from "lucide-react";
+import { ArrowLeft, ThumbsUp, ThumbsDown, Flag, Lightbulb } from "lucide-react";
 import QuizResults from "@/components/quiz/QuizResults";
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
@@ -16,6 +16,7 @@ interface Question {
   explanation: string;
   difficulty?: "Easy" | "Medium" | "Hard";
   difficultyName?: string;
+  difficultyValue?: number; // Added for new difficulty logic
   timer?: number;
 }
 
@@ -136,7 +137,7 @@ export default function Quiz() {
       }
     };
   }, [quizState.question, quizState.isAnswerSelected, timeUp]);
-  
+
   // This useEffect handles the scroll logic after bars animation completes
   useEffect(() => {
     if (showExplanation && explanationRef.current) {
@@ -147,10 +148,10 @@ export default function Quiz() {
           const elementRect = explanationRef.current.getBoundingClientRect();
           const isElementBelowFold = elementRect.top > viewportHeight * 0.8;
           const isElementCutOff = elementRect.bottom > viewportHeight;
-          
+
           if (isElementBelowFold || isElementCutOff) {
-            explanationRef.current.scrollIntoView({ 
-              behavior: 'smooth', 
+            explanationRef.current.scrollIntoView({
+              behavior: 'smooth',
               block: 'start',
               inline: 'nearest'
             });
@@ -170,12 +171,12 @@ export default function Quiz() {
     setShowBars(false);
     setAnswerResponse(null);
   }, [quizState.question, quizState.currentQuestionIndex]);
-  
+
   useEffect(() => {
     if (quizState.currentQuestionIndex > 0) {
-      window.scrollTo({ 
-        top: 0, 
-        behavior: 'smooth' 
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
       });
     }
   }, [quizState.currentQuestionIndex]);
@@ -288,7 +289,7 @@ export default function Quiz() {
       if (response.ok) {
         const answerData: AnswerResponse = await response.json();
         setAnswerResponse(answerData);
-        
+
         setQuizState((prevState) => ({
           ...prevState,
           incorrectAnswers: prevState.incorrectAnswers + 1,
@@ -317,7 +318,7 @@ export default function Quiz() {
 
     try {
       const { correctAnswers, incorrectAnswers, userAnswers } = quizState;
-      
+
       const completionPayload = {
         answers: userAnswers,
         score: correctAnswers,
@@ -341,7 +342,7 @@ export default function Quiz() {
 
       if (response.ok) {
         const completionData = await response.json();
-        
+
         setQuizState((prev) => ({
           ...prev,
           completed: true,
@@ -353,7 +354,7 @@ export default function Quiz() {
             categoryName: prev.selectedCategory?.name,
             categoryId: prev.selectedCategory?.id,
             answers: userAnswers,
-            completionData: completionData.results, 
+            completionData: completionData.results,
           },
         }));
       }
@@ -389,7 +390,7 @@ export default function Quiz() {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    
+
     setSelectedAnswer(answer);
     setQuizState((prev) => ({
       ...prev,
@@ -410,11 +411,11 @@ export default function Quiz() {
       if (response.ok) {
         const answerData: AnswerResponse = await response.json();
         setAnswerResponse(answerData);
-        
+
         const isCorrect = answerData.isCorrect;
-        
+
         handleVibration(isCorrect);
-        
+
         setQuizState((prev) => ({
           ...prev,
           correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
@@ -429,7 +430,7 @@ export default function Quiz() {
             }
           ]
         }));
-        
+
         if (isCorrect) {
           correctSound.play().catch(() => {});
         } else {
@@ -483,9 +484,9 @@ export default function Quiz() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${userToken}`,
         },
-        body: JSON.stringify({ 
-          questionId: quizState.question._id, 
-          action: type === "up" ? 1 : 2 
+        body: JSON.stringify({
+          questionId: quizState.question._id,
+          action: type === "up" ? 1 : 2
         }),
       });
 
@@ -502,22 +503,22 @@ export default function Quiz() {
     if (timeUp) {
       return "bg-muted/30 cursor-not-allowed opacity-50";
     }
-    
+
     if (selectedAnswer === null) {
       return "hover:bg-primary/5 cursor-pointer transition-colors";
     }
-    
+
     // Use the correct answer from API response if available
     const correctAnswer = answerResponse?.correctAnswer || quizState.question?.correct_answer;
-    
+
     if (answer === correctAnswer) {
       return "bg-success/10 text-success";
     }
-    
+
     if (answer === selectedAnswer && answer !== correctAnswer) {
       return "bg-destructive/10 text-destructive";
     }
-    
+
     return "bg-muted/30";
   };
 
@@ -525,22 +526,22 @@ export default function Quiz() {
     if (timeUp) {
       return "text-muted-foreground";
     }
-    
+
     if (selectedAnswer === null) {
       return "text-current";
     }
-    
+
     // Use the correct answer from API response if available
     const correctAnswer = answerResponse?.correctAnswer || quizState.question?.correct_answer;
-    
+
     if (answer === correctAnswer) {
       return "bg-success text-white";
     }
-    
+
     if (answer === selectedAnswer) {
       return "bg-destructive text-white";
     }
-    
+
     return "bg-muted text-muted-foreground";
   };
 
@@ -549,11 +550,23 @@ export default function Quiz() {
     if (timeLeft > 10) return "text-warning";
     return "text-destructive";
   };
-  
+
+  // New function to get difficulty color class
+  const getDifficultyColor = () => {
+    const difficulty = quizState.question?.difficultyValue;
+    if (difficulty === undefined) return "";
+    if (difficulty >= 1 && difficulty <= 3) return "border-success text-success bg-success/5";
+    if (difficulty >= 4 && difficulty <= 5) return "border-blue-400 text-blue-400 bg-blue-400/5";
+    if (difficulty >= 6 && difficulty <= 7) return "border-orange-400 text-orange-400 bg-orange-400/5";
+    if (difficulty >= 8 && difficulty <= 10) return "border-destructive text-destructive bg-destructive/5";
+    return "";
+  };
+
+
   // Calculate answer percentages for display using API data
   const getAnswerPercentage = (answer: string) => {
     if (!answerResponse?.answerStats) return 0;
-    
+
     const answerStat = answerResponse.answerStats.find(stat => stat.text === answer);
     return answerStat ? answerStat.percentage : 0;
   };
@@ -597,7 +610,7 @@ export default function Quiz() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-quiz-background to-background">
-      <div className="sticky top-0 z-30 bg-gradient-to-br from-quiz-background to-background border-b border-border/10 backdrop-blur-sm">
+      <div className="sticky top-0 z-30 bg-gradient-to-br from-quiz-background to-background backdrop-blur-sm">
         <div className="px-4 py-3 md:py-4 max-w-full lg:max-w-4xl xl:max-w-6xl mx-auto">
           <div className="flex items-center justify-between gap-2 mb-3">
             <Button
@@ -609,7 +622,7 @@ export default function Quiz() {
               <ArrowLeft className="h-4 w-4 flex-shrink-0" />
               <span className="hidden sm:inline truncate">Back</span>
             </Button>
-            
+
             <div className="text-center flex-1 min-w-0 px-2">
               <div className="text-sm md:text-base font-semibold text-primary truncate">
                 {categoryTitle}
@@ -618,43 +631,35 @@ export default function Quiz() {
                 Question {quizState.currentQuestionIndex} of {totalQuestions}
               </div>
             </div>
-            
-            <div className="flex items-center gap-1 bg-card/60 backdrop-blur-sm rounded-full px-2 py-1 flex-shrink-0">
-              <Clock className="h-4 w-4 text-warning flex-shrink-0" />
-              <Badge 
-                variant="outline" 
-                className={`border-warning bg-transparent text-sm min-w-[40px] text-center ${getTimerColor()} ${timeLeft <= 10 ? 'animate-pulse' : ''}`}
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Difficulty Display */}
+              {(quizState.question?.difficultyName || quizState.question?.difficulty) && (
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${getDifficultyColor()}`}
+                >
+                  {quizState.question?.difficultyName || quizState.question?.difficulty}
+                </Badge>
+              )}
+              <Badge
+                variant="outline"
+                className={`bg-card/60 backdrop-blur-sm text-sm min-w-[40px] text-center ${getTimerColor()} ${timeLeft <= 10 ? 'animate-pulse' : ''}`}
               >
                 {timeLeft}s
               </Badge>
             </div>
           </div>
-          
+
           <div className="w-full bg-secondary rounded-full h-2 mb-2">
-            <div 
+            <div
               className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
               style={{ width: `${((quizState.currentQuestionIndex - 1) / totalQuestions) * 100}%` }}
             />
           </div>
-
-          {/* Difficulty Display */}
-          {(quizState.question?.difficultyName || quizState.question?.difficulty) && (
-            <div className="flex justify-center">
-              <Badge 
-                variant="outline" 
-                className={`text-xs ${
-                  (quizState.question?.difficultyName || quizState.question?.difficulty) === "Easy" ? "border-success text-success bg-success/5" :
-                  (quizState.question?.difficultyName || quizState.question?.difficulty) === "Medium" ? "border-warning text-warning bg-warning/5" :
-                  "border-destructive text-destructive bg-destructive/5"
-                }`}
-              >
-                {quizState.question?.difficultyName || quizState.question?.difficulty}
-              </Badge>
-            </div>
-          )}
         </div>
       </div>
-      
+
       <div className="flex-1 overflow-y-auto px-4 py-6 max-w-full lg:max-w-4xl xl:max-w-6xl mx-auto">
         <div className="space-y-6">
           <div className="px-2 py-4">
@@ -667,27 +672,27 @@ export default function Quiz() {
             {quizState.question?.answers.map((answer, index) => (
               <Card
                 key={index}
-                className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer`}
+                className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer border border-transparent`}
                 onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
               >
                 {/* Background percentage bar */}
                 {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
-                  <div 
+                  <div
                     className={`absolute top-0 left-0 h-full animate-bar-fill rounded-r-md ${
                       answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
-                        ? 'bg-success/25 border-l-4 border-success' 
-                        : answer === selectedAnswer 
-                          ? 'bg-destructive/25 border-l-4 border-destructive' 
+                        ? 'bg-success/25 border-l-4 border-success'
+                        : answer === selectedAnswer
+                          ? 'bg-destructive/25 border-l-4 border-destructive'
                           : 'bg-primary/15'
                     }`}
-                    style={{ 
+                    style={{
                       '--target-width': `${getAnswerPercentage(answer)}%`,
                       animationDelay: `${index * 150}ms`,
                       animationDuration: '0.8s'
                     } as React.CSSProperties}
                   />
                 )}
-                
+
                 <div className="flex items-center gap-4 relative z-10">
                   <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-semibold text-base md:text-lg transition-all duration-300 flex-shrink-0 ${getLetterStyle(answer)}`}>
                     {String.fromCharCode(65 + index)}
@@ -697,8 +702,8 @@ export default function Quiz() {
                       {answer}
                     </span>
                     {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
-                      <span 
-                        className="text-sm font-semibold text-foreground ml-2 animate-fade-in-delayed" 
+                      <span
+                        className="text-sm font-semibold text-foreground ml-2 animate-fade-in-delayed"
                         style={{ animationDelay: `${1000 + (index * 150)}ms` }}
                       >
                         {getAnswerPercentage(answer)}%
@@ -712,7 +717,7 @@ export default function Quiz() {
 
           {timeUp && (
             <div ref={explanationRef}>
-              <Card className="p-6 md:p-8 bg-destructive/5 animate-slide-up">
+              <Card className="p-6 md:p-8 bg-destructive/5 animate-slide-up border-transparent">
                 <div className="text-center space-y-3">
                   <p className="font-semibold text-destructive text-base md:text-lg">⏰ Time's Up!</p>
                   <p className="text-sm md:text-base text-muted-foreground">
@@ -725,11 +730,11 @@ export default function Quiz() {
                   )}
                 </div>
               </Card>
-              
+
               <div className="mt-6 pb-4">
-                <Button 
-                  variant="default" 
-                  size="lg" 
+                <Button
+                  variant="default"
+                  size="lg"
                   className="w-full h-14 md:h-16 text-base md:text-lg"
                   onClick={handleNextQuestion}
                   disabled={isCompletingQuiz}
@@ -741,7 +746,7 @@ export default function Quiz() {
           )}
           {showExplanation && !timeUp && answerResponse && (
             <div ref={explanationRef}>
-              <Card className="p-6 md:p-8 bg-primary/5 animate-slide-up">
+              <Card className="p-6 md:p-8 bg-primary/5 animate-slide-up border-transparent">
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <Lightbulb className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-primary flex-shrink-0" />
@@ -756,43 +761,43 @@ export default function Quiz() {
               </Card>
 
               <div className="mt-6 space-y-4 animate-fade-in pb-4">
-                <Card className="p-4 md:p-6 bg-card/40">
+                <Card className="p-4 md:p-6 bg-card/40 border-transparent">
                   <div className="space-y-4">
                     <p className="text-sm font-medium text-center">Did you like this question?</p>
                     <div className="flex gap-4 justify-center">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => handleFeedback("up")}
                         disabled={feedbackGiven}
                         className={`text-sm flex-1 max-w-[120px] h-10 ${
-                          feedbackType === "up" 
-                            ? "bg-success/20 border-success text-success hover:bg-success/20 hover:text-success" 
-                            : feedbackGiven 
-                              ? "opacity-50" 
+                          feedbackType === "up"
+                            ? "bg-success/20 border-success text-success hover:bg-success/20 hover:text-success"
+                            : feedbackGiven
+                              ? "opacity-50"
                               : "hover:text-success"
                         }`}
                       >
                         <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
                         <span className="ml-1 sm:ml-2">Yes</span>
                       </Button>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => handleFeedback("down")}
                         disabled={feedbackGiven}
                         className={`text-sm flex-1 max-w-[120px] h-10 ${
-                          feedbackType === "down" 
-                            ? "bg-destructive/20 border-destructive text-destructive hover:bg-destructive/20 hover:text-destructive" 
-                            : feedbackGiven 
-                              ? "opacity-50" 
+                          feedbackType === "down"
+                            ? "bg-destructive/20 border-destructive text-destructive hover:bg-destructive/20 hover:text-destructive"
+                            : feedbackGiven
+                              ? "opacity-50"
                               : "hover:text-destructive"
                         }`}
                       >
                         <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
                         <span className="ml-1 sm:ml-2">No</span>
                       </Button>
-                      <Button variant="outline" size="sm" className="text-sm flex-1 max-w-[120px] h-10">
+                      <Button variant="outline" size="sm" className="text-sm flex-1 max-w-[120px] h-10 border-transparent">
                         <Flag className="h-4 w-4 md:h-5 md:w-5" />
                         <span className="ml-1 sm:ml-2 hidden sm:inline">Report</span>
                       </Button>
@@ -800,9 +805,9 @@ export default function Quiz() {
                   </div>
                 </Card>
 
-                <Button 
-                  variant="default" 
-                  size="lg" 
+                <Button
+                  variant="default"
+                  size="lg"
                   className="w-full h-14 md:h-16 text-base md:text-lg"
                   onClick={handleNextQuestion}
                   disabled={isCompletingQuiz}
@@ -826,7 +831,7 @@ export default function Quiz() {
             transform: translateY(0);
           }
         }
-        
+
         @keyframes fade-in {
           from {
             opacity: 0;
@@ -855,11 +860,11 @@ export default function Quiz() {
             transform: translateX(0);
           }
         }
-        
+
         .animate-slide-up {
           animation: slide-up 0.6s ease-out forwards;
         }
-        
+
         .animate-fade-in {
           animation: fade-in 0.5s ease-out forwards;
         }
