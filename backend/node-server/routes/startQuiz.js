@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const Category = require("../models/categoryModel");
+const User = require("../models/user");
+
 const { userQuestions } = require("../index"); // Import shared store
 const { populateCategory } = require("../scripts/populateCategories"); // Import async question population
 
