@@ -49,7 +49,6 @@ Additional guidance:
 - If the answer requires academic study or field expertise → score higher.
 - If the answer is guessable by most adults → score lower.
 - Take into account the provided explanation: if it relies on context most people would not know, the difficulty rises.
-- Focus on **knowledge accessibility**, not trivia trickiness.
 
 Now classify the following trivia question:
 
