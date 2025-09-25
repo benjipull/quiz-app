@@ -35,21 +35,51 @@ router.post("/", async (req, res) => {
     }
 
     try {
-        const category = await Category.findById(categoryId);
-
+        const category = await Category.findById(categoryId).lean();
         if (!category) {
             return res.status(404).json({ message: "Category not found." });
         }
 
-        const selectedQuestions = category.questions
-            .sort((a, b) => a.timesLoaded - b.timesLoaded)
+        // 🔑 Get user level from DB (assuming User model has it)
+        const User = require("../models/userModel");
+        const user = await User.findOne({ token: userToken }).lean(); // adapt to your schema
+        if (!user) {
+            return res.status(404).json({ message: "User not found." });
+        }
+
+        const userLevel = user.level || 1;
+
+        // 🎚 Sliding difficulty window
+        let minDifficulty = userLevel;
+        let maxDifficulty = userLevel + 2;
+        if (maxDifficulty > 10) {
+            minDifficulty = 9;
+            maxDifficulty = 10;
+        }
+
+        console.log(`User level: ${userLevel}, selecting difficulties ${minDifficulty}-${maxDifficulty}`);
+
+        // ✅ Filter questions by difficulty window
+        const filtered = category.questions.filter(q =>
+            q.difficulty_level >= minDifficulty && q.difficulty_level <= maxDifficulty
+        );
+
+        const selectedQuestions = filtered
+            .sort((a, b) => {
+                if (b.popularity !== a.popularity) {
+                    return b.popularity - a.popularity;
+                }
+                return a.timesLoaded - b.timesLoaded;
+            })
             .slice(0, numQuestions);
 
         if (selectedQuestions.length === 0) {
-            console.error(`Cannot start Quiz, no questions found. Populating category: ${category._id} (${category.name})`);
+            console.error(`Cannot start Quiz, no questions found in difficulty window. Populating category: ${category._id} (${category.name})`);
             populateCategory(category._id, 20);
 
-            return res.status(404).json({ message: "No available questions in this category please try again in a few minutes." });
+            return res.status(404).json({
+                message: "No available questions in this difficulty range. Please try again in a few minutes."
+            });
         }
 
         // Store questions for user in memory
@@ -70,7 +100,11 @@ router.post("/", async (req, res) => {
 
         console.log(`Loaded ${selectedQuestions.length} questions for user ${userToken}`);
 
-        res.json({ message: "✅ Questions preloaded!", total: selectedQuestions.length });
+        res.json({
+            message: "Questions preloaded.",
+            total: selectedQuestions.length,
+            difficultyRange: [minDifficulty, maxDifficulty] // for debugging
+        });
 
     } catch (error) {
         console.error("❌ Error loading questions from database:", error.message);
