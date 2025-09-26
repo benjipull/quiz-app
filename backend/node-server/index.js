@@ -46,6 +46,7 @@ app.use("/api/getGetegoryToPlay", require("./routes/getGetegoryToPlay"));
 //Categories
 app.use("/api/categories", require("./routes/createCategory"));
 app.use("/api/categories", require("./routes/getCategories"));
+app.use("/api/getUserCategories", require("./routes/getUserCategories"));
 app.use("/api/categories", require("./routes/recordCompletion")); 
 app.use("/api/categories", require("./routes/rateCategory")); 
 
