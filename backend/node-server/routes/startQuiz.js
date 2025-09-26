@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Category = require("../models/categoryModel");
 const User = require("../models/user");
-
+const authenticateToken = require("../middleware/auth");
 const { userQuestions } = require("../index"); // Import shared store
 const { populateCategory } = require("../scripts/populateCategories"); // Import async question population
 
@@ -20,7 +20,7 @@ const difficultyNames = {
     10: "Legendary"
 };
 
-router.post("/", async (req, res) => {
+router.post("/", authenticateToken, async (req, res) => {
     const { categoryId, numQuestions } = req.body;
 
     const authHeader = req.headers["authorization"];
@@ -36,24 +36,25 @@ router.post("/", async (req, res) => {
         return res.status(400).json({ message: "Missing required fields: categoryId, numQuestions." });
     }
 
+        const userId = req.user.id;
+
+        console.log("✅ Extracted User ID:", userId);
     try {
         const category = await Category.findById(categoryId).lean();
         if (!category) {
             return res.status(404).json({ message: "Category not found." });
         }
 
-        // 🔑 Get user level from DB (assuming User model has it)
-        const User = require("../models/userModel");
-        const user = await User.findOne({ token: userToken }).lean(); // adapt to your schema
+        const user = await User.findById(userId);
         if (!user) {
-            return res.status(404).json({ message: "User not found." });
+            return res.status(404).json({ message: "❌ User not found" });
         }
 
         const userLevel = user.level || 1;
 
         // 🎚 Sliding difficulty window
         let minDifficulty = userLevel;
-        let maxDifficulty = userLevel + 2;
+        let maxDifficulty = userLevel + 3;
         if (maxDifficulty > 10) {
             minDifficulty = 9;
             maxDifficulty = 10;
@@ -77,7 +78,6 @@ router.post("/", async (req, res) => {
 
         if (selectedQuestions.length === 0) {
             console.error(`Cannot start Quiz, no questions found in difficulty window. Populating category: ${category._id} (${category.name})`);
-            populateCategory(category._id, 20);
 
             return res.status(404).json({
                 message: "No available questions in this difficulty range. Please try again in a few minutes."
