@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -125,7 +123,7 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
   const getPerformanceData = (score: number) => {
     if (score === 100) {
       return {
-        message: "🏆 LEGENDARY! FLAWLESS VICTORY!",
+        message: "ðŸ† LEGENDARY! FLAWLESS VICTORY!",
         rank: "LEGENDARY",
         icon: <Crown className="h-6 w-6 sm:h-8 sm:w-8 animate-spin-slow text-accent" />,
         rankColor: "text-accent",
@@ -135,7 +133,7 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
       };
     } else if (score >= 90) {
       return {
-        message: "💎 DIAMOND RANK! Nearly Perfect!",
+        message: "ðŸ’Ž DIAMOND RANK! Nearly Perfect!",
         rank: "DIAMOND",
         icon: <Trophy className="h-6 w-6 sm:h-8 sm:w-8 animate-bounce-slow text-primary" />,
         rankColor: "text-primary",
@@ -145,7 +143,7 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
       };
     } else if (score >= 80) {
       return {
-        message: "🔥 GOLD TIER! Excellent Performance!",
+        message: "ðŸ”¥ GOLD TIER! Excellent Performance!",
         rank: "GOLD",
         icon: <Award className="h-6 w-6 sm:h-8 sm:w-8 animate-pulse-slow text-success" />,
         rankColor: "text-success",
@@ -155,7 +153,7 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
       };
     } else if (score >= 70) {
       return {
-        message: "⚡ SILVER RANK! Great Job!",
+        message: "âš¡ SILVER RANK! Great Job!",
         rank: "SILVER",
         icon: <Zap className="h-6 w-6 sm:h-8 sm:w-8 animate-pulse text-muted-foreground" />,
         rankColor: "text-muted-foreground",
@@ -165,7 +163,7 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
       };
     } else if (score >= 50) {
       return {
-        message: "🎯 BRONZE LEVEL! Keep Pushing!",
+        message: "ðŸŽ¯ BRONZE LEVEL! Keep Pushing!",
         rank: "BRONZE",
         icon: <Target className="h-6 w-6 sm:h-8 sm:w-8 animate-pulse text-warning" />,
         rankColor: "text-warning",
@@ -175,7 +173,7 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
       };
     } else {
       return {
-        message: "🛡️ ROOKIE TIER! Training Mode!",
+        message: "ðŸ›¡ï¸ ROOKIE TIER! Training Mode!",
         rank: "ROOKIE",
         icon: <RefreshCw className="h-6 w-6 sm:h-8 sm:w-8 animate-spin-slow text-destructive" />,
         rankColor: "text-destructive",
@@ -334,7 +332,7 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
                             LEVEL UP!
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            Level {previousLevel} → <span className="text-accent font-bold">Level {currentLevel}</span>
+                            Level {previousLevel} â†’ <span className="text-accent font-bold">Level {currentLevel}</span>
                           </div>
                         </div>
                       </div>
@@ -351,7 +349,7 @@ export default function QuizResults({ results, onPlayAgain }: QuizResultsProps) 
             <Card className="bg-card border border-border p-4 animate-fade-in delay-500">
               <div className="text-center space-y-4">
                 <h3 className="text-lg font-bold text-foreground">
-                  ⭐ RATE THIS MISSION ⭐
+                  â­ RATE THIS MISSION â­
                 </h3>
                 
                 <div className="flex items-center justify-center gap-2">

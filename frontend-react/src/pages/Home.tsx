@@ -175,12 +175,13 @@ export default function Home() {
     });
   };
 
-  const fetchUserCategories = async () => {
+const fetchUserCategories = async () => {
     setCategoriesLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`${BASE_URL}/api/categories`, {
+      // 1. Change the endpoint to the new dedicated one
+      const response = await fetch(`${BASE_URL}/api/getUserCategories`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${userToken}`,
@@ -189,23 +190,20 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch categories. Status: ${response.status}`);
+        throw new Error(`Failed to fetch user categories. Status: ${response.status}`);
       }
 
       const data = await response.json();
 
-      // Filter categories by the logged-in user's alias
-      const userAlias = userProfile?.alias;
-      const filteredCategories = Array.isArray(data)
-        ? data.filter((category) => category.createdBy === userAlias)
-        : [];
+      // 2. Remove client-side filtering since the new API endpoint handles it
+      const categoriesFromApi = Array.isArray(data) ? data : [];
 
       // Transform API data to match interface
-      const transformedCategories: Category[] = filteredCategories.map((category: any, index: number) => ({
+      const transformedCategories: Category[] = categoriesFromApi.map((category: any, index: number) => ({
         _id: category._id,
         name: category.name,
         description: category.description || `Test your knowledge in ${category.name}`,
-        createdBy: category.createdBy || "QuizMaster",
+        createdBy: category.createdBy || "QuizMaster", // This should now always be the user's alias
         completionCount: category.completionsCount || category.completionCount || 0,
         completionsCount: category.completionsCount || category.completionCount || 0,
         questionCount: category.questionCount || 10,
@@ -318,29 +316,34 @@ export default function Home() {
         </div>
 
         {/* Play Button */}
-        <div className="pb-3">
+{/* Play Button */}
+        <div className="pb-3 relative">
           <Button
             onClick={handleQuickQuiz}
             disabled={loading || playButtonLoading}
-            className="w-full h-12 bg-success hover:bg-success/90 text-white text-lg font-bold rounded-xl disabled:opacity-50"
+            className="w-full h-16 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-2xl disabled:opacity-50 flex items-center justify-between px-6 relative overflow-hidden shadow-lg" 
           >
             {playButtonLoading ? (
-              <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              <div className="flex items-center text-xl justify-center w-full">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
                 Starting Quiz...
               </div>
             ) : (
               <>
-                Play
-                <div className="ml-2 flex items-center bg-white/20 px-2 py-0.5 rounded-full">
-                  <span className="font-bold">{userLevel}</span>
-                  <span className="ml-1 text-xs">Lvl</span>
+                {/* The main "Play" text */}
+                <span className="text-3xl font-bold">Play</span>
+
+                {/* The Level Badge - circular design matching the reference */}
+                <div className="relative">
+                  <div className="bg-white rounded-full w-14 h-14 flex flex-col items-center justify-center shadow-md">
+                    <span className="text-purple-500 text-xl font-bold leading-none">{userLevel}</span>
+                    <span className="text-purple-500 text-xs font-medium uppercase leading-none">Level</span>
+                  </div>
                 </div>
               </>
             )}
           </Button>
         </div>
-
         {/* My Categories */}
         <div className="mt-4">
           <div className="flex items-center justify-between mb-3">
@@ -409,24 +412,25 @@ export default function Home() {
           ) : (
             // Show categories list and AddCategory component after
             <div className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {userCategories.map((cat) => (
-                  <CategoryCard
-                    key={cat._id}
-                    id={cat._id}
-                    title={cat.name}
-                    description={cat.description}
-                    difficulty={cat.difficulty || "Medium"}
-                    questionCount={cat.questionCount || 10}
-                    completions={cat.completionCount || cat.completionsCount || 0}
-                    rating={cat.averageRating || 0}
-                    timeEstimate={cat.timeEstimate || "5 min"}
-                    imageUrl={cat.imageUrl || `coming soon`}
-                    createdBy={cat.createdBy || "You"}
-                    onPlay={handlePlayQuiz}
-                  />
-                ))}
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {userCategories.map((cat) => (
+              <CategoryCard
+                key={cat._id}
+                id={cat._id}
+                title={cat.name}
+                description={cat.description}
+                difficulty={cat.difficulty || "Medium"}
+                questionCount={cat.questionCount || 10}
+                completions={cat.completionCount || cat.completionsCount || 0}
+                rating={cat.averageRating || 0}
+                timeEstimate={cat.timeEstimate || "5 min"}
+                imageUrl={cat.imageUrl || `coming soon`}
+                createdBy={cat.createdBy || "You"}
+                onPlay={handlePlayQuiz}
+              />
+            ))}
+          </div>
+
               
               {/* Add Category Section - Always show after categories */}
               <div className="mt-6">
