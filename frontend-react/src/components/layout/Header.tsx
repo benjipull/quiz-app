@@ -102,23 +102,6 @@ export const Header = ({
 
           <ThemeToggle />
 
-          {showSearch && (
-            <Button variant="ghost" size="icon">
-              <Search className="h-5 w-5" />
-            </Button>
-          )}
-
-          {showNotifications && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative"
-              onClick={() => navigate("/notifications")}
-            >
-              <Bell className="h-5 w-5" />
-              <div className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full animate-pulse" />
-            </Button>
-          )}
         </div>
       </div>
     </header>
