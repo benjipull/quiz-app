@@ -29,6 +29,7 @@ const avatars: string[] = Object.values(avatarImages) as string[];
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
+// ... (Category and CategoryToPlayResponse interfaces remain the same) ...
 interface Category {
   _id: string;
   name: string;
@@ -52,6 +53,16 @@ interface CategoryToPlayResponse {
   questionsCount: number;
 }
 
+
+// --- New Interface for User Details from API ---
+interface UserDetails {
+  _id: string;
+  alias: string;
+  level: number;
+  avatar: number; // Index or ID of the avatar
+  // ... other fields you might get from the API
+}
+
 export default function Home() {
   const [userCategories, setUserCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,9 +74,9 @@ export default function Home() {
   const [showSplash, setShowSplash] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  const [userProfile, setUserProfile] = useState<any | null>(null);
+  const [userProfile, setUserProfile] = useState<UserDetails | any | null>(null); // Updated type hint
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
-  const [userLevel, setUserLevel] = useState(1);
+  const [userLevel, setUserLevel] = useState(1); // Initial state is 1
 
   // New state to track screen size
   const [isSmallScreen, setIsSmallScreen] = useState(false);
@@ -76,6 +87,7 @@ export default function Home() {
   const navigate = useNavigate();
   const userToken = typeof window !== 'undefined' ? localStorage.getItem("token") || "" : "";
 
+  // ... (useEffect for initialization and screen size remains the same) ...
   useEffect(() => {
     const initializeApp = async () => {
       // Check if this is the first time loading the app in this session
@@ -96,7 +108,7 @@ export default function Home() {
       try {
         // Load all data concurrently
         await Promise.all([
-          loadUserProfile(),
+          loadUserProfile(), // This is now async and fetches from API
         ]);
 
         setDataLoaded(true);
@@ -142,43 +154,101 @@ export default function Home() {
 
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
-
-  // Fetch user categories when user profile is loaded
+// ... (useEffect for fetching categories remains the same) ...
   useEffect(() => {
     if (userProfile && userToken) {
       fetchUserCategories();
     }
   }, [userProfile, userToken]);
 
-  const loadUserProfile = () => {
-    return new Promise<void>((resolve) => {
-      const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
-      const storedAvatar = typeof window !== 'undefined' ? localStorage.getItem("userAvatar") : null;
 
+  // ----------------------------------------------------------------
+  // REVISED loadUserProfile to fetch from API
+  // ----------------------------------------------------------------
+  const loadUserProfile = async () => {
+    if (!userToken) {
+      // Fallback to local storage if token is missing (e.g., Guest user logic)
+      const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
       if (storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
           setUserProfile(parsedUser);
-
-          if (storedAvatar) {
-            setUserAvatar(storedAvatar);
-          } else if (parsedUser.avatar) {
-            setUserAvatar(avatars[parsedUser.avatar - 1] || null);
-          }
-
           if (parsedUser.level) setUserLevel(parsedUser.level);
         } catch (e) {
-          console.error("Failed to parse user data:", e);
+          console.error("Failed to parse local user data:", e);
         }
       }
-      resolve();
-    });
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${BASE_URL}/api/getUserDetails`, { // <-- The new API endpoint
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        // If API fails, try to load from local storage as a fallback
+        console.warn(`Failed to fetch user details from API. Status: ${response.status}. Falling back to local storage.`);
+        const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          setUserProfile(parsedUser);
+          if (parsedUser.level) setUserLevel(parsedUser.level);
+        }
+        return;
+      }
+
+      const apiUser: UserDetails = await response.json();
+
+      // 1. Update State with fresh API data
+      setUserProfile(apiUser);
+      if (apiUser.level !== undefined) {
+        setUserLevel(apiUser.level);
+      } else {
+        // Ensure level is set, defaults to 1 if not present in API response
+        setUserLevel(1); 
+      }
+
+      // 2. Update Avatar
+      const avatarIndex = apiUser.avatar ? apiUser.avatar - 1 : 0;
+      const calculatedAvatar = avatars[avatarIndex] || null;
+      setUserAvatar(calculatedAvatar);
+      
+      // 3. OPTIONAL: Update local storage with fresh data
+      if (typeof window !== 'undefined') {
+        localStorage.setItem("user", JSON.stringify(apiUser));
+        if(calculatedAvatar) {
+           localStorage.setItem("userAvatar", calculatedAvatar);
+        }
+      }
+
+    } catch (error) {
+      console.error("Error fetching user details from API:", error);
+      // Even on fetch error, try to load from local storage
+      const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setUserProfile(parsedUser);
+          if (parsedUser.level) setUserLevel(parsedUser.level);
+        } catch (e) {
+           console.error("Failed to parse local user data on API error:", e);
+        }
+      }
+    }
   };
+
+
+// ... (rest of the component's functions and render logic remain the same) ...
 
 const fetchUserCategories = async () => {
     setCategoriesLoading(true);
     setError(null);
-
+// ... (implementation of fetchUserCategories remains the same) ...
     try {
       // 1. Change the endpoint to the new dedicated one
       const response = await fetch(`${BASE_URL}/api/getUserCategories`, {
