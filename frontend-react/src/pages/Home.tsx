@@ -349,7 +349,7 @@ const fetchUserCategories = async () => {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-bold flex items-center">
               <Brain className="w-5 h-5 mr-2" />
-              Categories Created by You
+              Your Categories
             </h3>
             <Button
               onClick={() => navigate("/categories")}
