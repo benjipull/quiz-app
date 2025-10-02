@@ -107,13 +107,17 @@ export default function Quiz() {
       clearInterval(timerRef.current);
     }
 
-    // Use timer value from API if available, otherwise default to 30
     const initialTime = quizState.question?.timer || 30;
-    if (timeLeft !== initialTime && quizState.question && !quizState.isAnswerSelected && !timeUp) {
-      setTimeLeft(initialTime);
-    }
-
+    
+    // Fix 2: Always reset the timer based on the question's 'timer' property 
+    // when a new question loads (i.e., when quizState.question changes)
     if (quizState.question && !quizState.isAnswerSelected && !timeUp) {
+      // We set time left here only if it's a new question to ensure 
+      // the backend value is used, but we let the dependency array handle the main trigger.
+      if (timeLeft !== initialTime) {
+         setTimeLeft(initialTime);
+      }
+
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
@@ -166,6 +170,7 @@ export default function Quiz() {
     setShowExplanation(false);
     setFeedbackGiven(false);
     setFeedbackType(null);
+    // Ensure timer is reset whenever question/index changes
     setTimeLeft(quizState.question?.timer || 30);
     setTimeUp(false);
     setShowBars(false);
@@ -672,7 +677,8 @@ export default function Quiz() {
             {quizState.question?.answers.map((answer, index) => (
               <Card
                 key={index}
-                className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer border border-transparent`}
+                // Fix 1: Reduce borders. Removed `border border-transparent`
+                className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer`}
                 onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
               >
                 {/* Background percentage bar */}
@@ -698,7 +704,7 @@ export default function Quiz() {
                     {String.fromCharCode(65 + index)}
                   </div>
                   <div className="flex-1 min-w-0 flex items-center justify-between">
-                    <span className="font-medium text-base md:text-lg leading-snug break-words">
+                    <span className={`text-base md:text-lg leading-snug break-words ${selectedAnswer === null ? 'font-medium' : ''}`}>
                       {answer}
                     </span>
                     {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
