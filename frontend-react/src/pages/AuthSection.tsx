@@ -1,3 +1,5 @@
+// AuthSection.tsx (No changes required for the provided issue)
+
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, User, Brain, Zap, ArrowRight, Calendar } from "lucide-react"; // Calendar icon kept for consistency of removal of DOB and replacement with AGE
