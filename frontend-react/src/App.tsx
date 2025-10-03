@@ -37,6 +37,9 @@ const App = () => (
                     {/* Public route for authentication */}
                     <Route path="/auth" element={<AuthSection />} />
 
+                    {/* 💡 NEW: Add route for password reset link from email to ensure AuthSection loads */}
+                    <Route path="/reset-password" element={<AuthSection />} />
+
                     {/* Protected routes wrapped by ProtectedRoute */}
                     <Route path="/" element={<ProtectedRoute><MobileLayout /></ProtectedRoute>}>
                         <Route index element={<Home />} />
