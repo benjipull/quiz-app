@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card"; // Reduced imports to only what's needed for the card structure
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   CheckCircle,
@@ -15,8 +15,8 @@ import {
   Zap,
   ArrowUp,
   X,
-  Award, // Kept for logic, but minimized use in render
-  Trophy, // Kept for logic, but minimized use in render
+  Award,
+  Trophy,
 } from "lucide-react";
 import Confetti from "react-confetti";
 
@@ -333,10 +333,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       {/* Main Results Card Container (h-full is key here to let it stretch within the parent flex) */}
       <div className="relative z-10 w-full max-w-lg md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto h-full flex items-center justify-center"> 
         
-        {/* Main Results Card */}
+        {/* 💡 FIX 1: Added flex-col to the Card to enable proper height management for inner content */}
         <Card className={`
           relative overflow-hidden bg-card/95 backdrop-blur-xl border-2 ${performanceData.borderColor}
-          shadow-2xl ${performanceData.glowColor} transition-all duration-700 animate-scale-in w-full h-full max-h-[90vh] md:max-h-[85vh]
+          shadow-2xl ${performanceData.glowColor} transition-all duration-700 animate-scale-in w-full max-h-[95vh] md:max-h-[90vh] flex flex-col
         `}>
           
           {/* Gradient overlay (KEEP AS IS) */}
@@ -353,15 +353,15 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             <X className="h-5 w-5" />
           </Button>
           
-          {/* Main Content Area: Reduced padding, added **h-full** to content grid for max compactness */}
-          {/* Added overflow-y-auto as a last resort on tiny devices, though the design is now tight enough to prevent it on most phones. */}
-          <div className="relative z-10 p-4 md:p-6 space-y-4 md:grid md:grid-cols-2 md:gap-4 lg:gap-8 md:space-y-0 h-full overflow-y-auto"> 
+          {/* 💡 FIX 2: Changed h-full to flex-grow. This ensures the content DIV takes up all remaining space within the flex-col Card. */}
+          {/* overflow-y-auto is now correctly scoped to this inner content, preventing main page scroll. */}
+          <div className="relative z-10 p-4 md:p-6 space-y-4 md:grid md:grid-cols-2 md:gap-4 lg:gap-8 md:space-y-0 flex-grow overflow-y-auto"> 
             
             {/* LEFT COLUMN: Header, Score, and Rank */}
             <div className="md:col-span-1 flex flex-col items-center text-center space-y-3 md:space-y-4">
               
               {/* Header Section with Rank Badge */}
-              <div className="space-y-1 animate-fade-in-up"> 
+              <div className="space-y-1 animate-fade-in-up flex-shrink-0"> 
                 <div className="flex flex-col items-center gap-1">
                   <h1 className="text-xl md:text-2xl lg:text-3xl font-black text-foreground tracking-wider drop-shadow-lg">
                     MISSION COMPLETE!
@@ -426,7 +426,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               </div>
 
               {/* Action Buttons - Only "Next Quiz" remains */}
-              <div className="pt-1 w-full max-w-xs">
+              <div className="pt-1 w-full max-w-xs flex-shrink-0">
                 <Button
                   onClick={onPlayAgain}
                   size="lg" // Use lg for mobile too for tap target size
@@ -440,7 +440,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             </div>
             
             {/* RIGHT COLUMN: Stats Grid and Rating */}
-            <div className="md:col-span-1 space-y-3 flex flex-col justify-between"> 
+            {/* Added flex-grow to this column to ensure it uses vertical space if the screen is tall. */}
+            <div className="md:col-span-1 space-y-3 flex flex-col justify-between flex-grow"> 
               
               {/* Answer Breakdown */}
               <Card className="bg-card/50 border border-border p-3 animate-slide-in-left backdrop-blur-sm flex-shrink-0">
@@ -465,7 +466,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               </Card>
 
               {/* Progress Stats (XP and Level) */}
-              <div className="space-y-2 animate-slide-in-right flex-grow-0">
+              <div className="space-y-2 animate-slide-in-right flex-grow">
                 
                 {/* Knowledge Gained - Enhanced */}
                 <Card className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-2 border-blue-400/30 p-3 backdrop-blur-sm animate-glow-pulse">
