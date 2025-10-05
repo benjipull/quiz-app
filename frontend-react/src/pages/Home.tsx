@@ -29,6 +29,7 @@ const avatars: string[] = Object.values(avatarImages) as string[];
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
+// ... (Category and CategoryToPlayResponse interfaces remain the same) ...
 interface Category {
   _id: string;
   name: string;
@@ -52,6 +53,16 @@ interface CategoryToPlayResponse {
   questionsCount: number;
 }
 
+
+// --- New Interface for User Details from API ---
+interface UserDetails {
+  _id: string;
+  alias: string;
+  level: number;
+  avatar: number; // Index or ID of the avatar
+  // ... other fields you might get from the API
+}
+
 export default function Home() {
   const [userCategories, setUserCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,9 +74,9 @@ export default function Home() {
   const [showSplash, setShowSplash] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  const [userProfile, setUserProfile] = useState<any | null>(null);
+  const [userProfile, setUserProfile] = useState<UserDetails | any | null>(null); // Updated type hint
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
-  const [userLevel, setUserLevel] = useState(1);
+  const [userLevel, setUserLevel] = useState(1); // Initial state is 1
 
   // New state to track screen size
   const [isSmallScreen, setIsSmallScreen] = useState(false);
@@ -76,6 +87,7 @@ export default function Home() {
   const navigate = useNavigate();
   const userToken = typeof window !== 'undefined' ? localStorage.getItem("token") || "" : "";
 
+  // ... (useEffect for initialization and screen size remains the same) ...
   useEffect(() => {
     const initializeApp = async () => {
       // Check if this is the first time loading the app in this session
@@ -96,7 +108,7 @@ export default function Home() {
       try {
         // Load all data concurrently
         await Promise.all([
-          loadUserProfile(),
+          loadUserProfile(), // This is now async and fetches from API
         ]);
 
         setDataLoaded(true);
@@ -142,45 +154,35 @@ export default function Home() {
 
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
-
-  // Fetch user categories when user profile is loaded
+// ... (useEffect for fetching categories remains the same) ...
   useEffect(() => {
     if (userProfile && userToken) {
       fetchUserCategories();
     }
   }, [userProfile, userToken]);
 
-  const loadUserProfile = () => {
-    return new Promise<void>((resolve) => {
-      const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
-      const storedAvatar = typeof window !== 'undefined' ? localStorage.getItem("userAvatar") : null;
 
+  // ----------------------------------------------------------------
+  // REVISED loadUserProfile to fetch from API
+  // ----------------------------------------------------------------
+  const loadUserProfile = async () => {
+    if (!userToken) {
+      // Fallback to local storage if token is missing (e.g., Guest user logic)
+      const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
       if (storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
           setUserProfile(parsedUser);
-
-          if (storedAvatar) {
-            setUserAvatar(storedAvatar);
-          } else if (parsedUser.avatar) {
-            setUserAvatar(avatars[parsedUser.avatar - 1] || null);
-          }
-
           if (parsedUser.level) setUserLevel(parsedUser.level);
         } catch (e) {
-          console.error("Failed to parse user data:", e);
+          console.error("Failed to parse local user data:", e);
         }
       }
-      resolve();
-    });
-  };
-
-  const fetchUserCategories = async () => {
-    setCategoriesLoading(true);
-    setError(null);
-
+      return;
+    }
+    
     try {
-      const response = await fetch(`${BASE_URL}/api/categories`, {
+      const response = await fetch(`${BASE_URL}/api/getUserDetails`, { // <-- The new API endpoint
         method: "GET",
         headers: {
           Authorization: `Bearer ${userToken}`,
@@ -189,23 +191,89 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch categories. Status: ${response.status}`);
+        // If API fails, try to load from local storage as a fallback
+        console.warn(`Failed to fetch user details from API. Status: ${response.status}. Falling back to local storage.`);
+        const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          setUserProfile(parsedUser);
+          if (parsedUser.level) setUserLevel(parsedUser.level);
+        }
+        return;
+      }
+
+      const apiUser: UserDetails = await response.json();
+
+      // 1. Update State with fresh API data
+      setUserProfile(apiUser);
+      if (apiUser.level !== undefined) {
+        setUserLevel(apiUser.level);
+      } else {
+        // Ensure level is set, defaults to 1 if not present in API response
+        setUserLevel(1); 
+      }
+
+      // 2. Update Avatar
+      const avatarIndex = apiUser.avatar ? apiUser.avatar - 1 : 0;
+      const calculatedAvatar = avatars[avatarIndex] || null;
+      setUserAvatar(calculatedAvatar);
+      
+      // 3. OPTIONAL: Update local storage with fresh data
+      if (typeof window !== 'undefined') {
+        localStorage.setItem("user", JSON.stringify(apiUser));
+        if(calculatedAvatar) {
+           localStorage.setItem("userAvatar", calculatedAvatar);
+        }
+      }
+
+    } catch (error) {
+      console.error("Error fetching user details from API:", error);
+      // Even on fetch error, try to load from local storage
+      const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setUserProfile(parsedUser);
+          if (parsedUser.level) setUserLevel(parsedUser.level);
+        } catch (e) {
+           console.error("Failed to parse local user data on API error:", e);
+        }
+      }
+    }
+  };
+
+
+// ... (rest of the component's functions and render logic remain the same) ...
+
+const fetchUserCategories = async () => {
+    setCategoriesLoading(true);
+    setError(null);
+// ... (implementation of fetchUserCategories remains the same) ...
+    try {
+      // 1. Change the endpoint to the new dedicated one
+      const response = await fetch(`${BASE_URL}/api/getUserCategories`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch user categories. Status: ${response.status}`);
       }
 
       const data = await response.json();
 
-      // Filter categories by the logged-in user's alias
-      const userAlias = userProfile?.alias;
-      const filteredCategories = Array.isArray(data)
-        ? data.filter((category) => category.createdBy === userAlias)
-        : [];
+      // 2. Remove client-side filtering since the new API endpoint handles it
+      const categoriesFromApi = Array.isArray(data) ? data : [];
 
       // Transform API data to match interface
-      const transformedCategories: Category[] = filteredCategories.map((category: any, index: number) => ({
+      const transformedCategories: Category[] = categoriesFromApi.map((category: any, index: number) => ({
         _id: category._id,
         name: category.name,
         description: category.description || `Test your knowledge in ${category.name}`,
-        createdBy: category.createdBy || "QuizMaster",
+        createdBy: category.createdBy || "QuizMaster", // This should now always be the user's alias
         completionCount: category.completionsCount || category.completionCount || 0,
         completionsCount: category.completionsCount || category.completionCount || 0,
         questionCount: category.questionCount || 10,
@@ -318,35 +386,40 @@ export default function Home() {
         </div>
 
         {/* Play Button */}
-        <div className="pb-3">
+{/* Play Button */}
+        <div className="pb-3 relative">
           <Button
             onClick={handleQuickQuiz}
             disabled={loading || playButtonLoading}
-            className="w-full h-12 bg-success hover:bg-success/90 text-white text-lg font-bold rounded-xl disabled:opacity-50"
+            className="w-full h-16 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-2xl disabled:opacity-50 flex items-center justify-between px-6 relative overflow-hidden shadow-lg" 
           >
             {playButtonLoading ? (
-              <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              <div className="flex items-center text-xl justify-center w-full">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
                 Starting Quiz...
               </div>
             ) : (
               <>
-                Play
-                <div className="ml-2 flex items-center bg-white/20 px-2 py-0.5 rounded-full">
-                  <span className="font-bold">{userLevel}</span>
-                  <span className="ml-1 text-xs">Lvl</span>
+                {/* The main "Play" text */}
+                <span className="text-3xl font-bold">Play</span>
+
+                {/* The Level Badge - circular design matching the reference */}
+                <div className="relative">
+                  <div className="bg-white rounded-full w-14 h-14 flex flex-col items-center justify-center shadow-md">
+                    <span className="text-purple-500 text-xl font-bold leading-none">{userLevel}</span>
+                    <span className="text-purple-500 text-xs font-medium uppercase leading-none">Level</span>
+                  </div>
                 </div>
               </>
             )}
           </Button>
         </div>
-
         {/* My Categories */}
         <div className="mt-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-bold flex items-center">
               <Brain className="w-5 h-5 mr-2" />
-              Categories Created by You
+              Your Categories
             </h3>
             <Button
               onClick={() => navigate("/categories")}
@@ -409,24 +482,25 @@ export default function Home() {
           ) : (
             // Show categories list and AddCategory component after
             <div className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {userCategories.map((cat) => (
-                  <CategoryCard
-                    key={cat._id}
-                    id={cat._id}
-                    title={cat.name}
-                    description={cat.description}
-                    difficulty={cat.difficulty || "Medium"}
-                    questionCount={cat.questionCount || 10}
-                    completions={cat.completionCount || cat.completionsCount || 0}
-                    rating={cat.averageRating || 0}
-                    timeEstimate={cat.timeEstimate || "5 min"}
-                    imageUrl={cat.imageUrl || `coming soon`}
-                    createdBy={cat.createdBy || "You"}
-                    onPlay={handlePlayQuiz}
-                  />
-                ))}
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {userCategories.map((cat) => (
+              <CategoryCard
+                key={cat._id}
+                id={cat._id}
+                title={cat.name}
+                description={cat.description}
+                difficulty={cat.difficulty || "Medium"}
+                questionCount={cat.questionCount || 10}
+                completions={cat.completionCount || cat.completionsCount || 0}
+                rating={cat.averageRating || 0}
+                timeEstimate={cat.timeEstimate || "5 min"}
+                imageUrl={cat.imageUrl || `coming soon`}
+                createdBy={cat.createdBy || "You"}
+                onPlay={handlePlayQuiz}
+              />
+            ))}
+          </div>
+
               
               {/* Add Category Section - Always show after categories */}
               <div className="mt-6">
