@@ -13,14 +13,22 @@ async function populateAllCategories() {
         await connectDB();
         
         const categories = await Category.aggregate([
-            {
-                $project: {
-                    name: 1,
-                    questionCount: { $size: "$questions" } // Count questions in each category
+        {
+            $project: {
+            name: 1,
+            questionCount: {
+                $size: {
+                $filter: {
+                    input: "$questions",
+                    as: "q",
+                    cond: { $eq: ["$$q.disabled", false] } // only enabled
                 }
-            },
-            { $sort: { questionCount: 1 } }, // Sort by question count (ascending)
-            { $limit: 20 } // Get only the lowest
+                }
+            }
+            }
+        },
+        { $sort: { questionCount: 1 } }, // Sort by enabled question count (ascending)
+        { $limit: 20 } // Get only the lowest
         ]);
 
         if (categories.length === 0) {
@@ -31,7 +39,7 @@ async function populateAllCategories() {
         console.log(`🔹 Populating the categories with the lowest quesiton count.`);
 
         for (const category of categories) {
-            await populateCategoryLoop(category._id, 40, "easy");
+            await populateCategoryLoop(category._id, 40, "very easy and simple");
         }
 
         console.log("🎉 All categories populated successfully!");

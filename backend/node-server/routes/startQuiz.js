@@ -54,7 +54,7 @@ router.post("/", authenticateToken, async (req, res) => {
 
         // 🎚 Sliding difficulty window
         let minDifficulty = userLevel;
-        let maxDifficulty = userLevel + 3;
+        let maxDifficulty = userLevel + 2;
         if (maxDifficulty > 10) {
             minDifficulty = 9;
             maxDifficulty = 10;
@@ -62,9 +62,11 @@ router.post("/", authenticateToken, async (req, res) => {
 
         console.log(`User level: ${userLevel}, selecting difficulties ${minDifficulty}-${maxDifficulty}`);
 
-        // ✅ Filter questions by difficulty window
+        // ✅ Filter enabled questions by difficulty window
         const filtered = category.questions.filter(q =>
-            q.difficulty_level >= minDifficulty && q.difficulty_level <= maxDifficulty
+            !q.disabled &&                             // only enabled
+            q.difficulty_level >= minDifficulty &&
+            q.difficulty_level <= maxDifficulty
         );
 
         const selectedQuestions = filtered
@@ -76,11 +78,13 @@ router.post("/", authenticateToken, async (req, res) => {
             })
             .slice(0, numQuestions);
 
-        if (selectedQuestions.length === 0) {
-            console.error(`Cannot start Quiz, no questions found in difficulty window. Populating category: ${category._id} (${category.name})`);
+        if (selectedQuestions.length < 10) {
+            console.error(
+                `Cannot start Quiz, only ${selectedQuestions.length} questions found in difficulty window. Populating category: ${category._id} (${category.name})`
+            );
 
             return res.status(404).json({
-                message: "No available questions in this difficulty range. Please try again in a few minutes."
+                message: "Not enough available questions in this difficulty range (minimum 10 required). Please try again in a few minutes."
             });
         }
 
