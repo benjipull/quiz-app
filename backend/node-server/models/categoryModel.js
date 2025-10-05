@@ -5,6 +5,16 @@ const AnswerSchema = new mongoose.Schema({
     correctCount: { type: Number, default: 0 }
 });
 
+const ValidationSchema = new mongoose.Schema({
+    is_correct_answer_valid: { type: Boolean, default: false },
+    correct_answer_reasoning: { type: String, default: "" },
+    explanation_consistent: { type: Boolean, default: false },
+    explanation_reasoning: { type: String, default: "" },
+    other_answers_possible: [{ type: String, default: [] }],
+    final_verdict: { type: String, enum: ["Correct", "Incorrect", "Ambiguous"], default: "Ambiguous" },
+    validationVersion: { type: Number, default: 0 }
+}, { _id: false });
+
 const QuestionSchema = new mongoose.Schema({
     _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
     text: { type: String, required: true },
@@ -25,12 +35,16 @@ const QuestionSchema = new mongoose.Schema({
     timesAnsweredIncorrectly: { type: Number, default: 0 },
     
     difficulty_level: { type: Number, default: 0 },
-    difficulty_rationale: {type :String, default: ""},
+    difficulty_rationale: { type : String, default: "" },
     difficultyConfirmedVersion: { type: Number, default: 0 },
 
+    validation: { type: ValidationSchema, default: {} },
+
     hash: { type: String, required: true, unique: true },
-    version: { type: Number, default: 1, required: true}
+    version: { type: Number, default: 1, required: true }
 });
+
+
 
 
 const CompletionSchema = new mongoose.Schema({
@@ -42,15 +56,22 @@ const CompletionSchema = new mongoose.Schema({
 
 
 const CategorySchema = new mongoose.Schema({
-    name: { type: String, required: true, unique: true }, // ✅ Category name
-    disabled: { type: Boolean, default: false }, // ✅ Disabled until it is filled with questions
-    imageUrl: { type: String }, // ✅ Category image URL
-    createdAt: { type: Date, default: Date.now }, // ✅ Timestamp for creation
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // ✅ Tracks who created the category
-    completions: [CompletionSchema], // ✅ Tracks quiz completions
-    questions: [QuestionSchema], // ✅ Array of questions inside the category
-    ratings: [{ type: Number, min: 1, max: 5 }], // ✅ Store all individual ratings
-    averageRating: { type: Number, default: 0 }  // ✅ Store the computed average rating
+    name: { type: String, required: true, unique: true },
+    description: { type: String, default: "" },
+    disabled: { type: Boolean, default: false },
+    imageUrl: { type: String },
+    createdAt: { type: Date, default: Date.now },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    completions: [CompletionSchema],
+    questions: [QuestionSchema],
+    ratings: [{ type: Number, min: 1, max: 5 }],
+    averageRating: { type: Number, default: 0 },
+
+    // Tags like ["geography", "europe", "countries"]
+    tags: [{ type: String, index: true }],
+
+    // a higher-level "group" (for quick filtering)
+    groups: [{ type: String, index: true }],
 });
 
 module.exports = mongoose.model("Category", CategorySchema);

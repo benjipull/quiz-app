@@ -4,7 +4,7 @@ const Category = require("../models/categoryModel");
 const crypto = require("crypto");
 const axios = require("axios");
 
-const OLLAMA_URL = process.env.OLLAMA_URL || "http://ollama-container:11440/api/generate";
+const OLLAMA_URL = process.env.OLLAMA_URL;
 const avoidedQuestions = [];
 
 if (!OLLAMA_URL) {
@@ -33,50 +33,43 @@ async function fetchQuestions(categoryName, difficultyHint = "") {
         `
         : "";
 
-    const systemPrompt = `
+const systemPrompt = `
 You are an AI Quiz Generator. Output STRICT JSON only (no prose, no markdown).
 
-RUBRIC for "difficulty_level" (integer 1–10):
-1–2 Very Easy: universally known, primary-school facts.
-3–4 Easy: commonly taught basics.
-5–6 Moderate: regional specifics, niche-but-accessible details.
-7–8 Hard: specialized knowledge, advanced concepts, enthusiast-level facts.
-9–10 Very Hard: highly obscure, expert/scholarly facts.
+=== GENERAL RULES ===
+- Use real, verifiable facts. Do NOT fabricate.
+- Question must have exactly 4 distinct answer choices; exactly 1 correct.
+- Do NOT generate questions based on cultural epithets, nicknames, myths, legends, symbolism, allegories, idioms, or metaphorical associations.
+- Only generate questions grounded in factual, observable, or academically verifiable information.
+- Exclude any content that relies on folklore, religion, or interpretive traditions rather than established fact.
+- Avoid ambiguous or subjective wording.
+- Correct answer MUST be one of the provided answers.
+- Provide a concise explanation (1–2 sentences) in plain language that restates the fact from source_quote. This field must never be empty.
+- Provide a difficulty_rationale that explains why the fact fits the chosen difficulty level. This field must never be empty.
+- Sources: use reputable domains only (britannica.com, nasa.gov, who.int, smithsonianmag.com, etc.).
+- Each output must include: question, answers, correct_answer, explanation, source_domain, source_title, source_quote, difficulty_level, difficulty_rationale.
+
+=== DIFFICULTY RUBRIC (1–10) ===
+1–2: Very basic factual recall (e.g., color of a fruit, number of continents).
+3–4: Simple but slightly more detailed factual recall (e.g., main ingredient of a dish, country location of a city).
+5–6: Intermediate factual knowledge requiring some learning or context (e.g., name of a river’s source, year of an invention).
+7–8: Advanced factual knowledge often covered in higher studies (e.g., lesser-known historical treaties, specific scientific terms).
+9–10: Highly specialized or expert-level factual knowledge (e.g., detailed scientific classification, rare historical events).
+
 
 COUPLING RULES:
-- If difficulty_rationale uses any of: "specialized", "niche", "expert", "obscure", assign ≥7.
-- If rationale says "universally known" or "commonly taught", assign ≤4.
-- If uncertain between two adjacent levels, choose the higher.
+- Difficulty level = based on how specific and specialized the fact is, not on how “well-known” it is.
+- Always express the fact directly, without commentary on whether it is famous, common, or obscure.
 
-SOURCES (no URLs to avoid dead links):
-- Provide a reputable source_domain (e.g., britannica.com, nobelprize.org, nasa.gov, who.int, worldbank.org, un.org, loc.gov, census.gov, oecd.org, imf.org, smithsonianmag.com, ecdc.europa.eu).
-- Provide a source_title (exact page/article title) and a source_quote (≤20 words verbatim) supporting the key fact.
-- If you cannot provide these fields credibly, output {}.
-
-REQUIREMENTS:
-- Use real, verifiable facts. Do NOT fabricate.
-- Exactly 4 distinct answer choices; exactly 1 correct (single-correct MCQ).
-- Avoid questions where multiple choices could be correct; if unavoidable, output {}.
-- Explanation must mention the same key fact as the source_quote.
-- "difficulty_level" MUST be one of [1,2,3,4,5,6,7,8,9,10].
-- Provide difficulty_rationale (5–20 words) consistent with the rubric.
-
-SELF-CHECK (must pass all, or output {}):
-- correct_answer is one of answers.
-- answers are all unique (case-insensitive).
-- The question is unambiguous (only one correct choice).
-- source_domain is from the allowed list above.
-- source_quote directly supports the explanation’s key fact.
-
-OUTPUT (object only):
+=== OUTPUT FORMAT ===
 {
   "question": string,
   "answers": [string, string, string, string],
   "correct_answer": string,
   "explanation": string,
-  "source_domain": string,      // e.g., "britannica.com"
-  "source_title": string,       // page/article title
-  "source_quote": string,       // ≤20 words verbatim
+  "source_domain": string,
+  "source_title": string,
+  "source_quote": string,
   "difficulty_level": integer,
   "difficulty_rationale": string
 }
@@ -84,15 +77,18 @@ OUTPUT (object only):
 If any requirement fails, output {}.
 
 Category: ${categoryName}. Generate ONE question.
-${difficultySection}
 ${avoidSection}
+${difficultySection}
 `;
+
+
+//${avoidSection} //For now to see if it stop generating very similar questions
 
 //console.log(`🔹Prompt ${systemPrompt}`);
 
  try {
     const res = await axios.post(OLLAMA_URL, {
-      model: "mistral",
+      model: "llama3",
       format: "json",
       prompt: systemPrompt,
       stream: false,
@@ -230,7 +226,7 @@ async function populateCategory(categoryId, difficultyHint = "") {
                     timesAnsweredCorrectly: 0,
                     timesAnsweredIncorrectly: 0,
                     hash: questionHash,
-                    version: 0.16
+                    version: 1.02
                 };
 
                 category.questions.push(newQuestion);
