@@ -96,7 +96,7 @@ const Menu = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("userAvatar");
-    navigate("/login");
+    navigate("/auth");
   };
 
   const menuSections = [
