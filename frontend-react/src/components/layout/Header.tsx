@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
   Bell,
   Search,
@@ -100,7 +99,6 @@ export const Header = ({
             </div>
           )}
 
-          <ThemeToggle />
 
         </div>
       </div>
