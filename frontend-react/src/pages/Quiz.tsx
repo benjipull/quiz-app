@@ -607,6 +607,7 @@ export default function Quiz() {
   if (quizState.completed && quizState.results) {
     return (
       <QuizResults
+      onClose={handlePlayAgain}
         results={quizState.results}
         onPlayAgain={handlePlayAgain}
       />
