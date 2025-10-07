@@ -20,7 +20,7 @@ router.get("/", authenticateToken, async (req, res) => {
 
         // 🎚 Sliding difficulty window
         let minDifficulty = userLevel;
-        let maxDifficulty = userLevel + 3;
+        let maxDifficulty = userLevel + 2;
         if (maxDifficulty > 10) {
             minDifficulty = 9;
             maxDifficulty = 10;
@@ -31,10 +31,12 @@ router.get("/", authenticateToken, async (req, res) => {
         // 1️⃣ Get categories (not disabled)
         let categories = await Category.find({ disabled: false }).lean();
 
-        // 2️⃣ Keep only categories with at least 20 matching questions
+        // 2️⃣ Keep only categories with at least 20 matching (enabled) questions
         categories = categories.filter(cat => {
             const filtered = cat.questions.filter(q =>
-                q.difficulty_level >= minDifficulty && q.difficulty_level <= maxDifficulty
+                !q.disabled &&                           // only enabled
+                q.difficulty_level >= minDifficulty &&
+                q.difficulty_level <= maxDifficulty
             );
             return filtered.length >= 20;
         });

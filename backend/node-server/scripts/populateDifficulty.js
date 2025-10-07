@@ -5,7 +5,7 @@ const Category = require("../models/categoryModel");
 const connectDB = require("../config/db");
 
 
-const OLLAMA_URL = process.env.OLLAMA_URL || "http://ollama-container:11440/api/generate";
+const OLLAMA_URL = process.env.OLLAMA_URL;
 
 if (!process.env.MONGO_URI) {
   console.error("❌ Missing MONGO_URI in .env");
