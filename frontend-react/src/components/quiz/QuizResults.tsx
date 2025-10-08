@@ -21,7 +21,8 @@ import {
 import Confetti from "react-confetti";
 
 // A single-point sound effect for knowledge gain (XP)
-const KNOWLEDGE_GAIN_SOUND_SRC = "/sounds/xp-gain.mp3"; // Assuming a sound file exists at this path
+const KNOWLEDGE_GAIN_SOUND_SRC = "/knowledge-point.mp3"; 
+const LEVEL_UP_SOUND_SRC = "/player-level-up.mp3";
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
@@ -152,6 +153,11 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [knowledgeGainAudio] = useState(
     typeof Audio !== "undefined" ? new Audio(KNOWLEDGE_GAIN_SOUND_SRC) : null
   );
+  
+  // Initialize the level-up sound effect
+  const [levelUpAudio] = useState(
+    typeof Audio !== "undefined" ? new Audio(LEVEL_UP_SOUND_SRC) : null
+  );
 
   // --- HOOKS FOR SIZE AND ANIMATION (KEPT AS IS) ---
   useEffect(() => {
@@ -182,7 +188,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     return () => clearTimeout(scoreTimer);
   }, [percentage]);
   
-  // Animated knowledge counter with sound effect
+  // Animated knowledge counter with sound effect and level up trigger
   useEffect(() => {
     const knowledgeTimer = setTimeout(() => {
       let currentKnowledge = 0;
@@ -211,20 +217,106 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
     const levelUpTimer = hasLeveledUp ? setTimeout(() => {
       setShowLevelUp(true);
+      
+      // Play level up sound when the level up modal is shown
+      if (levelUpAudio) {
+        levelUpAudio.volume = 0.5;
+        levelUpAudio.play().catch(e => console.log("Level Up Audio play failed:", e));
+      }
+
     }, 1500) : undefined;
 
     return () => {
       clearTimeout(knowledgeTimer);
       if (levelUpTimer) clearTimeout(levelUpTimer);
     };
-  }, [knowledgeGained, hasLeveledUp, knowledgeGainAudio]);
+  }, [knowledgeGained, hasLeveledUp, knowledgeGainAudio, levelUpAudio]); // Added levelUpAudio as dependency
+  
 
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [hasRated, setHasRated] = useState<boolean>(false);
   const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
   const [ratingMessage, setRatingMessage] = useState<string | null>(null);
+  const [playButtonLoading, setPlayButtonLoading] = useState(false);
 
+  const handleNextQuiz = async () => {
+
+    if (!userToken) {
+
+      console.log("⚠️ You must be logged in to play.");
+
+      // Optional: Add a user message here if needed.
+
+      return;
+
+    }
+
+
+
+    setPlayButtonLoading(true);
+
+
+
+    try {
+
+      const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay`, {
+
+        method: "GET",
+
+        headers: {
+
+          "Content-Type": "application/json",
+
+          Authorization: `Bearer ${userToken}`,
+
+        },
+
+      });
+
+
+
+      if (!response.ok) {
+
+        throw new Error(`Failed to get category to play: ${response.status}`);
+
+      }
+
+
+
+      const data = await response.json();
+
+
+
+      if (data.categoryId) {
+
+        console.log(`🎮 Starting quiz with category: ${data.name} (${data.categoryId})`);
+
+        navigate(`/quiz/${data.categoryId}`);
+
+      } else {
+
+        throw new Error("No category ID returned from server");
+
+      }
+
+    } catch (error: any) {
+
+      console.error("Error getting category to play:", error);
+
+      // fallback: just reload current quiz
+
+      navigate(`/quiz/${categoryId}`);
+
+    } finally {
+
+      setPlayButtonLoading(false);
+
+    }
+
+  };
+
+  
   const handleRatingSubmit = async (value: number) => {
     if (!userToken) {
       setRatingMessage("You must be logged in to submit a rating.");
@@ -249,6 +341,11 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         setRating(value);
         setHasRated(true);
         setRatingMessage("Thanks for your feedback! It helps us improve.");
+        
+        // Add vibration feedback
+        if (navigator.vibrate) {
+          navigator.vibrate([50, 30, 50]);
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         setRatingMessage(err?.message || "Failed to submit rating.");
@@ -280,7 +377,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   return (
     // PRIMARY FIX: h-screen (or min-h-screen) is critical. Use p-2 for minimal padding.
     // **overflow-hidden** on the main container prevents external scroll.
-    <div className="h-screen bg-gradient-to-br from-background via-secondary/30 to-background flex items-center justify-center p-2 md:p-4 font-sans overflow-hidden relative">
+    <div className="h-screen bg-gradient-to-br from-background via-secondary/30 to-background flex items-center
+     justify-center p-2 md:p-4 font-sans overflow-hidden relative">
       
       {/* Animated background elements (KEEP AS IS) */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -333,7 +431,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       {/* Main Results Card Container (h-full is key here to let it stretch within the parent flex) */}
       <div className="relative z-10 w-full max-w-lg md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto h-full flex items-center justify-center"> 
         
-        {/* 💡 FIX 1: Added flex-col to the Card to enable proper height management for inner content */}
+        {/* FIX 1: Added flex-col to the Card to enable proper height management for inner content */}
         <Card className={`
           relative overflow-hidden bg-card/95 backdrop-blur-xl border-2 ${performanceData.borderColor}
           shadow-2xl ${performanceData.glowColor} transition-all duration-700 animate-scale-in w-full max-h-[95vh] md:max-h-[90vh] flex flex-col
@@ -353,7 +451,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             <X className="h-5 w-5" />
           </Button>
           
-          {/* 💡 FIX 2: Changed h-full to flex-grow. This ensures the content DIV takes up all remaining space within the flex-col Card. */}
+          {/* FIX 2: Changed h-full to flex-grow. This ensures the content DIV takes up all remaining space within the flex-col Card. */}
           {/* overflow-y-auto is now correctly scoped to this inner content, preventing main page scroll. */}
           <div className="relative z-10 p-4 md:p-6 space-y-4 md:grid md:grid-cols-2 md:gap-4 lg:gap-8 md:space-y-0 flex-grow overflow-y-auto"> 
             
@@ -379,6 +477,22 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
               {/* Circular Progress Score - Hero Element (Dynamic Size) */}
               <div className="flex justify-center py-2 md:py-4 animate-slide-in-up flex-shrink-0">
+                <Card className="bg-card/50 border border-border p-3 animate-slide-in-left backdrop-blur-sm flex-shrink-0">
+                <div className="flex justify-around gap-2">
+                  <div className="flex flex-col items-center">
+                    <CheckCircle className="h-6 w-6 text-emerald-500 animate-check-pulse" />
+                    <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{correctAnswers}</div>
+                    <div className="text-xs text-emerald-600 dark:text-emerald-300 font-semibold uppercase">Correct</div>
+                  </div>
+                  
+                  <div className="flex flex-col items-center">
+                    <XCircle className="h-6 w-6 text-red-500 animate-x-pulse" />
+                    <div className="text-2xl font-black text-red-600 dark:text-red-400">{incorrectAnswers}</div>
+                    <div className="text-xs text-red-600 dark:text-red-300 font-semibold uppercase">Incorrect</div>
+                  </div>
+                  
+                </div>
+              </Card>
                 <div className="relative">
                   <svg className={`transform -rotate-90`} style={{ width: progressSize, height: progressSize }}>
                     {/* Background Circle */}
@@ -413,6 +527,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                       </linearGradient>
                     </defs>
                   </svg>
+                  
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-4xl md:text-5xl font-black text-foreground drop-shadow-lg">
                       {animatedScore}%
@@ -424,47 +539,11 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   )}
                 </div>
               </div>
-
-              {/* Action Buttons - Only "Next Quiz" remains */}
-              <div className="pt-1 w-full max-w-xs flex-shrink-0">
-                <Button
-                  onClick={onPlayAgain}
-                  size="lg" // Use lg for mobile too for tap target size
-                  className="w-full h-10 text-sm md:text-md font-black bg-gradient-to-r from-purple-600 to-emerald-600 hover:from-purple-500 hover:to-emerald-500 text-white transform transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-purple-500/50 animate-button-glow-purple"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  NEXT QUIZ
-                </Button>
-              </div>
-
             </div>
             
             {/* RIGHT COLUMN: Stats Grid and Rating */}
             {/* Added flex-grow to this column to ensure it uses vertical space if the screen is tall. */}
-            <div className="md:col-span-1 space-y-3 flex flex-col justify-between flex-grow"> 
-              
-              {/* Answer Breakdown */}
-              <Card className="bg-card/50 border border-border p-3 animate-slide-in-left backdrop-blur-sm flex-shrink-0">
-                <h3 className="text-xs font-bold text-foreground mb-2 flex items-center justify-center gap-1">
-                  <Target className="h-3 w-3 text-cyan-500" />
-                  ANSWER BREAKDOWN
-                </h3>
-                <div className="flex justify-around gap-2">
-                  <div className="flex flex-col items-center">
-                    <CheckCircle className="h-6 w-6 text-emerald-500 animate-check-pulse" />
-                    <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{correctAnswers}</div>
-                    <div className="text-xs text-emerald-600 dark:text-emerald-300 font-semibold uppercase">Correct</div>
-                  </div>
-                  
-                  <div className="flex flex-col items-center">
-                    <XCircle className="h-6 w-6 text-red-500 animate-x-pulse" />
-                    <div className="text-2xl font-black text-red-600 dark:text-red-400">{incorrectAnswers}</div>
-                    <div className="text-xs text-red-600 dark:text-red-300 font-semibold uppercase">Incorrect</div>
-                  </div>
-                  
-                </div>
-              </Card>
-
+            <div className="md:col-span-1 space-y-3 flex flex-col justify-between flex-grow">
               {/* Progress Stats (XP and Level) */}
               <div className="space-y-2 animate-slide-in-right flex-grow">
                 
@@ -529,6 +608,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                         className={`
                           p-0.5 transition-all duration-200 transform
                           ${hasRated || isSubmittingRating ? "cursor-default" : "cursor-pointer hover:scale-125"}
+                          ${hasRated && star <= rating ? "animate-star-vibrate" : ""}
                         `}
                       >
                         <StarIcon
@@ -547,7 +627,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   )}
                   
                   {ratingMessage && (
-                    <div className={`text-[10px] font-bold animate-message ${ // Very small font size
+                    <div className={`text-[10px] font-bold animate-message ${
                       ratingMessage.includes("Thanks") 
                         ? "text-purple-600 dark:text-purple-400" 
                         : "text-red-600 dark:text-red-400"
@@ -557,14 +637,24 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   )}
                 </div>
               </Card>
-              
+               {/* Action Buttons - Only "Next Quiz" remains */}
+              <div className="pt-1 w-full max-w-xs flex-shrink-0">
+                <Button
+                  onClick={handleNextQuiz}
+                  size="lg"
+                  className="w-full h-10 text-sm md:text-md font-black bg-gradient-to-r from-purple-600 to-emerald-600 hover:from-purple-500 hover:to-emerald-500 text-white transform transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-purple-500/50 animate-button-glow-purple group"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-500" />
+                  <span className="animate-text-pulse">NEXT QUIZ</span>
+                </Button>
+              </div>
             </div>
             
           </div>
         </Card>
       </div>
 
-      {/* Enhanced CSS Animations (KEEP AS IS) */}
+      {/* Enhanced CSS Animations */}
       <style>{`
         /* Existing CSS animations retained and slightly adjusted for mobile feel */
         @keyframes scale-in {
