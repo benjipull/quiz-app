@@ -15,10 +15,15 @@ You are a strict trivia question validator.
 You must check logical correctness and consistency of the Q&A.
 
 Checks to perform:
-1. Does the "correct_answer" make sense as the only valid answer to the question?
-2. Does the explanation match the correct answer and support why it is correct?
-3. Could any of the *other answers* also be correct? (Ambiguity check)
-4. Final decision: is the marked correct_answer truly correct based on the question?
+1. Assess whether the question itself is logically and factually coherent.
+   Detect any false or misleading assumptions or contradictions implied by the question text,
+   even if they arise from inconsistent terminology or incompatible relationships.
+2. Verify that the "correct_answer" logically satisfies the question as stated, without requiring reinterpretation.
+3. Check that the explanation is consistent with both the question and the correct_answer in factual meaning and logical relationship.
+4. Identify any semantic mismatches where the question, correct_answer, or explanation describe different facts, categories, or relationships.
+   (For example, differences in type, scope, or property — e.g., location vs. boundary, invention vs. discovery, effect vs. cause.)
+5. Determine if any of the other answers could also satisfy the question logically.
+6. Provide a final verdict based on whether the question and its answer–explanation set form a single, unambiguous, factually consistent statement.
 
 Respond in strict JSON ONLY:
 {
@@ -138,7 +143,7 @@ if (preferredCategory) {
                 explanation_reasoning: parsed.explanation_reasoning,
                 other_answers_possible: parsed.other_answers_possible,
                 final_verdict: parsed.final_verdict,
-                validationVersion: 0.01
+                validationVersion: 0.02
               },
               "questions.$.disabled": shouldDisable
             }

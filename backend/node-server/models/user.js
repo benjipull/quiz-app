@@ -6,19 +6,25 @@ const UserSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     avatar: { type: Number, required: true, default: 1},
     
+    password: { type: String, required: true },
+    age: { type: Number, required: true, min: 1 },
+
     knowledgePoints: { type: Number, required: true, default: 0 },
     wisdomGems: { type: Number, required: true, default: 0 },
     enlightenmentCrystals: { type: Number, required: true, default: 0 },
     coins: { type: Number, required: true, default: 0 },
     level: { type: Number, required: true, default: 1 },
-    
-    password: { type: String, required: true },
-    age: { type: Number, required: true, min: 1 },
-    
+       
     created_at: { type: Date, default: Date.now },
     lastupdated_at: { type: Date, default: Date.now, required: true },
     lastlogin_at: { type: Date },
-
+    
+    userType: { 
+        type: String,
+        enum: ["Guest", "Registered", "Admin"],
+        required: true,
+        default: "Registered"
+    },
     resetPasswordToken: { type: String, default: null },
     resetPasswordExpires: { type: Date, default: null },
 });
