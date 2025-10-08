@@ -442,9 +442,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   <h1 className="text-xl md:text-2xl lg:text-3xl font-black text-foreground tracking-wider drop-shadow-lg">
                     MISSION COMPLETE!
                   </h1>
-                  <p className="text-sm text-muted-foreground font-bold">
-                    {performanceData.message}
-                  </p>
                 </div>
                 <div className="inline-block bg-primary/10 dark:bg-white/10 backdrop-blur-sm px-3 py-0.5 rounded-full border border-primary/20 dark:border-white/20 mt-1">
                   <h2 className="text-sm md:text-md font-bold text-foreground truncate max-w-full">
@@ -525,27 +522,49 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               {/* Progress Stats (XP and Level) */}
               <div className="space-y-2 animate-slide-in-right flex-grow">
                 
-                {/* Knowledge Gained - Enhanced */}
-                <Card className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-2 border-blue-400/30 p-3 backdrop-blur-sm animate-glow-pulse">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-blue-500/20 rounded-lg border border-blue-400/30 flex-shrink-0">
-                        <TrendingUp className="h-4 w-4 text-blue-500 animate-float" />
+                {/* Knowledge Gained - Enhanced with Flow Effect */}
+                <Card className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-2 border-blue-400/30 p-4 backdrop-blur-sm animate-glow-pulse">
+                  <div className="space-y-3">
+                    {/* Points Earned (Decreasing) */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-blue-500/20 rounded-lg border border-blue-400/30 flex-shrink-0">
+                          <TrendingUp className="h-5 w-5 text-blue-500 animate-float" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-blue-600 dark:text-blue-300 text-xs uppercase">Points Earned</div>
+                        </div>
                       </div>
-                      <div className="truncate">
-                        <div className="font-bold text-blue-600 dark:text-blue-300 text-xs uppercase">XP Earned</div>
-                        <div className="text-xs text-blue-600/80 dark:text-blue-200 truncate">
-                          Total XP: <span className="text-blue-600 dark:text-blue-300 font-bold tabular-nums">{animatedTotalXP}</span>
+                      <div className={`text-2xl font-black bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent transition-all duration-300 ${
+                        showKnowledgeBadge ? 'animate-points-drain' : 'opacity-30'
+                      }`}>
+                        {showKnowledgeBadge ? knowledgeGained - animatedKnowledge : 0}
+                      </div>
+                    </div>
+                    
+                    {/* Flow Arrow */}
+                    {showKnowledgeBadge && (
+                      <div className="flex justify-center -my-1">
+                        <ArrowUp className="h-6 w-6 text-purple-500 animate-flow-down transform rotate-180" />
+                      </div>
+                    )}
+                    
+                    {/* Total XP (Increasing) - More Prominent */}
+                    <div className="bg-gradient-to-r from-purple-600/20 to-blue-600/20 border-2 border-purple-500/40 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 bg-purple-500/30 rounded-lg border border-purple-400/40 flex-shrink-0">
+                            <Zap className="h-5 w-5 text-purple-400 animate-pulse" />
+                          </div>
+                          <div>
+                            <div className="font-black text-purple-600 dark:text-purple-300 text-sm uppercase">Total XP</div>
+                          </div>
+                        </div>
+                        <div className="text-3xl font-black bg-gradient-to-r from-purple-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent animate-xp-grow tabular-nums">
+                          {animatedTotalXP}
                         </div>
                       </div>
                     </div>
-                    {showKnowledgeBadge && (
-                      <Badge className={`text-lg font-black bg-gradient-to-r from-blue-500 to-purple-500 text-white px-2 py-0.5 shadow-lg flex-shrink-0 transition-all duration-500 ${
-                        !showKnowledgeBadge ? 'animate-badge-vanish' : 'animate-badge-bounce'
-                      }`}>
-                        +{animatedKnowledge}
-                      </Badge>
-                    )}
                   </div>
                 </Card>
 
