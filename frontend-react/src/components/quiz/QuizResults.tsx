@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -148,6 +149,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [mounted, setMounted] = useState(false);
   const [animatedScore, setAnimatedScore] = useState(0);
   const [animatedKnowledge, setAnimatedKnowledge] = useState(0);
+  const [animatedTotalXP, setAnimatedTotalXP] = useState(totalKnowledge - knowledgeGained);
+  const [showKnowledgeBadge, setShowKnowledgeBadge] = useState(true);
   const [showLevelUp, setShowLevelUp] = useState(false);
 
   const [knowledgeGainAudio] = useState(
@@ -188,30 +191,38 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     return () => clearTimeout(scoreTimer);
   }, [percentage]);
   
-  // Animated knowledge counter with sound effect and level up trigger
+  // Animated Total XP counter with sound effect for each point gained
   useEffect(() => {
-    const knowledgeTimer = setTimeout(() => {
-      let currentKnowledge = 0;
+    const startXP = totalKnowledge - knowledgeGained;
+    const targetXP = totalKnowledge;
+    
+    const xpTimer = setTimeout(() => {
+      let currentXP = startXP;
       const interval = setInterval(() => {
-        if (currentKnowledge >= knowledgeGained) {
+        if (currentXP >= targetXP) {
           clearInterval(interval);
-          setAnimatedKnowledge(knowledgeGained);
+          setAnimatedTotalXP(targetXP);
+          
+          // After total XP animation completes, hide the badge with animation
+          setTimeout(() => {
+            setShowKnowledgeBadge(false);
+          }, 500);
           return;
         }
 
-        // Increment the display value
-        const nextValue = Math.min(knowledgeGained, currentKnowledge + Math.ceil((knowledgeGained - currentKnowledge) / 8));
-        currentKnowledge = nextValue;
-        setAnimatedKnowledge(nextValue);
+        // Increment by 1 for each point
+        currentXP = currentXP + 1;
+        setAnimatedTotalXP(currentXP);
+        setAnimatedKnowledge(currentXP - startXP);
         
-        // Play sound on each increment (subtle, non-blocking)
-        if (knowledgeGainAudio && nextValue % 1 === 0 && nextValue > 0) {
-            const audioClone = knowledgeGainAudio.cloneNode(true) as HTMLAudioElement;
-            audioClone.volume = 0.2; // Keep volume low for continuous play
-            audioClone.play().catch(e => console.log("Audio play failed:", e));
+        // Play sound for each point gained
+        if (knowledgeGainAudio) {
+          const audioClone = knowledgeGainAudio.cloneNode(true) as HTMLAudioElement;
+          audioClone.volume = 0.2;
+          audioClone.play().catch(e => console.log("Audio play failed:", e));
         }
 
-      }, 50);
+      }, 50); // 50ms per point
       return () => clearInterval(interval);
     }, 600);
 
@@ -224,13 +235,13 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         levelUpAudio.play().catch(e => console.log("Level Up Audio play failed:", e));
       }
 
-    }, 1500) : undefined;
+    }, 600 + (knowledgeGained * 50) + 300) : undefined; // Trigger after XP animation
 
     return () => {
-      clearTimeout(knowledgeTimer);
+      clearTimeout(xpTimer);
       if (levelUpTimer) clearTimeout(levelUpTimer);
     };
-  }, [knowledgeGained, hasLeveledUp, knowledgeGainAudio, levelUpAudio]); // Added levelUpAudio as dependency
+  }, [knowledgeGained, totalKnowledge, hasLeveledUp, knowledgeGainAudio, levelUpAudio]);
   
 
   const [rating, setRating] = useState<number>(0);
@@ -240,7 +251,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [ratingMessage, setRatingMessage] = useState<string | null>(null);
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
 
- const handleNextQuiz = async () => {
+ const handleNextQuiz = async () => {
   if (!userToken) {
     console.log("⚠️ You must be logged in to play.");
     alert("You must be logged in to play.");
@@ -281,7 +292,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     setPlayButtonLoading(false);
   }
 
-  };
+  };
 
   
   const handleRatingSubmit = async (value: number) => {
@@ -524,13 +535,17 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                       <div className="truncate">
                         <div className="font-bold text-blue-600 dark:text-blue-300 text-xs uppercase">XP Earned</div>
                         <div className="text-xs text-blue-600/80 dark:text-blue-200 truncate">
-                          Total XP: <span className="text-blue-600 dark:text-blue-300 font-bold">{totalKnowledge}</span>
+                          Total XP: <span className="text-blue-600 dark:text-blue-300 font-bold tabular-nums">{animatedTotalXP}</span>
                         </div>
                       </div>
                     </div>
-                    <Badge className="text-lg font-black bg-gradient-to-r from-blue-500 to-purple-500 text-white px-2 py-0.5 shadow-lg animate-badge-bounce flex-shrink-0">
-                      +{animatedKnowledge}
-                    </Badge>
+                    {showKnowledgeBadge && (
+                      <Badge className={`text-lg font-black bg-gradient-to-r from-blue-500 to-purple-500 text-white px-2 py-0.5 shadow-lg flex-shrink-0 transition-all duration-500 ${
+                        !showKnowledgeBadge ? 'animate-badge-vanish' : 'animate-badge-bounce'
+                      }`}>
+                        +{animatedKnowledge}
+                      </Badge>
+                    )}
                   </div>
                 </Card>
 
