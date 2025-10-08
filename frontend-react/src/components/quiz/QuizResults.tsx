@@ -240,79 +240,46 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [ratingMessage, setRatingMessage] = useState<string | null>(null);
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
 
-  const handleNextQuiz = async () => {
+ const handleNextQuiz = async () => {
+  if (!userToken) {
+    console.log("⚠️ You must be logged in to play.");
+    alert("You must be logged in to play.");
+    return;
+  }
 
-    if (!userToken) {
+  setPlayButtonLoading(true);
 
-      console.log("⚠️ You must be logged in to play.");
+  try {
+    console.log("🔍 Fetching next category...");
+    // Pass the current categoryId as a query parameter to exclude it from results
+    const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay?exclude=${categoryId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${userToken}`,
+      },
+    });
 
-      // Optional: Add a user message here if needed.
+    if (!response.ok) {
+      throw new Error(`Failed to get category to play: ${response.status}`);
+    }
 
-      return;
+    const data = await response.json();
+    console.log("📦 Received data:", data);
 
-    }
-
-
-
-    setPlayButtonLoading(true);
-
-
-
-    try {
-
-      const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay`, {
-
-        method: "GET",
-
-        headers: {
-
-          "Content-Type": "application/json",
-
-          Authorization: `Bearer ${userToken}`,
-
-        },
-
-      });
-
-
-
-      if (!response.ok) {
-
-        throw new Error(`Failed to get category to play: ${response.status}`);
-
-      }
-
-
-
-      const data = await response.json();
-
-
-
-      if (data.categoryId) {
-
-        console.log(`🎮 Starting quiz with category: ${data.name} (${data.categoryId})`);
-
-        navigate(`/quiz/${data.categoryId}`);
-
-      } else {
-
-        throw new Error("No category ID returned from server");
-
-      }
-
-    } catch (error: any) {
-
-      console.error("Error getting category to play:", error);
-
-      // fallback: just reload current quiz
-
-      navigate(`/quiz/${categoryId}`);
-
-    } finally {
-
-      setPlayButtonLoading(false);
-
-    }
+    if (data.categoryId) {
+      console.log(`🎮 Navigating to: /quiz/${data.categoryId}`);
+      // Use window.location for reliable navigation
+      window.location.href = `/quiz/${data.categoryId}`;
+    } else {
+      throw new Error("No category ID returned from server");
+    }
+  } catch (error: any) {
+    console.error("❌ Error getting category to play:", error);
+    alert(`Error: ${error.message}`);
+  } finally {
+    setPlayButtonLoading(false);
+  }
 
   };
 
@@ -644,7 +611,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   size="lg"
                   className="w-full h-10 text-sm md:text-md font-black bg-gradient-to-r from-purple-600 to-emerald-600 hover:from-purple-500 hover:to-emerald-500 text-white transform transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-purple-500/50 animate-button-glow-purple group"
                 >
-                  <RefreshCw className="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-500" />
                   <span className="animate-text-pulse">NEXT QUIZ</span>
                 </Button>
               </div>
