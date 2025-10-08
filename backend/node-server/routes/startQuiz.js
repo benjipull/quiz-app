@@ -8,15 +8,15 @@ const { populateCategory } = require("../scripts/populateCategories"); // Import
 
 
 const difficultyNames = {
-    1: "Very Easy",
+    1: "Basic",
     2: "Easy",
-    3: "Fairly Easy",
+    3: "Casual",
     4: "Moderate",
     5: "Challenging",
     6: "Hard",
-    7: "Very Hard",
+    7: "Tough",
     8: "Expert",
-    9: "Extremely Hard",
+    9: "Master",
     10: "Legendary"
 };
 
@@ -53,12 +53,8 @@ router.post("/", authenticateToken, async (req, res) => {
         const userLevel = user.level || 1;
 
         // 🎚 Sliding difficulty window
-        let minDifficulty = userLevel;
-        let maxDifficulty = userLevel + 2;
-        if (maxDifficulty > 10) {
-            minDifficulty = 9;
-            maxDifficulty = 10;
-        }
+        let minDifficulty = Math.max(1, userLevel - 1);
+        let maxDifficulty = Math.min(10, userLevel + 1);
 
         console.log(`User level: ${userLevel}, selecting difficulties ${minDifficulty}-${maxDifficulty}`);
 
@@ -71,10 +67,12 @@ router.post("/", authenticateToken, async (req, res) => {
 
         const selectedQuestions = filtered
             .sort((a, b) => {
-                if (b.popularity !== a.popularity) {
-                    return b.popularity - a.popularity;
+                if (a.timesLoaded !== b.timesLoaded) {
+                    // 🟢 First priority: lower timesLoaded ranks higher
+                    return a.timesLoaded - b.timesLoaded;
                 }
-                return a.timesLoaded - b.timesLoaded;
+                // 🟡 Second priority: higher popularity ranks higher
+                return b.popularity - a.popularity;
             })
             .slice(0, numQuestions);
 

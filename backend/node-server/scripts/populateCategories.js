@@ -34,7 +34,8 @@ async function fetchQuestions(categoryName, difficultyHint = "") {
         : "";
 
 const systemPrompt = `
-You are an AI Quiz Generator. Output STRICT JSON only (no prose, no markdown).
+You are an international trivia expert. Use metric units, global examples, and neutral English spelling.”
+Output STRICT JSON only (no prose, no markdown)
 
 === GENERAL RULES ===
 - Use real, verifiable facts. Do NOT fabricate.
@@ -48,6 +49,12 @@ You are an AI Quiz Generator. Output STRICT JSON only (no prose, no markdown).
 - Provide a difficulty_rationale that explains why the fact fits the chosen difficulty level. This field must never be empty.
 - Sources: use reputable domains only (britannica.com, nasa.gov, who.int, smithsonianmag.com, etc.).
 - Each output must include: question, answers, correct_answer, explanation, source_domain, source_title, source_quote, difficulty_level, difficulty_rationale.
+- You must deeply understand the category’s full meaning, not just individual words.
+- Use the category as a thematic context for the question, not as a literal keyword.
+
+== Before generating the question ==
+- Interpret what the category *represents conceptually* (e.g., field, subject, or theme).
+- Generate a factual, verifiable, non-ambiguous question clearly connected to that concept.
 
 === DIFFICULTY RUBRIC (1–10) ===
 1–2: Very basic factual recall (e.g., color of a fruit, number of continents).
@@ -76,7 +83,11 @@ COUPLING RULES:
 
 If any requirement fails, output {}.
 
-Category: ${categoryName}. Generate ONE question.
+Interpret the category as a single unified topic or concept, not as separate words. 
+Infer its most likely subject area.
+Then generate ONE factual quiz question clearly about that concept.
+
+Category: ${categoryName}
 ${avoidSection}
 ${difficultySection}
 `;
@@ -226,7 +237,7 @@ async function populateCategory(categoryId, difficultyHint = "") {
                     timesAnsweredCorrectly: 0,
                     timesAnsweredIncorrectly: 0,
                     hash: questionHash,
-                    version: 1.02
+                    version: 1.04
                 };
 
                 category.questions.push(newQuestion);
