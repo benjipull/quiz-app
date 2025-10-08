@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ interface Question {
   explanation: string;
   difficulty?: "Easy" | "Medium" | "Hard";
   difficultyName?: string;
-  difficultyValue?: number; // Added for new difficulty logic
+  difficultyValue?: number;
   timer?: number;
 }
 
@@ -56,6 +56,7 @@ interface QuizState {
 export default function Quiz() {
   const { categoryId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const explanationRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -93,6 +94,15 @@ export default function Quiz() {
   const correctSound = new Audio("/correct.mp3");
   const incorrectSound = new Audio("/incorrect.mp3");
 
+  // Handle back navigation
+  const handleBackNavigation = () => {
+    if (location.state?.from) {
+      navigate(location.state.from);
+    } else {
+      navigate("/categories");
+    }
+  };
+
   useEffect(() => {
     if (categoryId && userToken) {
       startQuiz(categoryId);
@@ -109,11 +119,7 @@ export default function Quiz() {
 
     const initialTime = quizState.question?.timer || 30;
     
-    // Fix 2: Always reset the timer based on the question's 'timer' property 
-    // when a new question loads (i.e., when quizState.question changes)
     if (quizState.question && !quizState.isAnswerSelected && !timeUp) {
-      // We set time left here only if it's a new question to ensure 
-      // the backend value is used, but we let the dependency array handle the main trigger.
       if (timeLeft !== initialTime) {
          setTimeLeft(initialTime);
       }
@@ -142,10 +148,8 @@ export default function Quiz() {
     };
   }, [quizState.question, quizState.isAnswerSelected, timeUp]);
 
-  // This useEffect handles the scroll logic after bars animation completes
   useEffect(() => {
     if (showExplanation && explanationRef.current) {
-      // Delay scroll to allow bars to finish animating first
       setTimeout(() => {
         if (explanationRef.current) {
           const viewportHeight = window.innerHeight;
@@ -161,7 +165,7 @@ export default function Quiz() {
             });
           }
         }
-      }, 500); // Delay to let bars finish animating
+      }, 500);
     }
   }, [showExplanation]);
 
@@ -170,7 +174,6 @@ export default function Quiz() {
     setShowExplanation(false);
     setFeedbackGiven(false);
     setFeedbackType(null);
-    // Ensure timer is reset whenever question/index changes
     setTimeLeft(quizState.question?.timer || 30);
     setTimeUp(false);
     setShowBars(false);
@@ -267,7 +270,6 @@ export default function Quiz() {
           isAnswerSelected: false,
         }));
       } else {
-        // No more questions - complete the quiz
         await completeQuiz();
       }
     } catch (error) {
@@ -281,14 +283,13 @@ export default function Quiz() {
     if (!userToken || !quizState.question) return;
 
     try {
-      // Call answerQuestion API with empty answer for timeout
       const response = await fetch(`${BASE_URL}/api/answerQuestion/${userToken}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${userToken}`,
         },
-        body: JSON.stringify({ answer: "" }), // Empty answer for timeout
+        body: JSON.stringify({ answer: "" }),
       });
 
       if (response.ok) {
@@ -379,10 +380,8 @@ export default function Quiz() {
   const handleVibration = (isCorrect: boolean) => {
     if ("vibrate" in navigator) {
       if (isCorrect) {
-        // A single, short vibration for a correct answer
         navigator.vibrate(200);
       } else {
-        // A pattern of two short vibrations for an incorrect answer
         navigator.vibrate([200, 100, 200]);
       }
     }
@@ -403,7 +402,6 @@ export default function Quiz() {
     }));
 
     try {
-      // Call the answerQuestion API
       const response = await fetch(`${BASE_URL}/api/answerQuestion/${userToken}`, {
         method: "POST",
         headers: {
@@ -442,23 +440,19 @@ export default function Quiz() {
           incorrectSound.play().catch(() => {});
         }
 
-        // Show bars immediately after answer selection with staggered animation
         setTimeout(() => {
           setShowBars(true);
         }, 300);
 
-        // Show explanation after bars have finished animating
         setTimeout(() => {
           setShowExplanation(true);
-        }, 1800); // Reduced time for better flow
+        }, 1800);
       } else {
         setError("Failed to submit answer. Please try again.");
       }
     } catch (error) {
       console.error("Error submitting answer:", error);
       setError("Error submitting answer. Please try again.");
-    } finally {
-      // No longer using `setLoading` here as we're handling the UI state differently
     }
   };
 
@@ -513,7 +507,6 @@ export default function Quiz() {
       return "hover:bg-primary/5 cursor-pointer transition-colors";
     }
 
-    // Use the correct answer from API response if available
     const correctAnswer = answerResponse?.correctAnswer || quizState.question?.correct_answer;
 
     if (answer === correctAnswer) {
@@ -527,36 +520,12 @@ export default function Quiz() {
     return "bg-muted/30";
   };
 
-  const getLetterStyle = (answer: string) => {
-    if (timeUp) {
-      return "text-muted-foreground";
-    }
-
-    if (selectedAnswer === null) {
-      return "text-current";
-    }
-
-    // Use the correct answer from API response if available
-    const correctAnswer = answerResponse?.correctAnswer || quizState.question?.correct_answer;
-
-    if (answer === correctAnswer) {
-      return "bg-success text-white";
-    }
-
-    if (answer === selectedAnswer) {
-      return "bg-destructive text-white";
-    }
-
-    return "bg-muted text-muted-foreground";
-  };
-
   const getTimerColor = () => {
     if (timeLeft > 20) return "text-success";
     if (timeLeft > 10) return "text-warning";
     return "text-destructive";
   };
 
-  // New function to get difficulty color class
   const getDifficultyColor = () => {
     const difficulty = quizState.question?.difficultyValue;
     if (difficulty === undefined) return "";
@@ -567,8 +536,6 @@ export default function Quiz() {
     return "";
   };
 
-
-  // Calculate answer percentages for display using API data
   const getAnswerPercentage = (answer: string) => {
     if (!answerResponse?.answerStats) return 0;
 
@@ -582,7 +549,7 @@ export default function Quiz() {
         <div className="text-center space-y-4 max-w-md">
           <h2 className="text-xl md:text-2xl font-bold text-red-500">Error</h2>
           <p className="text-sm md:text-base text-gray-400">{error}</p>
-          <Button onClick={() => navigate("/categories")} variant="default" className="w-full">
+          <Button onClick={handleBackNavigation} variant="default" className="w-full">
             Back to Categories
           </Button>
         </div>
@@ -590,7 +557,6 @@ export default function Quiz() {
     );
   }
 
-  // The main loading state is only for initial load and fetching next questions
   if (loading || (!quizState.question && !quizState.completed)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-quiz-background to-background flex items-center justify-center px-4">
@@ -607,6 +573,7 @@ export default function Quiz() {
   if (quizState.completed && quizState.results) {
     return (
       <QuizResults
+        onClose={handlePlayAgain}
         results={quizState.results}
         onPlayAgain={handlePlayAgain}
       />
@@ -621,7 +588,7 @@ export default function Quiz() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate("/categories")}
+              onClick={handleBackNavigation}
               className="flex items-center gap-1 hover:bg-card/60 text-sm md:text-base px-2 py-1 flex-shrink-0 min-w-0"
             >
               <ArrowLeft className="h-4 w-4 flex-shrink-0" />
@@ -638,7 +605,6 @@ export default function Quiz() {
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Difficulty Display */}
               {(quizState.question?.difficultyName || quizState.question?.difficulty) && (
                 <Badge
                   variant="outline"
@@ -677,11 +643,9 @@ export default function Quiz() {
             {quizState.question?.answers.map((answer, index) => (
               <Card
                 key={index}
-                // Fix 1: Reduce borders. Removed `border border-transparent`
-                className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer`}
+                className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer border-0 shadow-sm`}
                 onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
               >
-                {/* Background percentage bar */}
                 {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
                   <div
                     className={`absolute top-0 left-0 h-full animate-bar-fill rounded-r-md ${
@@ -699,17 +663,14 @@ export default function Quiz() {
                   />
                 )}
 
-                <div className="flex items-center gap-4 relative z-10">
-                  <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-semibold text-base md:text-lg transition-all duration-300 flex-shrink-0 ${getLetterStyle(answer)}`}>
-                    {String.fromCharCode(65 + index)}
-                  </div>
+                <div className="flex items-center gap-3 relative z-10">
                   <div className="flex-1 min-w-0 flex items-center justify-between">
                     <span className={`text-base md:text-lg leading-snug break-words ${selectedAnswer === null ? 'font-medium' : ''}`}>
                       {answer}
                     </span>
                     {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
                       <span
-                        className="text-sm font-semibold text-foreground ml-2 animate-fade-in-delayed"
+                        className="text-sm font-semibold text-foreground ml-3 animate-fade-in-delayed flex-shrink-0"
                         style={{ animationDelay: `${1000 + (index * 150)}ms` }}
                       >
                         {getAnswerPercentage(answer)}%
@@ -723,7 +684,7 @@ export default function Quiz() {
 
           {timeUp && (
             <div ref={explanationRef}>
-              <Card className="p-6 md:p-8 bg-destructive/5 animate-slide-up border-transparent">
+              <Card className="p-6 md:p-8 bg-destructive/5 animate-slide-up border-0 shadow-sm">
                 <div className="text-center space-y-3">
                   <p className="font-semibold text-destructive text-base md:text-lg">⏰ Time's Up!</p>
                   <p className="text-sm md:text-base text-muted-foreground">
@@ -752,7 +713,7 @@ export default function Quiz() {
           )}
           {showExplanation && !timeUp && answerResponse && (
             <div ref={explanationRef}>
-              <Card className="p-6 md:p-8 bg-primary/5 animate-slide-up border-transparent">
+              <Card className="p-6 md:p-8 bg-primary/5 animate-slide-up border-0 shadow-sm">
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <Lightbulb className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-primary flex-shrink-0" />
@@ -767,7 +728,7 @@ export default function Quiz() {
               </Card>
 
               <div className="mt-6 space-y-4 animate-fade-in pb-4">
-                <Card className="p-4 md:p-6 bg-card/40 border-transparent">
+                <Card className="p-4 md:p-6 bg-card/40 border-0 shadow-sm">
                   <div className="space-y-4">
                     <p className="text-sm font-medium text-center">Did you like this question?</p>
                     <div className="flex gap-4 justify-center">
@@ -803,7 +764,7 @@ export default function Quiz() {
                         <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
                         <span className="ml-1 sm:ml-2">No</span>
                       </Button>
-                      <Button variant="outline" size="sm" className="text-sm flex-1 max-w-[120px] h-10 border-transparent">
+                      <Button variant="outline" size="sm" className="text-sm flex-1 max-w-[120px] h-10 border-0">
                         <Flag className="h-4 w-4 md:h-5 md:w-5" />
                         <span className="ml-1 sm:ml-2 hidden sm:inline">Report</span>
                       </Button>
@@ -825,7 +786,6 @@ export default function Quiz() {
           )}
         </div>
       </div>
-
       <style>{`
         @keyframes slide-up {
           from {

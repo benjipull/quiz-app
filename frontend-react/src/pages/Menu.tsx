@@ -104,14 +104,6 @@ const Menu = () => {
       title: "Game Settings",
       items: [
         { 
-          icon: theme === 'light' ? Sun : Moon, 
-          label: "Theme", 
-          description: theme === 'light' ? "Switch to dark mode" : "Switch to light mode",
-          action: toggleTheme,
-          toggle: true,
-          value: theme === 'dark'
-        },
-        { 
           icon: Bell, 
           label: "Notifications", 
           description: "Push notifications & alerts",
