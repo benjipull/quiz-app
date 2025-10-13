@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -148,6 +149,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [mounted, setMounted] = useState(false);
   const [animatedScore, setAnimatedScore] = useState(0);
   const [animatedKnowledge, setAnimatedKnowledge] = useState(0);
+  const [animatedTotalXP, setAnimatedTotalXP] = useState(totalKnowledge - knowledgeGained);
+  const [showKnowledgeBadge, setShowKnowledgeBadge] = useState(true);
   const [showLevelUp, setShowLevelUp] = useState(false);
 
   const [knowledgeGainAudio] = useState(
@@ -188,30 +191,38 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     return () => clearTimeout(scoreTimer);
   }, [percentage]);
   
-  // Animated knowledge counter with sound effect and level up trigger
+  // Animated Total XP counter with sound effect for each point gained
   useEffect(() => {
-    const knowledgeTimer = setTimeout(() => {
-      let currentKnowledge = 0;
+    const startXP = totalKnowledge - knowledgeGained;
+    const targetXP = totalKnowledge;
+    
+    const xpTimer = setTimeout(() => {
+      let currentXP = startXP;
       const interval = setInterval(() => {
-        if (currentKnowledge >= knowledgeGained) {
+        if (currentXP >= targetXP) {
           clearInterval(interval);
-          setAnimatedKnowledge(knowledgeGained);
+          setAnimatedTotalXP(targetXP);
+          
+          // After total XP animation completes, hide the badge with animation
+          setTimeout(() => {
+            setShowKnowledgeBadge(false);
+          }, 500);
           return;
         }
 
-        // Increment the display value
-        const nextValue = Math.min(knowledgeGained, currentKnowledge + Math.ceil((knowledgeGained - currentKnowledge) / 8));
-        currentKnowledge = nextValue;
-        setAnimatedKnowledge(nextValue);
+        // Increment by 1 for each point
+        currentXP = currentXP + 1;
+        setAnimatedTotalXP(currentXP);
+        setAnimatedKnowledge(currentXP - startXP);
         
-        // Play sound on each increment (subtle, non-blocking)
-        if (knowledgeGainAudio && nextValue % 1 === 0 && nextValue > 0) {
-            const audioClone = knowledgeGainAudio.cloneNode(true) as HTMLAudioElement;
-            audioClone.volume = 0.2; // Keep volume low for continuous play
-            audioClone.play().catch(e => console.log("Audio play failed:", e));
+        // Play sound for each point gained
+        if (knowledgeGainAudio) {
+          const audioClone = knowledgeGainAudio.cloneNode(true) as HTMLAudioElement;
+          audioClone.volume = 0.2;
+          audioClone.play().catch(e => console.log("Audio play failed:", e));
         }
 
-      }, 50);
+      }, 50); // 50ms per point
       return () => clearInterval(interval);
     }, 600);
 
@@ -224,13 +235,13 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         levelUpAudio.play().catch(e => console.log("Level Up Audio play failed:", e));
       }
 
-    }, 1500) : undefined;
+    }, 600 + (knowledgeGained * 50) + 300) : undefined; // Trigger after XP animation
 
     return () => {
-      clearTimeout(knowledgeTimer);
+      clearTimeout(xpTimer);
       if (levelUpTimer) clearTimeout(levelUpTimer);
     };
-  }, [knowledgeGained, hasLeveledUp, knowledgeGainAudio, levelUpAudio]); // Added levelUpAudio as dependency
+  }, [knowledgeGained, totalKnowledge, hasLeveledUp, knowledgeGainAudio, levelUpAudio]);
   
 
   const [rating, setRating] = useState<number>(0);
@@ -240,81 +251,48 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [ratingMessage, setRatingMessage] = useState<string | null>(null);
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
 
-  const handleNextQuiz = async () => {
+ const handleNextQuiz = async () => {
+  if (!userToken) {
+    console.log("⚠️ You must be logged in to play.");
+    alert("You must be logged in to play.");
+    return;
+  }
 
-    if (!userToken) {
+  setPlayButtonLoading(true);
 
-      console.log("⚠️ You must be logged in to play.");
+  try {
+    console.log("🔍 Fetching next category...");
+    // Pass the current categoryId as a query parameter to exclude it from results
+    const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay?exclude=${categoryId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${userToken}`,
+      },
+    });
 
-      // Optional: Add a user message here if needed.
+    if (!response.ok) {
+      throw new Error(`Failed to get category to play: ${response.status}`);
+    }
 
-      return;
+    const data = await response.json();
+    console.log("📦 Received data:", data);
 
-    }
+    if (data.categoryId) {
+      console.log(`🎮 Navigating to: /quiz/${data.categoryId}`);
+      // Use window.location for reliable navigation
+      window.location.href = `/quiz/${data.categoryId}`;
+    } else {
+      throw new Error("No category ID returned from server");
+    }
+  } catch (error: any) {
+    console.error("❌ Error getting category to play:", error);
+    alert(`Error: ${error.message}`);
+  } finally {
+    setPlayButtonLoading(false);
+  }
 
-
-
-    setPlayButtonLoading(true);
-
-
-
-    try {
-
-      const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay`, {
-
-        method: "GET",
-
-        headers: {
-
-          "Content-Type": "application/json",
-
-          Authorization: `Bearer ${userToken}`,
-
-        },
-
-      });
-
-
-
-      if (!response.ok) {
-
-        throw new Error(`Failed to get category to play: ${response.status}`);
-
-      }
-
-
-
-      const data = await response.json();
-
-
-
-      if (data.categoryId) {
-
-        console.log(`🎮 Starting quiz with category: ${data.name} (${data.categoryId})`);
-
-        navigate(`/quiz/${data.categoryId}`);
-
-      } else {
-
-        throw new Error("No category ID returned from server");
-
-      }
-
-    } catch (error: any) {
-
-      console.error("Error getting category to play:", error);
-
-      // fallback: just reload current quiz
-
-      navigate(`/quiz/${categoryId}`);
-
-    } finally {
-
-      setPlayButtonLoading(false);
-
-    }
-
-  };
+  };
 
   
   const handleRatingSubmit = async (value: number) => {
@@ -464,9 +442,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   <h1 className="text-xl md:text-2xl lg:text-3xl font-black text-foreground tracking-wider drop-shadow-lg">
                     MISSION COMPLETE!
                   </h1>
-                  <p className="text-sm text-muted-foreground font-bold">
-                    {performanceData.message}
-                  </p>
                 </div>
                 <div className="inline-block bg-primary/10 dark:bg-white/10 backdrop-blur-sm px-3 py-0.5 rounded-full border border-primary/20 dark:border-white/20 mt-1">
                   <h2 className="text-sm md:text-md font-bold text-foreground truncate max-w-full">
@@ -547,23 +522,49 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               {/* Progress Stats (XP and Level) */}
               <div className="space-y-2 animate-slide-in-right flex-grow">
                 
-                {/* Knowledge Gained - Enhanced */}
-                <Card className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-2 border-blue-400/30 p-3 backdrop-blur-sm animate-glow-pulse">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-blue-500/20 rounded-lg border border-blue-400/30 flex-shrink-0">
-                        <TrendingUp className="h-4 w-4 text-blue-500 animate-float" />
+                {/* Knowledge Gained - Enhanced with Flow Effect */}
+                <Card className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-2 border-blue-400/30 p-4 backdrop-blur-sm animate-glow-pulse">
+                  <div className="space-y-3">
+                    {/* Points Earned (Decreasing) */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-blue-500/20 rounded-lg border border-blue-400/30 flex-shrink-0">
+                          <TrendingUp className="h-5 w-5 text-blue-500 animate-float" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-blue-600 dark:text-blue-300 text-xs uppercase">Points Earned</div>
+                        </div>
                       </div>
-                      <div className="truncate">
-                        <div className="font-bold text-blue-600 dark:text-blue-300 text-xs uppercase">XP Earned</div>
-                        <div className="text-xs text-blue-600/80 dark:text-blue-200 truncate">
-                          Total XP: <span className="text-blue-600 dark:text-blue-300 font-bold">{totalKnowledge}</span>
+                      <div className={`text-2xl font-black bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent transition-all duration-300 ${
+                        showKnowledgeBadge ? 'animate-points-drain' : 'opacity-30'
+                      }`}>
+                        {showKnowledgeBadge ? knowledgeGained - animatedKnowledge : 0}
+                      </div>
+                    </div>
+                    
+                    {/* Flow Arrow */}
+                    {showKnowledgeBadge && (
+                      <div className="flex justify-center -my-1">
+                        <ArrowUp className="h-6 w-6 text-purple-500 animate-flow-down transform rotate-180" />
+                      </div>
+                    )}
+                    
+                    {/* Total XP (Increasing) - More Prominent */}
+                    <div className="bg-gradient-to-r from-purple-600/20 to-blue-600/20 border-2 border-purple-500/40 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 bg-purple-500/30 rounded-lg border border-purple-400/40 flex-shrink-0">
+                            <Zap className="h-5 w-5 text-purple-400 animate-pulse" />
+                          </div>
+                          <div>
+                            <div className="font-black text-purple-600 dark:text-purple-300 text-sm uppercase">Total XP</div>
+                          </div>
+                        </div>
+                        <div className="text-3xl font-black bg-gradient-to-r from-purple-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent animate-xp-grow tabular-nums">
+                          {animatedTotalXP}
                         </div>
                       </div>
                     </div>
-                    <Badge className="text-lg font-black bg-gradient-to-r from-blue-500 to-purple-500 text-white px-2 py-0.5 shadow-lg animate-badge-bounce flex-shrink-0">
-                      +{animatedKnowledge}
-                    </Badge>
                   </div>
                 </Card>
 
@@ -644,7 +645,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   size="lg"
                   className="w-full h-10 text-sm md:text-md font-black bg-gradient-to-r from-purple-600 to-emerald-600 hover:from-purple-500 hover:to-emerald-500 text-white transform transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-purple-500/50 animate-button-glow-purple group"
                 >
-                  <RefreshCw className="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-500" />
                   <span className="animate-text-pulse">NEXT QUIZ</span>
                 </Button>
               </div>
