@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Duplicate Group Viewer</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            background: #111;
+            color: #eee;
+            margin: 0;
+            padding: 2rem;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 1.5rem;
+            color: #5ea6ff;
+            text-decoration: none;
+        }
+
+        .question-block {
+            background: #1e1e1e;
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .question-block:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+        }
+
+        .category-name {
+            color: #5ea6ff;
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .question-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .answers-list {
+            list-style: none;
+            padding: 0;
+            margin: 0.5rem 0 0 0;
+        }
+
+        .answers-list li {
+            padding: 6px 0;
+            border-bottom: 1px solid #333;
+        }
+
+        .answers-list li:last-child {
+            border-bottom: none;
+        }
+
+        .correct-answer {
+            color: #6cff6c;
+            font-weight: bold;
+        }
+
+        .correct-answer::before {
+            content: "✅ ";
+        }
+
+        .wrong-answer {
+            color: #bbb;
+        }
+
+        .explanation {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            background: #222;
+            border-left: 4px solid #6cff6c;
+            border-radius: 6px;
+            color: #ddd;
+            font-size: 0.95em;
+        }
+
+        .meta {
+            font-size: 0.85rem;
+            color: #999;
+            margin-top: 0.5rem;
+        }
+
+        .mark-dup-btn {
+            margin-top: 0.75rem;
+            background: #ff5c5c;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s ease;
+        }
+
+        .mark-dup-btn:hover {
+            background: #d43c3c;
+        }
+
+        .disabled-box {
+            margin-top: 0.75rem;
+            background: #222;
+            border-left: 4px solid #ff5c5c;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            color: #ccc;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+
+<body>
+    <a href="/admin/pages/admin-categories.html" class="back-link">← Back to Categories</a>
+    <h1 id="title">Duplicate Group</h1>
+    <div id="status" class="loading">Loading...</div>
+    <div id="questions"></div>
+
+    <script>
+        const token = localStorage.getItem("token");
+        const userType = (localStorage.getItem("userType") || "").toLowerCase();
+        if (!token || userType !== "admin") {
+            window.location.href = "/admin/pages/admin-login.html";
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const groupId = params.get("id");
+
+        async function loadDuplicateGroup() {
+            const status = document.getElementById("status");
+            const container = document.getElementById("questions");
+
+            try {
+                const res = await fetch(`/api/admin/duplicates/${groupId}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+
+                if (!res.ok) throw new Error("Failed to fetch duplicate group");
+                const data = await res.json();
+
+                document.getElementById("title").textContent = `🔁 Duplicate Group: ${data.groupId} (${data.totalQuestions} Questions)`;
+                status.style.display = "none";
+
+                container.innerHTML = data.questions.map(q => {
+                    const isDisabled = q.disabled === true;
+                    const disabledInfo = isDisabled
+                        ? `<div class="disabled-box">❌ Disabled (${q.disabled_reason || "No reason specified"})</div>`
+                        : `<button class="mark-dup-btn" data-id="${q.questionId}">🚫 Mark as Duplicate</button>`;
+
+                    return `
+    <div class="question-block" data-id="${q.questionId}">
+      <div class="category-name">📂 ${q.categoryName}</div>
+      <div class="question-text">${q.text}</div>
+      <ul class="answers-list">
+        ${q.answers.map(a => {
+                        const isCorrect = a.text.trim().toLowerCase() === (q.correct_answer || "").trim().toLowerCase();
+                        return `<li class="${isCorrect ? "correct-answer" : "wrong-answer"}">${a.text}</li>`;
+                    }).join("")}
+      </ul>
+      ${q.explanation ? `<div class="explanation"><b>🧠 Explanation:</b> ${q.explanation}</div>` : ""}
+      <div class="meta">
+        Difficulty: ${q.difficulty_level ?? "—"} |
+        Validation: ${q.validation_verdict} |
+        Popularity: ${q.popularity ?? 0} |
+        Created: ${new Date(q.createdAt).toLocaleDateString()}
+      </div>
+      <div class="actions">${disabledInfo}</div>
+    </div>
+  `;
+                }).join("");
+
+
+            } catch (err) {
+                status.textContent = "Error: " + err.message;
+            }
+        }
+
+        loadDuplicateGroup();
+
+        // 🛠️ Listen for "Mark as Duplicate" button clicks
+        document.addEventListener("click", async (e) => {
+            if (e.target.classList.contains("mark-dup-btn")) {
+                const questionId = e.target.getAttribute("data-id");
+                if (!confirm("Are you sure you want to mark this question as duplicate?")) return;
+
+                try {
+                    const res = await fetch(`/api/admin/questions/${questionId}/mark-duplicate`, {
+                        method: "PUT",
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+
+                    const data = await res.json();
+
+                    if (!res.ok) {
+                        alert(`❌ Failed: ${data.message || "Error marking question"}`);
+                        return;
+                    }
+
+                    // Replace the button with disabled info
+                    const block = e.target.closest(".question-block");
+                    const actionsDiv = block.querySelector(".actions");
+                    actionsDiv.innerHTML = `<div class="disabled-box">❌ Disabled (${data.disabled_reason})</div>`;
+
+                    alert("✅ Question marked as duplicate successfully.");
+                } catch (err) {
+                    alert("❌ Error: " + err.message);
+                }
+            }
+        });
+
+    </script>
+</body>
+
+</html>

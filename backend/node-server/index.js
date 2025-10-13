@@ -26,7 +26,7 @@ app.use(cors());
 app.use(express.json());
 
 // Serve static files from "frontend" directory
-app.use(express.static(path.join(__dirname, "frontend")));
+app.use("/admin", express.static(path.join(__dirname, "frontend-admin")));
 
 // ==Routes== //
 
@@ -61,11 +61,19 @@ app.use("/api/getImageUrl", require("./routes/getImageUrl"));
 //Sources
 app.use("/api/DBpedia", require("./routes/DBpedia")); 
 
+// Admin APIs
+app.use("/api/admin/categories", require("./routes/admin/getAllCategories"));
+app.use("/api/admin/categories", require("./routes/admin/getCategoryQuestions"));
+app.use("/api/admin/duplicates", require("./routes/admin/getDuplicateGroupQuestions"));
+app.use("/api/admin/questions", require("./routes/admin/markQuestionAsDuplicate"));
+app.use("/api/admin/questions", require("./routes/admin/unmarkDuplicateGroup"));
+
+
+
 // Default route (serves index.html for all other routes)
 app.get("*", (req, res) => {
     res.sendFile(path.join(__dirname, "frontend", "index.html"));
 });
-
 
 // Protected Route (Requires Authentication)
 const authenticateToken = require("./middleware/auth");

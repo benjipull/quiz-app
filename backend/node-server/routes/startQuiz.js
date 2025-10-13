@@ -4,8 +4,6 @@ const Category = require("../models/categoryModel");
 const User = require("../models/user");
 const authenticateToken = require("../middleware/auth");
 const { userQuestions } = require("../index"); // Import shared store
-const { populateCategory } = require("../scripts/populateCategories"); // Import async question population
-
 
 const difficultyNames = {
     1: "Basic",
@@ -60,7 +58,7 @@ router.post("/", authenticateToken, async (req, res) => {
 
         // ✅ Filter enabled questions by difficulty window
         const filtered = category.questions.filter(q =>
-            !q.disabled &&                             // only enabled
+            !q.disabled &&
             q.difficulty_level >= minDifficulty &&
             q.difficulty_level <= maxDifficulty
         );

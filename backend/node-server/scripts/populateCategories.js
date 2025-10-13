@@ -52,6 +52,17 @@ Output STRICT JSON only (no prose, no markdown)
 - You must deeply understand the category’s full meaning, not just individual words.
 - Use the category as a thematic context for the question, not as a literal keyword.
 
+=== CONTEXTUAL FRAMING RULES ===
+- Every question must be fully meaningful on its own, without assuming unstated context.
+- If the question uses generic phrasing such as "Which of the following", "Who among these", or "What of the following",
+  you must clearly establish the frame of reference in the question itself.
+  (Example: Instead of "Which of the following animals is the fastest?", write "Which of the following African animals is the fastest?")
+- Ensure that the question explicitly anchors its scope to either:
+  • the category theme, or
+  • a shared property among the answer options (region, field, timeframe, etc.)
+- Do NOT generate globally ambiguous questions — all four answers must logically fit within the same contextual frame.
+
+
 == Before generating the question ==
 - Interpret what the category *represents conceptually* (e.g., field, subject, or theme).
 - Generate a factual, verifiable, non-ambiguous question clearly connected to that concept.
@@ -183,80 +194,71 @@ async function populateCategoryLoop(categoryId, iterations, difficultyHint = "")
 }
 
 async function populateCategory(categoryId, difficultyHint = "") {
-    try {
-        const category = await Category.findById(categoryId);
-        if (!category) {
-            console.error(`❌ Category not found: ${categoryId}`);
-            return;
-        }
-
-        const nonDisabledCount = category.questions.filter(q => !q.disabled).length;
-
-        if (nonDisabledCount >= 100) {
-            console.log(`🚫 Skipping ${category.name} (already has ${nonDisabledCount} questions).`);
-            return;
-        }
-
-        console.log(`🔹 ${category.name}: ${nonDisabledCount} questions. Fetching a ${difficultyHint} one.`);
-
-        const fetchedQuestions = await fetchQuestions(category.name, difficultyHint);
-        let newQuestionsAdded = 0;
-
-        try {
-            fetchedQuestions.forEach(q => {
-                const questionHash = generateQuestionHash(q.question);
-
-                avoidedQuestions.push(q.question);
-
-                if (category.questions.some(q => q.hash === questionHash)) {
-                    console.log(`⚠️ Duplicate skipped: ${q.question}`);
-                    return;
-                }
-
-                if (!q.answers.includes(q.correct_answer)) {
-                    console.error("❌ No correct answer, skipping...");
-                    return;
-                    console.log(`Fixed missing correct answer for question: ${q.question}`);
-                    q.answers[Math.floor(Math.random() * q.answers.length)] = q.correct_answer;
-                }
-
-                const newQuestion = {
-                    _id: new mongoose.Types.ObjectId(),
-                    text: q.question,
-                    answers: q.answers.map(answer => ({ text: answer, correctCount: 0, incorrectCount: 0 })),
-                    correct_answer: q.correct_answer,
-                    explanation: q.explanation,
-                    source_domain: q.source_domain,
-                    source_title: q.source_title,
-                    source_quote: q.source_quote,
-                    difficulty_level: q.difficulty_level,
-                    difficulty_rationale: q.difficulty_rationale,
-                    timesLoaded: 0,
-                    popularity: 0,
-                    disabled: false,
-                    timesAnsweredCorrectly: 0,
-                    timesAnsweredIncorrectly: 0,
-                    hash: questionHash,
-                    version: 1.04
-                };
-
-                category.questions.push(newQuestion);
-                newQuestionsAdded++;
-            });
-        } catch (error) {
-            console.error("❌ Error fetching question:", error.message);
-            console.error(`❌ Raw Response: ${JSON.stringify(fetchedQuestions)}`)
-        }
-
-        if (newQuestionsAdded > 0) {
-            category.disabled = false;
-            await category.save();
-            console.log(`✅ Added ${newQuestionsAdded} questions to ${category.name}.`);
-        }
-
-    } catch (error) {
-        console.error("❌ Error populating category:", error.message);
+  try {
+    const category = await Category.findById(categoryId);
+    if (!category) {
+      console.error(`❌ Category not found: ${categoryId}`);
+      return;
     }
+
+    const nonDisabledCount = category.questions.filter(q => !q.disabled).length;
+    if (nonDisabledCount >= 100) {
+      console.log(`🚫 Skipping ${category.name} (already has ${nonDisabledCount} questions).`);
+      return;
+    }
+
+    console.log(`🔹 ${category.name}: ${nonDisabledCount} questions. Fetching a ${difficultyHint} one.`);
+
+    const fetchedQuestions = await fetchQuestions(category.name, difficultyHint);
+    let newQuestionsAdded = 0;
+
+    for (const q of fetchedQuestions) {
+      const questionHash = generateQuestionHash(q.question);
+      avoidedQuestions.push(q.question);
+
+      // Skip duplicate hash
+      if (category.questions.some(existing => existing.hash === questionHash)) {
+        console.log(`⚠️ Duplicate skipped: ${q.question}`);
+        continue;
+      }
+
+      const newQuestion = {
+        _id: new mongoose.Types.ObjectId(),
+        text: q.question,
+        answers: q.answers.map(answer => ({
+          text: answer,
+          correctCount: 0,
+          incorrectCount: 0
+        })),
+        correct_answer: q.correct_answer,
+        explanation: q.explanation,
+        source_domain: q.source_domain,
+        source_title: q.source_title,
+        source_quote: q.source_quote,
+        difficulty_level: q.difficulty_level,
+        difficulty_rationale: q.difficulty_rationale,
+        timesLoaded: 0,
+        popularity: 0,
+        disabled: false, 
+        timesAnsweredCorrectly: 0,
+        timesAnsweredIncorrectly: 0,
+        hash: questionHash,
+        version: 1.05
+      };
+
+      category.questions.push(newQuestion);
+      newQuestionsAdded++;
+    }
+
+    if (newQuestionsAdded > 0) {
+      category.disabled = false;
+      await category.save();
+      console.log(`✅ Added ${newQuestionsAdded} question(s) to ${category.name}.`);
+    }
+  } catch (error) {
+    console.error("❌ Error populating category:", error.message);
+  }
 }
+
 
 module.exports = { populateCategory, populateCategoryLoop };

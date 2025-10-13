@@ -6,8 +6,6 @@ const connectDB = require("../config/db");
 
 const OLLAMA_URL = process.env.OLLAMA_URL;
 
-// 🟢 Category name from CLI argument
-const preferredCategory = process.argv[2];
 
 async function validateQuestion(question) {
   const prompt = `
@@ -16,14 +14,13 @@ You must check logical correctness and consistency of the Q&A.
 
 Checks to perform:
 1. Assess whether the question itself is logically and factually coherent.
-   Detect any false or misleading assumptions or contradictions implied by the question text,
-   even if they arise from inconsistent terminology or incompatible relationships.
-2. Verify that the "correct_answer" logically satisfies the question as stated, without requiring reinterpretation.
-3. Check that the explanation is consistent with both the question and the correct_answer in factual meaning and logical relationship.
-4. Identify any semantic mismatches where the question, correct_answer, or explanation describe different facts, categories, or relationships.
-   (For example, differences in type, scope, or property — e.g., location vs. boundary, invention vs. discovery, effect vs. cause.)
-5. Determine if any of the other answers could also satisfy the question logically.
-6. Provide a final verdict based on whether the question and its answer–explanation set form a single, unambiguous, factually consistent statement.
+   Detect any false or misleading assumptions or simplifications implied by the question text, such as treating a plural or multi-valued fact as singular.
+   A question must not imply that only one option exists when several are equally official or correct.
+2. Verify that the "correct_answer" logically satisfies the question.
+3. Check that the explanation is consistent with both the question and the correct_answer.
+4. Identify any semantic mismatches (type, scope, category differences).
+5. Determine if other answers could also satisfy the question.
+6. Provide a final verdict based on correctness and consistency.
 
 Respond in strict JSON ONLY:
 {
@@ -59,7 +56,7 @@ Explanation: ${question.explanation || "N/A"}
     });
 
     const raw = response.data.response.trim();
-    let parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw);
 
     if (
       parsed.is_correct_answer_valid === undefined ||
@@ -83,41 +80,62 @@ async function validateAllCategories() {
     await connectDB();
     console.log("✅ Connected to MongoDB");
 
-    // Only pull categories where at least one question has no validation
-    const categories = await Category.find(
-      { "questions.validation": { $exists: false } }, // only categories with unvalidated questions
-      { name: 1, questions: 1 }
-    ).limit(10);
+    // Fetch all categories so we can know which ones were skipped
+    const allCategories = await Category.find({}, { name: 1 });
+    const allCategoryNames = allCategories.map(c => c.name);
 
-       // 2️⃣ Reorder list so preferred category is first
-if (preferredCategory) {
+    // Fetch only categories with unvalidated questions
+    const categories = await Category.aggregate([
+      {
+        $project: {
+          name: 1,
+          questions: {
+            $filter: {
+              input: "$questions",
+              as: "q",
+              cond: {
+                $and: [
+                  // ✅ keep only NOT disabled
+                  { $ne: ["$$q.disabled", true] },
+                  // ✅ validation is missing, null, or version 0
+                  {
+                    $or: [
+                      { $eq: ["$$q.validation", null] },
+                      { $eq: ["$$q.validation.validationVersion", 0] },
+                      { $not: { $ifNull: ["$$q.validation.validationVersion", false] } }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      // ✅ remove categories with no matching questions
+      {
+        $match: {
+          "questions.0": { $exists: true }
+        }
+      }
+    ]);
 
-  // 1️⃣ Load ALL categories (only name + questions for speed)
-  let categories = await Category.find({}, { name: 1, questions: 1 }).lean();
 
-  // 2️⃣ Reorder list so keyword-matching categories come first
-  if (preferredCategory) {
-    const keyword = preferredCategory.toLowerCase();
-    const matched = categories.filter((c) =>
-      c.name.toLowerCase().includes(keyword)
-    );
-    const others = categories.filter(
-      (c) => !c.name.toLowerCase().includes(keyword)
-    );
+    // Derive skipped category names
+    const processedNames = categories.map(c => c.name);
+    const skippedNames = allCategoryNames.filter(name => !processedNames.includes(name));
 
-    if (matched.length > 0) {
-      categories = [...matched, ...others];
-      console.log(
-        `🟢 Starting with categories containing "${preferredCategory}" (${matched.length} matches)`
-      );
-    } else {
-      console.log(
-        `⚠️ No categories matched keyword "${preferredCategory}", continuing with all`
-      );
+    if (skippedNames.length > 0) {
+      console.log(`⚪ Skipped categories (all questions validated):`);
+      skippedNames.forEach(name => console.log("   •", name));
     }
-  }
-}
 
+    if (categories.length === 0) {
+      console.log("✅ No unvalidated questions found.");
+      mongoose.connection.close();
+      return;
+    }
+
+    console.log(`\n🔍 Found ${categories.length} categories with unvalidated questions.\n`);
 
     for (const category of categories) {
       console.log(`🔹 Validating category: ${category.name} (${category.questions.length} questions)`);
@@ -131,7 +149,6 @@ if (preferredCategory) {
           parsed.final_verdict === "Ambiguous" ||
           parsed.explanation_consistent === false;
 
-        // Update question inline inside category
         await Category.updateOne(
           { "questions._id": question._id },
           {
@@ -143,7 +160,7 @@ if (preferredCategory) {
                 explanation_reasoning: parsed.explanation_reasoning,
                 other_answers_possible: parsed.other_answers_possible,
                 final_verdict: parsed.final_verdict,
-                validationVersion: 0.02
+                validationVersion: 0.03
               },
               "questions.$.disabled": shouldDisable
             }
@@ -156,7 +173,7 @@ if (preferredCategory) {
       }
     }
 
-    console.log("🎉 All categories validated!");
+    console.log("\n🎉 All categories validated!");
     mongoose.connection.close();
   } catch (err) {
     console.error("❌ Error validating categories:", err.message);
