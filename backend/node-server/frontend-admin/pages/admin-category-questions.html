@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Category Questions</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#111;color:#eee;margin:0;padding:2rem;}
+h1{text-align:center;margin-bottom:1.5rem;}
+.back-link{display:inline-block;margin-bottom:1rem;color:#5ea6ff;text-decoration:none;}
+
+table{width:100%;border-collapse:collapse;max-width:1100px;margin:0 auto;background:#1e1e1e;border-radius:10px;
+box-shadow:0 4px 12px rgba(0,0,0,0.3);}
+th,td{padding:12px 16px;border-bottom:1px solid #222;text-align:left;}
+thead{background:#2b2b2b;}
+tr:hover{background:#292929;}
+.disabled{color:#ff5555;font-weight:bold;}
+.question-row{cursor:pointer;}
+.question-row:hover{background:#2f2f2f;}
+
+.answers-row{display:none;transition:all .3s ease;}
+.answers-row.open{display:table-row;}
+.answers-content{background:#181818;padding:1rem 1.5rem;border-radius:8px;}
+
+.answers-list{list-style:none;padding:0;margin:0;}
+.answers-list li{padding:6px 0;border-bottom:1px solid #333;}
+.answers-list li:last-child{border-bottom:none;}
+.correct-answer{color:#6cff6c;font-weight:bold;}
+.wrong-answer{color:#bbb;}
+
+.explanation{margin-top:1rem;padding:.75rem 1rem;background:#222;border-left:4px solid #6cff6c;border-radius:6px;
+color:#ddd;font-size:.95em;}
+
+.dup-section{margin-top:1rem;padding:1rem;background:#151515;border-radius:8px;border-left:4px solid #5ea6ff;}
+.dup-header{font-weight:bold;color:#5ea6ff;margin-bottom:.5rem;}
+.dup-item{padding:.75rem 0;border-bottom:1px solid #333;margin-bottom:.5rem;}
+.dup-item:last-child{border-bottom:none;}
+.dup-item b{color:#fff;}
+.dup-item small{color:#aaa;}
+.dup-item em{color:#ccc;font-size:.9rem;display:block;margin-top:.25rem;}
+.mark-dup-btn,.unmark-dup-btn{margin-top:.5rem;border:none;padding:.4rem .8rem;border-radius:6px;
+cursor:pointer;font-size:.85rem;transition:background .2s ease;}
+.mark-dup-btn{background:#ff5c5c;color:#fff;}
+.mark-dup-btn:hover{background:#d43c3c;}
+.unmark-dup-btn{background:#2b5cff;color:#fff;margin-left:.5rem;}
+.unmark-dup-btn:hover{background:#1f46cc;}
+.disabled-box{margin-top:.5rem;background:#222;border-left:4px solid #ff5c5c;padding:.4rem .8rem;border-radius:6px;
+color:#ccc;font-size:.85rem;}
+
+th[data-key]{cursor:pointer;user-select:none;}
+th[data-key]:hover{color:#fff;}
+.sort-indicator{font-size:.8em;opacity:.6;margin-left:5px;}
+</style>
+</head>
+<body>
+<a href="/admin/pages/admin-categories.html" class="back-link">← Back to categories</a>
+<h1 id="categoryName">Questions</h1>
+<div id="status" class="loading">Loading questions...</div>
+
+<table id="questionTable" style="display:none;">
+<thead>
+<tr>
+<th data-key="text">Question</th>
+<th data-key="difficulty_level">Difficulty</th>
+<th data-key="disabled">Disabled</th>
+<th data-key="validation_verdict">Validation</th>
+<th data-key="correct_answer">Correct Answer</th>
+<th data-key="popularity">Popularity</th>
+<th data-key="createdAt">Created</th>
+</tr>
+</thead>
+<tbody id="questionTableBody"></tbody>
+</table>
+
+<script>
+const token=localStorage.getItem("token");
+const userType=(localStorage.getItem("userType")||"").toLowerCase();
+if(!token||userType!=="admin")window.location.href="/admin/pages/admin-login.html";
+
+const params=new URLSearchParams(window.location.search);
+const categoryId=params.get("id");
+let questionsData=[];
+let sortState={key:"createdAt",asc:false};
+
+async function loadQuestions(){
+  const status=document.getElementById("status");
+  const table=document.getElementById("questionTable");
+  try{
+    const res=await fetch(`/api/admin/categories/${categoryId}/questions`,{
+      headers:{Authorization:`Bearer ${token}`}
+    });
+    if(!res.ok)throw new Error("Failed to fetch questions");
+    const data=await res.json();
+    document.getElementById("categoryName").textContent=`📘 ${data.categoryName} (${data.questionCount} Questions)`;
+    questionsData=data.questions;
+    await renderQuestionsTable();
+    status.style.display="none";table.style.display="table";
+  }catch(e){status.textContent="Error: "+e.message;}
+}
+
+async function renderQuestionsTable(){
+  const tbody=document.getElementById("questionTableBody");
+  const sorted=[...questionsData].sort((a,b)=>compareValues(a,b,sortState.key,sortState.asc));
+  const htmlParts=await Promise.all(sorted.map(async q=>{
+    const duplicatesHTML=q.duplicate_group_id?await renderDuplicateGroup(q.duplicate_group_id):"";
+    return `
+      <tr class="question-row" data-id="${q._id}">
+        <td>${q.text}${q.duplicate_group_id?'<span class="dup-flag" title="Has duplicates">🔁</span>':''}</td>
+        <td>${q.difficulty_level??"—"}</td>
+        <td class="${q.disabled?'disabled':''}">${q.disabled?"❌":"✅"}</td>
+        <td>${q.validation_verdict}</td>
+        <td>${q.correct_answer}</td>
+        <td>${q.popularity??0}</td>
+        <td>${new Date(q.createdAt).toLocaleDateString()}</td>
+      </tr>
+      <tr class="answers-row" id="answers-${q._id}">
+        <td colspan="7">
+          <div class="answers-content">
+            ${renderAnswers(q.answers,q.correct_answer,q.explanation)}
+            ${duplicatesHTML}
+          </div>
+        </td>
+      </tr>`;
+  }));
+  tbody.innerHTML=htmlParts.join("");
+  document.querySelectorAll(".question-row").forEach(r=>{
+    r.addEventListener("click",()=>{
+      const id=r.dataset.id;
+      document.getElementById(`answers-${id}`).classList.toggle("open");
+    });
+  });
+  updateSortIndicators();
+}
+
+function renderAnswers(ans=[],correct="",explanation=""){
+  const answersHTML=ans.length?
+    `<ul class="answers-list">
+      ${ans.map(a=>{
+        const ok=a.text.trim().toLowerCase()===correct.trim().toLowerCase();
+        return `<li class="${ok?'correct-answer':'wrong-answer'}">${ok?"✅":"•"} ${a.text}
+          <span class="count">(${a.correctCount??0} correct)</span></li>`;
+      }).join("")}</ul>`:`<em>No answers available</em>`;
+  const explanationHTML=explanation?
+    `<div class="explanation"><b>🧠 Explanation:</b> ${explanation}</div>`:"";
+  return answersHTML+explanationHTML;
+}
+
+async function renderDuplicateGroup(groupId){
+  try{
+    const res=await fetch(`/api/admin/duplicates/${groupId}`,{
+      headers:{Authorization:`Bearer ${token}`}
+    });
+    if(!res.ok)return"";
+    const data=await res.json();
+    if(!data.questions||!data.questions.length)return"";
+    return `
+      <div class="dup-section">
+        <div class="dup-header">🔁 Duplicate Group (${data.questions.length} Questions)</div>
+        ${data.questions.map(q=>renderDuplicateItem(q)).join("")}
+      </div>`;
+  }catch{return"";}
+}
+
+function renderDuplicateItem(q){
+  const answersHTML=q.answers?.length?
+    `<ul class="answers-list">
+      ${q.answers.map(a=>{
+        const ok=a.text.trim().toLowerCase()===q.correct_answer.trim().toLowerCase();
+        return `<li class="${ok?'correct-answer':'wrong-answer'}">${ok?"✅":"•"} ${a.text}
+          <span class="count">(${a.correctCount??0} correct)</span></li>`;
+      }).join("")}</ul>`:`<em>No answers available</em>`;
+  const explanationHTML=q.explanation?
+    `<div class="explanation"><b>🧠 Explanation:</b> ${q.explanation}</div>`:"";
+  const actionsHTML=q.disabled
+    ? `<div class="disabled-box">❌ Disabled (${q.disabled_reason||"Marked as duplicate"})</div>`
+    : `<div class="actions">
+         <button class="mark-dup-btn" data-id="${q.questionId}">🚫 Mark as Duplicate</button>
+         <button class="unmark-dup-btn" data-id="${q.questionId}">❎ Mark as Not Duplicate</button>
+       </div>`;
+  return `
+    <div class="dup-item" data-id="${q.questionId}">
+      <b>${q.text}</b><br/>
+      <small>✅ ${q.correct_answer} | Diff: ${q.difficulty_level} | ${q.disabled?"❌ Disabled":"Enabled"}</small>
+      ${answersHTML}
+      ${explanationHTML}
+      ${actionsHTML}
+    </div>`;
+}
+
+document.addEventListener("click",async e=>{
+  // 🚫 Mark as duplicate
+  if(e.target.classList.contains("mark-dup-btn")){
+    const qid=e.target.dataset.id;
+    if(!confirm("Mark this question as duplicate?"))return;
+    try{
+      const res=await fetch(`/api/admin/questions/${qid}/mark-duplicate`,{
+        method:"PUT",
+        headers:{Authorization:`Bearer ${token}`}
+      });
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.message||"Failed");
+      const parent=e.target.closest(".dup-item");
+      parent.querySelector(".actions").innerHTML=
+        `<div class="disabled-box">❌ Disabled (${data.disabled_reason})</div>`;
+      alert("✅ Marked as duplicate");
+    }catch(err){alert("❌ "+err.message);}
+  }
+
+  // ❎ Mark as not duplicate
+  if(e.target.classList.contains("unmark-dup-btn")){
+    const qid=e.target.dataset.id;
+    if(!confirm("Remove this question from duplicate group?"))return;
+    try{
+      const res=await fetch(`/api/admin/questions/${qid}/unmark-duplicate`,{
+        method:"PUT",
+        headers:{Authorization:`Bearer ${token}`}
+      });
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.message||"Failed");
+      const parent=e.target.closest(".dup-item");
+      parent.querySelector(".actions").innerHTML=
+        `<div class="disabled-box">✅ Marked as not duplicate</div>`;
+      alert("✅ Removed from duplicate group");
+    }catch(err){alert("❌ "+err.message);}
+  }
+});
+
+function compareValues(a,b,key,asc){
+  let va=a[key],vb=b[key];
+  if(key==="createdAt"){va=new Date(va).getTime();vb=new Date(vb).getTime();}
+  const na=parseFloat(va),nb=parseFloat(vb);
+  const num=!isNaN(na)&&!isNaN(nb);
+  let r=num?na-nb:String(va||"").localeCompare(String(vb||""),undefined,{sensitivity:"base"});
+  return asc?r:-r;
+}
+
+function updateSortIndicators(){
+  document.querySelectorAll("th[data-key]").forEach(th=>{
+    const i=th.querySelector(".sort-indicator");if(i)i.remove();
+    if(th.dataset.key===sortState.key){
+      const a=document.createElement("span");a.className="sort-indicator";
+      a.textContent=sortState.asc?"▲":"▼";th.appendChild(a);
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+  document.querySelectorAll("th[data-key]").forEach(th=>{
+    th.addEventListener("click",()=>{
+      const k=th.dataset.key;
+      if(sortState.key===k)sortState.asc=!sortState.asc;
+      else{sortState.key=k;sortState.asc=true;}
+      renderQuestionsTable();
+    });
+  });
+  loadQuestions();
+});
+</script>
+</body>
+</html>

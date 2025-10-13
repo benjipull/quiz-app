@@ -5,12 +5,13 @@ const Category = require("../models/categoryModel");
 const connectDB = require("../config/db");
 
 const OLLAMA_URL = process.env.OLLAMA_URL;
+const DUPLICATE_VERSION = 0.14; // bump when changing duplicate logic
 
-// Ask Ollama if two questions mean the same thing
+// 🧠 Ask Ollama if two questions mean the same thing
 async function isDuplicate(q1, q2) {
   const prompt = `
 You are a trivia question duplicate detector.
-Decide if these two questions essentially mean the same thing, even if worded differently.
+Determine if these two questions essentially mean the same thing, even if worded differently.
 
 Respond STRICT JSON only:
 { "duplicate": true|false }
@@ -23,11 +24,7 @@ Question 2: ${q2}
     const response = await axios.post(OLLAMA_URL, {
       model: "llama3",
       prompt,
-      options: {
-        num_ctx: 1024,
-        temperature: 0.0,
-        num_predict: 50
-      },
+      options: { temperature: 0.0, num_ctx: 1024, num_predict: 50 },
       stream: false
     });
 
@@ -40,62 +37,100 @@ Question 2: ${q2}
   }
 }
 
-async function findAndDisableDuplicates() {
+async function findDuplicatesAndMarkChecked() {
   try {
     await connectDB();
     console.log("✅ Connected to MongoDB");
 
-    // Only pull categories with questions that are enabled and not checked yet
     const categories = await Category.find(
-      { "questions.disabled": false, "questions.validation.duplicationChecked": { $ne: true } },
+      { "questions.disabled": false },
       { name: 1, questions: 1 }
     );
 
     for (const category of categories) {
-      console.log(`🔹 Checking category: ${category.name}`);
+      console.log(`\n🔹 Category: ${category.name}`);
 
-      // Only enabled + not-checked questions
-      const questions = category.questions.filter(
-        q => !q.disabled && (!q.validation || q.validation.duplicationChecked !== true)
-      );
+      const questions = category.questions.filter(q => {
+        if (q.disabled) return false;
+
+        const version = q?.duplicate?.duplicate_checked_version ?? 0;
+        return Number(version) < DUPLICATE_VERSION;
+      });
+
 
       if (questions.length <= 1) continue;
 
+      const duplicateGroups = [];
+      const checked = new Set();
+
       for (let i = 0; i < questions.length; i++) {
-        const q1 = questions[i];
+        const qI = questions[i];
+        if (checked.has(qI._id.toString())) continue;
+
+        const group = [qI];
+        checked.add(qI._id.toString()); // mark the base as checked right away
 
         for (let j = i + 1; j < questions.length; j++) {
-          const q2 = questions[j];
+          const qJ = questions[j];
+          if (checked.has(qJ._id.toString())) continue;
 
-          const duplicate = await isDuplicate(q1.text, q2.text);
+          const duplicate = await isDuplicate(qI.text, qJ.text);
+
           if (duplicate) {
-            console.log(`   ⚠️ Duplicate found:\n      Q1: ${q1.text}\n      Q2: ${q2.text}`);
-
-            // Keep q1, disable q2
-            await Category.updateOne(
-              { "questions._id": q2._id },
-              {
-                $set: {
-                  "questions.$.disabled": true,
-                  "questions.$.validation.duplicateOf": q1._id,
-                  "questions.$.validation.duplicationChecked": true
-                }
-              }
-            );
-
-            console.log(`   ❌ Disabled duplicate: ${q2._id} (kept ${q1._id})`);
+            group.push(qJ);
+            checked.add(qJ._id.toString());
           }
         }
 
-        // Mark q1 as checked even if no duplicates found
-        await Category.updateOne(
-          { "questions._id": q1._id },
-          { $set: { "questions.$.validation.duplicationChecked": true } }
-        );
+        if (group.length > 1) {
+          // ✅ generate one shared groupId per detected group
+          const groupId = new mongoose.Types.ObjectId().toString();
+          const ids = group.map(q => q._id);
+
+          await Category.updateOne(
+            { _id: category._id },
+            {
+              $set: {
+                "questions.$[elem].duplicate.duplicate_checked_version": DUPLICATE_VERSION,
+                "questions.$[elem].duplicate.duplicate_group_id": groupId,
+                "questions.$[elem].duplicate.last_checked_at": new Date()
+              }
+            },
+            {
+              arrayFilters: [{ "elem._id": { $in: ids } }]
+            }
+          );
+
+          console.log(
+            `⚠️ Duplicate group (${group.length}) saved for category "${category.name}" (GroupID: ${groupId}).`
+          );
+          group.forEach(q => console.log(`   ↳ ${q.text}`));
+        } else {
+          // no duplicates found for this question
+          await Category.updateOne(
+            { "questions._id": qI._id },
+            {
+              $set: {
+                "questions.$.duplicate.duplicate_checked_version": DUPLICATE_VERSION,
+                "questions.$.duplicate.duplicate_group_id": null,
+                "questions.$.duplicate.last_checked_at": new Date()
+              }
+            }
+          );
+          console.log(`✅ Cleared question: "${qI.text}"`);
+        }
+      }
+
+
+      // 🧾 Category summary
+      if (duplicateGroups.length > 0) {
+        console.log(`⚠️ Summary: ${duplicateGroups.length} duplicate group(s) in "${category.name}"`);
+      } else {
+        console.log(`✅ Category "${category.name}" fully cleared.`);
       }
     }
 
-    console.log("🎉 Duplicate scan complete!");
+    console.log("\n🎉 Duplicate detection complete!");
     mongoose.connection.close();
   } catch (err) {
     console.error("❌ Error:", err.message);
@@ -103,4 +138,4 @@ async function findAndDisableDuplicates() {
   }
 }
 
-findAndDisableDuplicates();
+findDuplicatesAndMarkChecked();
