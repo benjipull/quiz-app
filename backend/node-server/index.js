@@ -67,7 +67,7 @@ app.use("/api/admin/categories", require("./routes/admin/getCategoryQuestions"))
 app.use("/api/admin/duplicates", require("./routes/admin/getDuplicateGroupQuestions"));
 app.use("/api/admin/questions", require("./routes/admin/markQuestionAsDuplicate"));
 app.use("/api/admin/questions", require("./routes/admin/unmarkDuplicateGroup"));
-
+app.use("/api/admin/questions", require("./routes/admin/updateQuestion"));
 
 
 // Default route (serves index.html for all other routes)

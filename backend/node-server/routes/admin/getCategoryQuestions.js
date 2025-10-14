@@ -26,22 +26,23 @@ router.get("/:id/questions", auth, adminAuth, async (req, res) => {
       correct_answer: q.correct_answer,
       explanation: q.explanation || "",
       validation_verdict: q.validation?.final_verdict || "Not validated",
+      validation_version: q.validation?.validationVersion ?? 0, // ✅ Added this line
       createdAt: q.createdAt,
       popularity: q.popularity,
+
       // ✅ include duplicates info if present
       duplicate_group_id: q.duplicate?.duplicate_group_id || null,
       duplicate_of: q.duplicate?.duplicate_of || [],
       duplicate_reasoning: q.duplicate?.reasoning || "",
       duplicate_confidence: q.duplicate?.confidence || null,
       duplicate_checked_at: q.duplicate?.last_checked_at || null,
+
       // ✅ include answers
       answers: q.answers?.map(a => ({
         text: a.text,
         correctCount: a.correctCount || 0
       })) || []
     }));
-
-
 
     res.json({
       categoryName: category.name,
