@@ -5,30 +5,48 @@ const Category = require("../models/categoryModel");
 const connectDB = require("../config/db");
 
 const OLLAMA_URL = process.env.OLLAMA_URL;
-
+const CURRENT_VALIDATION_VERSION = 0.05;
 
 async function validateQuestion(question) {
   const prompt = `
-You are a strict trivia question validator.  
-You must check logical correctness and consistency of the Q&A.
+You are a *formal trivia question validator*.  
+Your job is to determine whether this question has **exactly one uniquely correct answer**.
 
-Checks to perform:
-1. Assess whether the question itself is logically and factually coherent.
-   Detect any false or misleading assumptions or simplifications implied by the question text, such as treating a plural or multi-valued fact as singular.
-   A question must not imply that only one option exists when several are equally official or correct.
-2. Verify that the "correct_answer" logically satisfies the question.
-3. Check that the explanation is consistent with both the question and the correct_answer.
-4. Identify any semantic mismatches (type, scope, category differences).
-5. Determine if other answers could also satisfy the question.
-6. Provide a final verdict based on correctness and consistency.
+---
 
-Respond in strict JSON ONLY:
+### STEP 1. Identify linguistic vagueness
+If the question contains phrases such as:
+- "a key", "a main", "one of", "commonly used", "an example of", "typically", or "usually"
+→ These imply that *multiple answers* might be correct.  
+If any such phrase appears **and** more than one listed answer fits the description, mark it as **Ambiguous**.
+
+### STEP 2. Test all options logically
+For each provided answer:
+- Ask: “Could this reasonably be considered correct or partially correct according to common factual knowledge?”
+- Count how many are valid.
+  - If more than one answer could be considered correct, list them under "other_answers_possible" and classify as **Ambiguous**.
+  - If the marked correct answer is factually wrong, classify as **Incorrect**.
+  - If exactly one answer fits perfectly and others clearly do not, classify as **Correct**.
+
+### STEP 3. Examine the explanation
+- If the explanation lists *multiple items* that align with different answer options (e.g., "made with cream, sugar, and eggs"), this implies multiple answers could be right → **Ambiguous**.
+- If the explanation does not directly justify the correct answer or is too broad, also **Ambiguous**.
+- If the explanation contradicts the correct answer, **Incorrect**.
+
+### STEP 4. Decide final verdict
+- "Correct": one unique valid answer, well-justified.
+- "Ambiguous": multiple plausible answers, vague wording, or multi-item explanation.
+- "Incorrect": correct_answer is factually wrong.
+
+---
+
+Return STRICT JSON ONLY:
 {
   "is_correct_answer_valid": true|false,
   "correct_answer_reasoning": "<why correct or not>",
   "explanation_consistent": true|false,
   "explanation_reasoning": "<why consistent or not>",
-  "other_answers_possible": [ "<answer1>", "<answer2>" ],
+  "other_answers_possible": ["<answer1>", "<answer2>"],
   "final_verdict": "Correct" | "Incorrect" | "Ambiguous"
 }
 
@@ -45,12 +63,11 @@ Explanation: ${question.explanation || "N/A"}
       options: {
         num_ctx: 4096,
         temperature: 0.0,
-        top_p: 0.9,
-        top_k: 40,
-        min_p: 0.05,
+        top_p: 1.0,
+        top_k: 0,
         repeat_penalty: 1.1,
         repeat_last_n: 64,
-        num_predict: 300
+        num_predict: 600
       },
       stream: false
     });
@@ -84,7 +101,6 @@ async function validateAllCategories() {
     const allCategories = await Category.find({}, { name: 1 });
     const allCategoryNames = allCategories.map(c => c.name);
 
-    // Fetch only categories with unvalidated questions
     const categories = await Category.aggregate([
       {
         $project: {
@@ -95,16 +111,20 @@ async function validateAllCategories() {
               as: "q",
               cond: {
                 $and: [
-                  // ✅ keep only NOT disabled
+                  // ✅ Keep only NOT disabled
                   { $ne: ["$$q.disabled", true] },
-                  // ✅ validation is missing, null, or version 0
+                  // ✅ validation missing, null, or older than current version
                   {
                     $or: [
+                      // No validation object at all
                       { $eq: ["$$q.validation", null] },
-                      { $eq: ["$$q.validation.validationVersion", 0] },
-                      { $not: { $ifNull: ["$$q.validation.validationVersion", false] } }
+                      // validationVersion field missing or null
+                      { $eq: ["$$q.validation.validationVersion", null] },
+                      // validationVersion strictly less than current version
+                      { $lt: ["$$q.validation.validationVersion", CURRENT_VALIDATION_VERSION] }
                     ]
                   }
+
                 ]
               }
             }
@@ -118,6 +138,7 @@ async function validateAllCategories() {
         }
       }
     ]);
+
 
 
     // Derive skipped category names
@@ -160,7 +181,7 @@ async function validateAllCategories() {
                 explanation_reasoning: parsed.explanation_reasoning,
                 other_answers_possible: parsed.other_answers_possible,
                 final_verdict: parsed.final_verdict,
-                validationVersion: 0.03
+                validationVersion: CURRENT_VALIDATION_VERSION
               },
               "questions.$.disabled": shouldDisable
             }
