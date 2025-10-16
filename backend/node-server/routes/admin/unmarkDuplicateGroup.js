@@ -18,7 +18,13 @@ router.put("/:questionId/unmark-duplicate", auth, adminAuth, async (req, res) =>
       {
         $set: {
           "questions.$.duplicate.duplicate_group_id": null,
-          "questions.$.duplicate.last_checked_at": new Date()
+          "questions.$.duplicate.duplicate_of": [],
+          "questions.$.duplicate.reasoning": "",
+          "questions.$.duplicate.confidence": null,
+          "questions.$.duplicate.last_checked_at": new Date(),
+          "questions.$.disabled": false,
+          "questions.$.disabled_reason": "",
+          "questions.$.new_question": false // ✅ clear new question flag
         }
       }
     );
@@ -27,7 +33,7 @@ router.put("/:questionId/unmark-duplicate", auth, adminAuth, async (req, res) =>
       return res.status(400).json({ message: "No changes made" });
 
     res.json({
-      message: "✅ Duplicate group cleared for question",
+      message: "✅ Question unmarked as duplicate and cleared as reviewed",
       questionId
     });
   } catch (err) {
