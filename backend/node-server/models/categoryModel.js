@@ -51,13 +51,13 @@ const QuestionSchema = new mongoose.Schema({
     difficultyConfirmedVersion: { type: Number, default: 0 },
 
     validation: { type: ValidationSchema, default: {} },
+    needs_validation: { type: Boolean, default: false },
+    new_question: { type: Boolean, default: true },
     duplicate: { type: DuplicateSchema, default: {} },
 
     hash: { type: String, required: true, unique: true },
     version: { type: Number, default: 1, required: true }
 });
-
-
 
 
 const CompletionSchema = new mongoose.Schema({

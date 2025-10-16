@@ -1,199 +1,132 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
-const Category = require("../models/categoryModel");
 const crypto = require("crypto");
 const axios = require("axios");
+const Category = require("../models/categoryModel");
 
+const { buildQuestionPrompt } = require("./prompts/questionPrompt");
+const { processSingleQuestion } = require("./validateDuplicateQuestions");
+
+
+// ==== GLOBAL CONFIG ====
 const OLLAMA_URL = process.env.OLLAMA_URL;
 const avoidedQuestions = [];
 
 if (!OLLAMA_URL) {
-    console.error("❌ OLLAMA_URL is not set! Please set it in your environment variables.");
-    process.exit(1);
+  console.error("❌ OLLAMA_URL is not set! Please set it in your environment variables.");
+  process.exit(1);
 }
 
 console.log(`🚀 Ollama API set to: ${OLLAMA_URL}`);
 
-// Generate a unique hash for each question
-const generateQuestionHash = (questionText) => {
-    return crypto.createHash("sha256").update(questionText).digest("hex");
-};
+// ==== HELPER FUNCTIONS ====
 
-async function fetchQuestions(categoryName, difficultyHint = "") {
-
-    console.log(`🔹 Generating for category: "${categoryName}" from ollama`);
-
-    const difficultySection = difficultyHint
-  ? `\nDifficulty requested: ${difficultyHint}. Generate the question at this difficulty.\n`
-  : "";
-
-    const avoidSection = avoidedQuestions.length > 0
-        ? `Do NOT generate any of these questions (nor semantically similar ones):
-        \n${avoidedQuestions.map(q => `- ${q}`).join("\n")}\n\n
-        `
-        : "";
-
-const systemPrompt = `
-You are an international trivia expert. Use metric units, global examples, and neutral English spelling.”
-Output STRICT JSON only (no prose, no markdown)
-
-=== GENERAL RULES ===
-- Use real, verifiable facts. Do NOT fabricate.
-- Question must have exactly 4 distinct answer choices; exactly 1 correct.
-- Do NOT generate questions based on cultural epithets, nicknames, myths, legends, symbolism, allegories, idioms, or metaphorical associations.
-- Only generate questions grounded in factual, observable, or academically verifiable information.
-- Exclude any content that relies on folklore, religion, or interpretive traditions rather than established fact.
-- Avoid ambiguous or subjective wording.
-- Correct answer MUST be one of the provided answers.
-- Provide a concise explanation (1–2 sentences) in plain language that restates the fact from source_quote. This field must never be empty.
-- Provide a difficulty_rationale that explains why the fact fits the chosen difficulty level. This field must never be empty.
-- Sources: use reputable domains only (britannica.com, nasa.gov, who.int, smithsonianmag.com, etc.).
-- Each output must include: question, answers, correct_answer, explanation, source_domain, source_title, source_quote, difficulty_level, difficulty_rationale.
-- You must deeply understand the category’s full meaning, not just individual words.
-- Use the category as a thematic context for the question, not as a literal keyword.
-
-=== CONTEXTUAL FRAMING RULES ===
-- Every question must be fully meaningful on its own, without assuming unstated context.
-- If the question uses generic phrasing such as "Which of the following", "Who among these", or "What of the following",
-  you must clearly establish the frame of reference in the question itself.
-  (Example: Instead of "Which of the following animals is the fastest?", write "Which of the following African animals is the fastest?")
-- Ensure that the question explicitly anchors its scope to either:
-  • the category theme, or
-  • a shared property among the answer options (region, field, timeframe, etc.)
-- Do NOT generate globally ambiguous questions — all four answers must logically fit within the same contextual frame.
-
-
-== Before generating the question ==
-- Interpret what the category *represents conceptually* (e.g., field, subject, or theme).
-- Generate a factual, verifiable, non-ambiguous question clearly connected to that concept.
-
-=== DIFFICULTY RUBRIC (1–10) ===
-1–2: Very basic factual recall (e.g., color of a fruit, number of continents).
-3–4: Simple but slightly more detailed factual recall (e.g., main ingredient of a dish, country location of a city).
-5–6: Intermediate factual knowledge requiring some learning or context (e.g., name of a river’s source, year of an invention).
-7–8: Advanced factual knowledge often covered in higher studies (e.g., lesser-known historical treaties, specific scientific terms).
-9–10: Highly specialized or expert-level factual knowledge (e.g., detailed scientific classification, rare historical events).
-
-
-COUPLING RULES:
-- Difficulty level = based on how specific and specialized the fact is, not on how “well-known” it is.
-- Always express the fact directly, without commentary on whether it is famous, common, or obscure.
-
-=== OUTPUT FORMAT ===
-{
-  "question": string,
-  "answers": [string, string, string, string],
-  "correct_answer": string,
-  "explanation": string,
-  "source_domain": string,
-  "source_title": string,
-  "source_quote": string,
-  "difficulty_level": integer,
-  "difficulty_rationale": string
+function generateQuestionHash(text) {
+  return crypto.createHash("sha256").update(text).digest("hex");
 }
 
-If any requirement fails, output {}.
+function buildAvoidSection() {
+  if (avoidedQuestions.length === 0) return "";
+  return `Do NOT generate any of these questions (nor semantically similar ones):\n${avoidedQuestions.map(q => `- ${q}`).join("\n")}\n\n`;
+}
 
-Interpret the category as a single unified topic or concept, not as separate words. 
-Infer its most likely subject area.
-Then generate ONE factual quiz question clearly about that concept.
+function buildDifficultySection(hint) {
+  return hint ? `\nDifficulty requested: ${hint}. Generate the question at this difficulty.\n` : "";
+}
 
-Category: ${categoryName}
-${avoidSection}
-${difficultySection}
-`;
+function normalizeQuestion(raw) {
+  const difficulty = Number(raw.difficulty ?? raw.difficulty_level ?? 5);
+  return {
+    question: raw.question ?? "",
+    answers: Array.isArray(raw.answers) ? raw.answers.slice(0, 4) : [],
+    correct_answer: raw.correct_answer ?? "",
+    explanation: raw.explanation ?? "",
+    source_domain: raw.source_domain ?? "",
+    source_title: raw.source_title ?? "",
+    source_quote: raw.source_quote ?? "",
+    difficulty_level: Number.isFinite(difficulty)
+      ? Math.max(1, Math.min(10, Math.round(difficulty)))
+      : 5,
+    difficulty_rationale: raw.difficulty_rationale ?? ""
+  };
+}
 
+function parseOllamaResponse(rawResponse) {
+  try {
+    return JSON.parse(rawResponse);
+  } catch {
+    const cleaned = rawResponse
+      .replace(/```(\w+)?/g, "")
+      .replace(/\u201C|\u201D/g, '"')
+      .replace(/\u2019/g, "'");
+    return JSON.parse(cleaned);
+  }
+}
 
-//${avoidSection} //For now to see if it stop generating very similar questions
+// ==== OLLAMA COMMUNICATION ====
 
-//console.log(`🔹Prompt ${systemPrompt}`);
-
- try {
-    const res = await axios.post(OLLAMA_URL, {
-      model: "llama3",
-      format: "json",
-      prompt: systemPrompt,
-      stream: false,
-      options: {
-        num_ctx: 4096,
-        num_keep: 200,
-        temperature: 0.2,
-        top_p: 0.7,
-        top_k: 5,
-        min_p: 0.1,
-        repeat_penalty: 1.15,
-        repeat_last_n: 128,
-        num_predict: 512
-      }
-    }, { timeout: 240_000 });
+async function queryOllama(prompt) {
+  try {
+    const res = await axios.post(
+      OLLAMA_URL,
+      {
+        model: "llama3",
+        format: "json",
+        prompt,
+        stream: false,
+        options: {
+          num_ctx: 4096,
+          num_keep: 200,
+          temperature: 0.2,
+          top_p: 0.7,
+          top_k: 5,
+          min_p: 0.1,
+          repeat_penalty: 1.15,
+          repeat_last_n: 128,
+          num_predict: 512
+        }
+      },
+      { timeout: 240_000 }
+    );
 
     if (!res.data || !res.data.response) {
       throw new Error("❌ Ollama response missing 'response' field.");
     }
 
-    let rawResponse = String(res.data.response).trim();
-    
-    // Try to parse JSON directly
-    let parsed;
-    try {
-      parsed = JSON.parse(rawResponse);
-    } catch {
-      // fallback cleanup for quotes/markdown fences
-      rawResponse = rawResponse
-        .replace(/```(\w+)?/g, "")
-        .replace(/\u201C|\u201D/g, '"')
-        .replace(/\u2019/g, "'");
-      parsed = JSON.parse(rawResponse);
-    }
-
-    const question = normalizeQuestion(parsed);
-    //console.log(`✅ Parsed question: ${JSON.stringify(question)}`);
-
-    return [question]; // still return as array so populateCategory works
+    const parsed = parseOllamaResponse(String(res.data.response).trim());
+    return normalizeQuestion(parsed);
 
   } catch (error) {
-    console.error("⚠️ Error fetching question from Ollama:");
-    if (error.response) {
-      console.error(`❌ HTTP ${error.response.status}:`, error.response.data);
-    } else if (error.request) {
-      console.error("❌ No response from Ollama.");
-    } else {
-      console.error("❌ Request error:", error.message);
-    }
-    return [];
+    logOllamaError(error);
+    return null;
   }
 }
 
-function normalizeQuestion(q) {
-  const difficulty = Number(q.difficulty ?? q.difficulty_level ?? 5);
-  return {
-    question: q.question ?? "",
-    answers: Array.isArray(q.answers) ? q.answers.slice(0, 4) : [],
-    correct_answer: q.correct_answer ?? "",
-    explanation: q.explanation ?? "",
-    source_domain: q.source_domain ?? "",
-    source_title: q.source_title ?? "",
-    source_quote: q.source_quote ?? "",
-    difficulty_level: Number.isFinite(difficulty)
-      ? Math.max(1, Math.min(10, Math.round(difficulty)))
-      : 5,
-    difficulty_rationale: q.difficulty_rationale ?? ""
-  };
+function logOllamaError(error) {
+  console.error("⚠️ Error fetching question from Ollama:");
+  if (error.response) {
+    console.error(`❌ HTTP ${error.response.status}:`, error.response.data);
+  } else if (error.request) {
+    console.error("❌ No response from Ollama.");
+  } else {
+    console.error("❌ Request error:", error.message);
+  }
 }
 
-async function populateCategoryLoop(categoryId, iterations, difficultyHint = "") {
-    try {
-        for (let i = 0; i < iterations; i++) {
-            console.log(`\n🔄 Iteration ${i + 1}/${iterations} for category ${categoryId}`);
-            await populateCategory(categoryId, difficultyHint);
-        }
-    } finally {
-        avoidedQuestions.length = 0;
-        console.log("🧹 Cleared avoided questions list after loop.");
-    }
+// ==== MAIN FUNCTIONALITY ====
+
+async function fetchQuestions(categoryName, difficultyHint) {
+  console.log(`🔹 Generating for category: "${categoryName}" from Ollama`);
+
+  const avoidSection = buildAvoidSection();
+  const difficultySection = buildDifficultySection(difficultyHint);
+  const prompt = buildQuestionPrompt(categoryName, avoidSection, difficultySection);
+
+  const question = await queryOllama(prompt);
+  return question ? [question] : [];
 }
 
-async function populateCategory(categoryId, difficultyHint = "") {
+async function populateCategory(categoryId, difficultyHint) {
   try {
     const category = await Category.findById(categoryId);
     if (!category) {
@@ -201,64 +134,118 @@ async function populateCategory(categoryId, difficultyHint = "") {
       return;
     }
 
-    const nonDisabledCount = category.questions.filter(q => !q.disabled).length;
-    if (nonDisabledCount >= 100) {
-      console.log(`🚫 Skipping ${category.name} (already has ${nonDisabledCount} questions).`);
+    const activeQuestions = category.questions.filter(q => !q.disabled).length;
+    if (activeQuestions >= 100) {
+      console.log(`🚫 Skipping ${category.name} (already has ${activeQuestions} questions).`);
       return;
     }
 
-    console.log(`🔹 ${category.name}: ${nonDisabledCount} questions. Fetching a ${difficultyHint} one.`);
+    console.log(`🔹 ${category.name}: ${activeQuestions} questions. Fetching a ${difficultyHint} one.`);
 
+    // 🧠 Step 1: Generate new question(s)
     const fetchedQuestions = await fetchQuestions(category.name, difficultyHint);
-    let newQuestionsAdded = 0;
+    if (!fetchedQuestions?.length) {
+      console.log("⚠️ No question returned from Ollama.");
+      return;
+    }
 
+    // 🧠 Step 2: Add them to category object
+    const addedCount = await addQuestionsToCategory(category, fetchedQuestions);
+    if (addedCount === 0) {
+      console.log("⚠️ No new question added (duplicate hash skipped).");
+      return;
+    }
+
+    // 🧠 Step 3: Save the updated category to MongoDB
+    category.disabled = false;
+    await category.save();
+    console.log(`✅ Added ${addedCount} question(s) to ${category.name}.`);
+
+    // 🧠 Step 4: Re-fetch category to ensure IDs are present
+    const refreshedCategory = await Category.findById(categoryId);
+
+    // 🧠 Step 5: For each added question, check for duplicates within this category
     for (const q of fetchedQuestions) {
-      const questionHash = generateQuestionHash(q.question);
-      avoidedQuestions.push(q.question);
-
-      // Skip duplicate hash
-      if (category.questions.some(existing => existing.hash === questionHash)) {
-        console.log(`⚠️ Duplicate skipped: ${q.question}`);
-        continue;
+      const savedQuestion = refreshedCategory.questions.find(x => x.text === q.question);
+      if (savedQuestion) {
+        await checkQuestionInSameCategory(refreshedCategory, savedQuestion);
       }
-
-      const newQuestion = {
-        _id: new mongoose.Types.ObjectId(),
-        text: q.question,
-        answers: q.answers.map(answer => ({
-          text: answer,
-          correctCount: 0,
-          incorrectCount: 0
-        })),
-        correct_answer: q.correct_answer,
-        explanation: q.explanation,
-        source_domain: q.source_domain,
-        source_title: q.source_title,
-        source_quote: q.source_quote,
-        difficulty_level: q.difficulty_level,
-        difficulty_rationale: q.difficulty_rationale,
-        timesLoaded: 0,
-        popularity: 0,
-        disabled: false, 
-        timesAnsweredCorrectly: 0,
-        timesAnsweredIncorrectly: 0,
-        hash: questionHash,
-        version: 1.05
-      };
-
-      category.questions.push(newQuestion);
-      newQuestionsAdded++;
     }
 
-    if (newQuestionsAdded > 0) {
-      category.disabled = false;
-      await category.save();
-      console.log(`✅ Added ${newQuestionsAdded} question(s) to ${category.name}.`);
-    }
   } catch (error) {
     console.error("❌ Error populating category:", error.message);
   }
 }
 
+
+async function addQuestionsToCategory(category, questions) {
+  let added = 0;
+
+  for (const q of questions) {
+    const hash = generateQuestionHash(q.question);
+    avoidedQuestions.push(q.question);
+
+    if (category.questions.some(x => x.hash === hash)) {
+      console.log(`⚠️ Duplicate skipped: ${q.question}`);
+      continue;
+    }
+
+    category.questions.push({
+      _id: new mongoose.Types.ObjectId(),
+      text: q.question,
+      answers: q.answers.map(a => ({ text: a, correctCount: 0, incorrectCount: 0 })),
+      correct_answer: q.correct_answer,
+      explanation: q.explanation,
+      source_domain: q.source_domain,
+      source_title: q.source_title,
+      source_quote: q.source_quote,
+      difficulty_level: q.difficulty_level,
+      difficulty_rationale: q.difficulty_rationale,
+      timesLoaded: 0,
+      popularity: 0,
+      disabled: false,
+      timesAnsweredCorrectly: 0,
+      timesAnsweredIncorrectly: 0,
+      hash,
+      version: 1.05
+    });
+
+    added++;
+  }
+
+  return added;
+}
+
+async function checkQuestionInSameCategory(category, newQuestion) {
+  console.log(`\n🔍 Checking "${newQuestion.text}" against others in ${category.name}`);
+
+  // Skip disabled questions and itself
+  const otherQuestions = category.questions.filter(
+    q => !q.disabled && q._id.toString() !== newQuestion._id.toString()
+  );
+
+  if (otherQuestions.length === 0) {
+    console.log("ℹ️ No other questions to compare against.");
+    return;
+  }
+
+  // 🔥 Reuse your existing processSingleQuestion() helper
+  await processSingleQuestion(category, newQuestion);
+
+  console.log(`✅ Finished duplicate check within "${category.name}"`);
+}
+
+
+async function populateCategoryLoop(categoryId, iterations, difficultyHint) {
+  try {
+    for (let i = 0; i < iterations; i++) {
+      console.log(`\n🔄 Iteration ${i + 1}/${iterations} for category ${categoryId}`);
+      await populateCategory(categoryId, difficultyHint);
+    }
+  } finally {
+    avoidedQuestions.length = 0;
+    console.log("🧹 Cleared avoided questions list after loop.");
+  }
+}
 
 module.exports = { populateCategory, populateCategoryLoop };
