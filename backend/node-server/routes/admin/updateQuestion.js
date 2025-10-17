@@ -15,8 +15,11 @@ const allowedUpdateFields = new Set([
   "validation_version",
   "popularity",
   "disabled",
-  "disabled_reason"
+  "disabled_reason",
+  "needs_validation",
+  "new_question"
 ]);
+
 
 function sanitizePayload(body) {
   const out = {};
@@ -50,6 +53,8 @@ function sanitizePayload(body) {
       }
 
       case "disabled":
+      case "needs_validation":
+      case "new_question":
         out[key] = !!value;
         break;
 
@@ -59,6 +64,7 @@ function sanitizePayload(body) {
   }
   return out;
 }
+
 
 // PUT /api/admin/questions/:id
 router.put("/:id", auth, adminAuth, async (req, res) => {
@@ -108,9 +114,12 @@ router.put("/:id", auth, adminAuth, async (req, res) => {
         popularity: q.popularity ?? 0,
         disabled: q.disabled,
         disabled_reason: q.disabled_reason ?? "",
+        needs_validation: q.needs_validation,
+        new_question: q.new_question,
         createdAt: q.createdAt,
       },
     });
+
   } catch (err) {
     console.error("Error updating question:", err);
     res.status(500).json({ message: "Server error updating question" });

@@ -8,6 +8,7 @@ const adminAuth = require("../../middleware/adminauth");
 router.get("/:id/questions", auth, adminAuth, async (req, res) => {
   try {
     const categoryId = req.params.id;
+    const showDisabled = req.query.showDisabled === "true"; // Default false
 
     const category = await Category.findById(categoryId)
       .select("name questions")
@@ -17,7 +18,12 @@ router.get("/:id/questions", auth, adminAuth, async (req, res) => {
       return res.status(404).json({ message: "Category not found" });
     }
 
-    const questions = category.questions.map(q => ({
+    // 🧠 Apply server-side filter (default: exclude disabled)
+    const filteredQuestions = (category.questions || []).filter(q =>
+      showDisabled ? true : !q.disabled
+    );
+
+    const questions = filteredQuestions.map(q => ({
       _id: q._id,
       text: q.text,
       difficulty_level: q.difficulty_level,
