@@ -150,10 +150,10 @@ async function processCategory(category) {
 async function processSingleQuestion(category, targetQuestion) {
   console.log(`\n🔍 Checking duplicates for: "${targetQuestion.text}" in ${category.name}`);
 
-  // Include ALL questions except itself (even disabled)
-  const otherQuestions = category.questions.filter(
-    q => q._id.toString() !== targetQuestion._id.toString()
-  );
+const otherQuestions = category.questions.filter(
+  q => q._id.toString() !== targetQuestion._id.toString() && !q.disabled
+);
+
 
   if (otherQuestions.length === 0) {
     console.log("ℹ️ No other questions to compare against.");

@@ -266,6 +266,16 @@
 <body>
   <a href="/admin/pages/admin-categories.html" class="back-link">← Back to categories</a>
   <h1 id="categoryName">Questions</h1>
+
+  <div id="filterPanel"
+    style="max-width:1200px;margin:0 auto 1rem auto;padding:.5rem 1rem;background:#1a1a1a;border-radius:8px;display:flex;align-items:center;gap:1rem;justify-content:flex-start;">
+    <label style="display:flex;align-items:center;gap:.5rem;">
+      <input type="checkbox" id="showDisabled" /> Show disabled
+    </label>
+    <button id="applyFiltersBtn"
+      style="padding:.3rem .8rem;border:none;border-radius:6px;background:#5ea6ff;color:#fff;cursor:pointer;font-size:.85rem;">Apply</button>
+  </div>
+
   <div id="status" class="loading">Loading questions...</div>
 
   <table id="questionTable" style="display:none;">
@@ -274,14 +284,16 @@
         <th data-key="text">Question</th>
         <th data-key="difficulty_level">Difficulty</th>
         <th data-key="disabled">Disabled</th>
+        <th data-key="new_question">New Question</th>
         <th data-key="validation_verdict">Validation</th>
-        <th data-key="validation_version">Val. Ver.</th>
         <th data-key="correct_answer">Correct Answer</th>
         <th data-key="popularity">Popularity</th>
         <th data-key="createdAt">Created</th>
         <th>Actions</th>
       </tr>
     </thead>
+
+
     <tbody id="questionTableBody"></tbody>
   </table>
 
@@ -294,23 +306,30 @@
     const categoryId = params.get("id");
     let questionsData = [];
     let sortState = { key: "createdAt", asc: false };
+    let filters = { disabled: false };
 
     async function loadQuestions() {
       const status = document.getElementById("status");
       const table = document.getElementById("questionTable");
       try {
-        const res = await fetch(`/api/admin/categories/${categoryId}/questions`, {
+
+        const res = await fetch(`/api/admin/categories/${categoryId}/questions?showDisabled=${filters.disabled}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
+
         if (!res.ok) throw new Error("Failed to fetch questions");
         const data = await res.json();
         document.getElementById("categoryName").textContent =
           `📘 ${data.categoryName} (${data.questionCount} Questions)`;
         questionsData = data.questions || [];
         await renderQuestionsTable();
-        status.style.display = "none"; table.style.display = "table";
-      } catch (e) { status.textContent = "Error: " + e.message; }
+        status.style.display = "none";
+        table.style.display = "table";
+      } catch (e) {
+        status.textContent = "Error: " + e.message;
+      }
     }
+
 
     async function renderQuestionsTable() {
       const tbody = document.getElementById("questionTableBody");
@@ -328,8 +347,11 @@
           <input type="checkbox" class="disabled-checkbox" ${q.disabled ? "checked" : ""} />
         </td>
 
+        <td class="editable new-question-flag" contenteditable="false">
+          <input type="checkbox" class="new-question-checkbox" ${q.new_question ? "checked" : ""} />
+        </td>
+
         <td class="editable validation_verdict" contenteditable="false">${q.validation_verdict}</td>
-        <td class="editable validation_version" contenteditable="false">${q.validation_version ?? 0}</td>
         <td class="editable correct_answer" contenteditable="false">${escapeHtml(q.correct_answer)}</td>
         <td class="editable popularity" contenteditable="false">${q.popularity ?? 0}</td>
         <td>${new Date(q.createdAt).toLocaleDateString()}</td>
@@ -338,6 +360,7 @@
           <button class="save-btn">💾 Save</button>
           <button class="cancel-btn">❌ Cancel</button>
         </td>
+
       </tr>
       <tr class="answers-row" id="answers-${q._id}">
         <td colspan="9">
@@ -452,7 +475,7 @@
           const parent = e.target.closest(".dup-item");
           parent.querySelector(".actions").innerHTML =
             `<div class="disabled-box">✅ Marked as not duplicate</div>`;
-          alert("✅ Removed from duplicate group");
+
         } catch (err) { alert("❌ " + err.message); }
       }
     });
@@ -478,15 +501,17 @@
 
       if (e.target.classList.contains("save-btn")) {
         const id = row.dataset.id;
+
         const payload = {
           text: row.querySelector(".text").textContent.trim(),
           difficulty_level: parseInt(row.querySelector(".difficulty_level").textContent) || 0,
           correct_answer: row.querySelector(".correct_answer").textContent.trim(),
           validation_verdict: row.querySelector(".validation_verdict").textContent.trim(),
-          validation_version: parseFloat(row.querySelector(".validation_version").textContent.trim()) || 0,
           popularity: parseInt(row.querySelector(".popularity").textContent) || 0,
-          disabled: row.querySelector(".disabled-checkbox")?.checked || false
+          disabled: row.querySelector(".disabled-checkbox")?.checked || false,
+          new_question: row.querySelector(".new-question-checkbox")?.checked || false
         };
+
         try {
           const res = await fetch(`/api/admin/questions/${id}`, {
             method: "PUT",
@@ -544,7 +569,9 @@
     function escapeHtml(s) {
       return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     }
+
     document.addEventListener("DOMContentLoaded", () => {
+
       document.querySelectorAll("th[data-key]").forEach(th => {
         th.addEventListener("click", () => {
           const k = th.dataset.key;
@@ -554,7 +581,16 @@
         });
       });
       loadQuestions();
+
+      document.getElementById("applyFiltersBtn").addEventListener("click", () => {
+        const showDisabled = document.getElementById("showDisabled").checked;
+        filters.disabled = showDisabled; // true = show disabled, false = exclude
+        loadQuestions();
+      });
+
+
     });
+
   </script>
 </body>
 

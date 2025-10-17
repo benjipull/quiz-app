@@ -15,7 +15,15 @@ router.get("/:groupId", auth, adminAuth, async (req, res) => {
 
     const pipeline = [
       { $unwind: "$questions" },
-      { $match: { "questions.duplicate.duplicate_group_id": groupId } },
+      {
+        $match: {
+          "questions.duplicate.duplicate_group_id": groupId,
+          $or: [
+            { "questions.disabled": { $exists: false } },
+            { "questions.disabled": false }
+          ]
+        }
+      },
       {
         $project: {
           _id: 0,
@@ -39,32 +47,27 @@ router.get("/:groupId", auth, adminAuth, async (req, res) => {
           duplicate_confidence: "$questions.duplicate.confidence",
           duplicate_checked_at: "$questions.duplicate.last_checked_at",
 
-          // ✅ Correctly reference question-level flags (not inside duplicate)
-          needs_validation: {
-            $ifNull: ["$questions.needs_validation", false],
-          },
-          new_question: {
-            $ifNull: ["$questions.new_question", false],
-          },
+          // ✅ Flags
+          needs_validation: { $ifNull: ["$questions.needs_validation", false] },
+          new_question: { $ifNull: ["$questions.new_question", false] },
 
-          // ✅ Include answers
+          // ✅ Answers
           answers: "$questions.answers",
         },
       },
       {
         $sort: {
-          new_question: -1,   // ✅ Move new questions to the top
-          createdAt: -1       // ✅ Then newest first
+          new_question: -1,  // new questions first
+          createdAt: -1      // newest first
         }
       },
-
     ];
 
     const results = await Category.aggregate(pipeline);
 
     if (!results.length) {
       return res.status(404).json({
-        message: `No questions found for duplicate group ID "${groupId}"`,
+        message: `No enabled questions found for duplicate group ID "${groupId}"`,
       });
     }
 

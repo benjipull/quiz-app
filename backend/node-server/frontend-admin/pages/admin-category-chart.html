@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Category Question Counts</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #111;
+      color: #eee;
+      margin: 0;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 2rem;
+      color: #5ea6ff;
+    }
+
+    .chart-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #1a1a1a;
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    }
+
+    canvas {
+      width: 100% !important;
+      display: block;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1rem;
+      color: #5ea6ff;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <a href="/admin/pages/admin-landing.html" class="back-link">← Back to Admin Home</a>
+  <h1>📊 Questions per Category</h1>
+
+  <div class="chart-container">
+    <canvas id="categoryChart"></canvas>
+  </div>
+
+  <script>
+    const token = localStorage.getItem("token");
+    const userType = (localStorage.getItem("userType") || "").toLowerCase();
+    if (!token || userType !== "admin") window.location.href = "/admin/pages/admin-login.html";
+
+    async function loadChart() {
+      try {
+        const res = await fetch("/api/admin/categories", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error("Failed to fetch categories");
+        const data = await res.json();
+
+        // 🧠 Sort categories by descending question count
+        const sorted = [...data].sort((a, b) => (b.questionCount || 0) - (a.questionCount || 0));
+
+        const labels = sorted.map(c => c.name);
+        const values = sorted.map(c => c.questionCount || 0);
+
+        // 🧩 Dynamically resize canvas based on number of categories
+        const canvas = document.getElementById("categoryChart");
+        const barHeight = 25; // px per category
+        canvas.height = Math.max(400, sorted.length * barHeight);
+
+        const ctx = canvas.getContext("2d");
+
+        new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels,
+            datasets: [
+              {
+                label: "Number of Questions",
+                data: values,
+                backgroundColor: "#5ea6ff",
+                borderRadius: 6
+              }
+            ]
+          },
+          options: {
+            indexAxis: "y", // horizontal bars
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              title: {
+                display: true,
+                text: "Number of Questions per Category",
+                color: "#eee",
+                font: { size: 18 }
+              },
+              tooltip: {
+                backgroundColor: "#222",
+                borderColor: "#5ea6ff",
+                borderWidth: 1,
+                titleColor: "#fff",
+                bodyColor: "#ccc"
+              }
+            },
+            scales: {
+              x: {
+                ticks: { color: "#aaa", precision: 0 },
+                grid: { color: "#333" }
+              },
+              y: {
+                ticks: { color: "#ccc", autoSkip: false },
+                grid: { color: "#222" }
+              }
+            }
+          }
+        });
+      } catch (err) {
+        document.body.innerHTML = `<p style="color:#ff5555;">❌ ${err.message}</p>`;
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", loadChart);
+  </script>
+</body>
+</html>
