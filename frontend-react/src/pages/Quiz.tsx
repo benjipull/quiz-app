@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ThumbsUp, ThumbsDown, Flag, Lightbulb } from "lucide-react";
 import QuizResults from "@/components/quiz/QuizResults";
+import ReactGA from "react-ga4";
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
@@ -118,10 +119,10 @@ export default function Quiz() {
     }
 
     const initialTime = quizState.question?.timer || 30;
-    
+
     if (quizState.question && !quizState.isAnswerSelected && !timeUp) {
       if (timeLeft !== initialTime) {
-         setTimeLeft(initialTime);
+        setTimeLeft(initialTime);
       }
 
       timerRef.current = setInterval(() => {
@@ -227,6 +228,13 @@ export default function Quiz() {
             ...prev,
             selectedCategory: { id: categoryId, name: category.name }
           }));
+
+          // 🧠 Log GA4 event
+          ReactGA.event("quiz_start", {
+            category: category.name,
+            category_id: categoryId,
+          });
+
         }
       }
 
@@ -311,9 +319,16 @@ export default function Quiz() {
           ]
         }));
       }
+
+      ReactGA.event("time_up", {
+        category: quizState.selectedCategory?.name,
+        question_id: quizState.question?._id,
+      });
+
     } catch (error) {
       console.error("Error handling timeout:", error);
     }
+
   };
 
   const completeQuiz = async () => {
@@ -321,6 +336,7 @@ export default function Quiz() {
 
     setIsCompletingQuiz(true);
     setLoading(true);
+
 
     try {
       const { correctAnswers, incorrectAnswers, userAnswers } = quizState;
@@ -363,6 +379,15 @@ export default function Quiz() {
             completionData: completionData.results,
           },
         }));
+
+        ReactGA.event("quiz_complete", {
+          category: quizState.selectedCategory?.name,
+          correct_answers: correctAnswers,
+          incorrect_answers: incorrectAnswers,
+          total_questions: totalQuestions,
+          score_percentage: (correctAnswers / totalQuestions) * 100,
+        });
+
       }
       else {
         console.error("⚠️ Failed to complete quiz");
@@ -417,6 +442,13 @@ export default function Quiz() {
 
         const isCorrect = answerData.isCorrect;
 
+        // 🎯 Log GA4 event
+        ReactGA.event("question_answered", {
+          category: quizState.selectedCategory?.name,
+          question_id: quizState.question?._id,
+          correct: isCorrect,
+        });
+
         handleVibration(isCorrect);
 
         setQuizState((prev) => ({
@@ -435,9 +467,9 @@ export default function Quiz() {
         }));
 
         if (isCorrect) {
-          correctSound.play().catch(() => {});
+          correctSound.play().catch(() => { });
         } else {
-          incorrectSound.play().catch(() => {});
+          incorrectSound.play().catch(() => { });
         }
 
         setTimeout(() => {
@@ -487,12 +519,19 @@ export default function Quiz() {
           questionId: quizState.question._id,
           action: type === "up" ? 1 : 2
         }),
+
       });
 
       if (!response.ok) {
         const errorData = await response.json();
         console.error("⚠️ Failed to update popularity:", errorData.message || errorData);
       }
+
+      ReactGA.event("feedback_given", {
+        question_id: quizState.question?._id,
+        feedback: type === "up" ? "positive" : "negative",
+      });
+
     } catch (err) {
       console.error("⚠️ Error updating popularity:", err);
     }
@@ -648,13 +687,12 @@ export default function Quiz() {
               >
                 {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
                   <div
-                    className={`absolute top-0 left-0 h-full animate-bar-fill rounded-r-md ${
-                      answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
-                        ? 'bg-success/25 border-l-4 border-success'
-                        : answer === selectedAnswer
-                          ? 'bg-destructive/25 border-l-4 border-destructive'
-                          : 'bg-primary/15'
-                    }`}
+                    className={`absolute top-0 left-0 h-full animate-bar-fill rounded-r-md ${answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
+                      ? 'bg-success/25 border-l-4 border-success'
+                      : answer === selectedAnswer
+                        ? 'bg-destructive/25 border-l-4 border-destructive'
+                        : 'bg-primary/15'
+                      }`}
                     style={{
                       '--target-width': `${getAnswerPercentage(answer)}%`,
                       animationDelay: `${index * 150}ms`,
@@ -737,13 +775,12 @@ export default function Quiz() {
                         size="sm"
                         onClick={() => handleFeedback("up")}
                         disabled={feedbackGiven}
-                        className={`text-sm flex-1 max-w-[120px] h-10 ${
-                          feedbackType === "up"
-                            ? "bg-success/20 border-success text-success hover:bg-success/20 hover:text-success"
-                            : feedbackGiven
-                              ? "opacity-50"
-                              : "hover:text-success"
-                        }`}
+                        className={`text-sm flex-1 max-w-[120px] h-10 ${feedbackType === "up"
+                          ? "bg-success/20 border-success text-success hover:bg-success/20 hover:text-success"
+                          : feedbackGiven
+                            ? "opacity-50"
+                            : "hover:text-success"
+                          }`}
                       >
                         <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
                         <span className="ml-1 sm:ml-2">Yes</span>
@@ -753,13 +790,12 @@ export default function Quiz() {
                         size="sm"
                         onClick={() => handleFeedback("down")}
                         disabled={feedbackGiven}
-                        className={`text-sm flex-1 max-w-[120px] h-10 ${
-                          feedbackType === "down"
-                            ? "bg-destructive/20 border-destructive text-destructive hover:bg-destructive/20 hover:text-destructive"
-                            : feedbackGiven
-                              ? "opacity-50"
-                              : "hover:text-destructive"
-                        }`}
+                        className={`text-sm flex-1 max-w-[120px] h-10 ${feedbackType === "down"
+                          ? "bg-destructive/20 border-destructive text-destructive hover:bg-destructive/20 hover:text-destructive"
+                          : feedbackGiven
+                            ? "opacity-50"
+                            : "hover:text-destructive"
+                          }`}
                       >
                         <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
                         <span className="ml-1 sm:ml-2">No</span>
