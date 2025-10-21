@@ -19,12 +19,13 @@ router.put("/:questionId/unmark-duplicate", auth, adminAuth, async (req, res) =>
         $set: {
           "questions.$.duplicate.duplicate_group_id": null,
           "questions.$.duplicate.duplicate_of": [],
-          "questions.$.duplicate.reasoning": "",
+          "questions.$.duplicate.reasoning": "Manually marked as non duplicate",
           "questions.$.duplicate.confidence": null,
           "questions.$.duplicate.last_checked_at": new Date(),
           "questions.$.disabled": false,
           "questions.$.disabled_reason": "",
-          "questions.$.new_question": false // ✅ clear new question flag
+          "questions.$.new_question": false,
+          "questions.$.needs_validation": false
         }
       }
     );
