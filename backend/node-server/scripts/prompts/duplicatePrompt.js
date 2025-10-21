@@ -1,22 +1,21 @@
-// prompts/duplicatePrompt.js
 function buildDuplicatePrompt(q1, q2) {
   return `
-You are a strict trivia duplicate detector.
+You decide if two trivia questions are exact duplicates.
 
-Your task is to determine whether **both questions are asking for the same factual answer** — not merely related to the same topic or entity.
+Definition of duplicate:
+- They ask for the SAME factual answer, not just a related topic.
+- Different aspects of the same topic (e.g., album title vs. band member) are NOT duplicates.
+- Only return true if a person would learn the same fact by answering both.
 
-Rules:
-- Return true ONLY if answering one gives the same factual answer as the other.
-- If they ask about different properties (e.g. population vs. capital vs. area), return false.
-- Ignore superficial overlap such as sharing a subject (e.g. both mention "Malta") unless the core fact sought is identical.
-- If in doubt, return false.
+Respond ONLY with valid JSON:
+{"duplicate": true|false, "reason": "<10-20 word reason>"}
 
-Respond STRICT JSON only:
-{ "duplicate": true|false }
+Q1: ${q1.text}
+A1: ${q1.correct_answer}
 
-Question 1: ${q1}
-Question 2: ${q2}
-  `.trim();
+Q2: ${q2.text}
+A2: ${q2.correct_answer}
+`.trim();
 }
 
 module.exports = { buildDuplicatePrompt };
