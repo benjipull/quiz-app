@@ -17,7 +17,7 @@ async function queryOllama(prompt) {
         prompt,
         options: {
           temperature: 0,
-          num_ctx: 512,
+          num_ctx: 4096,
           num_predict: 50,
           top_p: 0.9,
           repeat_penalty: 1.1,
@@ -195,6 +195,9 @@ async function findDuplicatesAndMarkChecked() {
   }
 }
 
-findDuplicatesAndMarkChecked();
+if (require.main === module && process.env.RUN_DUPLICATE_CHECK === "true") {
+  findDuplicatesAndMarkChecked();
+}
+
 
 module.exports = { processSingleQuestion: null };

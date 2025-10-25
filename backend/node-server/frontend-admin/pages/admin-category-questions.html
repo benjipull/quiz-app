@@ -5,7 +5,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Category Questions</title>
-
   <style>
     body {
       font-family: system-ui, sans-serif;
@@ -344,7 +343,56 @@
     .inline-msg.show {
       opacity: 1;
     }
+
+    /* === ANSWER STAT BARS === */
+    .bar-container {
+      position: relative;
+      background: #1c1c1c;
+      border-radius: 6px;
+      overflow: hidden;
+      height: 30px;
+      margin: 6px 0;
+      display: flex;
+      align-items: center;
+    }
+
+    .bar-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.08); /* neutral gray fill */
+      border-radius: 6px;
+      transition: width 0.5s ease;
+    }
+
+    .bar-content {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: 0 12px;
+      font-weight: 500;
+      color: #eee;
+    }
+
+    .bar-count {
+      font-size: 0.85em;
+      color: #aaa;
+    }
+
+    .correct-answer {
+      color: #6cff6c;
+      font-weight: bold;
+    }
+
+    .answer-row:hover .bar-fill {
+      background: rgba(255, 255, 255, 0.15);
+    }
   </style>
+
 </head>
 
 <body>
@@ -417,7 +465,7 @@
         const duplicatesHTML = q.duplicate_group_id ? await renderDuplicateGroup(q.duplicate_group_id, q._id) : "";
         return `
       <tr class="question-row ${q.needs_validation ? 'needs-validation' : ''}" data-id="${q._id}">
-        <td>${escapeHtml(q.text)}${q.new_question ? '<span class="dup-flag">🔁</span>' : ""}</td>
+        <td>${escapeHtml(q.text)}</td>
         <td>${q.difficulty_level ?? "—"}</td>
         <td><input type="checkbox" ${q.disabled ? "checked" : ""} /></td>
         <td><input type="checkbox" ${q.new_question ? "checked" : ""} /></td>
@@ -449,21 +497,46 @@
     }
 
     function renderAnswers(ans = [], correct = "", explanation = "", q = {}) {
+      const total = ans.reduce((sum, a) => sum + (a.correctCount || 0), 0);
+
       const answersHTML = ans?.length
-        ? `<ul class="answers-list">${ans.map(a => {
-          const ok = a.text.trim().toLowerCase() === correct.trim().toLowerCase();
-          return `<li class="${ok ? 'correct-answer' : 'wrong-answer'}">${ok ? "✅" : "•"} ${escapeHtml(a.text)}</li>`;
-        }).join("")}</ul>` : `<em>No answers available</em>`;
-      const explanationHTML = explanation ? `<div class="explanation"><b>🧠 Explanation:</b> ${escapeHtml(explanation)}</div>` : "";
+        ? `<ul class="answers-list">
+        ${ans.map(a => {
+          const isCorrect = a.text.trim().toLowerCase() === correct.trim().toLowerCase();
+          const count = a.correctCount || 0;
+          const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+
+          return `
+            <li class="answer-row" style="position:relative;">
+              <div class="bar-container">
+                <div class="bar-fill" style="width:${pct}%;"></div>
+                <div class="bar-content ${isCorrect ? 'correct-answer' : ''}">
+                  ${isCorrect ? "✅ " : "• "}
+                  ${escapeHtml(a.text)}
+                  <span class="bar-count">${count} (${pct}%)</span>
+                </div>
+              </div>
+            </li>`;
+        }).join("")}
+      </ul>`
+        : `<em>No answers available</em>`;
+
+      const explanationHTML = explanation
+        ? `<div class="explanation"><b>🧠 Explanation:</b> ${escapeHtml(explanation)}</div>`
+        : "";
+
       const validationHTML = q.needs_validation
         ? `<div class="validation-needed">
-             <div class="dup-header">⚠️ Validation Needed</div>
-             <div>Review this question and confirm whether it is a duplicate.</div>
-             <button class="mark-dup-btn" data-id="${q._id}">🚫 Mark as Duplicate</button>
-             <button class="unmark-dup-btn" data-id="${q._id}">❎ Mark as Not Duplicate</button>
-           </div>` : "";
+         <div class="dup-header">⚠️ Validation Needed</div>
+         <div>Review this question and confirm whether it is a duplicate.</div>
+         <button class="mark-dup-btn" data-id="${q._id}">🚫 Mark as Duplicate</button>
+         <button class="unmark-dup-btn" data-id="${q._id}">❎ Mark as Not Duplicate</button>
+       </div>`
+        : "";
+
       return answersHTML + explanationHTML + validationHTML;
     }
+
 
     async function renderDuplicateGroup(groupId, currentId) {
       try {
