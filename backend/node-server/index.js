@@ -54,6 +54,7 @@ app.use("/api/categories", require("./routes/rateCategory"));
 app.use("/api/nextQuestion", require("./routes/nextQuestion")); 
 app.use("/api/answerQuestion", require("./routes/answerQuestion")); 
 app.use("/api/updatePopularity", require("./routes/updatePopularity")); 
+app.use("/api/reportQuestion", require("./routes/reportQuestion")); 
 
 //Images
 app.use("/api/getImageUrl", require("./routes/getImageUrl")); 
