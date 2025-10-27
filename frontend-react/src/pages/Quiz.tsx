@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ThumbsUp, ThumbsDown, Flag, Lightbulb } from "lucide-react";
+import { ArrowLeft, ThumbsUp, ThumbsDown, Flag, Lightbulb, X } from "lucide-react"; // ADDED: X for close button
 import QuizResults from "@/components/quiz/QuizResults";
 
 // NOTE: Placeholder component for the required confirmation dialog
@@ -20,6 +20,111 @@ const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmTe
     </Card>
   </div>
 );
+
+// ADDED: Report Dialog Component
+interface ReportDialogProps {
+  onClose: () => void;
+  onSubmit: (reportType: string, description: string) => void;
+  isSubmitting: boolean;
+  isThankYou: boolean;
+}
+
+const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDialogProps) => {
+  const [reportType, setReportType] = useState<string | null>(null);
+  const [otherDescription, setOtherDescription] = useState('');
+
+  const reportOptions = [
+    { value: "Incorrect Answer", label: "Incorrect Answer" },
+    { value: "Ambiguous or Poorly Worded Question", label: "Ambiguous or Poorly Worded Question" },
+    { value: "Duplicate Question", label: "Duplicate Question" },
+    { value: "Offensive or Inappropriate Content", label: "Offensive or Inappropriate Content" },
+    { value: "Other", label: "Other (please describe)" },
+  ];
+
+  const handleSubmit = () => {
+    if (reportType) {
+      const description = reportType === "Other" ? otherDescription : reportType;
+      onSubmit(reportType, description);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <Card className="max-w-md w-full p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <h3 className="text-xl font-bold">{isThankYou ? "Thank You!" : "Report Question Issue"}</h3>
+          <Button variant="ghost" size="icon" onClick={onClose} disabled={isSubmitting}>
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {isThankYou ? (
+          <div className="text-center space-y-4">
+            <p className="text-base text-muted-foreground">
+              Thank you for helping us improve our quiz! Your feedback is highly appreciated.
+            </p>
+            <Button onClick={onClose} variant="default">Close</Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Please select the issue that best describes the problem with this question.
+            </p>
+
+            <div className="space-y-2">
+              {reportOptions.map((option) => (
+                <div
+                  key={option.value}
+                  className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                    reportType === option.value
+                      ? "border-primary bg-primary/10"
+                      : "hover:bg-muted"
+                  }`}
+                  onClick={() => setReportType(option.value)}
+                >
+                  <label className="flex items-center space-x-2 cursor-pointer font-medium text-sm">
+                    <input
+                      type="radio"
+                      name="report-issue"
+                      value={option.value}
+                      checked={reportType === option.value}
+                      onChange={() => setReportType(option.value)}
+                      className="hidden"
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                </div>
+              ))}
+            </div>
+
+            {reportType === "Other" && (
+              <div>
+                <textarea
+                  placeholder="Describe the issue..."
+                  value={otherDescription}
+                  onChange={(e) => setOtherDescription(e.target.value)}
+                  className="w-full p-3 border rounded-lg resize-none text-sm  text-gray-900 focus:ring-primary focus:border-primary mt-2"
+                  rows={3}
+                />
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+              <Button
+                variant="default"
+                onClick={handleSubmit}
+                disabled={!reportType || (reportType === "Other" && otherDescription.trim() === '') || isSubmitting}
+              >
+                {isSubmitting ? "Submitting..." : "Submit Report"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+};
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
@@ -102,6 +207,11 @@ export default function Quiz() {
   const [showBars, setShowBars] = useState(false);
   const [answerResponse, setAnswerResponse] = useState<AnswerResponse | null>(null);
   const [showExitDialog, setShowExitDialog] = useState(false); // ADDED: Exit Dialog State
+  // ADDED: State for Report Dialog
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
+
 
   const userToken = localStorage.getItem("token");
   const totalQuestions = 10;
@@ -124,6 +234,53 @@ export default function Quiz() {
     } else {
       navigate("/categories");
     }
+  };
+  
+  // ADDED: Report Question Logic
+  const handleReportQuestion = async (reportType: string, description: string) => {
+    if (!quizState.question?._id) return;
+
+    setIsReporting(true);
+    setReportSuccess(false);
+
+    try {
+      const response = await fetch(`${BASE_URL}/api/reportQuestion`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({
+          questionId: quizState.question._id,
+          reportType: reportType,
+          description: description,
+          questionText: quizState.question.question,
+          category: quizState.selectedCategory?.name,
+        }),
+      });
+
+      if (response.ok) {
+        setReportSuccess(true);
+        // The dialog will now show the thank you message
+      } else {
+        console.error("⚠️ Failed to submit report.");
+        // Optional: show a temporary error message in the dialog
+        setReportSuccess(false);
+      }
+    } catch (err) {
+      console.error("⚠️ Error submitting report:", err);
+      // Optional: show a temporary error message in the dialog
+      setReportSuccess(false);
+    } finally {
+      setIsReporting(false);
+      // If success, the dialog will show the thank you message, which will be closed by the user
+      // If fail, the dialog remains open with the error message
+    }
+  };
+
+  const closeReportDialog = () => {
+    setShowReportDialog(false);
+    setReportSuccess(false); // Reset success state for the next report
   };
 
   useEffect(() => {
@@ -838,7 +995,13 @@ export default function Quiz() {
                           <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
                           <span className="ml-1 sm:ml-2">No</span>
                         </Button>
-                        <Button variant="outline" size="sm" className="text-sm flex-1 max-w-[120px] h-10 border-0">
+                        {/* UPDATED: Report Button onClick handler */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-sm flex-1 max-w-[120px] h-10 border-0"
+                          onClick={() => setShowReportDialog(true)}
+                        >
                           <Flag className="h-4 w-4 md:h-5 md:w-5" />
                           <span className="ml-1 sm:ml-2 hidden sm:inline">Report</span>
                         </Button>
@@ -871,6 +1034,16 @@ export default function Quiz() {
           onCancel={() => setShowExitDialog(false)}
           confirmText="Exit Quiz"
           cancelText="Keep Playing"
+        />
+      )}
+
+      {/* ADDED: Report Question Dialog */}
+      {showReportDialog && (
+        <ReportDialog
+          onClose={closeReportDialog}
+          onSubmit={handleReportQuestion}
+          isSubmitting={isReporting}
+          isThankYou={reportSuccess}
         />
       )}
 
