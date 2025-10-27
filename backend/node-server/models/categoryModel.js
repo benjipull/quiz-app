@@ -15,11 +15,21 @@ const ValidationSchema = new mongoose.Schema({
     validationVersion: { type: Number, default: 0 }
 }, { _id: false });
 
+const DuplicateSchema = new mongoose.Schema({
+    duplicate_checked_version: { type: Number, default: 0 }, // version control
+    duplicate_group_id: { type: String, default: null },     // optional grouping
+    duplicate_of: [{ type: mongoose.Schema.Types.ObjectId }], // related question IDs
+    reasoning: { type: String, default: "" },                // optional explanation
+    confidence: { type: Number, default: null },             // for future AI scoring
+    last_checked_at: { type: Date, default: null }           // timestamp
+}, { _id: false });
+
+
 const QuestionSchema = new mongoose.Schema({
     _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
     text: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
-    
+
     answers: [AnswerSchema],
     correct_answer: { type: String, required: true },
     explanation: { type: String, default: "" },
@@ -31,20 +41,23 @@ const QuestionSchema = new mongoose.Schema({
     timesLoaded: { type: Number, default: 0 },
     popularity: { type: Number, default: 0 },
     disabled: { type: Boolean, default: false },
+    disabled_reason: { type: String, default: "" },
+
     timesAnsweredCorrectly: { type: Number, default: 0 },
     timesAnsweredIncorrectly: { type: Number, default: 0 },
-    
+
     difficulty_level: { type: Number, default: 0 },
-    difficulty_rationale: { type : String, default: "" },
+    difficulty_rationale: { type: String, default: "" },
     difficultyConfirmedVersion: { type: Number, default: 0 },
 
     validation: { type: ValidationSchema, default: {} },
+    needs_validation: { type: Boolean, default: false },
+    new_question: { type: Boolean, default: true },
+    duplicate: { type: DuplicateSchema, default: {} },
 
     hash: { type: String, required: true, unique: true },
     version: { type: Number, default: 1, required: true }
 });
-
-
 
 
 const CompletionSchema = new mongoose.Schema({

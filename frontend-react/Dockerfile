@@ -6,20 +6,15 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm install
 
+# Optional safeguard: ensure react-ga4 exists
+RUN npm install react-ga4
+
 COPY . .
 RUN npm run build
 
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
-
-# Copy the built app from Stage 1
 COPY --from=build /app/dist /usr/share/nginx/html
-
-# Replace the default nginx config with our custom one
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Expose port 80
 EXPOSE 80
-
-# Start nginx
 CMD ["nginx", "-g", "daemon off;"]

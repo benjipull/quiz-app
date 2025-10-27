@@ -10,13 +10,13 @@ router.post("/", authenticateToken, async (req, res) => {
         const userId = req.user.id;
         const { alias, age, avatar, email } = req.body;
 
-        // ✅ Find user first
+        // Find user
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ error: "User not found." });
         }
 
-        // ✅ Basic validation
+        // Basic validation
         if (alias && typeof alias !== "string") {
             return res.status(400).json({ error: "Invalid alias." });
         }
@@ -27,27 +27,36 @@ router.post("/", authenticateToken, async (req, res) => {
             return res.status(400).json({ error: "Invalid avatar selection." });
         }
 
-        // 🟡 Update allowed fields
+        // Track userType before update
+        const wasGuest = user.userType === "Guest";
+
+        // Update allowed fields
         if (alias) user.alias = alias;
         if (age) user.age = age;
         if (avatar) user.avatar = avatar;
 
-        // 🧭 If user is Guest and provides a new email → upgrade to Registered
-        if (email && user.userType === "Guest") {
+        // 🧭 If user was Guest and provides a new email → upgrade to Registered
+        if (email) {
             user.email = email.toLowerCase().trim();
-            user.userType = "Registered";
+
+            if (wasGuest) {
+                user.userType = "Registered";
+            }
         }
 
         user.lastupdated_at = new Date();
         await user.save();
 
-        // ✅ Clean response
         const { password: _, ...userWithoutPassword } = user.toObject();
 
-        return res.status(200).json({
-            message: user.userType === "Registered"
+        // Choose message
+        const message =
+            wasGuest && user.userType === "Registered"
                 ? "Email updated — account upgraded to Registered!"
-                : "User details updated successfully!",
+                : "User details updated successfully!";
+
+        return res.status(200).json({
+            message,
             user: userWithoutPassword
         });
 
