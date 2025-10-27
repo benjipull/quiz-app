@@ -810,7 +810,8 @@ export default function Quiz() {
       {/* Content wrapper */}
       <div className="relative z-10 flex flex-col min-h-screen">
         <div className="sticky top-0 z-30 bg-quiz-background/80 backdrop-blur-sm">
-          <div className="px-4 py-3 md:py-4 max-w-full lg:max-w-3xl xl:max-w-5xl mx-auto">
+          {/* MODIFIED: Reduced horizontal padding from px-4 to px-3 and removed max-width classes (lg:max-w-3xl xl:max-w-5xl) for header to use more screen space */}
+          <div className="px-2 py-2 md:py-4 max-w-full mx-auto">
             <div className="flex items-center justify-between gap-2 mb-3">
               <Button
                 variant="ghost"
@@ -858,10 +859,10 @@ export default function Quiz() {
           </div>
         </div>
 
-        {/* Reduced max-width for less border/empty space */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 max-w-full lg:max-w-3xl xl:max-w-5xl mx-auto w-full">
+        {/* MODIFIED: Reduced horizontal padding from px-4 to px-3 and removed max-width classes (lg:max-w-3xl xl:max-w-5xl) for content to use more screen space */}
+        <div className="flex-1 overflow-y-auto px-3 py-3 max-w-full mx-auto w-full">
           <div className="space-y-6">
-            {/* Reduced Padding for Question */}
+            {/* Reduced Padding for Question (px-1 is already tight) */}
             <div className="px-1 py-3 md:py-4">
               <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-relaxed">
                 {quizState.question?.question}
