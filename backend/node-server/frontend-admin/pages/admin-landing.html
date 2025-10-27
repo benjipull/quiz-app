@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quizicle Admin Portal</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: radial-gradient(circle at top left, #111 0%, #000 100%);
+      color: #eee;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .logo {
+      width: 340px;
+      max-width: 90%;
+      margin-bottom: 1.2rem;
+      filter: drop-shadow(0 0 12px rgba(255, 80, 180, 0.6));
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 1rem;
+      letter-spacing: 0.05em;
+      color: #5ea6ff;
+      text-shadow: 0 0 10px rgba(94,166,255,0.5);
+    }
+
+    .greeting {
+      font-size: 1.1rem;
+      margin-bottom: 2rem;
+      color: #ccc;
+      text-shadow: 0 0 6px rgba(255,255,255,0.2);
+    }
+
+    /* ==== GRID LAYOUT ==== */
+    .menu {
+      display: grid;
+      grid-template-columns: repeat(2, 260px);
+      grid-template-rows: repeat(2, auto);
+      gap: 1.8rem 2rem;
+      justify-content: center;
+      align-items: stretch;
+    }
+
+    @media (max-width: 600px) {
+      .menu {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ==== CARD STYLES ==== */
+    .card {
+      background: linear-gradient(145deg, #1a1a1a, #0f0f0f);
+      border: 1px solid #222;
+      border-radius: 14px;
+      padding: 1.5rem 1rem;
+      text-align: center;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      box-shadow: 0 0 15px rgba(0,0,0,0.5);
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 0 20px rgba(94,166,255,0.7);
+      border-color: #5ea6ff;
+    }
+
+    .card h2 {
+      color: #fff;
+      margin: 0.5rem 0 0.25rem;
+      font-size: 1.2rem;
+    }
+
+    .card p {
+      color: #bbb;
+      font-size: 0.9rem;
+    }
+
+    /* Disabled / Coming Soon cards */
+    .card.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      position: relative;
+      pointer-events: none;
+      background: linear-gradient(145deg, #151515, #0b0b0b);
+      border: 1px solid #222;
+    }
+
+    .card.disabled::after {
+      content: "Coming Soon";
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 0.7rem;
+      color: #ff6699;
+      background: rgba(255, 102, 153, 0.1);
+      border: 1px solid rgba(255, 102, 153, 0.3);
+      border-radius: 6px;
+      padding: 0.2rem 0.4rem;
+    }
+
+    footer {
+      bottom: 1rem;
+      color: #555;
+      font-size: 0.8rem;
+      margin-top: 3.5rem;
+    }
+
+    a {
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <img src="../images/Quizzcle Logo.PNG" alt="Quizicle Logo" class="logo" />
+  <h1>Quizicle Admin Portal</h1>
+  <div class="greeting" id="greetingText"></div>
+
+  <div class="menu">
+    <a href="/admin/pages/admin-categories.html" class="card">
+      <h2>📚 Content Management</h2>
+      <p>Manage categories, questions, and validation</p>
+    </a>
+
+    <a href="/admin/pages/admin-category-chart.html" class="card">
+      <h2>📊 Charts & Insights</h2>
+      <p>View category statistics and question counts</p>
+    </a>
+
+    <div class="card disabled">
+      <h2>👥 CMS (Customer Management)</h2>
+      <p>Track and manage quiz players</p>
+    </div>
+
+    <div class="card disabled">
+      <h2>⚙️ Game Settings</h2>
+      <p>Administer Gameplay</p>
+    </div>
+  </div>
+
+  <footer>© 2025 Quizicle Admin Portal</footer>
+
+  <script>
+    // ✅ Security check
+    const token = localStorage.getItem("token");
+    const userType = (localStorage.getItem("userType") || "").toLowerCase();
+    if (!token || userType !== "admin") {
+      window.location.href = "/admin/pages/admin-login.html";
+    }
+
+    // ✅ Personalized greeting
+    const name = localStorage.getItem("alias") || "there";
+    const hour = new Date().getHours();
+    let greeting = "Hello";
+
+    if (hour < 12) greeting = "Good morning";
+    else if (hour < 18) greeting = "Good afternoon";
+    else greeting = "Good evening";
+
+    document.getElementById("greetingText").textContent = `${greeting}, ${name}!`;
+  </script>
+</body>
+</html>

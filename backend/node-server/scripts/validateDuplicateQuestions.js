@@ -3,104 +3,201 @@ const mongoose = require("mongoose");
 const axios = require("axios");
 const Category = require("../models/categoryModel");
 const connectDB = require("../config/db");
+const { buildDuplicatePrompt } = require("./prompts/duplicatePrompt");
 
 const OLLAMA_URL = process.env.OLLAMA_URL;
+const DUPLICATE_VERSION = 0.17;
 
-// Ask Ollama if two questions mean the same thing
-async function isDuplicate(q1, q2) {
-  const prompt = `
-You are a trivia question duplicate detector.
-Decide if these two questions essentially mean the same thing, even if worded differently.
-
-Respond STRICT JSON only:
-{ "duplicate": true|false }
-
-Question 1: ${q1}
-Question 2: ${q2}
-  `.trim();
-
+async function queryOllama(prompt) {
   try {
-    const response = await axios.post(OLLAMA_URL, {
-      model: "llama3",
-      prompt,
-      options: {
-        num_ctx: 1024,
-        temperature: 0.0,
-        num_predict: 50
+    const res = await axios.post(
+      OLLAMA_URL,
+      {
+        model: "llama3",
+        prompt,
+        options: {
+          temperature: 0,
+          num_ctx: 4096,
+          num_predict: 50,
+          top_p: 0.9,
+          repeat_penalty: 1.1,
+        },
+        stream: false,
       },
-      stream: false
-    });
+      { timeout: 60_000 }
+    );
 
-    const raw = response.data.response.trim();
-    const parsed = JSON.parse(raw);
-    return parsed.duplicate === true;
+    const raw = String(res.data.response || "").trim();
+
+    // Extract everything from the first { to the end
+    const jsonMatch = raw.match(/\{[\s\S]*$/);
+    if (!jsonMatch) {
+      console.error("⚠️ Invalid JSON from model:", raw.slice(0, 200));
+      return { duplicate: false, reason: "Invalid JSON (no { found)" };
+    }
+
+    // Try to repair truncated JSON (missing closing brace, curly quotes, etc.)
+    let text = jsonMatch[0]
+      .replace(/“|”/g, '"') // replace fancy quotes
+      .replace(/,\s*$/, "") // trailing commas
+      .trim();
+
+    if (!text.endsWith("}")) text += "}"; // add closing brace if missing
+
+    let parsedObj;
+    try {
+      parsedObj = JSON.parse(text);
+    } catch (e) {
+      console.error("⚠️ JSON parse error:", e.message, raw.slice(0, 200));
+      return { duplicate: false, reason: "Parse error" };
+    }
+
+    // Validate parsed object
+    if (typeof parsedObj.duplicate !== "boolean") parsedObj.duplicate = false;
+    if (typeof parsedObj.reason !== "string") parsedObj.reason = "";
+
+    return {
+      duplicate: parsedObj.duplicate,
+      reason: parsedObj.reason,
+    };
+
   } catch (err) {
-    console.error("❌ Duplicate check failed:", err.message);
-    return false;
+    console.error("❌ Ollama duplicate check failed:", err.response?.data || err.message);
+    return { duplicate: false, reason: "Request failed" };
   }
 }
 
-async function findAndDisableDuplicates() {
+
+// =========================
+// 🔹 Duplicate Checking
+// =========================
+async function isDuplicate(q1, q2) {
+  const prompt = buildDuplicatePrompt(q1, q2);
+  return queryOllama(prompt);
+}
+
+// =========================
+// 🔹 Database Update Helpers
+// =========================
+async function updateDuplicateGroup(categoryId, questionIds, groupId) {
+  await Category.updateOne(
+    { _id: categoryId },
+    {
+      $set: {
+        "questions.$[elem].duplicate.duplicate_checked_version": DUPLICATE_VERSION,
+        "questions.$[elem].duplicate.duplicate_group_id": groupId,
+        "questions.$[elem].duplicate.last_checked_at": new Date(),
+        "questions.$[elem].needs_validation": true,
+        "questions.$[elem].duplicate.reasoning": "Potential duplicate — requires validation",
+      },
+    },
+    {
+      arrayFilters: [{ "elem._id": { $in: questionIds } }],
+    }
+  );
+}
+
+async function clearQuestionDuplicateFlag(questionId) {
+  await Category.updateOne(
+    { "questions._id": questionId },
+    {
+      $set: {
+        "questions.$.duplicate.duplicate_checked_version": DUPLICATE_VERSION,
+        "questions.$.duplicate.duplicate_group_id": null,
+        "questions.$.duplicate.last_checked_at": new Date(),
+        "questions.$.needs_validation": false,
+        "questions.$.duplicate.reasoning": "",
+      },
+    }
+  );
+}
+
+async function processCategory(category) {
+  console.log(`\n🔹 Category: ${category.name}`);
+
+  let questions = category.questions.filter((q) => {
+    if (q.disabled) return false;
+    const version = q?.duplicate?.duplicate_checked_version ?? 0;
+    return Number(version) < DUPLICATE_VERSION;
+  });
+
+  if (questions.length <= 1) {
+    return;
+  }
+
+  const checked = new Set();
+
+  while (questions.length > 0) {
+    const qI = questions.shift(); // take the first question out
+    if (checked.has(qI._id.toString())) continue;
+
+    const group = [qI];
+    checked.add(qI._id.toString());
+
+    for (let j = 0; j < questions.length; j++) {
+      const qJ = questions[j];
+      if (checked.has(qJ._id.toString())) continue;
+
+      const { duplicate, reason } = await isDuplicate(qI, qJ);
+      if (duplicate) {
+        console.log(`   🔁 "${qI.text}" ↔ "${qJ.text}"`);
+        console.log(`      🤖 Reason: ${reason}`);
+        group.push(qJ);
+        checked.add(qJ._id.toString());
+      }
+    }
+
+    if (group.length > 1) {
+      // 🧹 Remove this group’s members from future checks
+      const groupIds = new Set(group.map((g) => g._id.toString()));
+      questions = questions.filter((q) => !groupIds.has(q._id.toString()));
+
+      const groupId = new mongoose.Types.ObjectId().toString();
+      const ids = group.map((q) => q._id);
+      await updateDuplicateGroup(category._id, ids, groupId);
+
+      console.log(
+        `⚠️ Duplicate group (${group.length}) saved for category "${category.name}" (GroupID: ${groupId}).`
+      );
+      group.forEach((q) => console.log(`   ↳ ${q.text}`));
+    } else {
+      await clearQuestionDuplicateFlag(qI._id);
+      console.log(`✅ Cleared question: "${qI.text}"`);
+    }
+  }
+
+  console.log(`✅ Category "${category.name}" complete.`);
+}
+
+
+// =========================
+// 🔹 Main Entry
+// =========================
+async function findDuplicatesAndMarkChecked() {
   try {
     await connectDB();
     console.log("✅ Connected to MongoDB");
 
-    // Only pull categories with questions that are enabled and not checked yet
     const categories = await Category.find(
-      { "questions.disabled": false, "questions.validation.duplicationChecked": { $ne: true } },
+      { "questions.disabled": false },
       { name: 1, questions: 1 }
     );
 
     for (const category of categories) {
-      console.log(`🔹 Checking category: ${category.name}`);
-
-      // Only enabled + not-checked questions
-      const questions = category.questions.filter(
-        q => !q.disabled && (!q.validation || q.validation.duplicationChecked !== true)
-      );
-
-      if (questions.length <= 1) continue;
-
-      for (let i = 0; i < questions.length; i++) {
-        const q1 = questions[i];
-
-        for (let j = i + 1; j < questions.length; j++) {
-          const q2 = questions[j];
-
-          const duplicate = await isDuplicate(q1.text, q2.text);
-          if (duplicate) {
-            console.log(`   ⚠️ Duplicate found:\n      Q1: ${q1.text}\n      Q2: ${q2.text}`);
-
-            // Keep q1, disable q2
-            await Category.updateOne(
-              { "questions._id": q2._id },
-              {
-                $set: {
-                  "questions.$.disabled": true,
-                  "questions.$.validation.duplicateOf": q1._id,
-                  "questions.$.validation.duplicationChecked": true
-                }
-              }
-            );
-
-            console.log(`   ❌ Disabled duplicate: ${q2._id} (kept ${q1._id})`);
-          }
-        }
-
-        // Mark q1 as checked even if no duplicates found
-        await Category.updateOne(
-          { "questions._id": q1._id },
-          { $set: { "questions.$.validation.duplicationChecked": true } }
-        );
-      }
+      await processCategory(category);
     }
 
-    console.log("🎉 Duplicate scan complete!");
-    mongoose.connection.close();
+    console.log("\n🎉 Duplicate detection complete!");
   } catch (err) {
     console.error("❌ Error:", err.message);
+  } finally {
     mongoose.connection.close();
   }
 }
 
-findAndDisableDuplicates();
+if (require.main === module && process.env.RUN_DUPLICATE_CHECK === "true") {
+  findDuplicatesAndMarkChecked();
+}
+
+
+module.exports = { processSingleQuestion: null };

@@ -3,8 +3,7 @@ import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-// ADDED: X for close icon
-import { ArrowLeft, ThumbsUp, ThumbsDown, Flag, Lightbulb, X } from "lucide-react";
+import { ArrowLeft, ThumbsUp, ThumbsDown, Flag, Lightbulb } from "lucide-react";
 import QuizResults from "@/components/quiz/QuizResults";
 
 // NOTE: Placeholder component for the required confirmation dialog
@@ -22,145 +21,9 @@ const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmTe
   </div>
 );
 
-// ADDED: Report Dialog Component
-const ReportDialog = ({ questionId, onReport, onCancel, base_url, userToken }: any) => {
-  const [reportType, setReportType] = useState<string | null>(null);
-  const [otherDescription, setOtherDescription] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const reportOptions = [
-    { id: "incorrect_answer", label: "Incorrect Answer", description: "The provided “correct” answer is actually wrong, outdated, or debatable." },
-    { id: "ambiguous_question", label: "Ambiguous or Poorly Worded Question", description: "The question is confusing, unclear, or allows multiple valid interpretations." },
-    { id: "duplicate_question", label: "Duplicate Question", description: "The question (or a very similar one) has appeared elsewhere in the quiz." },
-    { id: "inappropriate_content", label: "Offensive or Inappropriate Content", description: "The question or answer contains offensive, biased, or otherwise inappropriate language." },
-    { id: "other", label: "Other (please describe)" },
-  ];
-
-  const handleSubmit = async () => {
-    if (!reportType || (reportType === "other" && !otherDescription.trim())) return;
-
-    setIsSubmitting(true);
-    const reportDetails = reportType === "other" ? otherDescription.trim() : reportOptions.find(opt => opt.id === reportType)?.description || reportType;
-    
-    try {
-      // NOTE: Replace '/api/reportQuestion' with your actual endpoint
-      const response = await fetch(`${base_url}/api/reportQuestion`, { 
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({
-          questionId,
-          reportType,
-          details: reportDetails,
-        }),
-      });
-
-      if (response.ok) {
-        setSuccessMessage("Thank you for your help! The question has been successfully reported for review.");
-        onReport(); // Notify parent of successful report (e.g., to disable the button)
-      } else {
-        throw new Error("Failed to submit report.");
-      }
-    } catch (error) {
-      console.error("Error submitting report:", error);
-      setSuccessMessage("⚠️ Failed to submit report. Please try again later.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <Card className="max-w-md w-full p-6 space-y-5 relative">
-        <div className="flex justify-between items-start">
-          <h3 className="text-xl font-bold text-primary">Report Question</h3>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onCancel}
-            className="text-muted-foreground hover:text-foreground absolute top-4 right-4"
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-
-        {successMessage ? (
-          <div className="text-center space-y-4 py-4">
-            <p className={`font-medium ${successMessage.startsWith("⚠️") ? 'text-destructive' : 'text-success'}`}>{successMessage}</p>
-            <Button variant="default" onClick={onCancel}>Close</Button>
-          </div>
-        ) : (
-          <>
-            <p className="text-sm text-muted-foreground -mt-3">
-              Please select the issue you found with this question.
-            </p>
-
-            <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
-              {reportOptions.map((option) => (
-                <div 
-                  key={option.id}
-                  onClick={() => setReportType(option.id)}
-                  className={`p-3 border rounded-lg transition-colors cursor-pointer ${
-                    reportType === option.id 
-                      ? "border-primary bg-primary/10 ring-2 ring-primary/50" 
-                      : "border-border hover:bg-muted/50"
-                  }`}
-                >
-                  <label className="flex items-center space-x-3 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="reportType"
-                      checked={reportType === option.id}
-                      onChange={() => setReportType(option.id)}
-                      className="form-radio h-4 w-4 text-primary bg-background border-muted-foreground"
-                    />
-                    <div className="flex-1">
-                      <p className="font-semibold text-sm">{option.label}</p>
-                      {option.description && (
-                        <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
-                      )}
-                    </div>
-                  </label>
-                </div>
-              ))}
-            </div>
-
-            {reportType === "other" && (
-              <textarea
-                value={otherDescription}
-                onChange={(e) => setOtherDescription(e.target.value)}
-                placeholder="Describe the issue here..."
-                rows={4}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm"
-              />
-            )}
-
-            <div className="flex justify-end gap-3 pt-3">
-              <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              <Button 
-                variant="destructive" 
-                onClick={handleSubmit} 
-                disabled={isSubmitting || !reportType || (reportType === "other" && !otherDescription.trim())}
-              >
-                {isSubmitting ? "Submitting..." : "Submit Report"}
-              </Button>
-            </div>
-          </>
-        )}
-      </Card>
-    </div>
-  );
-};
-
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
 interface Question {
-// ... (rest of Question interface)
   _id: string;
   question: string;
   answers: string[];
@@ -178,7 +41,6 @@ interface AnswerStats {
 }
 
 interface AnswerResponse {
-// ... (rest of AnswerResponse interface)
   question: string;
   correctAnswer: string;
   explanation: string;
@@ -189,7 +51,6 @@ interface AnswerResponse {
 }
 
 interface QuizState {
-// ... (rest of QuizState interface)
   started: boolean;
   completed: boolean;
   selectedCategory: { id: string; name: string } | null;
@@ -215,7 +76,6 @@ export default function Quiz() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [quizState, setQuizState] = useState<QuizState>({
-// ... (rest of quizState initialisation)
     started: false,
     completed: false,
     selectedCategory: null,
@@ -242,11 +102,6 @@ export default function Quiz() {
   const [showBars, setShowBars] = useState(false);
   const [answerResponse, setAnswerResponse] = useState<AnswerResponse | null>(null);
   const [showExitDialog, setShowExitDialog] = useState(false); // ADDED: Exit Dialog State
-  // ADDED: Report Dialog State
-  const [showReportDialog, setShowReportDialog] = useState(false); 
-  // ADDED: Report Submitted State
-  const [reportSubmitted, setReportSubmitted] = useState(false);
-
 
   const userToken = localStorage.getItem("token");
   const totalQuestions = 10;
@@ -259,7 +114,6 @@ export default function Quiz() {
   const incorrectSound = new Audio("/incorrect.mp3");
 
   // ADDED: Handle back navigation with confirmation
-// ... (handleBackNavigation and confirmExit)
   const handleBackNavigation = () => {
     setShowExitDialog(true);
   };
@@ -272,18 +126,6 @@ export default function Quiz() {
     }
   };
 
-  // ADDED: Function to handle report button click (shows dialog)
-  const handleReportButtonClick = () => {
-    if (!quizState.question?._id) return;
-    setShowReportDialog(true);
-  };
-
-  // ADDED: Function to handle successful report submission from dialog
-  const handleReportSuccess = () => {
-    setReportSubmitted(true);
-  };
-  
-// ... (rest of useEffects and functions)
   useEffect(() => {
     if (categoryId && userToken) {
       startQuiz(categoryId);
@@ -356,7 +198,6 @@ export default function Quiz() {
     setShowExplanation(false);
     setFeedbackGiven(false);
     setFeedbackType(null);
-    setReportSubmitted(false); // ADDED: Reset report state
     // Use timer from backend response
     setTimeLeft(quizState.question?.timer || 30);
     setTimeUp(false);
@@ -373,7 +214,6 @@ export default function Quiz() {
     }
   }, [quizState.currentQuestionIndex]);
 
-// ... (rest of startQuiz, fetchNextQuestion, handleTimeUp, completeQuiz)
   const startQuiz = async (categoryId: string) => {
     if (!userToken) {
       console.log("⚠️ You must be logged in to play.");
@@ -692,8 +532,6 @@ export default function Quiz() {
     }
   };
 
-// ... (rest of helper functions getOptionStyle, getTimerColor, getDifficultyColor, getAnswerPercentage, QuizBase)
-
   const getOptionStyle = (answer: string) => {
     if (timeUp) {
       return "bg-muted/30 cursor-not-allowed opacity-50";
@@ -758,7 +596,6 @@ export default function Quiz() {
   );
 
   if (error) {
-// ... (rest of error state)
     return (
       <QuizBase>
         <div className="flex-1 flex items-center justify-center px-4">
@@ -775,7 +612,6 @@ export default function Quiz() {
   }
 
   if (loading || (!quizState.question && !quizState.completed)) {
-// ... (rest of loading state)
     return (
       <QuizBase>
         <div className="flex-1 flex items-center justify-center px-4">
@@ -791,7 +627,6 @@ export default function Quiz() {
   }
 
   if (quizState.completed && quizState.results) {
-// ... (rest of completed state)
     return (
       <QuizBase>
         <QuizResults
@@ -920,6 +755,7 @@ export default function Quiz() {
                 </Card>
               ))}
             </div>
+
             {timeUp && (
               <div ref={explanationRef}>
                 <Card className="p-6 md:p-8 bg-destructive/5 animate-slide-up border-0 shadow-sm rounded-xl">
@@ -1002,15 +838,9 @@ export default function Quiz() {
                           <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
                           <span className="ml-1 sm:ml-2">No</span>
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={handleReportButtonClick} // UPDATED: Click handler
-                          disabled={reportSubmitted} // ADDED: Disable after reporting
-                          className={`text-sm flex-1 max-w-[120px] h-10 border-0 ${reportSubmitted ? "bg-primary/10 text-primary border-primary/50" : "hover:bg-card/60"}`} // ADDED: Style for reported state
-                        >
+                        <Button variant="outline" size="sm" className="text-sm flex-1 max-w-[120px] h-10 border-0">
                           <Flag className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:ml-2 hidden sm:inline">{reportSubmitted ? "Reported" : "Report"}</span>
+                          <span className="ml-1 sm:ml-2 hidden sm:inline">Report</span>
                         </Button>
                       </div>
                     </div>
@@ -1043,24 +873,8 @@ export default function Quiz() {
           cancelText="Keep Playing"
         />
       )}
-      
-      {/* ADDED: Report Question Dialog */}
-      {showReportDialog && quizState.question && (
-        <ReportDialog
-          questionId={quizState.question._id}
-          onReport={() => {
-            handleReportSuccess();
-            // Optional: Close dialog immediately or after a delay on success
-            // For now, let the dialog manage its own success state.
-          }}
-          onCancel={() => setShowReportDialog(false)}
-          base_url={BASE_URL}
-          userToken={userToken}
-        />
-      )}
 
       <style>{`
-// ... (rest of styles)
         @keyframes slide-up {
           from {
             opacity: 0;

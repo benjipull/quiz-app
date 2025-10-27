@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Categories</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #111;
+      color: #eee;
+      margin: 0;
+      padding: 2rem;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .table-container {
+      max-width: 1100px;
+      margin: 0 auto;
+      background: #1e1e1e;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: #2b2b2b;
+    }
+
+    th,
+    td {
+      padding: 12px 16px;
+      text-align: left;
+    }
+
+    th {
+      color: #a0a0a0;
+      font-weight: 600;
+      border-bottom: 1px solid #333;
+    }
+
+    tr {
+      border-bottom: 1px solid #222;
+      transition: background 0.2s ease;
+    }
+
+    tr:hover {
+      background: #292929;
+    }
+
+    .disabled {
+      color: #ff5555;
+      font-weight: bold;
+    }
+
+    .enabled {
+      color: #66ff88;
+    }
+
+    .category-row {
+      cursor: pointer;
+    }
+
+    .category-row:hover {
+      background: #2f2f2f;
+    }
+  </style>
+</head>
+
+<body>
+  <a href="/admin/pages/admin-landing.html" class="back-link">← Back to Admin Home</a>
+  <h1>📋 Category Overview</h1>
+  <div id="status" class="loading">Loading categories...</div>
+  <div class="table-container">
+    <table id="categoryTable" style="display: none;">
+      <thead>
+        <tr>
+          <th data-key="name">Name ⬍</th>
+          <th data-key="questionCount"># Questions ⬍</th>
+          <th data-key="createdBy">Created By ⬍</th>
+          <th data-key="disabled">Disabled ⬍</th>
+          <th data-key="averageRating">Average Rating ⬍</th>
+          <th data-key="completionCount"># Completions ⬍</th>
+          <th data-key="createdAt">Created ⬍</th>
+        </tr>
+      </thead>
+
+      <tbody id="categoryTableBody"></tbody>
+    </table>
+  </div>
+
+  <tbody id="categoryTableBody"></tbody>
+
+  <script>
+    const token = localStorage.getItem("token");
+    const userType = (localStorage.getItem("userType") || "").toLowerCase();
+    if (!token || userType !== "admin") {
+      window.location.href = "/admin/pages/admin-login.html";
+    }
+
+    let categories = [];
+    let sortState = { key: "name", asc: true };
+
+    async function fetchCategories() {
+      const statusEl = document.getElementById("status");
+      const table = document.getElementById("categoryTable");
+      const tbody = document.getElementById("categoryTableBody");
+
+      try {
+        const res = await fetch("/api/admin/categories", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
+        categories = await res.json();
+
+        statusEl.style.display = "none";
+        table.style.display = "table";
+        renderTable();
+      } catch (err) {
+        statusEl.textContent = "Error loading categories: " + err.message;
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("categoryTableBody");
+      const sorted = [...categories].sort((a, b) => compareValues(a, b, sortState.key, sortState.asc));
+
+      tbody.innerHTML = sorted.map(cat => `
+    <tr class="category-row" data-id="${cat._id}">
+      <td>${cat.name}</td>
+      <td>${cat.questionCount ?? 0}</td>
+      <td>${cat.createdBy?.alias || cat.createdBy?.email || "—"}</td>
+      <td class="${cat.disabled ? 'disabled' : 'enabled'}">
+        ${cat.disabled ? "❌" : "✅"}
+      </td>
+      <td>${cat.averageRating?.toFixed?.(1) ?? "—"}</td>
+      <td>${cat.completionCount ?? 0}</td>
+      <td>${new Date(cat.createdAt).toLocaleDateString()}</td>
+    </tr>
+  `).join("");
+
+      // row click navigation
+      document.querySelectorAll(".category-row").forEach(row => {
+        row.addEventListener("click", () => {
+          const id = row.getAttribute("data-id");
+          window.location.href = `/admin/pages/admin-category-questions.html?id=${id}`;
+        });
+      });
+    }
+
+    // 🔢 numeric vs string comparison
+    function compareValues(a, b, key, asc) {
+      let valA = a[key];
+      let valB = b[key];
+
+      // nested keys (like createdBy)
+      if (key === "createdBy") {
+        valA = a.createdBy?.alias || a.createdBy?.email || "";
+        valB = b.createdBy?.alias || b.createdBy?.email || "";
+      }
+
+      // date handling
+      if (key === "createdAt") {
+        valA = new Date(valA).getTime();
+        valB = new Date(valB).getTime();
+      }
+
+      const numA = parseFloat(valA);
+      const numB = parseFloat(valB);
+      const bothNumeric = !isNaN(numA) && !isNaN(numB);
+
+      let comparison = 0;
+      if (bothNumeric) {
+        comparison = numA - numB;
+      } else {
+        comparison = String(valA).localeCompare(String(valB), undefined, { sensitivity: "base" });
+      }
+      return asc ? comparison : -comparison;
+    }
+
+    // add click sorting on header
+    document.addEventListener("DOMContentLoaded", () => {
+      fetchCategories();
+
+      document.querySelectorAll("th[data-key]").forEach(th => {
+        th.addEventListener("click", () => {
+          const key = th.dataset.key;
+          if (sortState.key === key) {
+            sortState.asc = !sortState.asc;
+          } else {
+            sortState.key = key;
+            sortState.asc = true;
+          }
+          renderTable();
+        });
+      });
+    });
+  </script>
+
+
+</body>
+
+</html>
