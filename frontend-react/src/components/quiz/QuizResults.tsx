@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -145,9 +145,16 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [animatedScore, setAnimatedScore] = useState(0);
   const [animatedKnowledge, setAnimatedKnowledge] = useState(0);
   const [animatedTotalXP, setAnimatedTotalXP] = useState(totalKnowledge - knowledgeGained);
+  // Change 3: Add state for showing the "Points Earned" modal animation
   const [showPointsOverlay, setShowPointsOverlay] = useState(true);
+  // Change 4: Add state for showing the flying tokens
+  const [showFlyingTokens, setShowFlyingTokens] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [tokens, setTokens] = useState<Array<{id: number; delay: number}>>([]);
+  
+  // Change 5: Refs for tracking element positions
+  const pointsOverlayRef = useRef<HTMLDivElement>(null);
+  const xpCardRef = useRef<HTMLDivElement>(null);
 
   const [knowledgeGainAudio] = useState(
     typeof Audio !== "undefined" ? new Audio(KNOWLEDGE_GAIN_SOUND_SRC) : null
@@ -197,8 +204,15 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           
           // Hide overlay and start token animation
           setTimeout(() => {
-            setShowPointsOverlay(false);
-            startTokenAnimation();
+            // Change 6: Add a fade-out class before setting showPointsOverlay to false
+            if (pointsOverlayRef.current) {
+              pointsOverlayRef.current.classList.add('animate-fade-out');
+            }
+            // Start the token animation right before the fade-out completes
+            setTimeout(() => {
+              setShowPointsOverlay(false);
+              startTokenAnimation();
+            }, 500); // 500ms for the fade-out animation
           }, 600);
         }
         setAnimatedKnowledge(count);
@@ -211,24 +225,53 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
   // Token flying animation
   const startTokenAnimation = () => {
+    const pointsRect = pointsOverlayRef.current?.getBoundingClientRect();
+    const xpRect = xpCardRef.current?.getBoundingClientRect();
+
+    if (!pointsRect || !xpRect) {
+      // Fallback: If refs are not ready, jump to XP animation
+      setAnimatedTotalXP(totalKnowledge);
+      if (hasLeveledUp) {
+        setTimeout(() => setShowLevelUp(true), 300);
+      }
+      return;
+    }
+
+    // Calculate center coordinates
+    const popUpCenterX = pointsRect.left + pointsRect.width / 2;
+    const popUpCenterY = pointsRect.top + pointsRect.height / 2;
+
+    // Target the center of the XP Card
+    const xpTargetX = xpRect.left + xpRect.width / 2;
+    const xpTargetY = xpRect.top + xpRect.height / 2;
+    
+    // Set CSS variables for the animation
     const tokenCount = Math.min(12, Math.max(6, knowledgeGained / 10));
     const newTokens = Array.from({ length: Math.floor(tokenCount) }, (_, i) => ({
       id: i,
-      delay: 150 + i * 45
+      delay: 50 + i * 40
     }));
+
     setTokens(newTokens);
+    setShowFlyingTokens(true); // Show tokens
 
     // Animate XP increase in sync with tokens
     const startXP = totalKnowledge - knowledgeGained;
     let currentXP = startXP;
     const per = Math.max(1, Math.round(knowledgeGained / tokenCount));
+    let tokenIndex = 0;
     
     const xpTimer = setInterval(() => {
-      currentXP += per;
-      if (currentXP >= totalKnowledge) {
+      if (tokenIndex < tokenCount) {
+        currentXP += per;
+        tokenIndex++;
+      } else {
         currentXP = totalKnowledge;
         clearInterval(xpTimer);
         
+        // Hide tokens after animation is complete
+        setTimeout(() => setShowFlyingTokens(false), 200);
+
         // Check for level up after XP animation
         if (hasLeveledUp) {
           setTimeout(() => {
@@ -240,7 +283,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           }, 300);
         }
       }
-      setAnimatedTotalXP(currentXP);
+
+      setAnimatedTotalXP(Math.min(currentXP, totalKnowledge));
       
       // Play sound
       if (knowledgeGainAudio) {
@@ -249,6 +293,12 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         audioClone.play().catch(e => console.log("Audio play failed:", e));
       }
     }, 120);
+
+    // Change 7: Apply the calculated positions as CSS custom properties
+    document.documentElement.style.setProperty('--token-start-x', `${popUpCenterX}px`);
+    document.documentElement.style.setProperty('--token-start-y', `${popUpCenterY}px`);
+    document.documentElement.style.setProperty('--token-end-x', `${xpTargetX}px`);
+    document.documentElement.style.setProperty('--token-end-y', `${xpTargetY}px`);
   };
 
   const [rating, setRating] = useState<number>(0);
@@ -341,10 +391,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     return null;
   }
 
-  // KEY CHANGES ARE HERE:
+  // KEY CHANGES IN RENDER AND CSS:
   return (
-    // Change 1: Use 'fixed inset-0' and 'overflow-hidden' to make the entire component fixed and prevent body scroll.
-    // The previous 'min-h-screen' and 'relative' only ensured it was full-height in the flow, not fixed to the viewport.
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-sans overflow-hidden bg-slate-900/100">
       
       {/* Ambient background effects */}
@@ -368,7 +416,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
       {/* Points Earned Overlay */}
       {showPointsOverlay && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none animate-fade-in">
+        // Change 8: Attach ref to the Card
+        <div ref={pointsOverlayRef} className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none animate-fade-in">
           <Card className="bg-gradient-to-br from-slate-900 via-blue-950/50 to-slate-900 border-2 border-blue-500/40 p-8 text-center shadow-2xl shadow-blue-500/30 animate-pop-in">
             <div className="space-y-3">
               <div className="text-blue-300/80 font-bold text-xs tracking-[0.2em] uppercase">
@@ -386,7 +435,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       )}
 
       {/* Flying Tokens */}
-      {tokens.map((token) => (
+      {showFlyingTokens && tokens.map((token) => (
         <div
           key={token.id}
           className="token"
@@ -428,10 +477,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       )}
 
       {/* Main Results Card Container */}
-      {/* Change 2: Apply 'max-h-full' and 'overflow-y-auto' to the inner container. 
-          This ensures the card is never taller than the viewport and will scroll 
-          internally if its content is too large (especially on mobile). 
-          The 'p-4' on the outer fixed div creates necessary padding around the card. */}
       <div className="relative z-10 w-full max-w-xl mx-auto max-h-full overflow-y-auto">
         <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl border-2 border-blue-500/30 shadow-2xl shadow-blue-500/20 animate-scale-in">
           
@@ -532,7 +577,11 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             </div>
 
             {/* XP Pill */}
-            <Card className="bg-gradient-to-r from-purple-500/20 via-blue-500/20 to-cyan-500/20 border border-purple-400/30 p-4 backdrop-blur-sm animate-slide-in-left shadow-lg shadow-blue-500/10">
+            {/* Change 9: Attach ref to the XP Card */}
+            <Card 
+              ref={xpCardRef}
+              className="bg-gradient-to-r from-purple-500/20 via-blue-500/20 to-cyan-500/20 border border-purple-400/30 p-4 backdrop-blur-sm animate-slide-in-left shadow-lg shadow-blue-500/10"
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-xs font-bold text-slate-400 tracking-[0.12em] uppercase mb-1">
@@ -609,7 +658,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </Card>
       </div>
 
-      {/* CSS Animations - (No changes needed here) */}
+      {/* CSS Animations - (Updated fly-token and added fade-out) */}
       <style>{`
         @keyframes scale-in {
           0% { transform: scale(0.9); opacity: 0; }
@@ -678,13 +727,23 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           0% { opacity: 0; }
           100% { opacity: 1; }
         }
+
+        /* NEW FADE OUT */
+        @keyframes fade-out {
+          0% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+
+        .animate-fade-out {
+          animation: fade-out 0.5s ease-out forwards;
+        }
         
         @keyframes button-glow {
           0%, 100% { box-shadow: 0 4px 20px rgba(147, 51, 234, 0.4); }
           50% { box-shadow: 0 6px 30px rgba(147, 51, 234, 0.6); }
         }
         
-        /* Flying Token Animation */
+        /* Flying Token Animation - UPDATED */
         .token {
           position: fixed;
           width: 14px;
@@ -701,22 +760,34 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         @keyframes fly-token {
           0% {
             opacity: 0;
+            /* Start from the center of the fading points overlay, with a slight spread */
             transform: translate(
-              calc(50vw + cos(var(--token-angle, 0)) * 60px),
-              calc(50vh + sin(var(--token-angle, 0)) * 60px)
+              calc(var(--token-start-x, 50vw) - 7px + cos(var(--token-angle, 0)) * 30px),
+              calc(var(--token-start-y, 50vh) - 7px + sin(var(--token-angle, 0)) * 30px)
             ) scale(0.6);
           }
-          8% {
+          10% {
             opacity: 1;
-          }
-          55% {
+            /* slight scale up for visual pop */
             transform: translate(
-              calc(50vw + cos(var(--token-angle, 0)) * 30px),
-              calc(50vh + sin(var(--token-angle, 0)) * 30px)
+              calc(var(--token-start-x, 50vw) - 7px + cos(var(--token-angle, 0)) * 20px),
+              calc(var(--token-start-y, 50vh) - 7px + sin(var(--token-angle, 0)) * 20px)
             ) scale(1);
           }
+          90% {
+             /* Fly towards the target with a bit of a curve */
+            transform: translate(
+              calc(var(--token-end-x, 50vw) - 7px),
+              calc(var(--token-end-y, 50vh) - 7px)
+            ) scale(0.4);
+            opacity: 1;
+          }
           100% {
-            transform: translate(50vw, 50vh) scale(0.2);
+            /* end at the target location, faded and smaller */
+            transform: translate(
+              calc(var(--token-end-x, 50vw) - 7px),
+              calc(var(--token-end-y, 50vh) - 7px)
+            ) scale(0.1);
             opacity: 0;
           }
         }

@@ -273,7 +273,7 @@ export default function Quiz() {
       setReportSuccess(false);
     } finally {
       setIsReporting(false);
-      // If success, the dialog will show the thank you message, which will be closed by the user
+      // If success, the dialog will now show the thank you message, which will be closed by the user
       // If fail, the dialog remains open with the error message
     }
   };
@@ -708,6 +708,7 @@ export default function Quiz() {
       return "bg-destructive/10 text-destructive border-destructive/50 border-2"; // Added border-2 for emphasis
     }
 
+    // This is the style for an incorrect answer that was not selected by the user
     return "bg-muted/30 border-transparent border-2";
   };
 
@@ -874,7 +875,8 @@ export default function Quiz() {
                 <Card
                   key={index}
                   // ADDED: rounded-xl for rounded frames. Adjusted getOptionStyle to add border-2.
-                  className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer shadow-sm rounded-xl`}
+                  // MODIFIED: Added border-2 border-transparent to ensure consistent space for border and prevent layout shift.
+                  className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer shadow-sm rounded-xl border-2 border-transparent`}
                   onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
                 >
                   {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
@@ -896,8 +898,12 @@ export default function Quiz() {
 
                   <div className="flex items-center gap-3 relative z-10">
                     <div className="flex-1 min-w-0 flex items-center justify-between">
-                      {/* Added flex-shrink for reflow resilience */}
-                      <span className={`text-base md:text-lg leading-snug break-words flex-shrink ${selectedAnswer === null ? 'font-medium' : ''}`}>
+                      {/* MODIFIED: 
+                      1. Removed conditional font-weight and set to font-medium for consistency.
+                      2. Removed flex-shrink.
+                      3. Added w-full and text-left to prevent centering/layout shifts.
+                      */}
+                      <span className={`text-base md:text-lg leading-snug break-words w-full font-medium text-left`}>
                         {answer}
                       </span>
                       {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
