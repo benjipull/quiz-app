@@ -341,8 +341,11 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     return null;
   }
 
+  // KEY CHANGES ARE HERE:
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 font-sans overflow-hidden relative">
+    // Change 1: Use 'fixed inset-0' and 'overflow-hidden' to make the entire component fixed and prevent body scroll.
+    // The previous 'min-h-screen' and 'relative' only ensured it was full-height in the flow, not fixed to the viewport.
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-sans overflow-hidden bg-slate-900/100">
       
       {/* Ambient background effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -424,8 +427,12 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </div>
       )}
 
-      {/* Main Results Card */}
-      <div className="relative z-10 w-full max-w-xl mx-auto">
+      {/* Main Results Card Container */}
+      {/* Change 2: Apply 'max-h-full' and 'overflow-y-auto' to the inner container. 
+          This ensures the card is never taller than the viewport and will scroll 
+          internally if its content is too large (especially on mobile). 
+          The 'p-4' on the outer fixed div creates necessary padding around the card. */}
+      <div className="relative z-10 w-full max-w-xl mx-auto max-h-full overflow-y-auto">
         <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl border-2 border-blue-500/30 shadow-2xl shadow-blue-500/20 animate-scale-in">
           
           {/* Gradient overlay */}
@@ -602,7 +609,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </Card>
       </div>
 
-      {/* CSS Animations */}
+      {/* CSS Animations - (No changes needed here) */}
       <style>{`
         @keyframes scale-in {
           0% { transform: scale(0.9); opacity: 0; }

@@ -805,7 +805,7 @@ export default function Quiz() {
       } : {}}
     >
       {/* Semi-transparent dark overlay for readability */}
-      <div className="absolute inset-0 bg-background/90 backdrop-blur-none z-0"></div>
+      <div className="absolute inset-0 bg-background/90 backdrop-blur-lg z-0"></div>
 
       {/* Content wrapper */}
       <div className="relative z-10 flex flex-col min-h-screen">
