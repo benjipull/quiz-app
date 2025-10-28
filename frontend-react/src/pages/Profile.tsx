@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, Trophy, Clock, RotateCcw, ArrowLeft, Edit, Play, Brain, Users, Star, ShoppingBag, Crown, Target, Zap, Award, TrendingUp, Calendar, Gift } from "lucide-react";
+import { User, Trophy, Clock, RotateCcw, ArrowLeft, Edit, Play, Brain, Users, Star, ShoppingBag, Crown, Target, Zap, Award, TrendingUp, Calendar, Gift, CheckCircle2, XCircle, Coins, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -30,91 +30,15 @@ const Profile = () => {
   const [quizScores, setQuizScores] = useState<any[]>([]);
   const [userCategories, setUserCategories] = useState<any[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
+  const [changingPassword, setChangingPassword] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const userToken = localStorage.getItem("token") || "";
-
-
-  const achievements = [
-    {
-      id: 1,
-      name: "Quiz Scout",
-      description: "Play 7 days in a row",
-      progress: 14,
-      total: 100,
-      icon: "🕵️",
-      unlocked: false
-    },
-    {
-      id: 2,
-      name: "Quiz Enthusiast", 
-      description: "Play 20 days in a row",
-      progress: 5,
-      total: 100,
-      icon: "🎯",
-      unlocked: false
-    },
-    {
-      id: 3,
-      name: "Quiz Hunter",
-      description: "Play 50 days in a row", 
-      progress: 2,
-      total: 100,
-      icon: "🏹",
-      unlocked: false
-    },
-    {
-      id: 4,
-      name: "Quiz Devotee",
-      description: "Play 100 days in a row",
-      progress: 1,
-      total: 100,
-      icon: "💡",
-      unlocked: false
-    },
-    {
-      id: 5,
-      name: "Quiz Master",
-      description: "Get 10 perfect scores",
-      progress: 60,
-      total: 100,
-      icon: "👑",
-      unlocked: true
-    }
-  ];
-
-  const purchases = [
-    {
-      id: 1,
-      name: "Premium Avatar Pack",
-      description: "Unlock 20 exclusive avatars",
-      price: "$4.99",
-      purchased: true,
-      date: "2024-01-15"
-    },
-    {
-      id: 2,
-      name: "Double XP Boost",
-      description: "2x experience points for 7 days",
-      price: "$2.99",
-      purchased: false
-    },
-    {
-      id: 3,
-      name: "Quiz Creator Pro",
-      description: "Advanced quiz creation tools",
-      price: "$9.99",
-      purchased: true,
-      date: "2024-01-10"
-    },
-    {
-      id: 4,
-      name: "Hint Master Pack",
-      description: "100 quiz hints bundle",
-      price: "$1.99",
-      purchased: false
-    }
-  ];
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -279,6 +203,23 @@ const Profile = () => {
     }
   };
 
+  // Calculate statistics
+  const calculateStats = () => {
+    const totalQuizzes = quizScores.length;
+    const totalCorrect = quizScores.reduce((sum, score) => sum + score.score, 0);
+    const totalQuestions = quizScores.reduce((sum, score) => sum + score.totalQuestions, 0);
+    const totalIncorrect = totalQuestions - totalCorrect;
+
+    return {
+      totalQuizzes,
+      totalCorrect,
+      totalIncorrect,
+      totalQuestions
+    };
+  };
+
+  const stats = calculateStats();
+
   const handleAvatarSelection = (selectedAvatar: string, index: number) => {
     setAvatar(selectedAvatar);
     localStorage.setItem("userAvatar", selectedAvatar);
@@ -299,10 +240,14 @@ const Profile = () => {
         return;
       }
 
+      // Get the avatar index from localStorage or calculate it
+      const avatarIndex = localStorage.getItem("userAvatarIndex");
+      const avatarValue = avatarIndex ? parseInt(avatarIndex) + 1 : (avatars.indexOf(avatar || "") + 1) || user.avatar;
+
       const updateData = {
         alias,
         age: parseInt(age),
-        avatar: avatar || user.avatar,
+        avatar: avatarValue
       };
 
       const response = await fetch(`${BASE_URL}/api/updateUserDetails`, {
@@ -316,7 +261,7 @@ const Profile = () => {
 
       if (response.ok) {
         const data = await response.json();
-        const updatedUser = { ...user, alias, age: parseInt(age), avatar: data.user.avatar };
+        const updatedUser = { ...user, alias, age: parseInt(age), avatar: avatarValue };
         setUser(updatedUser);
         localStorage.setItem("user", JSON.stringify(updatedUser));
 
@@ -339,6 +284,61 @@ const Profile = () => {
       });
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({
+        title: "Validation Error",
+        description: "New passwords do not match.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast({
+        title: "Validation Error",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${BASE_URL}/api/users/change-password`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Password changed successfully!",
+        });
+        setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to change password.");
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -442,19 +442,17 @@ const Profile = () => {
       {isProfileVisible ? (
         <>
           {/* Main sticky header with backdrop blur */}
-          <div className="sticky top-0 z-20 w-full bg-background/50 backdrop-blur-md">
+          <div className="sticky top-0 z-20 w-full bg-background/50 backdrop-blur-md border-b border-border/30">
             {/* Header Stats Bar */}
             <div className="container max-w-4xl mx-auto p-4 flex items-center justify-between">
               <Button variant="ghost" onClick={() => navigate("/")} className="text-foreground p-2 hover:bg-accent">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <div className="flex items-center space-x-3">
-        <GameStatsHeader userToken={userToken} />
-              </div>
+                <GameStatsHeader userToken={userToken} isParentLoading={loading} />
             </div>
             
             {/* Profile Info Section */}
-            <div className="container max-w-4xl mx-auto p-4 pb-0">
+            <div className="container max-w-4xl mx-auto p-4 pb-6">
               <div className="flex items-center space-x-4 mb-4">
                 <div className="relative inline-block">
                   <Avatar className="w-20 h-20 md:w-24 md:h-24 border-4 border-background shadow-2xl">
@@ -479,14 +477,33 @@ const Profile = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-card/50 backdrop-blur-sm rounded-lg p-3 border border-border/30 text-center">
+                  <Trophy className="w-5 h-5 text-primary mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-foreground">{stats.totalQuizzes}</p>
+                  <p className="text-xs text-muted-foreground">Quizzes</p>
+                </div>
+                <div className="bg-card/50 backdrop-blur-sm rounded-lg p-3 border border-border/30 text-center">
+                  <CheckCircle2 className="w-5 h-5 text-green-500 mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-foreground">{stats.totalCorrect}</p>
+                  <p className="text-xs text-muted-foreground">Correct</p>
+                </div>
+                <div className="bg-card/50 backdrop-blur-sm rounded-lg p-3 border border-border/30 text-center">
+                  <XCircle className="w-5 h-5 text-red-500 mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-foreground">{stats.totalIncorrect}</p>
+                  <p className="text-xs text-muted-foreground">Incorrect</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* This container holds the entire Tabs component, fixing the structural error */}
+          {/* This container holds the entire Tabs component */}
           <div className="container max-w-4xl mx-auto p-4">
             <Tabs defaultValue="history" className="w-full">
               {/* TabsList is now sticky, appearing right below the main header */}
-              <TabsList className="sticky top-[90px] z-10 grid w-full grid-cols-3 bg-background/50 backdrop-blur-sm border-b border-muted-foreground/30">
+              <TabsList className="sticky top-[240px] z-10 grid w-full grid-cols-4 bg-background/50 backdrop-blur-sm border-b border-muted-foreground/30">
                 <TabsTrigger
                   value="history"
                   className="rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:font-bold text-muted-foreground font-semibold hover:bg-transparent transition-all"
@@ -502,47 +519,22 @@ const Profile = () => {
                   My Quizzes
                 </TabsTrigger>
                 <TabsTrigger
-                  value="purchases"
+                  value="economy"
                   className="rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:font-bold text-muted-foreground font-semibold hover:bg-transparent transition-all"
                 >
-                  <ShoppingBag className="w-4 h-4 mr-2" />
-                  Store
+                  <Coins className="w-4 h-4 mr-2" />
+                  Economy
+                </TabsTrigger>
+                <TabsTrigger
+                  value="settings"
+                  className="rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:font-bold text-muted-foreground font-semibold hover:bg-transparent transition-all"
+                >
+                  <Lock className="w-4 h-4 mr-2" />
+                  Settings
                 </TabsTrigger>
               </TabsList>
               
               <TabsContent value="history" className="mt-6 space-y-4">
-                <Card className="bg-transparent backdrop-blur-sm border-border/50 shadow-xl">
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2 text-foreground">
-                      <Award className="w-5 h-5" />
-                      <span>Achievements</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {achievements.map((achievement) => (
-                      <div key={achievement.id} className="flex items-center space-x-4 p-3 rounded-lg bg-transparent border border-border/40">
-                        <div className="w-12 h-12 rounded-full bg-card flex items-center justify-center text-2xl border-2 border-border">
-                          {achievement.icon}
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-foreground">{achievement.name}</h3>
-                          <p className="text-sm text-muted-foreground">{achievement.description}</p>
-                          <div className="w-full bg-muted rounded-full h-2 mt-2">
-                            <div
-                              className="bg-primary h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${achievement.progress}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-bold text-foreground">{achievement.progress}%</p>
-                          {achievement.unlocked && <Crown className="w-4 h-4 text-yellow-500 dark:text-yellow-400 mx-auto mt-1" />}
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-
                 <Card className="bg-transparent backdrop-blur-sm border-border/50 shadow-xl">
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2 text-foreground">
@@ -644,12 +636,10 @@ const Profile = () => {
                               )}
                               <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <div className="flex items-center space-x-3">
-                                  {category.completionCount > 0 && (
-                                    <div className="flex items-center space-x-1">
-                                      <Users className="w-3 h-3" />
-                                      <span>{category.completionCount}</span>
-                                    </div>
-                                  )}
+                                  <div className="flex items-center space-x-1">
+                                    <Users className="w-3 h-3" />
+                                    <span>{category.completionCount} plays</span>
+                                  </div>
                                   {category.averageRating > 0 && (
                                     <div className="flex items-center space-x-1">
                                       <Star className="w-3 h-3 text-yellow-500 dark:text-yellow-400 fill-current" />
@@ -672,40 +662,182 @@ const Profile = () => {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="purchases" className="mt-6">
+              <TabsContent value="economy" className="mt-6">
                 <Card className="bg-transparent backdrop-blur-sm border-border/50 shadow-xl">
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2 text-foreground">
-                      <ShoppingBag className="w-5 h-5" />
-                      <span>Store & Purchases</span>
+                      <Coins className="w-5 h-5" />
+                      <span>Economy Overview</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Currency Balance */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 rounded-lg p-6 border border-yellow-500/30">
+                        <div className="flex items-center justify-center mb-3">
+                          <Coins className="w-12 h-12 text-yellow-500" />
+                        </div>
+                        <p className="text-center text-3xl font-bold text-foreground mb-1">{user.coins || 0}</p>
+                        <p className="text-center text-sm text-muted-foreground">Gold Coins</p>
+                      </div>
+                      <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-lg p-6 border border-purple-500/30">
+                        <div className="flex items-center justify-center mb-3">
+                          <Zap className="w-12 h-12 text-purple-500" />
+                        </div>
+                        <p className="text-center text-3xl font-bold text-foreground mb-1">{user.gems || 0}</p>
+                        <p className="text-center text-sm text-muted-foreground">Premium Gems</p>
+                      </div>
+                    </div>
+
+                    {/* Economy Details */}
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-foreground text-lg">Currency Details</h3>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-accent/30 border border-border/30">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                              <Coins className="w-5 h-5 text-yellow-500" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-foreground">Gold Coins</p>
+                              <p className="text-xs text-muted-foreground">Earned from completing quizzes</p>
+                            </div>
+                          </div>
+                          <p className="text-xl font-bold text-yellow-500">{user.coins || 0}</p>
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-accent/30 border border-border/30">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                              <Zap className="w-5 h-5 text-purple-500" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-foreground">Premium Gems</p>
+                              <p className="text-xs text-muted-foreground">Premium currency for special items</p>
+                            </div>
+                          </div>
+                          <p className="text-xl font-bold text-purple-500">{user.gems || 0}</p>
+                        </div>
+
+                        {user.tokens && (
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-accent/30 border border-border/30">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                <Award className="w-5 h-5 text-blue-500" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-foreground">Quiz Tokens</p>
+                                <p className="text-xs text-muted-foreground">Special event currency</p>
+                              </div>
+                            </div>
+                            <p className="text-xl font-bold text-blue-500">{user.tokens}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Earning History */}
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-foreground text-lg">How to Earn</h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-start space-x-2 p-3 rounded-lg bg-card/50">
+                          <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5" />
+                          <div>
+                            <p className="font-semibold text-foreground">Complete Quizzes</p>
+                            <p className="text-muted-foreground">Earn 10-50 coins based on performance</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-2 p-3 rounded-lg bg-card/50">
+                          <Trophy className="w-4 h-4 text-yellow-500 mt-0.5" />
+                          <div>
+                            <p className="font-semibold text-foreground">Perfect Scores</p>
+                            <p className="text-muted-foreground">Get bonus 25 coins for 100% accuracy</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start space-x-2 p-3 rounded-lg bg-card/50">
+                          <Brain className="w-4 h-4 text-primary mt-0.5" />
+                          <div>
+                            <p className="font-semibold text-foreground">Create Quizzes</p>
+                            <p className="text-muted-foreground">Earn 5 coins when others play your quizzes</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="settings" className="mt-6">
+                <Card className="bg-transparent backdrop-blur-sm border-border/50 shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-foreground">
+                      <Lock className="w-5 h-5" />
+                      <span>Security Settings</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {purchases.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <Gift className="w-16 h-16 mx-auto mb-4" />
-                          <p>No purchases yet. Check out the store!</p>
-                        </div>
-                      ) : (
-                        purchases.map((purchase) => (
-                          <div key={purchase.id} className="flex items-center justify-between p-4 rounded-lg bg-inherit border border-border/30">
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-foreground">{purchase.name}</h3>
-                              <p className="text-sm text-muted-foreground">{purchase.description}</p>
-                              {purchase.purchased && (
-                                <p className="text-xs text-green-500 flex items-center mt-1">
-                                  <Clock className="w-3 h-3 mr-1" />
-                                  Purchased on {purchase.date}
-                                </p>
-                              )}
-                            </div>
-                            <Badge variant={purchase.purchased ? "default" : "secondary"}>
-                              {purchase.purchased ? "Purchased" : purchase.price}
-                            </Badge>
+                    <div className="space-y-6">
+                      {/* Change Password Section */}
+                      <div className="space-y-4">
+                        <h3 className="font-semibold text-foreground">Change Password</h3>
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="currentPassword">Current Password</Label>
+                            <Input
+                              id="currentPassword"
+                              type="password"
+                              value={passwordData.currentPassword}
+                              onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                              placeholder="Enter current password"
+                            />
                           </div>
-                        ))
-                      )}
+                          <div className="space-y-2">
+                            <Label htmlFor="newPassword">New Password</Label>
+                            <Input
+                              id="newPassword"
+                              type="password"
+                              value={passwordData.newPassword}
+                              onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                              placeholder="Enter new password (min 6 characters)"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                            <Input
+                              id="confirmPassword"
+                              type="password"
+                              value={passwordData.confirmPassword}
+                              onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                              placeholder="Confirm new password"
+                            />
+                          </div>
+                          <Button 
+                            onClick={handleChangePassword}
+                            disabled={changingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+                            className="w-full bg-primary text-primary-foreground hover:bg-primary/80"
+                          >
+                            {changingPassword ? (
+                              <div className="flex items-center space-x-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                                <span>Changing Password...</span>
+                              </div>
+                            ) : (
+                              "Change Password"
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Account Actions */}
+                      <div className="pt-4 border-t border-border/30">
+                        <Button 
+                          onClick={handleLogout}
+                          variant="destructive"
+                          className="w-full"
+                        >
+                          Logout
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -714,101 +846,101 @@ const Profile = () => {
           </div>
         </>
       ) : (
-        <Card className="bg-card/90 backdrop-blur-sm border-border/50 shadow-xl">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-foreground">
-              <User className="w-5 h-5" />
-              <span>Edit Profile</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSaveClick(); }}>
-              <div className="space-y-2">
-                <Label htmlFor="alias" className="text-primary-700">Username</Label>
-                <Input
-                  id="alias"
-                  value={alias}
-                  onChange={(e) => setAlias(e.target.value)}
-                  placeholder="Enter your username"
-                  required
-                  className="border-primary-200 focus:border-primary-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-primary-700">Email</Label>
-                <Input
-                  value={user.email}
-                  disabled
-                  className="cursor-not-allowed bg-primary-50 border-primary-200"
-                />
-                <p className="text-xs text-primary-500">Email cannot be changed</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="age" className="text-primary-700">Age</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  value={age}
-                  onChange={(e) => setAge(e.target.value)}
-                  placeholder="Enter your age"
-                  min="1"
-                  max="120"
-                  required
-                  className="border-primary-200 focus:border-primary-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-primary-700">Select Avatar</Label>
-                <div className="grid grid-cols-4 gap-2 p-3 border border-primary-200 rounded-lg bg-primary-50/50">
-                  {avatars.map((avatarImg, index) => (
-                    <Avatar
-                      key={index}
-                      className={`w-16 h-16 cursor-pointer border-2 transition-all ${
-                        avatar === avatarImg
-                          ? "border-primary-500 ring-2 ring-primary-300 shadow-lg transform scale-110"
-                          : "border-transparent hover:border-primary-300 hover:scale-105"
-                      }`}
-                      onClick={() => handleAvatarSelection(avatarImg, index)}
-                    >
-                      <AvatarImage src={avatarImg} alt={`Avatar ${index + 1}`} />
-                      <AvatarFallback className="bg-primary-100 text-primary-600">AV</AvatarFallback>
-                    </Avatar>
-                  ))}
+        <div className="container max-w-4xl mx-auto p-4">
+          <Card className="bg-card/90 backdrop-blur-sm border-border/50 shadow-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2 text-foreground">
+                <User className="w-5 h-5" />
+                <span>Edit Profile</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSaveClick(); }}>
+                <div className="space-y-2">
+                  <Label htmlFor="alias">Username</Label>
+                  <Input
+                    id="alias"
+                    value={alias}
+                    onChange={(e) => setAlias(e.target.value)}
+                    placeholder="Enter your username"
+                    required
+                  />
                 </div>
-              </div>
-              <div className="flex flex-col-reverse sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 mt-6">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setIsProfileVisible(true);
-                    setAlias(user.alias || "");
-                    setAge(user.age || "");
-                    setAvatar(avatars[user.avatar - 1] || null);
-                  }}
-                  disabled={updating}
-                  className="w-full sm:w-auto border-primary-300 text-primary-700 hover:bg-primary-50"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={updating}
-                  className="w-full sm:w-auto bg-gradient-to-r from-primary-500 to-pink-500 text-white"
-                >
-                  {updating ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                      <span>Saving...</span>
-                    </div>
-                  ) : (
-                    "Save Changes"
-                  )}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    value={user.email}
+                    disabled
+                    className="cursor-not-allowed bg-muted"
+                  />
+                  <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="age">Age</Label>
+                  <Input
+                    id="age"
+                    type="number"
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    placeholder="Enter your age"
+                    min="1"
+                    max="120"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Select Avatar</Label>
+                  <div className="grid grid-cols-4 gap-2 p-3 border border-border rounded-lg bg-card">
+                    {avatars.map((avatarImg, index) => (
+                      <Avatar
+                        key={index}
+                        className={`w-16 h-16 cursor-pointer border-2 transition-all ${
+                          avatar === avatarImg
+                            ? "border-primary ring-2 ring-primary/30 shadow-lg transform scale-110"
+                            : "border-transparent hover:border-primary/50 hover:scale-105"
+                        }`}
+                        onClick={() => handleAvatarSelection(avatarImg, index)}
+                      >
+                        <AvatarImage src={avatarImg} alt={`Avatar ${index + 1}`} />
+                        <AvatarFallback className="bg-muted text-muted-foreground">AV</AvatarFallback>
+                      </Avatar>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-col-reverse sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 mt-6">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setIsProfileVisible(true);
+                      setAlias(user.alias || "");
+                      setAge(user.age || "");
+                      setAvatar(avatars[user.avatar - 1] || null);
+                    }}
+                    disabled={updating}
+                    className="w-full sm:w-auto"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={updating}
+                    className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/80"
+                  >
+                    {updating ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                        <span>Saving...</span>
+                      </div>
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );
