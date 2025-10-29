@@ -1,4 +1,4 @@
-// AuthSection.tsx (No changes required for the provided issue)
+// AuthSection.tsx
 
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -151,6 +151,45 @@ const AuthSection = () => {
             toast({
                 title: "Registration failed",
                 description: error.message || "Something went wrong. Please try again.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // NEW: Handler for Guest Login
+    const handleGuestLogin = async () => {
+        setIsLoading(true);
+        try {
+            // POST /api/users/guestLogin - Empty body
+            const response = await fetch(`${BASE_URL}/api/users/guestLogin`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+            });
+            const data = await response.json();
+            if (response.ok) {
+                // The backend should return the token and a user object which includes playerType: 'Guest'
+                localStorage.setItem("token", data.token);
+                localStorage.setItem("user", JSON.stringify(data.user));
+                
+                toast({
+                    title: "Welcome, Guest!",
+                    description: "You are logged in as a guest. Register to save your progress!",
+                });
+                navigate("/");
+            } else {
+                toast({
+                    title: "Guest Login Failed",
+                    description: data.message || "Something went wrong during guest login.",
+                    variant: "destructive",
+                });
+            }
+        } catch (error) {
+            console.error("Guest login error:", error);
+            toast({
+                title: "Network error",
+                description: "Could not connect to the server. Please try again.",
                 variant: "destructive",
             });
         } finally {
@@ -454,6 +493,25 @@ const AuthSection = () => {
                             </>
                         )}
                     </Button>
+                     <Button
+                        type="button"
+                        onClick={handleGuestLogin}
+                        className="w-full h-12 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+                        disabled={isLoading}
+                    >
+                        {isLoading ? (
+                            <div className="flex items-center space-x-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                                <span>Logging in as Guest...</span>
+                            </div>
+                        ) : (
+                            <>
+                                <User className="w-4 h-4 mr-2" />
+                                Login as Guest
+                                <ArrowRight className="w-4 h-4 ml-2" />
+                            </>
+                        )}
+                    </Button>
                 </form>
             );
         } else {
@@ -581,6 +639,16 @@ const AuthSection = () => {
                             </>
                         )}
                     </Button>
+
+                    {/* NEW: Login as Guest Divider */}
+                    <div className="flex items-center space-x-2 my-4">
+                        <hr className="flex-grow border-t border-border/50" />
+                        <span className="text-muted-foreground text-sm">OR</span>
+                        <hr className="flex-grow border-t border-border/50" />
+                    </div>
+
+                    {/* NEW: Login as Guest Button */}
+                   
                 </form>
             );
         }

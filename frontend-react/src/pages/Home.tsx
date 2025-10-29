@@ -1,3 +1,5 @@
+// Home.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -14,12 +16,14 @@ import {
   Clock,
   Plus,
   Brain,
+  AlertTriangle, // NEW: Import AlertTriangle
 } from "lucide-react";
 import logo from "../assets/images/QuizicleLogo.png";
 // Import the new components
 import SplashScreen from "../components/SplashScreen";
 import GameStatsHeader from "../components/GameStatsHeader";
 import AddCategory from "@/components/AddCategory";
+import { useToast } from "@/hooks/use-toast"; // NEW: Import useToast
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
@@ -54,12 +58,13 @@ interface CategoryToPlayResponse {
 }
 
 
-// --- New Interface for User Details from API ---
+// --- New Interface for User Details from API (Updated to include playerType) ---
 interface UserDetails {
   _id: string;
   alias: string;
   level: number;
   avatar: number; // Index or ID of the avatar
+  playerType?: 'Guest' | 'Normal'; // NEW: Player type field
   // ... other fields you might get from the API
 }
 
@@ -83,9 +88,13 @@ export default function Home() {
 
   // State to control AddCategory component visibility
   const [showAddCategory, setShowAddCategory] = useState(false);
+  
+  // NEW: State for Guest status
+  const [isGuest, setIsGuest] = useState(false);
 
   const navigate = useNavigate();
   const userToken = typeof window !== 'undefined' ? localStorage.getItem("token") || "" : "";
+  const { toast, dismiss } = useToast(); // FIX: Initialize toast and include dismiss function
 
   // ... (useEffect for initialization and screen size remains the same) ...
   useEffect(() => {
@@ -163,7 +172,7 @@ export default function Home() {
 
 
   // ----------------------------------------------------------------
-  // REVISED loadUserProfile to fetch from API
+  // REVISED loadUserProfile to fetch from API and handle guest status
   // ----------------------------------------------------------------
   const loadUserProfile = async () => {
     if (!userToken) {
@@ -174,9 +183,14 @@ export default function Home() {
           const parsedUser = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
+          // NEW: Check guest status from local storage fallback
+          setIsGuest(parsedUser.playerType === 'Guest'); 
         } catch (e) {
           console.error("Failed to parse local user data:", e);
         }
+      } else {
+        // If no token AND no local user, redirect to auth
+        navigate("/auth");
       }
       return;
     }
@@ -198,6 +212,8 @@ export default function Home() {
           const parsedUser = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
+          // NEW: Check guest status from local storage fallback
+          setIsGuest(parsedUser.playerType === 'Guest'); 
         }
         return;
       }
@@ -212,15 +228,23 @@ export default function Home() {
         // Ensure level is set, defaults to 1 if not present in API response
         setUserLevel(1); 
       }
+      
+      // NEW: Update Guest status
+      setIsGuest(apiUser.playerType === 'Guest');
 
       // 2. Update Avatar
       const avatarIndex = apiUser.avatar ? apiUser.avatar - 1 : 0;
       const calculatedAvatar = avatars[avatarIndex] || null;
       setUserAvatar(calculatedAvatar);
       
-      // 3. OPTIONAL: Update local storage with fresh data
+      // 3. OPTIONAL: Update local storage with fresh data, including playerType
       if (typeof window !== 'undefined') {
-        localStorage.setItem("user", JSON.stringify(apiUser));
+        const userToStore = { 
+            ...apiUser, 
+            level: apiUser.level !== undefined ? apiUser.level : 1, 
+            playerType: apiUser.playerType || 'Normal' 
+        };
+        localStorage.setItem("user", JSON.stringify(userToStore));
         if(calculatedAvatar) {
            localStorage.setItem("userAvatar", calculatedAvatar);
         }
@@ -235,6 +259,8 @@ export default function Home() {
           const parsedUser = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
+          // NEW: Check guest status from local storage fallback
+          setIsGuest(parsedUser.playerType === 'Guest'); 
         } catch (e) {
            console.error("Failed to parse local user data on API error:", e);
         }
@@ -342,9 +368,47 @@ const fetchUserCategories = async () => {
       setPlayButtonLoading(false);
     }
   };
+  
+  // NEW: Unified handler to check for guest status before allowing category creation
+  const handleCreateCategoryAttempt = () => {
+    if (isGuest) {
+        // Prompt the guest user to register and capture the toast ID from the return value
+        const { id: toastId } = toast({
+            title: "🔒 Registration Required",
+            description: "You must complete your registration to create a quiz and save your progress. Register now?",
+            variant: "destructive", // Using destructive for a strong prompt
+            action: (
+                <div className="flex space-x-2">
+                    <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => {
+                            navigate("/profile"); // Navigate to profile screen
+                            dismiss(toastId); // FIX: Use the dismiss function with the captured ID
+                        }}
+                        className="bg-primary hover:bg-primary/80"
+                    >
+                        Register
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => dismiss(toastId)} // FIX: Use the dismiss function with the captured ID
+                    >
+                        Cancel
+                    </Button>
+                </div>
+            ),
+        });
+    } else {
+        // If not a guest, proceed to show the AddCategory component
+        setShowAddCategory(true);
+    }
+  };
 
+  // Original handler now calls the new unified handler
   const handleCreateFirstCategory = () => {
-    setShowAddCategory(true);
+    handleCreateCategoryAttempt();
   };
 
   const handleCategoryCreated = () => {
@@ -368,6 +432,27 @@ const fetchUserCategories = async () => {
       <div className="mx-auto max-w-full space-y-4 px-4 pb-4 lg:px-8 lg:pb-8">
         {/* Game Stats Header - It will now wait for isParentLoading to be false */}
         <GameStatsHeader userToken={userToken} isParentLoading={loading} />
+
+        {/* NEW: Guest User Registration Panel */}
+        {isGuest && (
+          <Card className="bg-amber-100 border-amber-400 text-amber-900 p-4 shadow-md flex items-start space-x-3">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div className="flex-grow">
+              <h4 className="font-semibold leading-snug">Don't lose your progress!</h4>
+              <p className="text-sm">
+                You are currently logged in as a **Guest**. Complete your registration to secure your account and save all your quiz progress.
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate("/profile")}
+              className="bg-amber-500 hover:bg-amber-600 text-white border-amber-500 hover:border-amber-600 flex-shrink-0"
+            >
+              Register Now
+            </Button>
+          </Card>
+        )}
 
         {/* User Avatar Section */}
         <div className="flex flex-col items-center space-y-2 py-3">
@@ -419,7 +504,7 @@ const fetchUserCategories = async () => {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-bold flex items-center">
               <Brain className="w-5 h-5 mr-2" />
-              Your Categories
+              Your Quizzes
             </h3>
             <Button
               onClick={() => navigate("/categories")}
@@ -427,7 +512,7 @@ const fetchUserCategories = async () => {
               size="sm"
               className="text-xs"
             >
-              View All Categories
+              View All Quizzes
             </Button>
           </div>
 
@@ -460,18 +545,18 @@ const fetchUserCategories = async () => {
                 <Card className="p-8 text-center">
                   <div className="space-y-3">
                     <Brain className="h-12 w-12 mx-auto text-muted-foreground" />
-                    <h4 className="font-semibold text-foreground">No categories yet</h4>
+                    <h4 className="font-semibold text-foreground">No quizzes yet</h4>
                     <p className="text-sm text-muted-foreground">
-                      Create your first quiz category to get started
+                      Create your first quiz to get started
                     </p>
                     <Button 
                       variant="outline" 
                       size="sm" 
                       className="mt-2"
-                      onClick={handleCreateFirstCategory}
+                      onClick={handleCreateFirstCategory} // Uses the handler that checks for guest status
                     >
                       <Plus className="h-4 w-4 mr-2" />
-                      Create Your First Category
+                      Create Your First Quiz
                     </Button>
                   </div>
                 </Card>
@@ -504,7 +589,18 @@ const fetchUserCategories = async () => {
               
               {/* Add Category Section - Always show after categories */}
               <div className="mt-6">
-                <AddCategory fetchCategories={fetchUserCategories} />
+                {/* Conditionally render AddCategory or a registration prompt button */}
+                {isGuest ? (
+                    <Button 
+                        onClick={handleCreateCategoryAttempt} 
+                        className="w-full h-12 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg shadow-lg"
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create New Quiz (Register to Enable)
+                    </Button>
+                ) : (
+                    <AddCategory fetchCategories={fetchUserCategories} />
+                )}
               </div>
             </div>
           )}

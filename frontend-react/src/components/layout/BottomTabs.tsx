@@ -5,7 +5,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 const tabs = [
   { icon: User, label: "Profile", path: "/profile" },
-  { icon: Grid3X3, label: "Categories", path: "/categories" },
+  { icon: Grid3X3, label: "Quizzes", path: "/categories" },
   { icon: Home, label: "Home", path: "/" },
   { icon: ShoppingCart, label: "Store", path: "/store" },
   { icon: Menu, label: "Menu", path: "/menu" },

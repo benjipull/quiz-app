@@ -137,7 +137,7 @@ export default function Categories() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background pb-20">
-      <Header title="Categories" showSearch />
+      <Header title="Quizzes" showSearch />
 
       <div className="px-4 lg:px-8 space-y-6 max-w-full mx-auto">
         {/* Search Bar */}
@@ -145,7 +145,7 @@ export default function Categories() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search categories..."
+              placeholder="Search quizzes..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               className="pl-10 h-12 bg-card/60 backdrop-blur-sm border-border/50 focus:border-primary"
@@ -202,13 +202,13 @@ export default function Categories() {
           <Card className="p-8 text-center">
             <div className="space-y-3">
               <Search className="h-12 w-12 mx-auto text-muted-foreground" />
-              <h4 className="font-semibold text-foreground">No categories found</h4>
+              <h4 className="font-semibold text-foreground">No quizzes found</h4>
               <p className="text-sm text-muted-foreground">
-                Try searching with different keywords or create your own category
+                Try searching with different keywords or create your own Quiz
               </p>
               <Button variant="outline" size="sm">
                 <Plus className="h-4 w-4" />
-                Create "{searchQuery}" Category
+                Create "{searchQuery}" Quiz
               </Button>
             </div>
           </Card>

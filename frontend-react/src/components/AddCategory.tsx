@@ -72,7 +72,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({ fetchCategories = () => {} })
         <div>
           <h4 className="font-semibold text-foreground">Create Your Own</h4>
           <p className="text-sm text-muted-foreground">
-            Build a custom quiz category and share it with others!
+            Build a custom quiz and share it with others!
           </p>
         </div>
 
@@ -98,7 +98,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({ fetchCategories = () => {} })
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-foreground">Create New Category</h2>
+              <h2 className="text-xl font-bold text-foreground">Create New Quiz</h2>
               <button
                 onClick={() => setIsOpen(false)}
                 className="text-muted-foreground hover:text-foreground transition-colors"
@@ -110,7 +110,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({ fetchCategories = () => {} })
             <div className="space-y-4">
               <input
                 type="text"
-                placeholder="Enter category name"
+                placeholder="Enter quiz name"
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreateCategory()}

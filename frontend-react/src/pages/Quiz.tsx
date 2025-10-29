@@ -21,32 +21,59 @@ const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmTe
   </div>
 );
 
-// ADDED: Report Dialog Component
+// UPDATED: Report Dialog Props for new payload structure
 interface ReportDialogProps {
   onClose: () => void;
-  onSubmit: (reportType: string, description: string) => void;
+  onSubmit: (reason: string, otherText: string) => void; // MODIFIED: Changed signature
   isSubmitting: boolean;
   isThankYou: boolean;
 }
 
+// UPDATED: Report Dialog Component
 const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDialogProps) => {
-  const [reportType, setReportType] = useState<string | null>(null);
-  const [otherDescription, setOtherDescription] = useState('');
+  // MODIFIED: Use the reason value for selection
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [otherText, setOtherText] = useState('');
 
+  // MODIFIED: New report options with correct values and descriptions
   const reportOptions = [
-    { value: "Incorrect Answer", label: "Incorrect Answer" },
-    { value: "Ambiguous or Poorly Worded Question", label: "Ambiguous or Poorly Worded Question" },
-    { value: "Duplicate Question", label: "Duplicate Question" },
-    { value: "Offensive or Inappropriate Content", label: "Offensive or Inappropriate Content" },
-    { value: "Other", label: "Other (please describe)" },
+    { 
+      value: "incorrect_answer", 
+      label: "Incorrect Answer",
+      description: "The provided 'correct' answer is actually wrong, outdated, or debatable.",
+    },
+    { 
+      value: "ambiguous_wording", 
+      label: "Ambiguous or Poorly Worded Question",
+      description: "The question is confusing, unclear, or allows multiple valid interpretations.",
+    },
+    { 
+      value: "duplicate_question", 
+      label: "Duplicate Question",
+      description: "The question (or a very similar one) has appeared elsewhere in the quiz.",
+    },
+    { 
+      value: "offensive_content", 
+      label: "Offensive or Inappropriate Content",
+      description: "The question or answer contains offensive, biased, or otherwise inappropriate language.",
+    },
+    { 
+      value: "other", 
+      label: "Other (please describe)",
+      description: "Free-text field for users to specify an issue not covered by the options above (e.g., factual precision, typo, wrong category, etc.).",
+    },
   ];
 
   const handleSubmit = () => {
-    if (reportType) {
-      const description = reportType === "Other" ? otherDescription : reportType;
-      onSubmit(reportType, description);
+    if (selectedReason) {
+      // MODIFIED: Pass reason and otherText directly
+      const text = selectedReason === "other" ? otherText : "";
+      onSubmit(selectedReason, text);
     }
   };
+  
+  // MODIFIED: Check for submit button disable condition
+  const isSubmitDisabled = !selectedReason || (selectedReason === "other" && otherText.trim() === '') || isSubmitting;
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -75,35 +102,41 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
               {reportOptions.map((option) => (
                 <div
                   key={option.value}
+                  // MODIFIED: Use selectedReason
                   className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                    reportType === option.value
+                    selectedReason === option.value
                       ? "border-primary bg-primary/10"
-                      : "hover:bg-muted"
+                      : "hover:bg-muted border-border" // ADDED: explicit border-border for all options
                   }`}
-                  onClick={() => setReportType(option.value)}
+                  onClick={() => setSelectedReason(option.value)}
                 >
-                  <label className="flex items-center space-x-2 cursor-pointer font-medium text-sm">
+                  <label className="flex items-start space-x-2 cursor-pointer font-medium text-sm">
                     <input
                       type="radio"
                       name="report-issue"
                       value={option.value}
-                      checked={reportType === option.value}
-                      onChange={() => setReportType(option.value)}
+                      // MODIFIED: Use selectedReason
+                      checked={selectedReason === option.value}
+                      onChange={() => setSelectedReason(option.value)}
                       className="hidden"
                     />
-                    <span>{option.label}</span>
+                    <div className="flex flex-col">
+                      <span className="font-semibold">{option.label}</span>
+                      <span className="text-xs text-muted-foreground font-normal mt-1">{option.description}</span>
+                    </div>
                   </label>
                 </div>
               ))}
             </div>
 
-            {reportType === "Other" && (
+            {/* MODIFIED: Use selectedReason and otherText */}
+            {selectedReason === "other" && (
               <div>
                 <textarea
                   placeholder="Describe the issue..."
-                  value={otherDescription}
-                  onChange={(e) => setOtherDescription(e.target.value)}
-                  className="w-full p-3 border rounded-lg resize-none text-sm  text-gray-900 focus:ring-primary focus:border-primary mt-2"
+                  value={otherText}
+                  onChange={(e) => setOtherText(e.target.value)}
+                  className="w-full p-3 border rounded-lg resize-none text-sm text-gray-900 focus:ring-primary focus:border-primary mt-2"
                   rows={3}
                 />
               </div>
@@ -114,7 +147,7 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
               <Button
                 variant="default"
                 onClick={handleSubmit}
-                disabled={!reportType || (reportType === "Other" && otherDescription.trim() === '') || isSubmitting}
+                disabled={isSubmitDisabled}
               >
                 {isSubmitting ? "Submitting..." : "Submit Report"}
               </Button>
@@ -236,27 +269,27 @@ export default function Quiz() {
     }
   };
   
-  // ADDED: Report Question Logic
-  const handleReportQuestion = async (reportType: string, description: string) => {
+  // MODIFIED: Report Question Logic with new payload structure
+  const handleReportQuestion = async (reason: string, otherText: string) => {
     if (!quizState.question?._id) return;
 
     setIsReporting(true);
     setReportSuccess(false);
 
     try {
+      const payload: { questionId: string; reason: string; otherText: string } = {
+        questionId: quizState.question._id,
+        reason: reason,
+        otherText: otherText, // Only accepted if reason is 'other'
+      };
+
       const response = await fetch(`${BASE_URL}/api/reportQuestion`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${userToken}`,
         },
-        body: JSON.stringify({
-          questionId: quizState.question._id,
-          reportType: reportType,
-          description: description,
-          questionText: quizState.question.question,
-          category: quizState.selectedCategory?.name,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -691,25 +724,25 @@ export default function Quiz() {
 
   const getOptionStyle = (answer: string) => {
     if (timeUp) {
-      return "bg-muted/30 cursor-not-allowed opacity-50";
+      return "bg-muted/30 cursor-not-allowed opacity-50 border-2 border-border"; // ADDED: Default border for Time Up
     }
 
     if (selectedAnswer === null) {
-      return "hover:bg-primary/5 cursor-pointer transition-colors";
+      return "hover:bg-primary/5 cursor-pointer transition-colors border-2 border-border"; // ADDED: Default border
     }
 
     const correctAnswer = answerResponse?.correctAnswer || quizState.question?.correct_answer;
 
     if (answer === correctAnswer) {
-      return "bg-success/10 text-success border-success/50 border-2"; // Added border-2 for emphasis
+      return "bg-success/10 text-success border-success/50 border-2"; // Success border
     }
 
     if (answer === selectedAnswer && answer !== correctAnswer) {
-      return "bg-destructive/10 text-destructive border-destructive/50 border-2"; // Added border-2 for emphasis
+      return "bg-destructive/10 text-destructive border-destructive/50 border-2"; // Error border
     }
 
     // This is the style for an incorrect answer that was not selected by the user
-    return "bg-muted/30 border-transparent border-2";
+    return "bg-muted/30 border-2 border-border"; // ADDED: Default border for unselected incorrect
   };
 
   const getTimerColor = () => {
@@ -861,7 +894,8 @@ export default function Quiz() {
         </div>
 
         {/* MODIFIED: Reduced horizontal padding from px-4 to px-3 and removed max-width classes (lg:max-w-3xl xl:max-w-5xl) for content to use more screen space */}
-        <div className="flex-1 overflow-y-auto px-3 py-3 max-w-full mx-auto w-full">
+        {/* ADDED: Max width for content on large screens */}
+        <div className="flex-1 overflow-y-auto px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-3xl"> 
           <div className="space-y-6">
             {/* Reduced Padding for Question (px-1 is already tight) */}
             <div className="px-1 py-3 md:py-4">
@@ -874,9 +908,8 @@ export default function Quiz() {
               {quizState.question?.answers.map((answer, index) => (
                 <Card
                   key={index}
-                  // ADDED: rounded-xl for rounded frames. Adjusted getOptionStyle to add border-2.
-                  // MODIFIED: Added border-2 border-transparent to ensure consistent space for border and prevent layout shift.
-                  className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer shadow-sm rounded-xl border-2 border-transparent`}
+                  // MODIFIED: getOptionStyle now handles all border logic
+                  className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer shadow-sm rounded-xl`}
                   onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
                 >
                   {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
@@ -1010,7 +1043,7 @@ export default function Quiz() {
                           onClick={() => setShowReportDialog(true)}
                         >
                           <Flag className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:ml-2 hidden sm:inline">Report</span>
+                          <span className="ml-1 sm:inline">Report</span>
                         </Button>
                       </div>
                     </div>
