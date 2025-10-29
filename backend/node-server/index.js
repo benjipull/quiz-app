@@ -33,6 +33,7 @@ app.use("/admin", express.static(path.join(__dirname, "frontend-admin")));
 //Users
 app.use("/api/users/register", require("./routes/register"));
 app.use("/api/users/login", require("./routes/login"));
+app.use("/api/users/guestLogin", require("./routes/guestLogin"));
 app.use("/api/resetPassword", require("./routes/resetPassword"));
 app.use("/api/updatePassword", require("./routes/updatePassword"));
 app.use("/api/getUserDetails", require("./routes/getUserDetails"));

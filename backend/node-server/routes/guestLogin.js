@@ -13,7 +13,7 @@ router.post("/", async (req, res) => {
         const alias = `Guest_${code}`;
         const email = `${code}@quizicle.com`;
         const password = code; // random guest password (hashed in schema)
-        const age = 0;
+        const age = 1;
         const userType = "Guest";
 
         // Create new user
