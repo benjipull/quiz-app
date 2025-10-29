@@ -1,15 +1,22 @@
 const express = require("express");
 const router = express.Router();
 const Report = require("../models/reportModel");
+const authenticateToken = require("../middleware/auth");
 
 // POST /api/reports
-router.post("/", async (req, res) => {
+router.post("/", authenticateToken, async (req, res) => {
   try {
-    const { questionId, userId, reason, otherText } = req.body;
+
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized: invalid token." });
+    }
+
+    const { questionId, reason, otherText } = req.body;
 
     if (!questionId || !userId || !reason) {
       return res.status(400).json({
-        message: "questionId, userId, and reason are required.",
+        message: "questionId, and reason are required.",
       });
     }
 
@@ -20,6 +27,7 @@ router.post("/", async (req, res) => {
       "offensive_content",
       "other",
     ];
+    
     if (!validReasons.includes(reason)) {
       return res.status(400).json({ message: "Invalid report reason." });
     }
