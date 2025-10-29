@@ -5,7 +5,7 @@ const axios = require("axios");
 const Category = require("../models/categoryModel");
 
 const { buildQuestionPrompt } = require("./prompts/questionPrompt");
-const { processSingleQuestion } = require("./validateDuplicateQuestions");
+//const { processSingleQuestion } = require("./validateDuplicateQuestions");
 
 
 // ==== GLOBAL CONFIG ====
@@ -161,6 +161,7 @@ async function populateCategory(categoryId, difficultyHint) {
     await category.save();
     console.log(`✅ Added ${addedCount} question(s) to ${category.name}.`);
 
+    /*
     // 🧠 Step 4: Re-fetch category to ensure IDs are present
     const refreshedCategory = await Category.findById(categoryId);
 
@@ -171,6 +172,7 @@ async function populateCategory(categoryId, difficultyHint) {
         await checkQuestionInSameCategory(refreshedCategory, savedQuestion);
       }
     }
+      */
 
   } catch (error) {
     console.error("❌ Error populating category:", error.message);
