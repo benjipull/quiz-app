@@ -26,7 +26,9 @@ const Profile = () => {
   const [age, setAge] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
-  const [isGuest, setIsGuest] = useState(false);
+  const [userType, setUserType] = useState<"Guest" | "Registered" | "Admin">(
+    "Registered"
+  );
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -37,7 +39,7 @@ const Profile = () => {
       setUser(parsedUser);
       setAlias(parsedUser.alias || "");
       setAge(parsedUser.age || "");
-      setIsGuest(parsedUser.playerType === "Guest");
+      setUserType(parsedUser.userType || "Registered");
       setAvatar(
         localStorage.getItem("userAvatar") ||
           avatars[parsedUser.avatar - 1] ||
@@ -77,7 +79,7 @@ const Profile = () => {
         alias,
         age: parseInt(age),
         avatar: avatarValue,
-        email: user.email, // ✅ Always send updated email
+        ...(userType === "Guest" && user.email ? { email: user.email } : {}),
       };
 
       const response = await fetch(`${BASE_URL}/api/updateUserDetails`, {
@@ -91,8 +93,8 @@ const Profile = () => {
 
       if (response.ok) {
         const data = await response.json();
-        const newPlayerType =
-          data.user?.playerType || user.playerType || "Normal";
+        const newType: "Guest" | "Registered" | "Admin" =
+          data.user?.userType || "Registered";
 
         const updatedUser = {
           ...user,
@@ -100,24 +102,22 @@ const Profile = () => {
           alias,
           age: parseInt(age),
           avatar: avatarValue,
-          playerType: newPlayerType,
-          email: user.email,
+          userType: newType,
         };
 
         setUser(updatedUser);
         localStorage.setItem("user", JSON.stringify(updatedUser));
-        setIsGuest(newPlayerType === "Guest");
+        setUserType(newType);
 
         toast({
           title: "Success",
           description: "Profile updated successfully!",
         });
 
-        if (newPlayerType === "Normal") {
+        if (newType === "Registered") {
           toast({
             title: "Registration Complete",
-            description:
-              "Welcome! Your progress will now be saved permanently.",
+            description: "Welcome! Your email is now verified and locked.",
           });
           setTimeout(() => navigate("/"), 1500);
         }
@@ -171,10 +171,10 @@ const Profile = () => {
       return;
     }
 
-    if (!user.email || !user.email.includes("@")) {
+    if (userType === "Guest" && (!user.email || !user.email.includes("@"))) {
       toast({
         title: "Validation Error",
-        description: "Enter a valid email address.",
+        description: "Please enter a valid email to complete registration.",
         variant: "destructive",
       });
       return;
@@ -190,6 +190,8 @@ const Profile = () => {
       </div>
     );
   }
+
+  const isGuest = userType === "Guest";
 
   return (
     <div className="min-h-screen bg-background p-4 flex items-center justify-center">
@@ -236,13 +238,25 @@ const Profile = () => {
               <Input
                 type="email"
                 value={user.email || ""}
-                onChange={(e) => setUser({ ...user, email: e.target.value })}
-                placeholder="Enter your email address"
-                required
+                onChange={(e) =>
+                  isGuest ? setUser({ ...user, email: e.target.value }) : null
+                }
+                placeholder={
+                  isGuest ? "Enter your email to complete registration" : ""
+                }
+                disabled={!isGuest}
+                className={`${!isGuest ? "cursor-not-allowed bg-muted" : ""}`}
               />
-              <p className="text-xs text-muted-foreground">
-                You can update your email anytime.
-              </p>
+              {isGuest ? (
+                <p className="text-xs text-amber-500">
+                  You are currently a <strong>Guest</strong>. Enter your email
+                  and click “Save Changes” to complete registration.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Email cannot be changed after registration.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
