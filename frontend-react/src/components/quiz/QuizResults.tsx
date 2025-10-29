@@ -1,5 +1,4 @@
-
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,7 +20,6 @@ import {
 } from "lucide-react";
 import Confetti from "react-confetti";
 
-// A single-point sound effect for knowledge gain (XP)
 const KNOWLEDGE_GAIN_SOUND_SRC = "/knowledge-point.mp3"; 
 const LEVEL_UP_SOUND_SRC = "/player-level-up.mp3";
 
@@ -46,11 +44,9 @@ interface QuizResultsProps {
   onClose: () => void;
 }
 
-// --- NEW/UPDATED RANKING LOGIC (KEEP AS IS) ---
 const getPerformanceData = (percentage: number) => {
   const score = percentage;
 
-  // New color scheme: Purple -> Blue -> Emerald -> Cyan -> Gray -> Orange -> Red
   if (score === 100) {
     return {
       message: "FLAWLESS VICTORY!",
@@ -119,10 +115,9 @@ const getPerformanceData = (percentage: number) => {
     };
   }
 };
-// ------------------------------------
 
 export default function QuizResults({ results, onPlayAgain, onClose }: QuizResultsProps) {
-  const navigate = useNavigate(); // Not used, but kept in case
+  const navigate = useNavigate();
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const {
@@ -130,7 +125,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     incorrectAnswers,
     categoryName,
     categoryId,
-    totalQuestions, // Not used in the render, but kept in case
+    totalQuestions,
     completionData,
   } = results;
 
@@ -150,19 +145,25 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [animatedScore, setAnimatedScore] = useState(0);
   const [animatedKnowledge, setAnimatedKnowledge] = useState(0);
   const [animatedTotalXP, setAnimatedTotalXP] = useState(totalKnowledge - knowledgeGained);
-  const [showKnowledgeBadge, setShowKnowledgeBadge] = useState(true);
+  // Change 3: Add state for showing the "Points Earned" modal animation
+  const [showPointsOverlay, setShowPointsOverlay] = useState(true);
+  // Change 4: Add state for showing the flying tokens
+  const [showFlyingTokens, setShowFlyingTokens] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
+  const [tokens, setTokens] = useState<Array<{id: number; delay: number}>>([]);
+  
+  // Change 5: Refs for tracking element positions
+  const pointsOverlayRef = useRef<HTMLDivElement>(null);
+  const xpCardRef = useRef<HTMLDivElement>(null);
 
   const [knowledgeGainAudio] = useState(
     typeof Audio !== "undefined" ? new Audio(KNOWLEDGE_GAIN_SOUND_SRC) : null
   );
   
-  // Initialize the level-up sound effect
   const [levelUpAudio] = useState(
     typeof Audio !== "undefined" ? new Audio(LEVEL_UP_SOUND_SRC) : null
   );
 
-  // --- HOOKS FOR SIZE AND ANIMATION (KEPT AS IS) ---
   useEffect(() => {
     setMounted(true);
     const updateSize = () => {
@@ -173,7 +174,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  // Animated score counter effect
+  // Animated score counter
   useEffect(() => {
     const scoreTimer = setTimeout(() => {
       const interval = setInterval(() => {
@@ -190,59 +191,115 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
     return () => clearTimeout(scoreTimer);
   }, [percentage]);
-  
-  // Animated Total XP counter with sound effect for each point gained
+
+  // Points earned overlay animation
   useEffect(() => {
-    const startXP = totalKnowledge - knowledgeGained;
-    const targetXP = totalKnowledge;
-    
-    const xpTimer = setTimeout(() => {
-      let currentXP = startXP;
+    const earnedTimer = setTimeout(() => {
+      let count = 0;
       const interval = setInterval(() => {
-        if (currentXP >= targetXP) {
+        count += Math.ceil(knowledgeGained / 15);
+        if (count >= knowledgeGained) {
+          count = knowledgeGained;
           clearInterval(interval);
-          setAnimatedTotalXP(targetXP);
           
-          // After total XP animation completes, hide the badge with animation
+          // Hide overlay and start token animation
           setTimeout(() => {
-            setShowKnowledgeBadge(false);
-          }, 500);
-          return;
+            // Change 6: Add a fade-out class before setting showPointsOverlay to false
+            if (pointsOverlayRef.current) {
+              pointsOverlayRef.current.classList.add('animate-fade-out');
+            }
+            // Start the token animation right before the fade-out completes
+            setTimeout(() => {
+              setShowPointsOverlay(false);
+              startTokenAnimation();
+            }, 500); // 500ms for the fade-out animation
+          }, 600);
         }
-
-        // Increment by 1 for each point
-        currentXP = currentXP + 1;
-        setAnimatedTotalXP(currentXP);
-        setAnimatedKnowledge(currentXP - startXP);
-        
-        // Play sound for each point gained
-        if (knowledgeGainAudio) {
-          const audioClone = knowledgeGainAudio.cloneNode(true) as HTMLAudioElement;
-          audioClone.volume = 0.2;
-          audioClone.play().catch(e => console.log("Audio play failed:", e));
-        }
-
-      }, 50); // 50ms per point
+        setAnimatedKnowledge(count);
+      }, 60);
       return () => clearInterval(interval);
-    }, 600);
+    }, 400);
 
-    const levelUpTimer = hasLeveledUp ? setTimeout(() => {
-      setShowLevelUp(true);
-      
-      // Play level up sound when the level up modal is shown
-      if (levelUpAudio) {
-        levelUpAudio.volume = 0.5;
-        levelUpAudio.play().catch(e => console.log("Level Up Audio play failed:", e));
+    return () => clearTimeout(earnedTimer);
+  }, [knowledgeGained]);
+
+  // Token flying animation
+  const startTokenAnimation = () => {
+    const pointsRect = pointsOverlayRef.current?.getBoundingClientRect();
+    const xpRect = xpCardRef.current?.getBoundingClientRect();
+
+    if (!pointsRect || !xpRect) {
+      // Fallback: If refs are not ready, jump to XP animation
+      setAnimatedTotalXP(totalKnowledge);
+      if (hasLeveledUp) {
+        setTimeout(() => setShowLevelUp(true), 300);
+      }
+      return;
+    }
+
+    // Calculate center coordinates
+    const popUpCenterX = pointsRect.left + pointsRect.width / 2;
+    const popUpCenterY = pointsRect.top + pointsRect.height / 2;
+
+    // Target the center of the XP Card
+    const xpTargetX = xpRect.left + xpRect.width / 2;
+    const xpTargetY = xpRect.top + xpRect.height / 2;
+    
+    // Set CSS variables for the animation
+    const tokenCount = Math.min(12, Math.max(6, knowledgeGained / 10));
+    const newTokens = Array.from({ length: Math.floor(tokenCount) }, (_, i) => ({
+      id: i,
+      delay: 50 + i * 40
+    }));
+
+    setTokens(newTokens);
+    setShowFlyingTokens(true); // Show tokens
+
+    // Animate XP increase in sync with tokens
+    const startXP = totalKnowledge - knowledgeGained;
+    let currentXP = startXP;
+    const per = Math.max(1, Math.round(knowledgeGained / tokenCount));
+    let tokenIndex = 0;
+    
+    const xpTimer = setInterval(() => {
+      if (tokenIndex < tokenCount) {
+        currentXP += per;
+        tokenIndex++;
+      } else {
+        currentXP = totalKnowledge;
+        clearInterval(xpTimer);
+        
+        // Hide tokens after animation is complete
+        setTimeout(() => setShowFlyingTokens(false), 200);
+
+        // Check for level up after XP animation
+        if (hasLeveledUp) {
+          setTimeout(() => {
+            setShowLevelUp(true);
+            if (levelUpAudio) {
+              levelUpAudio.volume = 0.5;
+              levelUpAudio.play().catch(e => console.log("Level Up Audio failed:", e));
+            }
+          }, 300);
+        }
       }
 
-    }, 600 + (knowledgeGained * 50) + 300) : undefined; // Trigger after XP animation
+      setAnimatedTotalXP(Math.min(currentXP, totalKnowledge));
+      
+      // Play sound
+      if (knowledgeGainAudio) {
+        const audioClone = knowledgeGainAudio.cloneNode(true) as HTMLAudioElement;
+        audioClone.volume = 0.15;
+        audioClone.play().catch(e => console.log("Audio play failed:", e));
+      }
+    }, 120);
 
-    return () => {
-      clearTimeout(xpTimer);
-      if (levelUpTimer) clearTimeout(levelUpTimer);
-    };
-  }, [knowledgeGained, totalKnowledge, hasLeveledUp, knowledgeGainAudio, levelUpAudio]);
-  
+    // Change 7: Apply the calculated positions as CSS custom properties
+    document.documentElement.style.setProperty('--token-start-x', `${popUpCenterX}px`);
+    document.documentElement.style.setProperty('--token-start-y', `${popUpCenterY}px`);
+    document.documentElement.style.setProperty('--token-end-x', `${xpTargetX}px`);
+    document.documentElement.style.setProperty('--token-end-y', `${xpTargetY}px`);
+  };
 
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
@@ -251,50 +308,42 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [ratingMessage, setRatingMessage] = useState<string | null>(null);
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
 
- const handleNextQuiz = async () => {
-  if (!userToken) {
-    console.log("⚠️ You must be logged in to play.");
-    alert("You must be logged in to play.");
-    return;
-  }
-
-  setPlayButtonLoading(true);
-
-  try {
-    console.log("🔍 Fetching next category...");
-    // Pass the current categoryId as a query parameter to exclude it from results
-    const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay?exclude=${categoryId}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${userToken}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to get category to play: ${response.status}`);
+  const handleNextQuiz = async () => {
+    if (!userToken) {
+      alert("You must be logged in to play.");
+      return;
     }
 
-    const data = await response.json();
-    console.log("📦 Received data:", data);
+    setPlayButtonLoading(true);
 
-    if (data.categoryId) {
-      console.log(`🎮 Navigating to: /quiz/${data.categoryId}`);
-      // Use window.location for reliable navigation
-      window.location.href = `/quiz/${data.categoryId}`;
-    } else {
-      throw new Error("No category ID returned from server");
+    try {
+      const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay?exclude=${categoryId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get category to play: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.categoryId) {
+        window.location.href = `/quiz/${data.categoryId}`;
+      } else {
+        throw new Error("No category ID returned from server");
+      }
+    } catch (error: any) {
+      console.error("Error getting category to play:", error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      setPlayButtonLoading(false);
     }
-  } catch (error: any) {
-    console.error("❌ Error getting category to play:", error);
-    alert(`Error: ${error.message}`);
-  } finally {
-    setPlayButtonLoading(false);
-  }
-
   };
 
-  
   const handleRatingSubmit = async (value: number) => {
     if (!userToken) {
       setRatingMessage("You must be logged in to submit a rating.");
@@ -320,7 +369,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         setHasRated(true);
         setRatingMessage("Thanks for your feedback! It helps us improve.");
         
-        // Add vibration feedback
         if (navigator.vibrate) {
           navigator.vibrate([50, 30, 50]);
         }
@@ -337,34 +385,24 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     }
   };
 
-  // Performance data (cached with useMemo)
   const performanceData = useMemo(() => getPerformanceData(percentage), [percentage]);
   
   if (!mounted) {
     return null;
   }
 
-  // Circular Progress Metrics - Reduced max size for better fit on small vertical screens
-  // progressSize is now max 144px on mobile and 180px on larger screens
-  const progressSize = windowSize.width >= 768 ? 180 : 130; 
-  const progressRadius = progressSize / 2 - 8; // Reduced stroke for compactness
-  const progressCenter = progressSize / 2;
-  const progressStroke = 8; // Reduced stroke width
-  // ------------------------------------
-
+  // KEY CHANGES IN RENDER AND CSS:
   return (
-    // PRIMARY FIX: h-screen (or min-h-screen) is critical. Use p-2 for minimal padding.
-    // **overflow-hidden** on the main container prevents external scroll.
-    <div className="h-screen bg-gradient-to-br from-background via-secondary/30 to-background flex items-center
-     justify-center p-2 md:p-4 font-sans overflow-hidden relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-sans overflow-hidden bg-slate-900/100">
       
-      {/* Animated background elements (KEEP AS IS) */}
+      {/* Ambient background effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl animate-pulse-slow md:w-48 md:h-48" />
-        <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl animate-pulse-delayed md:w-48 md:h-48" />
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse-slow" />
+        <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse-delayed" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-3xl" />
       </div>
 
-      {/* Confetti for achievements (KEEP AS IS) */}
+      {/* Confetti */}
       {(percentage >= 80 || hasLeveledUp) && windowSize.width > 0 && (
         <Confetti
           width={windowSize.width}
@@ -376,7 +414,39 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         />
       )}
 
-      {/* Level Up Celebration Modal (KEEP AS IS) */}
+      {/* Points Earned Overlay */}
+      {showPointsOverlay && (
+        // Change 8: Attach ref to the Card
+        <div ref={pointsOverlayRef} className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none animate-fade-in">
+          <Card className="bg-gradient-to-br from-slate-900 via-blue-950/50 to-slate-900 border-2 border-blue-500/40 p-8 text-center shadow-2xl shadow-blue-500/30 animate-pop-in">
+            <div className="space-y-3">
+              <div className="text-blue-300/80 font-bold text-xs tracking-[0.2em] uppercase">
+                Points Earned
+              </div>
+              <div className="text-6xl font-black bg-gradient-to-b from-cyan-300 via-blue-400 to-purple-400 bg-clip-text text-transparent animate-count-up">
+                +{animatedKnowledge}
+              </div>
+              <div className="text-slate-400 text-sm">
+                {performanceData.message}
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Flying Tokens */}
+      {showFlyingTokens && tokens.map((token) => (
+        <div
+          key={token.id}
+          className="token"
+          style={{
+            '--token-delay': `${token.delay}ms`,
+            '--token-angle': `${(Math.PI * 2) * (token.id / tokens.length)}`,
+          } as any}
+        />
+      ))}
+
+      {/* Level Up Modal */}
       {showLevelUp && hasLeveledUp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
           <Card className="bg-gradient-to-br from-purple-600 via-purple-500 to-indigo-600 border-4 border-purple-300 p-6 text-center max-w-xs mx-2 animate-level-up-popup shadow-2xl shadow-purple-500/50">
@@ -390,7 +460,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   Congratulations!
                 </p>
                 <div className="flex items-center justify-center gap-2 text-2xl font-bold text-white">
-                  <span className="text-lg animate-fade-out">{previousLevel}</span>
+                  <span className="text-lg opacity-60">{previousLevel}</span>
                   <ArrowUp className="h-6 w-6 animate-bounce" />
                   <span className="animate-scale-up">{currentLevel}</span>
                 </div>
@@ -399,271 +469,204 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 onClick={() => setShowLevelUp(false)}
                 className="bg-white text-purple-600 hover:bg-purple-50 font-black px-6 py-2 text-md"
               >
-                OKAY!
+                AWESOME!
               </Button>
             </div>
           </Card>
         </div>
       )}
 
-      {/* Main Results Card Container (h-full is key here to let it stretch within the parent flex) */}
-      <div className="relative z-10 w-full max-w-lg md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto h-full flex items-center justify-center"> 
-        
-        {/* FIX 1: Added flex-col to the Card to enable proper height management for inner content */}
-        <Card className={`
-          relative overflow-hidden bg-card/95 backdrop-blur-xl border-2 ${performanceData.borderColor}
-          shadow-2xl ${performanceData.glowColor} transition-all duration-700 animate-scale-in w-full max-h-[95vh] md:max-h-[90vh] flex flex-col
-        `}>
+      {/* Main Results Card Container */}
+      <div className="relative z-10 w-full max-w-xl mx-auto max-h-full overflow-y-auto">
+        <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl border-2 border-blue-500/30 shadow-2xl shadow-blue-500/20 animate-scale-in">
           
-          {/* Gradient overlay (KEEP AS IS) */}
-          <div className={`absolute inset-0 bg-gradient-to-br ${performanceData.bgGradient} opacity-40`} />
+          {/* Gradient overlay */}
+          <div className={`absolute inset-0 bg-gradient-to-br ${performanceData.bgGradient} opacity-30`} />
           
-          {/* Close Button (KEEP AS IS) */}
+          {/* Close Button */}
           <Button
             onClick={onClose}
             variant="ghost"
             size="icon"
-            className="absolute top-2 right-2 z-20 h-8 w-8 text-foreground/70 hover:text-red-500 hover:bg-red-500/10 rounded-full transition-colors"
-            aria-label="Close results"
+            className="absolute top-3 right-3 z-20 h-8 w-8 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors"
           >
             <X className="h-5 w-5" />
           </Button>
           
-          {/* FIX 2: Changed h-full to flex-grow. This ensures the content DIV takes up all remaining space within the flex-col Card. */}
-          {/* overflow-y-auto is now correctly scoped to this inner content, preventing main page scroll. */}
-          <div className="relative z-10 p-4 md:p-6 space-y-4 md:grid md:grid-cols-2 md:gap-4 lg:gap-8 md:space-y-0 flex-grow overflow-y-auto"> 
+          <div className="relative z-10 p-6 space-y-5">
             
-            {/* LEFT COLUMN: Header, Score, and Rank */}
-            <div className="md:col-span-1 flex flex-col items-center text-center space-y-3 md:space-y-4">
+            {/* Header */}
+            <div className="text-center space-y-2 animate-fade-in-up">
+              <h1 className="text-2xl md:text-3xl font-black text-slate-100 tracking-wider">
+                MISSION COMPLETE!
+              </h1>
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/15 border border-blue-400/30">
+                <span className="text-sm font-bold text-blue-300">{categoryName}</span>
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-4 animate-slide-in-up">
               
-              {/* Header Section with Rank Badge */}
-              <div className="space-y-1 animate-fade-in-up flex-shrink-0"> 
-                <div className="flex flex-col items-center gap-1">
-                  <h1 className="text-xl md:text-2xl lg:text-3xl font-black text-foreground tracking-wider drop-shadow-lg">
-                    MISSION COMPLETE!
-                  </h1>
-                </div>
-                <div className="inline-block bg-primary/10 dark:bg-white/10 backdrop-blur-sm px-3 py-0.5 rounded-full border border-primary/20 dark:border-white/20 mt-1">
-                  <h2 className="text-sm md:text-md font-bold text-foreground truncate max-w-full">
-                    {categoryName}
-                  </h2>
-                </div>
-              </div>
-
-              {/* Circular Progress Score - Hero Element (Dynamic Size) */}
-              <div className="flex justify-center py-2 md:py-4 animate-slide-in-up flex-shrink-0">
-                <Card className="bg-card/50 border border-border p-3 animate-slide-in-left backdrop-blur-sm flex-shrink-0">
-                <div className="flex justify-around gap-2">
-                  <div className="flex flex-col items-center">
-                    <CheckCircle className="h-6 w-6 text-emerald-500 animate-check-pulse" />
-                    <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{correctAnswers}</div>
-                    <div className="text-xs text-emerald-600 dark:text-emerald-300 font-semibold uppercase">Correct</div>
+              {/* Results Card */}
+              <Card className="bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-cyan-500/20 p-4 backdrop-blur-sm">
+                <h4 className="text-xs font-bold text-slate-400 tracking-[0.15em] mb-3 uppercase">
+                  Result
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex items-baseline gap-2">
+                    <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0 mt-1" />
+                    <div>
+                      <div className="text-3xl font-black text-emerald-400">{correctAnswers}</div>
+                      <div className="text-xs font-bold text-emerald-500/80 uppercase">Correct</div>
+                    </div>
                   </div>
-                  
-                  <div className="flex flex-col items-center">
-                    <XCircle className="h-6 w-6 text-red-500 animate-x-pulse" />
-                    <div className="text-2xl font-black text-red-600 dark:text-red-400">{incorrectAnswers}</div>
-                    <div className="text-xs text-red-600 dark:text-red-300 font-semibold uppercase">Incorrect</div>
+                  <div className="flex items-baseline gap-2">
+                    <XCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-1" />
+                    <div>
+                      <div className="text-3xl font-black text-red-400">{incorrectAnswers}</div>
+                      <div className="text-xs font-bold text-red-500/80 uppercase">Incorrect</div>
+                    </div>
                   </div>
-                  
                 </div>
               </Card>
-                <div className="relative">
-                  <svg className={`transform -rotate-90`} style={{ width: progressSize, height: progressSize }}>
-                    {/* Background Circle */}
-                    <circle
-                      cx={progressCenter} 
-                      cy={progressCenter}
-                      r={progressRadius}
-                      stroke="currentColor"
-                      className="text-muted/20"
-                      strokeWidth={progressStroke}
-                      fill="none"
-                    />
-                    {/* Foreground Circle */}
-                    <circle
-                      cx={progressCenter}
-                      cy={progressCenter}
-                      r={progressRadius}
-                      stroke="url(#gradient)"
-                      strokeWidth={progressStroke}
-                      fill="none"
-                      strokeDasharray={`${2 * Math.PI * progressRadius}`}
-                      strokeDashoffset={`${2 * Math.PI * progressRadius * (1 - animatedScore / 100)}`}
-                      strokeLinecap="round"
-                      className="transition-all duration-1000 ease-out"
-                    />
-                    <defs>
-                      {/* Gradient for the progress bar (Updated to blue/purple/cyan) */}
-                      <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#8b5cf6" /> {/* Purple */}
-                        <stop offset="50%" stopColor="#3b82f6" /> {/* Blue */}
-                        <stop offset="100%" stopColor="#06b6d4" /> {/* Cyan */}
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-4xl md:text-5xl font-black text-foreground drop-shadow-lg">
-                      {animatedScore}%
-                    </span>
-                    <span className="text-xs text-muted-foreground font-semibold">ACCURACY</span>
-                  </div>
-                  {percentage === 100 && (
-                    <Flame className="absolute -top-4 left-1/2 -translate-x-1/2 h-6 w-6 text-emerald-500 animate-flame-flicker" />
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            {/* RIGHT COLUMN: Stats Grid and Rating */}
-            {/* Added flex-grow to this column to ensure it uses vertical space if the screen is tall. */}
-            <div className="md:col-span-1 space-y-3 flex flex-col justify-between flex-grow">
-              {/* Progress Stats (XP and Level) */}
-              <div className="space-y-2 animate-slide-in-right flex-grow">
-                
-                {/* Knowledge Gained - Enhanced with Flow Effect */}
-                <Card className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-2 border-blue-400/30 p-4 backdrop-blur-sm animate-glow-pulse">
-                  <div className="space-y-3">
-                    {/* Points Earned (Decreasing) */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-blue-500/20 rounded-lg border border-blue-400/30 flex-shrink-0">
-                          <TrendingUp className="h-5 w-5 text-blue-500 animate-float" />
-                        </div>
-                        <div>
-                          <div className="font-bold text-blue-600 dark:text-blue-300 text-xs uppercase">Points Earned</div>
-                        </div>
-                      </div>
-                      <div className={`text-2xl font-black bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent transition-all duration-300 ${
-                        showKnowledgeBadge ? 'animate-points-drain' : 'opacity-30'
-                      }`}>
-                        {showKnowledgeBadge ? knowledgeGained - animatedKnowledge : 0}
-                      </div>
-                    </div>
-                    
-                    {/* Flow Arrow */}
-                    {showKnowledgeBadge && (
-                      <div className="flex justify-center -my-1">
-                        <ArrowUp className="h-6 w-6 text-purple-500 animate-flow-down transform rotate-180" />
-                      </div>
-                    )}
-                    
-                    {/* Total XP (Increasing) - More Prominent */}
-                    <div className="bg-gradient-to-r from-purple-600/20 to-blue-600/20 border-2 border-purple-500/40 rounded-lg p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1.5 bg-purple-500/30 rounded-lg border border-purple-400/40 flex-shrink-0">
-                            <Zap className="h-5 w-5 text-purple-400 animate-pulse" />
-                          </div>
-                          <div>
-                            <div className="font-black text-purple-600 dark:text-purple-300 text-sm uppercase">Total XP</div>
-                          </div>
-                        </div>
-                        <div className="text-3xl font-black bg-gradient-to-r from-purple-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent animate-xp-grow tabular-nums">
-                          {animatedTotalXP}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
 
-                {/* Current Level Display */}
-                <Card className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border-2 border-purple-400/30 p-3 backdrop-blur-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-purple-500/20 rounded-lg border border-purple-400/30 flex-shrink-0">
-                        <Crown className="h-4 w-4 text-purple-500" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-purple-600 dark:text-purple-300 text-xs uppercase">Current Level</div>
-                        <div className="text-xl font-black text-purple-700 dark:text-purple-200">{currentLevel}</div>
-                      </div>
-                    </div>
-                    {hasLeveledUp && (
-                      <Badge className="bg-gradient-to-r from-purple-500 to-emerald-500 text-white font-bold text-xs px-2 py-0.5 animate-pulse flex-shrink-0">
-                        NEW LEVEL!
-                      </Badge>
-                    )}
-                  </div>
-                </Card>
-              </div>
-
-              {/* Rating Section */}
-              <Card className="bg-card/50 border border-border p-3 flex-shrink-0 animate-fade-in backdrop-blur-sm">
+              {/* Accuracy Card */}
+              <Card className="bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-cyan-500/20 p-4 backdrop-blur-sm flex items-center justify-center">
                 <div className="text-center space-y-2">
-                  <h3 className="text-xs font-bold text-foreground flex items-center justify-center gap-1">
-                    <StarIcon className="h-3 w-3 text-purple-500" />
-                    RATE THIS QUIZ
-                  </h3>
-                  
-                  <div className="flex items-center justify-center gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        disabled={hasRated || isSubmittingRating}
-                        onClick={() => handleRatingSubmit(star)}
-                        onMouseEnter={() => !hasRated && setHoveredRating(star)}
-                        onMouseLeave={() => !hasRated && setHoveredRating(0)}
-                        className={`
-                          p-0.5 transition-all duration-200 transform
-                          ${hasRated || isSubmittingRating ? "cursor-default" : "cursor-pointer hover:scale-125"}
-                          ${hasRated && star <= rating ? "animate-star-vibrate" : ""}
-                        `}
-                      >
-                        <StarIcon
-                          className={`h-6 w-6 transition-all duration-200 ${
-                            star <= (hoveredRating || rating)
-                              ? "fill-purple-500 text-purple-500 drop-shadow-glow"
-                              : "text-muted-foreground hover:text-purple-500/60"
-                          }`}
-                        />
-                      </button>
-                    ))}
-                  </div>
-
-                  {isSubmittingRating && (
-                    <div className="text-xs text-muted-foreground animate-pulse">Submitting...</div>
-                  )}
-                  
-                  {ratingMessage && (
-                    <div className={`text-[10px] font-bold animate-message ${
-                      ratingMessage.includes("Thanks") 
-                        ? "text-purple-600 dark:text-purple-400" 
-                        : "text-red-600 dark:text-red-400"
-                    }`}>
-                      {ratingMessage}
+                  <div className="relative inline-block">
+                    <svg className="w-20 h-20 transform -rotate-90">
+                      <circle
+                        cx="40"
+                        cy="40"
+                        r="36"
+                        stroke="currentColor"
+                        className="text-slate-700"
+                        strokeWidth="6"
+                        fill="none"
+                      />
+                      <circle
+                        cx="40"
+                        cy="40"
+                        r="36"
+                        stroke="url(#accuracyGradient)"
+                        strokeWidth="6"
+                        fill="none"
+                        strokeDasharray={`${2 * Math.PI * 36}`}
+                        strokeDashoffset={`${2 * Math.PI * 36 * (1 - animatedScore / 100)}`}
+                        strokeLinecap="round"
+                        className="transition-all duration-1000"
+                      />
+                      <defs>
+                        <linearGradient id="accuracyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#06b6d4" />
+                          <stop offset="100%" stopColor="#3b82f6" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-xl font-black text-slate-100">{animatedScore}%</span>
                     </div>
-                  )}
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-300 uppercase">Accuracy</div>
+                    <div className="text-[10px] text-slate-500">{performanceData.rank}</div>
+                  </div>
                 </div>
               </Card>
-               {/* Action Buttons - Only "Next Quiz" remains */}
-              <div className="pt-1 w-full max-w-xs flex-shrink-0">
-                <Button
-                  onClick={handleNextQuiz}
-                  size="lg"
-                  className="w-full h-10 text-sm md:text-md font-black bg-gradient-to-r from-purple-600 to-emerald-600 hover:from-purple-500 hover:to-emerald-500 text-white transform transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-purple-500/50 animate-button-glow-purple group"
-                >
-                  <span className="animate-text-pulse">NEXT QUIZ</span>
-                </Button>
-              </div>
             </div>
-            
+
+            {/* XP Pill */}
+            {/* Change 9: Attach ref to the XP Card */}
+            <Card 
+              ref={xpCardRef}
+              className="bg-gradient-to-r from-purple-500/20 via-blue-500/20 to-cyan-500/20 border border-purple-400/30 p-4 backdrop-blur-sm animate-slide-in-left shadow-lg shadow-blue-500/10"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-slate-400 tracking-[0.12em] uppercase mb-1">
+                    Total XP
+                  </div>
+                  <div className="text-4xl font-black bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 bg-clip-text text-transparent tabular-nums">
+                    {animatedTotalXP}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-2 bg-slate-800/60 rounded-xl border border-slate-700/50">
+                  <Crown className="h-5 w-5 text-purple-400" />
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase">Level</div>
+                    <div className="text-2xl font-black text-slate-200">{currentLevel}</div>
+                  </div>
+                  {hasLeveledUp && (
+                    <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] px-2 py-0.5 animate-pulse">
+                      NEW!
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </Card>
+
+            {/* Rating Section */}
+            <Card className="bg-slate-800/40 border border-slate-700/50 p-4 backdrop-blur-sm animate-fade-in">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-bold text-slate-400 tracking-[0.12em] uppercase">
+                  Rate This Quiz
+                </div>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      disabled={hasRated || isSubmittingRating}
+                      onClick={() => handleRatingSubmit(star)}
+                      onMouseEnter={() => !hasRated && setHoveredRating(star)}
+                      onMouseLeave={() => !hasRated && setHoveredRating(0)}
+                      className={`transition-all duration-200 transform ${
+                        hasRated || isSubmittingRating ? "cursor-default" : "cursor-pointer hover:scale-125"
+                      }`}
+                    >
+                      <StarIcon
+                        className={`h-5 w-5 transition-all ${
+                          star <= (hoveredRating || rating)
+                            ? "fill-yellow-400 text-yellow-400"
+                            : "text-slate-600 hover:text-yellow-400/60"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {ratingMessage && (
+                <div className={`text-xs mt-2 ${
+                  ratingMessage.includes("Thanks") ? "text-emerald-400" : "text-red-400"
+                }`}>
+                  {ratingMessage}
+                </div>
+              )}
+            </Card>
+
+            {/* Next Quiz Button */}
+            <Button
+              onClick={handleNextQuiz}
+              disabled={playButtonLoading}
+              size="lg"
+              className="w-full h-12 text-base font-black bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-[1.02] animate-button-glow"
+            >
+              {playButtonLoading ? "LOADING..." : "NEXT QUIZ"}
+            </Button>
           </div>
         </Card>
       </div>
 
-      {/* Enhanced CSS Animations */}
+      {/* CSS Animations - (Updated fly-token and added fade-out) */}
       <style>{`
-        /* Existing CSS animations retained and slightly adjusted for mobile feel */
         @keyframes scale-in {
-          0% { transform: scale(0.8) translateY(20px); opacity: 0; }
-          100% { transform: scale(1) translateY(0); opacity: 1; }
+          0% { transform: scale(0.9); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
         }
         
         @keyframes fade-in-up {
-          0% { transform: translateY(15px); opacity: 0; }
+          0% { transform: translateY(20px); opacity: 0; }
           100% { transform: translateY(0); opacity: 1; }
         }
         
@@ -673,77 +676,35 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         }
         
         @keyframes slide-in-left {
-          0% { transform: translateX(-20px); opacity: 0; }
+          0% { transform: translateX(-30px); opacity: 0; }
           100% { transform: translateX(0); opacity: 1; }
-        }
-        
-        @keyframes slide-in-right {
-          0% { transform: translateX(20px); opacity: 0; }
-          100% { transform: translateX(0); opacity: 1; }
-        }
-        
-        @keyframes icon-bounce {
-          0%, 100% { transform: translateY(0) scale(1); }
-          50% { transform: translateY(-5px) scale(1.1); }
-        }
-        
-        @keyframes badge-pop {
-          0% { transform: scale(0); opacity: 0; }
-          50% { transform: scale(1.1); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        
-        @keyframes badge-bounce {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
         }
         
         @keyframes pop-in {
           0% { transform: scale(0.8); opacity: 0; }
-          50% { transform: scale(1.02); opacity: 1; }
+          50% { transform: scale(1.05); opacity: 1; }
           100% { transform: scale(1); opacity: 1; }
         }
         
-        @keyframes pop-in-delayed {
-          0% { transform: scale(0.8); opacity: 0; }
-          50% { transform: scale(1.02); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        
-        @keyframes check-pulse {
+        @keyframes count-up {
           0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.1); }
-        }
-        
-        @keyframes x-pulse {
-          0%, 100% { transform: scale(1) rotate(0deg); }
-          50% { transform: scale(1.1) rotate(90deg); }
-        }
-        
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-5px); }
+          50% { transform: scale(1.05); }
         }
         
         @keyframes pulse-slow {
-          0%, 100% { opacity: 0.2; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(1.03); }
+          0%, 100% { opacity: 0.3; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.05); }
         }
         
         @keyframes pulse-delayed {
-          0%, 100% { opacity: 0.2; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(1.03); }
-        }
-        
-        @keyframes glow-pulse {
-          0%, 100% { box-shadow: 0 0 10px rgba(59, 130, 246, 0.2); }
-          50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.4); }
+          0%, 100% { opacity: 0.3; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.05); }
         }
         
         @keyframes level-up-popup {
           0% { transform: scale(0.4) rotate(-10deg); opacity: 0; }
           50% { transform: scale(1.05) rotate(5deg); opacity: 1; }
-          100% { transform: scale(1) rotate(0deg); opacity: 1; }
+          100% { transform: scale(1) rotate(0); opacity: 1; }
         }
         
         @keyframes crown-bounce {
@@ -753,46 +714,143 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         }
         
         @keyframes text-glow {
-          0%, 100% { text-shadow: 0 0 10px rgba(255, 255, 255, 0.4); }
-          50% { text-shadow: 0 0 20px rgba(255, 255, 255, 0.6); }
-        }
-        
-        @keyframes fade-out {
-          0% { opacity: 1; }
-          100% { opacity: 0.3; }
+          0%, 100% { text-shadow: 0 0 20px rgba(255, 255, 255, 0.5); }
+          50% { text-shadow: 0 0 30px rgba(255, 255, 255, 0.8); }
         }
         
         @keyframes scale-up {
           0% { transform: scale(0.8); opacity: 0; }
-          100% { transform: scale(1.1); opacity: 1; }
-        }
-        
-        @keyframes button-glow-purple {
-          0%, 100% { box-shadow: 0 2px 10px rgba(147, 51, 234, 0.4); } /* Adjusted to purple glow */
-          50% { box-shadow: 0 4px 20px rgba(147, 51, 234, 0.7); }
-        }
-        
-        @keyframes flame-flicker {
-          0%, 100% { opacity: 1; transform: translateY(0) scale(1); }
-          25% { opacity: 0.8; transform: translateY(-3px) scale(1.05); }
-          50% { opacity: 1; transform: translateY(-1px) scale(0.95); }
-          75% { opacity: 0.9; transform: translateY(-4px) scale(1.03); }
+          100% { transform: scale(1.2); opacity: 1; }
         }
         
         @keyframes fade-in {
           0% { opacity: 0; }
           100% { opacity: 1; }
         }
+
+        /* NEW FADE OUT */
+        @keyframes fade-out {
+          0% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+
+        .animate-fade-out {
+          animation: fade-out 0.5s ease-out forwards;
+        }
         
-        @keyframes message {
-          0% { transform: translateY(-5px); opacity: 0; }
-          100% { transform: translateY(0); opacity: 1; }
+        @keyframes button-glow {
+          0%, 100% { box-shadow: 0 4px 20px rgba(147, 51, 234, 0.4); }
+          50% { box-shadow: 0 6px 30px rgba(147, 51, 234, 0.6); }
+        }
+        
+        /* Flying Token Animation - UPDATED */
+        .token {
+          position: fixed;
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: radial-gradient(circle at 35% 35%, #FFFFFF, #A9F0FF 35%, #46CFFF 65%, #5F7CFF);
+          box-shadow: 0 0 0 2px rgba(94, 164, 255, 0.35), 0 10px 25px rgba(0, 0, 0, 0.35);
+          z-index: 60;
+          opacity: 0;
+          pointer-events: none;
+          animation: fly-token 900ms cubic-bezier(0.17, 0.67, 0.29, 1.01) var(--token-delay, 0ms) forwards;
+        }
+        
+        @keyframes fly-token {
+          0% {
+            opacity: 0;
+            /* Start from the center of the fading points overlay, with a slight spread */
+            transform: translate(
+              calc(var(--token-start-x, 50vw) - 7px + cos(var(--token-angle, 0)) * 30px),
+              calc(var(--token-start-y, 50vh) - 7px + sin(var(--token-angle, 0)) * 30px)
+            ) scale(0.6);
+          }
+          10% {
+            opacity: 1;
+            /* slight scale up for visual pop */
+            transform: translate(
+              calc(var(--token-start-x, 50vw) - 7px + cos(var(--token-angle, 0)) * 20px),
+              calc(var(--token-start-y, 50vh) - 7px + sin(var(--token-angle, 0)) * 20px)
+            ) scale(1);
+          }
+          90% {
+             /* Fly towards the target with a bit of a curve */
+            transform: translate(
+              calc(var(--token-end-x, 50vw) - 7px),
+              calc(var(--token-end-y, 50vh) - 7px)
+            ) scale(0.4);
+            opacity: 1;
+          }
+          100% {
+            /* end at the target location, faded and smaller */
+            transform: translate(
+              calc(var(--token-end-x, 50vw) - 7px),
+              calc(var(--token-end-y, 50vh) - 7px)
+            ) scale(0.1);
+            opacity: 0;
+          }
+        }
+        
+        .animate-scale-in {
+          animation: scale-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        
+        .animate-fade-in-up {
+          animation: fade-in-up 0.6s ease-out 0.1s both;
+        }
+        
+        .animate-slide-in-up {
+          animation: slide-in-up 0.6s ease-out 0.2s both;
+        }
+        
+        .animate-slide-in-left {
+          animation: slide-in-left 0.6s ease-out 0.3s both;
+        }
+        
+        .animate-pop-in {
+          animation: pop-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        
+        .animate-count-up {
+          animation: count-up 0.3s ease-in-out infinite;
+        }
+        
+        .animate-pulse-slow {
+          animation: pulse-slow 4s ease-in-out infinite;
+        }
+        
+        .animate-pulse-delayed {
+          animation: pulse-delayed 4s ease-in-out infinite 2s;
+        }
+        
+        .animate-level-up-popup {
+          animation: level-up-popup 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        
+        .animate-crown-bounce {
+          animation: crown-bounce 1s ease-in-out infinite;
+        }
+        
+        .animate-text-glow {
+          animation: text-glow 2s ease-in-out infinite;
+        }
+        
+        .animate-scale-up {
+          animation: scale-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 0.4s ease-out;
+        }
+        
+        .animate-button-glow {
+          animation: button-glow 2s ease-in-out infinite;
         }
         
         .drop-shadow-glow {
-          filter: drop-shadow(0 0 4px currentColor);
+          filter: drop-shadow(0 0 8px currentColor);
         }
-        
       `}</style>
     </div>
   );

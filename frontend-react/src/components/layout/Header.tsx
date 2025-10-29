@@ -8,6 +8,7 @@ import {
   Grid3X3,
   Trophy,
   User,
+  ShoppingBag
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ const navTabs = [
   { icon: Home, label: "Home", path: "/" },
   { icon: Grid3X3, label: "Categories", path: "/categories" },
   { icon: User, label: "Profile", path: "/profile" },
+  { icon: ShoppingBag, label: "Store", path: "/store" },
   { icon: Menu, label: "Menu", path: "/menu" },
 ];
 
