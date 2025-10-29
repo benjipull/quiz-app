@@ -15,17 +15,8 @@ import AuthSection from "./pages/AuthSection";
 import Notifications from "./pages/Notification";
 import Store from "./pages/Store";
 import Menu from "./pages/Menu";
+import ProtectedRoute from "./components/ProtectedRoute";
 const queryClient = new QueryClient();
-
-// ProtectedRoute component to guard routes
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-    const userToken = localStorage.getItem("token");
-    if (!userToken) {
-        // Redirect to the login page if not authenticated
-        return <Navigate to="/auth" replace />;
-    }
-    return children;
-};
 
 const App = () => (
     <QueryClientProvider client={queryClient}>
