@@ -182,7 +182,7 @@ export default function Home() {
     }
     
     try {
-      const response = await fetch(`${BASE_URL}/api/getUserDetails`, { // <-- The new API endpoint
+      const response = await fetch(`${BASE_URL}/api/getUserDetails`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${userToken}`,
