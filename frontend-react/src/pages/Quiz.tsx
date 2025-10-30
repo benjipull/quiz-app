@@ -75,14 +75,28 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
   // MODIFIED: Check for submit button disable condition
   const isSubmitDisabled = !selectedReason || (selectedReason === "other" && otherText.trim() === '') || isSubmitting;
 
+  // STYLED: Close Button to be a Red Circle
+  const CloseButton = () => (
+    <Button 
+      variant="ghost" 
+      size="icon" 
+      onClick={onClose} 
+      disabled={isSubmitting}
+      // ADDED STYLES: Red circle background, white X, hover effect
+      className="bg-red-600 hover:bg-red-700 rounded-full h-8 w-8 p-1 text-white"
+      aria-label="Close"
+    >
+      <X className="h-5 w-5" />
+    </Button>
+  );
+
   return (
     <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
       <Card className="max-w-md w-full p-6 space-y-6">
         <div className="flex justify-between items-center">
           <h3 className="text-xl font-bold">{isThankYou ? "Thank You!" : "Report Question Issue"}</h3>
-          <Button variant="ghost" size="icon" onClick={onClose} disabled={isSubmitting}>
-            <X className="h-5 w-5" />
-          </Button>
+          {/* Using the styled CloseButton component */}
+          <CloseButton /> 
         </div>
 
         {isThankYou ? (
@@ -212,6 +226,10 @@ export default function Quiz() {
   const location = useLocation();
   const explanationRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 🔥 FIX: Ref to ensure the initial setup (startQuiz) only runs once, 
+  // preventing double-fetch/double-increment in React Strict Mode.
+  const hasStartedRef = useRef(false); 
 
   const [quizState, setQuizState] = useState<QuizState>({
     started: false,
@@ -316,14 +334,17 @@ export default function Quiz() {
     setReportSuccess(false); // Reset success state for the next report
   };
 
+  // 🔥 FIX IMPLEMENTATION: Use a ref to ensure startQuiz is called only once
   useEffect(() => {
-    if (categoryId && userToken) {
+    if (categoryId && userToken && !hasStartedRef.current) {
+      hasStartedRef.current = true; // Mark as started
       startQuiz(categoryId);
     } else if (!userToken) {
       console.log("⚠️ You must be logged in to play.");
       navigate("/categories");
     }
-  }, [categoryId, userToken]);
+    // Dependency array remains for React to warn about missing deps, but the ref controls execution
+  }, [categoryId, userToken, navigate]); 
 
   useEffect(() => {
     if (timerRef.current) {
@@ -413,12 +434,14 @@ export default function Quiz() {
     setLoading(true);
     setError(null);
     setIsCompletingQuiz(false);
+    
+    // NOTE: currentQuestionIndex is reset to 0 here.
     setQuizState({
       started: true,
       completed: false,
       selectedCategory: null,
       question: null,
-      currentQuestionIndex: 0,
+      currentQuestionIndex: 0, 
       correctAnswers: 0,
       incorrectAnswers: 0,
       results: null,
@@ -481,7 +504,7 @@ export default function Quiz() {
 
       if (response.ok && data.question) {
         setQuizState((prev) => {
-          const newIndex = prev.currentQuestionIndex + 1;
+          const newIndex = prev.currentQuestionIndex + 1; // 0 -> 1 (Correct)
           // ADDED: Play sound effect when first question starts
           if (newIndex === 1) {
             startSound.play().catch(() => {});
@@ -689,6 +712,8 @@ export default function Quiz() {
   };
 
   const handlePlayAgain = () => {
+    // Reset the ref when playing again to allow startQuiz to run
+    hasStartedRef.current = false;
     if (categoryId) {
       startQuiz(categoryId);
     }
@@ -862,7 +887,8 @@ export default function Quiz() {
                   {categoryTitle}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Question {quizState.currentQuestionIndex} of {totalQuestions}
+                  {/* The index is correct now because the double increment is blocked */}
+                  Question {quizState.currentQuestionIndex} of {totalQuestions} 
                 </div>
               </div>
 
