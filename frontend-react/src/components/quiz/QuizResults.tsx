@@ -262,7 +262,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
   const handleNextQuiz = async () => {
     if (!userToken) {
-      alert("You must be logged in to play.");
+      // Use console.error instead of alert, as per best practices.
+      console.error("User must be logged in to play the next quiz.");
+      // Can show a temporary message on screen instead of alert
+      setRatingMessage("You must be logged in to play the next quiz.");
       return;
     }
 
@@ -290,7 +293,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       }
     } catch (error: any) {
       console.error("Error getting category to play:", error);
-      alert(`Error: ${error.message}`);
+      // Can show a temporary message on screen instead of alert
+      setRatingMessage(`Error playing next quiz: ${error.message}`);
     } finally {
       setPlayButtonLoading(false);
     }
@@ -353,10 +357,22 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           {/* Stat Item: Hearts */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
-              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5 text-cyan-400"
+              >
+                <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
+                <path d="m6 3 6 6 6-6" />
+                <path d="m2 9 10 12 10-12" />
+              </svg>
             </div>
             <div>
-              <div className="text-xs text-slate-500">Hearts</div>
               <div className="text-base sm:text-lg font-bold text-slate-200">0</div>
             </div>
           </div>
@@ -364,10 +380,18 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           {/* Stat Item - XP */}
           <div ref={headerXPRef} className="flex items-center gap-1.5 sm:gap-2">
             <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center">
-              <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400" />
+              <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="h-5 w-5 text-amber-500"
+            >
+              <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
+              <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
+              <circle cx="12" cy="9" r="2" fill="#fff" />
+            </svg>
             </div>
             <div>
-              <div className="text-xs text-slate-500">Total XP</div>
               <div className="text-base sm:text-lg font-bold text-yellow-400 tabular-nums">{animatedTotalXP}</div>
             </div>
           </div>
@@ -375,10 +399,18 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           {/* Stat Item: Gems */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
-              <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-purple-400" />
+              <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="h-5 w-5 text-purple-500"
+            >
+              <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
+              <path d="m6 3 6 6 6-6" fill="#fff" fillOpacity="0.3" />
+              <path d="m2 9 10 12 10-12" fill="#fff" fillOpacity="0.2" />
+            </svg>
             </div>
             <div>
-              <div className="text-xs text-slate-500">Gems</div>
               <div className="text-base sm:text-lg font-bold text-slate-200">0</div>
             </div>
           </div>
@@ -439,9 +471,11 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </div>
       )}
 
-      {/* Main Results Card */}
-      <div className="relative z-10 w-full max-w-lg mx-auto flex-1 flex flex-col justify-center min-h-0 pb-12 sm:pb-0">
-        <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in">
+      {/* Main Results Card Container - FIX APPLIED HERE */}
+      {/* Removed flex-1 flex flex-col justify-center to top-align the card after the header */}
+      <div className="relative z-10 w-full max-w-lg mx-auto pb-12 sm:pb-0">
+        <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl
+         border-2 border-slate-700/50 shadow-2xl animate-scale-in">
           
           {/* Close Button - Updated to Red Circle Link */}
           <Link
