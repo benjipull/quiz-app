@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Content Management</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: radial-gradient(circle at top left, #111 0%, #000 100%);
+      color: #eee;
+      margin: 0;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 2rem;
+      text-align: center;
+      color: #5ea6ff;
+    }
+
+    .back-link {
+      align-self: flex-start;
+      margin-bottom: 1.5rem;
+      color: #5ea6ff;
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .card {
+      background: #1b1b1b;
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      text-align: center;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 22px rgba(94, 166, 255, 0.4);
+      border-color: #5ea6ff33;
+    }
+
+    .card h2 {
+      color: #5ea6ff;
+      font-size: 1.4rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .card p {
+      font-size: 0.95rem;
+      color: #ccc;
+      line-height: 1.4;
+      margin-bottom: 1rem;
+    }
+
+    .card button {
+      background: #5ea6ff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.6rem 1.2rem;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.25s ease;
+    }
+
+    .card button:hover {
+      background: #3a8cff;
+    }
+
+    footer {
+      margin-top: 3rem;
+      font-size: 0.85rem;
+      color: #888;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+  <a href="/admin/pages/admin-landing.html" class="back-link">← Back to Admin Home</a>
+  <h1>Content Management</h1>
+
+  <div class="dashboard">
+    <!-- CATEGORIES & QUESTIONS -->
+    <div class="card" onclick="navigateTo('admin-categories.html')">
+      <h2>📘 Manage Categories & Questions</h2>
+      <p>View, edit, and validate quiz categories and their questions. You can enable/disable questions and verify AI-generated content.</p>
+      <button>Go to Categories</button>
+    </div>
+
+    <!-- PLAYER REPORTS -->
+    <div class="card" onclick="navigateTo('admin-reports.html')">
+      <h2>⚠️ Player Reports</h2>
+      <p>Review reports submitted by players for incorrect, ambiguous, or inappropriate questions. Mark issues as resolved once addressed.</p>
+      <button>View Reports</button>
+    </div>
+  </div>
+
+  <footer>Quizicle Admin Portal © 2025</footer>
+
+  <script>
+    const token = localStorage.getItem("token");
+    const userType = (localStorage.getItem("userType") || "").toLowerCase();
+    if (!token || userType !== "admin") window.location.href = "/admin/pages/admin-login.html";
+
+    function navigateTo(page) {
+      window.location.href = `/admin/pages/${page}`;
+    }
+  </script>
+</body>
+</html>

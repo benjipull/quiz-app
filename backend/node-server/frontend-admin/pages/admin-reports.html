@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unresolved Player Reports</title>
+  <link rel="stylesheet" href="../styles/admin-common.css" />
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #111;
+      color: #eee;
+      margin: 0;
+      padding: 2rem;
+    }
+    h1 { text-align: center; margin-bottom: 1.5rem; }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1rem;
+      color: #5ea6ff;
+      text-decoration: none;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #1e1e1e;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    th, td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #222;
+      vertical-align: top;
+    }
+    thead { background: #2b2b2b; }
+    tr:hover { background: #292929; }
+    .question-row { cursor: pointer; }
+    .answers-row { display: none; }
+    .answers-row.open { display: table-row; }
+
+    .answers-content {
+      background: #181818;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+    }
+
+    .answers-list {
+      list-style: none; padding: 0; margin: 0;
+    }
+    .answers-list li {
+      padding: 6px 0; border-bottom: 1px solid #333;
+    }
+    .answers-list li:last-child { border-bottom: none; }
+    .correct-answer { color: #6cff6c; font-weight: bold; }
+    .wrong-answer { color: #bbb; }
+
+    .user-info, .report-info {
+      background: #1b1b1b;
+      margin-top: 1rem;
+      padding: .75rem 1rem;
+      border-left: 4px solid #5ea6ff;
+      border-radius: 8px;
+    }
+
+    .resolve-btn {
+      background: #2bbf6b;
+      border: none;
+      color: white;
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .9rem;
+      transition: background 0.2s ease;
+    }
+    .resolve-btn:hover { background: #22a45a; }
+
+    .mark-incorrect-btn {
+      background: #d9534f;
+      border: none;
+      color: white;
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .9rem;
+      margin-left: .3rem;
+      transition: background 0.2s ease;
+    }
+    .mark-incorrect-btn:hover { background: #c9302c; }
+
+    .category-label {
+      background: #2b2b2b;
+      padding: .25rem .6rem;
+      border-radius: 6px;
+      color: #9ec9ff;
+      font-size: 0.85rem;
+      margin-left: .5rem;
+    }
+
+    .fade-out {
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+  </style>
+</head>
+
+<body>
+  <a href="/admin/pages/admin-content-management.html" class="back-link">← Back to Content Management</a>
+  <h1>Unresolved Player Reports</h1>
+
+  <div id="status" class="loading">Loading reports...</div>
+
+  <table id="reportTable" style="display:none;">
+    <thead>
+      <tr>
+        <th>Question</th>
+        <th>Reason</th>
+        <th>User</th>
+        <th>Action</th>
+        <th>Reported On</th>
+      </tr>
+    </thead>
+    <tbody id="reportTableBody"></tbody>
+  </table>
+
+  <script>
+    const token = localStorage.getItem("token");
+    const userType = (localStorage.getItem("userType") || "").toLowerCase();
+    if (!token || userType !== "admin") window.location.href = "/admin/pages/admin-login.html";
+
+    async function loadReports() {
+      const status = document.getElementById("status");
+      const table = document.getElementById("reportTable");
+      try {
+        const res = await fetch("/api/admin/reports", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error("Failed to load reports");
+        const reports = await res.json();
+        renderReports(reports);
+        status.style.display = "none";
+        table.style.display = "table";
+      } catch (err) {
+        status.textContent = "❌ " + err.message;
+      }
+    }
+
+    function renderReports(reports) {
+      const tbody = document.getElementById("reportTableBody");
+      tbody.innerHTML = reports.map(r => {
+        const q = r.question;
+        const u = r.user;
+        const readableReason = reasonToText(r.reason);
+        const category = r.categoryName ? `<span class="category-label">${escapeHtml(r.categoryName)}</span>` : "";
+        return `
+          <tr class="question-row" data-id="${r._id}">
+            <td>${escapeHtml(q?.text || "Unknown question")} ${category}</td>
+            <td>${escapeHtml(readableReason)}</td>
+            <td>${escapeHtml(u?.alias || "Unknown")}</td>
+            <td>
+              <button class="resolve-btn" data-id="${r._id}">Mark Resolved</button>
+              <button class="mark-incorrect-btn" data-qid="${q?._id}" data-id="${r._id}">Mark Incorrect</button>
+            </td>
+            <td>${new Date(r.createdAt).toLocaleDateString()}</td>
+          </tr>
+          <tr class="answers-row" id="answers-${r._id}">
+            <td colspan="5">
+              <div class="answers-content">
+                ${renderQuestionDetails(q)}
+                ${renderUserInfo(u)}
+                ${renderReportInfo(r)}
+              </div>
+            </td>
+          </tr>`;
+      }).join("");
+
+      document.querySelectorAll(".question-row").forEach(row => {
+        row.addEventListener("click", ev => {
+          if (ev.target.closest("button")) return; // skip expand if button clicked
+          const id = row.dataset.id;
+          document.getElementById(`answers-${id}`).classList.toggle("open");
+        });
+      });
+
+      document.querySelectorAll(".resolve-btn").forEach(btn => {
+        btn.addEventListener("click", () => resolveReport(btn.dataset.id));
+      });
+
+      document.querySelectorAll(".mark-incorrect-btn").forEach(btn => {
+        btn.addEventListener("click", () => markIncorrect(btn.dataset.qid, btn.dataset.id));
+      });
+    }
+
+    async function resolveReport(id) {
+      if (!confirm("Mark this report as resolved?")) return;
+      try {
+        const res = await fetch(`/api/admin/reports/${id}/resolve`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ resolutionNotes: "Resolved via admin panel" })
+        });
+        if (!res.ok) throw new Error("Failed to mark as resolved");
+
+        removeRow(id);
+      } catch (err) {
+        alert("❌ " + err.message);
+      }
+    }
+
+    async function markIncorrect(questionId, reportId) {
+      if (!confirm("Disable this question and mark report as confirmed?")) return;
+      try {
+        const res = await fetch(`/api/admin/questions/${questionId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            disabled: true,
+            disabled_reason: "Confirmed report",
+            needs_validation: false,
+            new_question: false
+          })
+        });
+
+        if (!res.ok) throw new Error("Failed to mark as incorrect");
+
+        removeRow(reportId);
+      } catch (err) {
+        alert("❌ " + err.message);
+      }
+    }
+
+    function removeRow(id) {
+      const row = document.querySelector(`tr[data-id='${id}']`);
+      const answersRow = document.getElementById(`answers-${id}`);
+      row.classList.add("fade-out");
+      answersRow?.classList.add("fade-out");
+      setTimeout(() => {
+        row.remove();
+        answersRow?.remove();
+      }, 300);
+    }
+
+    function renderQuestionDetails(q) {
+      if (!q) return `<em>Question not found.</em>`;
+      const answers = q.answers?.length
+        ? `<ul class="answers-list">
+            ${q.answers.map(a => `
+              <li class="${a.text.trim().toLowerCase() === q.correct_answer.trim().toLowerCase() ? 'correct-answer' : 'wrong-answer'}">
+                ${escapeHtml(a.text)}
+              </li>`).join("")}
+          </ul>` : `<em>No answers recorded</em>`;
+      const explanation = q.explanation ? `<div class="explanation"><b>🧠 Explanation:</b> ${escapeHtml(q.explanation)}</div>` : "";
+      return `<div>
+        <b>Question:</b> ${escapeHtml(q.text)}<br/>
+        ${answers}
+        ${explanation}
+      </div>`;
+    }
+
+    function renderUserInfo(u) {
+      if (!u) return "";
+      return `<div class="user-info">
+        <b>👤 User Info</b><br/>
+        Alias: ${escapeHtml(u.alias)}<br/>
+        Email: ${escapeHtml(u.email)}<br/>
+        Type: ${escapeHtml(u.userType)}<br/>
+        Joined: ${new Date(u.created_at).toLocaleDateString()}
+      </div>`;
+    }
+
+    function renderReportInfo(r) {
+      return `<div class="report-info">
+        <b>📝 Report Details</b><br/>
+        Reason: ${escapeHtml(reasonToText(r.reason))}<br/>
+        Other: ${escapeHtml(r.otherText || "—")}<br/>
+        Reported: ${new Date(r.createdAt).toLocaleString()}<br/>
+        Updated: ${new Date(r.updatedAt).toLocaleString()}
+      </div>`;
+    }
+
+    function reasonToText(key) {
+      const map = {
+        incorrect_answer: "Incorrect Answer",
+        ambiguous_wording: "Ambiguous Wording",
+        duplicate_question: "Duplicate Question",
+        offensive_content: "Offensive Content",
+        other: "Other"
+      };
+      return map[key] || key;
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    document.addEventListener("DOMContentLoaded", loadReports);
+  </script>
+</body>
+</html>
