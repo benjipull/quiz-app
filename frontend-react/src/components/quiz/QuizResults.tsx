@@ -438,7 +438,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       )}
 
       {/* Main Results Card */}
-      {/* flex-1 to allow it to push the header up and center the card vertically */}
       <div className="relative z-10 w-full max-w-lg mx-auto flex-1 flex flex-col justify-center min-h-0 pb-12 sm:pb-0">
         <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in">
           
@@ -482,7 +481,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 </div>
               </div>
             ) : (
-              // This is the section where the vertical spacing is reduced for mobile
+              // Use slightly reduced vertical spacing for compact mobile view
               <div className="space-y-4 sm:space-y-6 animate-fade-in">
                 {/* Results Grid */}
                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
@@ -507,29 +506,30 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                     </div>
                   </Card>
 
-                  {/* Accuracy Circle */}
+                  {/* Accuracy Circle (Scaled Down) */}
                   <Card className="bg-slate-800/40 border border-slate-700/50 p-4 sm:p-5 flex items-center justify-center">
                     <div className="text-center">
                       <div className="relative inline-block mb-3">
-                        <svg className="w-20 h-20 sm:w-24 sm:h-24 transform -rotate-90">
+                        {/* Reduced SVG size: w-16 h-16 (64px) for mobile, w-20 h-20 (80px) for sm+ */}
+                        <svg className="w-16 h-16 sm:w-20 sm:h-20 transform -rotate-90">
                           <circle
-                            cx="48"
-                            cy="48"
-                            r="42"
+                            cx="32" // Adjusted center x
+                            cy="32" // Adjusted center y
+                            r="28"  // Adjusted radius
                             stroke="currentColor"
                             className="text-slate-700"
                             strokeWidth="8"
                             fill="none"
                           />
                           <circle
-                            cx="48"
-                            cy="48"
-                            r="42"
+                            cx="32" // Adjusted center x
+                            cy="32" // Adjusted center y
+                            r="28"  // Adjusted radius
                             stroke="url(#accuracyGradient)"
                             strokeWidth="8"
                             fill="none"
-                            strokeDasharray={`${2 * Math.PI * 42}`}
-                            strokeDashoffset={`${2 * Math.PI * 42 * (1 - animatedScore / 100)}`}
+                            strokeDasharray={`${2 * Math.PI * 28}`} // Updated dash array calculation
+                            strokeDashoffset={`${2 * Math.PI * 28 * (1 - animatedScore / 100)}`} // Updated dash offset calculation
                             strokeLinecap="round"
                             className="transition-all duration-1000"
                           />
@@ -540,7 +540,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                             </linearGradient>
                           </defs>
                         </svg>
-                        <div className="absolute inset-0 flex items-center justify-center" style={{ top: '2px', left: '2px' }}>
+                        {/* Adjusting the center number position based on the smaller SVG size */}
+                        <div className="absolute inset-0 flex items-center justify-center">
                           <span className="text-xl sm:text-2xl font-black text-slate-100">{animatedScore}%</span>
                         </div>
                       </div>
