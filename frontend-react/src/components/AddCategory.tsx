@@ -1,8 +1,11 @@
 import React, { useState } from "react";
 import { Plus, X } from "lucide-react";
 
+// NEW PROPS
 interface AddCategoryProps {
   fetchCategories?: () => void;
+  isGuest: boolean; 
+  onRegistrationRequired: () => void;
 }
 
 interface Notification {
@@ -10,7 +13,12 @@ interface Notification {
   type: "success" | "error";
 }
 
-const AddCategory: React.FC<AddCategoryProps> = ({ fetchCategories = () => {} }) => {
+const AddCategory: React.FC<AddCategoryProps> = ({ 
+    fetchCategories = () => {},
+    // Destructure new props
+    isGuest,
+    onRegistrationRequired 
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [categoryName, setCategoryName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,6 +30,13 @@ const AddCategory: React.FC<AddCategoryProps> = ({ fetchCategories = () => {} })
   };
 
   const handleCreateCategory = async () => {
+    // 1. CRITICAL: Prevent API call if user is a guest (in case Home.tsx logic was bypassed)
+    if (isGuest) {
+        setIsOpen(false); // Close the modal
+        onRegistrationRequired(); // Show the registration toast
+        return;
+    }
+
     if (!categoryName.trim()) {
       showNotification("Please enter a category name.", "error");
       return;
@@ -64,6 +79,18 @@ const AddCategory: React.FC<AddCategoryProps> = ({ fetchCategories = () => {} })
       setLoading(false);
     }
   };
+    
+  // NEW: Handler for the main button click to check guest status
+  const handleMainButtonClick = () => {
+    if (isGuest) {
+        // If guest, show the registration required prompt/toast from Home.tsx
+        onRegistrationRequired();
+    } else {
+        // If not a guest, open the modal
+        setIsOpen(true);
+    }
+  };
+
 
   return (
     <div className="w-full max-w-6xl mx-auto p-4 space-y-6">
@@ -72,12 +99,13 @@ const AddCategory: React.FC<AddCategoryProps> = ({ fetchCategories = () => {} })
         <div>
           <h4 className="font-semibold text-foreground">Create Your Own</h4>
           <p className="text-sm text-muted-foreground">
-            Build a custom quiz category and share it with others!
+            Build a custom quiz and share it with others!
           </p>
         </div>
 
         <button
-          onClick={() => setIsOpen(true)}
+          // Use the unified click handler for guest check or modal open
+          onClick={handleMainButtonClick}
           className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-primary-foreground shadow-button
                      bg-[linear-gradient(135deg,hsl(var(--primary)),hsl(var(--accent)))]
                      hover:opacity-90 transition-smooth"
@@ -98,7 +126,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({ fetchCategories = () => {} })
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-foreground">Create New Category</h2>
+              <h2 className="text-xl font-bold text-foreground">Create New Quiz</h2>
               <button
                 onClick={() => setIsOpen(false)}
                 className="text-muted-foreground hover:text-foreground transition-colors"
@@ -110,7 +138,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({ fetchCategories = () => {} })
             <div className="space-y-4">
               <input
                 type="text"
-                placeholder="Enter category name"
+                placeholder="Enter quiz name"
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreateCategory()}
@@ -120,6 +148,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({ fetchCategories = () => {} })
 
               <div className="flex space-x-3">
                 <button
+                  // This button will also trigger the guest check now
                   onClick={handleCreateCategory}
                   disabled={loading || !categoryName.trim()}
                   className="flex-1 px-4 py-2 rounded-lg font-medium text-primary-foreground
