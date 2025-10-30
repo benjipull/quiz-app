@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+// Assuming you use react-router-dom for navigation:
+import { Link } from "react-router-dom"; 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -441,15 +443,17 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       <div className="relative z-10 w-full max-w-lg mx-auto flex-1 flex flex-col justify-center min-h-0 pb-12 sm:pb-0">
         <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in">
           
-          {/* Close Button */}
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            size="icon"
-            className="absolute top-3 right-3 z-20 h-8 w-8 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors"
+          {/* Close Button - Updated to Red Circle Link */}
+          <Link
+            to={"/categories"}
+            // Combines the required red background, rounded shape, size, and centering
+            className="absolute top-3 right-3 z-20 h-8 w-8 bg-red-600 hover:bg-red-700 
+                       rounded-full transition-colors flex items-center justify-center shadow-lg"
+            onClick={onClose} // Keep the onClose functionality if it's needed for state cleanup
+            aria-label="Close Results and go to Categories"
           >
-            <X className="h-5 w-5" />
-          </Button>
+            <X className="h-5 w-5 text-white" />
+          </Link>
           
           {/* Content Wrapper */}
           <div className="relative z-10 p-5 sm:p-8 space-y-5 sm:space-y-6">
@@ -460,7 +464,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                 <span className="text-xs sm:text-sm font-bold text-slate-300">{categoryName}</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-100 tracking-wide">
+              <h1 className="text-3xl sm:text-4xl font-black text-slate-100 tracking-wide">
                 MISSION COMPLETE!
               </h1>
             </div>
@@ -506,7 +510,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                     </div>
                   </Card>
 
-                  {/* Accuracy Circle (Scaled Down) */}
+                  {/* Accuracy Circle (Scaled Down for Mobile) */}
                   <Card className="bg-slate-800/40 border border-slate-700/50 p-4 sm:p-5 flex items-center justify-center">
                     <div className="text-center">
                       <div className="relative inline-block mb-3">
