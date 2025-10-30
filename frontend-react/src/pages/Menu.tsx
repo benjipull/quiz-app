@@ -137,25 +137,25 @@ const Menu = () => {
         },
       ]
     },
-    {
-      title: "Social",
-      items: [
-        { icon: Users, label: "Friends", description: "Manage your friends list", action: () => navigate("/friends") },
-        { icon: MessageCircle, label: "Leaderboard", description: "Global & friends ranking", action: () => navigate("/leaderboard") },
-        { icon: Share2, label: "Invite Friends", description: "Share the app with others", action: () => {} },
-        { icon: Star, label: "Rate App", description: "Rate us on the app store", action: () => {} },
-      ]
-    },
+    // {
+    //   title: "Social",
+    //   items: [
+    //     { icon: Users, label: "Friends", description: "Manage your friends list", action: () => navigate("/friends") },
+    //     { icon: MessageCircle, label: "Leaderboard", description: "Global & friends ranking", action: () => navigate("/leaderboard") },
+    //     { icon: Share2, label: "Invite Friends", description: "Share the app with others", action: () => {} },
+    //     { icon: Star, label: "Rate App", description: "Rate us on the app store", action: () => {} },
+    //   ]
+    // },
 
-    {
-      title: "Privacy & Data",
-      items: [
-        { icon: Download, label: "Data Saver Mode", description: "Reduce data usage", toggle: true, value: settings.dataSaver, action: (value) => updateSetting('dataSaver', value) },
-        { icon: BookOpen, label: "Offline Mode", description: "Download quizzes for offline play", toggle: true, value: settings.offlineMode, action: (value) => updateSetting('offlineMode', value) },
-        { icon: Shield, label: "Privacy Policy", description: "How we handle your data", action: () => {} },
-        { icon: Lock, label: "Terms of Service", description: "App usage terms", action: () => {} },
-      ]
-    },
+    // {
+    //   title: "Privacy & Data",
+    //   items: [
+    //     { icon: Download, label: "Data Saver Mode", description: "Reduce data usage", toggle: true, value: settings.dataSaver, action: (value) => updateSetting('dataSaver', value) },
+    //     { icon: BookOpen, label: "Offline Mode", description: "Download quizzes for offline play", toggle: true, value: settings.offlineMode, action: (value) => updateSetting('offlineMode', value) },
+    //     { icon: Shield, label: "Privacy Policy", description: "How we handle your data", action: () => {} },
+    //     { icon: Lock, label: "Terms of Service", description: "App usage terms", action: () => {} },
+    //   ]
+    // },
     {
       title: "Support & Info",
       items: [

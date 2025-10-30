@@ -1,3 +1,5 @@
+// Home.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,18 +10,19 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  Zap,
-  TrendingUp,
-  Award,
-  Clock,
-  Plus,
   Brain,
+  Plus,
+  AlertTriangle,
+  Zap, // Added back for completeness if needed elsewhere
+  TrendingUp, // Added back for completeness if needed elsewhere
+  Award, // Added back for completeness if needed elsewhere
+  Clock, // Added back for completeness if needed elsewhere
 } from "lucide-react";
 import logo from "../assets/images/QuizicleLogo.png";
-// Import the new components
 import SplashScreen from "../components/SplashScreen";
 import GameStatsHeader from "../components/GameStatsHeader";
 import AddCategory from "@/components/AddCategory";
+import { useToast } from "@/hooks/use-toast";
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
@@ -29,7 +32,6 @@ const avatars: string[] = Object.values(avatarImages) as string[];
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
-// ... (Category and CategoryToPlayResponse interfaces remain the same) ...
 interface Category {
   _id: string;
   name: string;
@@ -53,14 +55,13 @@ interface CategoryToPlayResponse {
   questionsCount: number;
 }
 
-
-// --- New Interface for User Details from API ---
+// CRITICAL: Ensure playerType is now userType across the interface
 interface UserDetails {
   _id: string;
   alias: string;
   level: number;
-  avatar: number; // Index or ID of the avatar
-  // ... other fields you might get from the API
+  avatar: number;
+  userType?: "Guest" | "Registered" | "Admin"; // Changed from playerType
 }
 
 export default function Home() {
@@ -69,114 +70,94 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
-
-  // Splash screen state - only show on initial app load
   const [showSplash, setShowSplash] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
-
-  const [userProfile, setUserProfile] = useState<UserDetails | any | null>(null); // Updated type hint
+  // Use UserDetails type
+  const [userProfile, setUserProfile] = useState<UserDetails | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
-  const [userLevel, setUserLevel] = useState(1); // Initial state is 1
-
-  // New state to track screen size
+  const [userLevel, setUserLevel] = useState(1);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
+  
+  // State for AddCategory logic is now ONLY based on isGuest
+  // Removed showAddCategory state as the logic is now handled by the AddCategory component itself.
 
-  // State to control AddCategory component visibility
-  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
 
   const navigate = useNavigate();
-  const userToken = typeof window !== 'undefined' ? localStorage.getItem("token") || "" : "";
+  const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+  const { toast, dismiss } = useToast();
 
-  // ... (useEffect for initialization and screen size remains the same) ...
+  // Initial load effect
   useEffect(() => {
     const initializeApp = async () => {
-      // Check if this is the first time loading the app in this session
       const hasShownSplash = typeof window !== 'undefined' ? sessionStorage.getItem("splashShown") : null;
       const shouldShowSplash = !hasShownSplash;
       
       if (shouldShowSplash) {
         setShowSplash(true);
-        // Mark that we've shown the splash screen for this session
         if (typeof window !== 'undefined') {
           sessionStorage.setItem("splashShown", "true");
         }
       }
 
       const startTime = Date.now();
-      const minSplashDuration = shouldShowSplash ? 2500 : 0; // 2.5 seconds for gaming vibes, 0 if not showing splash
+      const minSplashDuration = shouldShowSplash ? 2500 : 0;
 
       try {
-        // Load all data concurrently
-        await Promise.all([
-          loadUserProfile(), // This is now async and fetches from API
-        ]);
-
+        await loadUserProfile();
         setDataLoaded(true);
 
         if (shouldShowSplash) {
-          // Calculate remaining time for splash screen
           const elapsedTime = Date.now() - startTime;
           const remainingTime = Math.max(0, minSplashDuration - elapsedTime);
 
-          // Wait for the remaining time before hiding splash
           setTimeout(() => {
             setShowSplash(false);
             setLoading(false);
           }, remainingTime);
         } else {
-          // No splash screen, just set loading to false
           setLoading(false);
         }
-
-      } catch (error) {
-        console.error("Error during app initialization:", error);
-        if (shouldShowSplash) {
-          // Even if there's an error, show the app after minimum duration
-          setTimeout(() => {
-            setShowSplash(false);
-            setLoading(false);
-          }, minSplashDuration);
-        } else {
-          setLoading(false);
-        }
+      } catch (err) {
+        console.error("Init error:", err);
+        setLoading(false);
       }
     };
 
     initializeApp();
-
-    // Function to check screen size
-    const checkScreenSize = () => {
-      setIsSmallScreen(window.innerWidth < 768);
-    };
-
+    const checkScreenSize = () => setIsSmallScreen(window.innerWidth < 768);
     checkScreenSize();
     window.addEventListener("resize", checkScreenSize);
-
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
-// ... (useEffect for fetching categories remains the same) ...
+
   useEffect(() => {
+    // Only fetch categories if userProfile is loaded AND we have a token (to prevent fetching for the generic 'Guest' in a token-less state)
     if (userProfile && userToken) {
       fetchUserCategories();
     }
   }, [userProfile, userToken]);
 
-
   // ----------------------------------------------------------------
-  // REVISED loadUserProfile to fetch from API
+  // REVISED loadUserProfile for 'userType'
   // ----------------------------------------------------------------
   const loadUserProfile = async () => {
     if (!userToken) {
-      // Fallback to local storage if token is missing (e.g., Guest user logic)
+      // Fallback to local storage for a token-less user (likely Guest)
       const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
       if (storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
+          // Check guest status from local storage fallback (using userType)
+          setIsGuest(parsedUser.userType === 'Guest'); 
         } catch (e) {
           console.error("Failed to parse local user data:", e);
         }
+      } else {
+        // If no token AND no local user, redirect to auth
+        navigate("/auth");
       }
       return;
     }
@@ -191,13 +172,15 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        // If API fails, try to load from local storage as a fallback
-        console.warn(`Failed to fetch user details from API. Status: ${response.status}. Falling back to local storage.`);
+        // Fallback to local storage on API failure
+        console.warn(`Failed to fetch user details. Falling back to local storage.`);
         const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
+          // Check guest status from local storage fallback (using userType)
+          setIsGuest(parsedUser.userType === 'Guest'); 
         }
         return;
       }
@@ -206,21 +189,24 @@ export default function Home() {
 
       // 1. Update State with fresh API data
       setUserProfile(apiUser);
-      if (apiUser.level !== undefined) {
-        setUserLevel(apiUser.level);
-      } else {
-        // Ensure level is set, defaults to 1 if not present in API response
-        setUserLevel(1); 
-      }
+      setUserLevel(apiUser.level || 1);
+      
+      // Update Guest status (using userType)
+      setIsGuest(apiUser.userType === 'Guest');
 
       // 2. Update Avatar
       const avatarIndex = apiUser.avatar ? apiUser.avatar - 1 : 0;
       const calculatedAvatar = avatars[avatarIndex] || null;
       setUserAvatar(calculatedAvatar);
       
-      // 3. OPTIONAL: Update local storage with fresh data
+      // 3. Update local storage with fresh data, using userType
       if (typeof window !== 'undefined') {
-        localStorage.setItem("user", JSON.stringify(apiUser));
+        const userToStore = { 
+            ...apiUser, 
+            level: apiUser.level || 1, 
+            userType: apiUser.userType || 'Registered' // Ensure userType is stored
+        };
+        localStorage.setItem("user", JSON.stringify(userToStore));
         if(calculatedAvatar) {
            localStorage.setItem("userAvatar", calculatedAvatar);
         }
@@ -235,6 +221,8 @@ export default function Home() {
           const parsedUser = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
+          // Check guest status from local storage fallback (using userType)
+          setIsGuest(parsedUser.userType === 'Guest'); 
         } catch (e) {
            console.error("Failed to parse local user data on API error:", e);
         }
@@ -243,55 +231,37 @@ export default function Home() {
   };
 
 
-// ... (rest of the component's functions and render logic remain the same) ...
-
-const fetchUserCategories = async () => {
+  const fetchUserCategories = async () => {
     setCategoriesLoading(true);
     setError(null);
-// ... (implementation of fetchUserCategories remains the same) ...
     try {
-      // 1. Change the endpoint to the new dedicated one
-      const response = await fetch(`${BASE_URL}/api/getUserCategories`, {
+      const res = await fetch(`${BASE_URL}/api/getUserCategories`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${userToken}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${userToken}` },
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch user categories. Status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      // 2. Remove client-side filtering since the new API endpoint handles it
-      const categoriesFromApi = Array.isArray(data) ? data : [];
-
-      // Transform API data to match interface
-      const transformedCategories: Category[] = categoriesFromApi.map((category: any, index: number) => ({
-        _id: category._id,
-        name: category.name,
-        description: category.description || `Test your knowledge in ${category.name}`,
-        createdBy: category.createdBy || "QuizMaster", // This should now always be the user's alias
-        completionCount: category.completionsCount || category.completionCount || 0,
-        completionsCount: category.completionsCount || category.completionCount || 0,
-        questionCount: category.questionCount || 10,
-        averageRating: category.averageRating ?? (3 + Math.random() * 2),
-        difficulty: category.difficulty || (index % 3 === 0 ? "Easy" : index % 3 === 1 ? "Medium" : "Hard"),
-        imageUrl: category.imageUrl || category.image,
-        trending: (category.completionsCount || category.completionCount || 0) > 50,
-        isNew: index < 2 || (new Date().getTime() - new Date(category.createdAt || 0).getTime()) < (7 * 24 * 60 * 60 * 1000),
-        timeEstimate: `${Math.ceil((category.questionCount || 10) * 0.6)} min`
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      const data = await res.json();
+      const transformed: Category[] = data.map((c: any, i: number) => ({
+        _id: c._id,
+        name: c.name,
+        description: c.description || `Test your knowledge in ${c.name}`,
+        createdBy: c.createdBy || userProfile?.alias || "QuizMaster",
+        completionCount: c.completionCount || 0,
+        completionsCount: c.completionsCount || 0,
+        questionCount: c.questionCount || 10,
+        averageRating: c.averageRating ?? (3 + Math.random() * 2),
+        difficulty: c.difficulty || ["Easy", "Medium", "Hard"][i % 3],
+        imageUrl: c.imageUrl || c.image,
+        timeEstimate: `${Math.ceil((c.questionCount || 10) * 0.6)} min`,
       }));
-
-      setUserCategories(transformedCategories);
-    } catch (error: any) {
-      setError(error.message);
+      setUserCategories(transformed);
+    } catch (e: any) {
+      setError(e.message);
     } finally {
       setCategoriesLoading(false);
     }
   };
+
 
   const handlePlayQuiz = (categoryId: string) => {
     if (!userToken) {
@@ -325,14 +295,12 @@ const fetchUserCategories = async () => {
       const data: CategoryToPlayResponse = await response.json();
 
       if (data.categoryId) {
-        console.log(`🎮 Starting quiz with category: ${data.name} (${data.categoryId})`);
         navigate(`/quiz/${data.categoryId}`);
       } else {
         throw new Error("No category ID returned from server");
       }
     } catch (error: any) {
       console.error("Error getting category to play:", error);
-      // fallback to first user category
       if (userCategories.length > 0) {
         navigate(`/quiz/${userCategories[0]._id}`);
       } else {
@@ -343,31 +311,81 @@ const fetchUserCategories = async () => {
     }
   };
 
-  const handleCreateFirstCategory = () => {
-    setShowAddCategory(true);
+
+  // UNIFIED HANDLER: Handles all category creation attempts (both buttons)
+  // CRITICAL FIX: Only handles the GUEST requirement, as the AddCategory component handles the modal open.
+  const handleCreateCategoryAttempt = () => {
+    if (isGuest) {
+      // Show the registration toast for Guest users
+      const { id: toastId } = toast({
+        title: "🔒 Registration Required",
+        description: "You must complete your registration to create a quiz.",
+        variant: "destructive",
+        action: (
+          <div className="flex space-x-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => {
+                navigate("/profile"); // Navigate to profile screen
+                dismiss(toastId);
+              }}
+              className="bg-primary hover:bg-primary/80"
+            >
+              Register
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => dismiss(toastId)}
+            >
+              Cancel
+            </Button>
+          </div>
+        ),
+      });
+    }
+    // No else block needed; the AddCategory component handles the non-guest flow 
+    // by opening its internal modal via handleMainButtonClick.
   };
 
-  const handleCategoryCreated = () => {
-    // Refresh categories after creating a new one
-    fetchUserCategories();
-  };
+  // REMOVE: handleCategoryCreated is no longer needed since showAddCategory state was removed.
 
   // Conditionally render the splash screen only on initial load
   if (showSplash) {
     return <SplashScreen dataLoaded={dataLoaded} />;
   }
 
-  const alias = userProfile?.alias || userProfile?.name || "Guest";
+  const alias = userProfile?.alias || "Guest";
   const avatarImage = userAvatar || undefined;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background">
-      {/* Conditionally render the Header based on screen size */}
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
       <div className="mx-auto max-w-full space-y-4 px-4 pb-4 lg:px-8 lg:pb-8">
-        {/* Game Stats Header - It will now wait for isParentLoading to be false */}
         <GameStatsHeader userToken={userToken} isParentLoading={loading} />
+
+        {/* Guest User Registration Panel */}
+        {isGuest && (
+          <Card className="bg-purple-100 border-purple-400 text-purple-900 p-4 shadow-md flex items-start space-x-3">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div className="flex-grow">
+              <h4 className="font-semibold leading-snug">Don't lose your progress!</h4>
+              <p className="text-sm">
+                Complete your registration to secure your account and save all your quiz progress.
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate("/profile")}
+              className="bg-purple-500 hover:bg-purple-600 text-white border-purple-500 hover:border-purple-600 flex-shrink-0"
+            >
+              Register Now
+            </Button>
+          </Card>
+        )}
 
         {/* User Avatar Section */}
         <div className="flex flex-col items-center space-y-2 py-3">
@@ -386,7 +404,6 @@ const fetchUserCategories = async () => {
         </div>
 
         {/* Play Button */}
-{/* Play Button */}
         <div className="pb-3 relative">
           <Button
             onClick={handleQuickQuiz}
@@ -400,10 +417,7 @@ const fetchUserCategories = async () => {
               </div>
             ) : (
               <>
-                {/* The main "Play" text */}
                 <span className="text-3xl font-bold">Play</span>
-
-                {/* The Level Badge - circular design matching the reference */}
                 <div className="relative">
                   <div className="bg-white rounded-full w-14 h-14 flex flex-col items-center justify-center shadow-md">
                     <span className="text-purple-500 text-xl font-bold leading-none">{userLevel}</span>
@@ -414,12 +428,13 @@ const fetchUserCategories = async () => {
             )}
           </Button>
         </div>
+
         {/* My Categories */}
         <div className="mt-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-bold flex items-center">
               <Brain className="w-5 h-5 mr-2" />
-              Your Categories
+              Your Quizzes
             </h3>
             <Button
               onClick={() => navigate("/categories")}
@@ -427,7 +442,7 @@ const fetchUserCategories = async () => {
               size="sm"
               className="text-xs"
             >
-              View All Categories
+              View All Quizzes
             </Button>
           </div>
 
@@ -454,60 +469,49 @@ const fetchUserCategories = async () => {
               ))}
             </div>
           ) : userCategories.length === 0 ? (
-            // Show AddCategory component when no categories exist
-            <div className="space-y-4">
-              {!showAddCategory ? (
-                <Card className="p-8 text-center">
-                  <div className="space-y-3">
-                    <Brain className="h-12 w-12 mx-auto text-muted-foreground" />
-                    <h4 className="font-semibold text-foreground">No categories yet</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Create your first quiz category to get started
-                    </p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={handleCreateFirstCategory}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Your First Category
-                    </Button>
-                  </div>
-                </Card>
-              ) : (
-                <AddCategory fetchCategories={handleCategoryCreated} />
-              )}
-            </div>
+            // Show 'No quizzes yet' card. The creation button is now on the AddCategory component rendered below.
+            <Card className="p-8 text-center">
+              <div className="space-y-3">
+                <Brain className="h-12 w-12 mx-auto text-muted-foreground" />
+                <h4 className="font-semibold text-foreground">No quizzes yet</h4>
+                <p className="text-sm text-muted-foreground">
+                  Create your first quiz to get started
+                </p>
+                {/* The create button is removed from here and is now always in the AddCategory card below */}
+              </div>
+            </Card>
           ) : (
-            // Show categories list and AddCategory component after
+            // Show categories list
             <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {userCategories.map((cat) => (
-              <CategoryCard
-                key={cat._id}
-                id={cat._id}
-                title={cat.name}
-                description={cat.description}
-                difficulty={cat.difficulty || "Medium"}
-                questionCount={cat.questionCount || 10}
-                completions={cat.completionCount || cat.completionsCount || 0}
-                rating={cat.averageRating || 0}
-                timeEstimate={cat.timeEstimate || "5 min"}
-                imageUrl={cat.imageUrl || `coming soon`}
-                createdBy={cat.createdBy || "You"}
-                onPlay={handlePlayQuiz}
-              />
-            ))}
-          </div>
-
-              
-              {/* Add Category Section - Always show after categories */}
-              <div className="mt-6">
-                <AddCategory fetchCategories={fetchUserCategories} />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {userCategories.map((cat) => (
+                  <CategoryCard
+                    key={cat._id}
+                    id={cat._id}
+                    title={cat.name}
+                    description={cat.description}
+                    difficulty={cat.difficulty || "Medium"}
+                    questionCount={cat.questionCount || 10}
+                    completions={cat.completionCount || cat.completionsCount || 0}
+                    rating={cat.averageRating || 0}
+                    timeEstimate={cat.timeEstimate || "5 min"}
+                    imageUrl={cat.imageUrl || `coming soon`}
+                    createdBy={cat.createdBy || alias}
+                    onPlay={handlePlayQuiz}
+                  />
+                ))}
               </div>
             </div>
           )}
+
+          {/* Add Category Section - Always show after quizzes or the empty state card */}
+          <div className="mt-6">
+            <AddCategory 
+                fetchCategories={fetchUserCategories} 
+                isGuest={isGuest}
+                onRegistrationRequired={handleCreateCategoryAttempt}
+            />
+          </div>
         </div>
       </div>
     </div>
