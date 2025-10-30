@@ -464,7 +464,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                 <span className="text-xs sm:text-sm font-bold text-slate-300">{categoryName}</span>
               </div>
-              <h1 className="text-3xl sm:text-4xl font-black text-slate-100 tracking-wide">
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-100 tracking-wide">
                 MISSION COMPLETE!
               </h1>
             </div>

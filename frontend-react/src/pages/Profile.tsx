@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { X, User, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -196,15 +196,13 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-background p-4 flex items-center justify-center">
       <Card className="w-full max-w-lg bg-card/90 backdrop-blur-sm border-border/50 shadow-xl relative">
-        {/* Back Button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
-          onClick={() => navigate("/")}
-        >
-          <X className="w-5 h-5" />
-        </Button>
+         <Link 
+            to={"/"}
+            className="absolute top-3 right-3 z-20 h-8 w-8 bg-red-600 hover:bg-red-700 rounded-full transition-colors flex items-center justify-center shadow-lg"
+            aria-label="Close Results and go to Categories"
+                 >
+            <X className="h-5 w-5 text-white" />
+            </Link>
 
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-foreground">
