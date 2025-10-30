@@ -13,6 +13,8 @@ router.put("/:questionId/unmark-duplicate", auth, adminAuth, async (req, res) =>
     if (!category)
       return res.status(404).json({ message: "Question not found" });
 
+    
+    
     const result = await Category.updateOne(
       { "questions._id": questionId },
       {

@@ -57,11 +57,14 @@ app.use("/api/answerQuestion", require("./routes/answerQuestion"));
 app.use("/api/updatePopularity", require("./routes/updatePopularity")); 
 app.use("/api/reportQuestion", require("./routes/reportQuestion")); 
 
+
 //Images
 app.use("/api/getImageUrl", require("./routes/getImageUrl")); 
 
+
 //Sources
 app.use("/api/DBpedia", require("./routes/DBpedia")); 
+
 
 // Admin APIs
 app.use("/api/admin/categories", require("./routes/admin/getAllCategories"));
@@ -70,7 +73,7 @@ app.use("/api/admin/duplicates", require("./routes/admin/getDuplicateGroupQuesti
 app.use("/api/admin/questions", require("./routes/admin/markQuestionAsDuplicate"));
 app.use("/api/admin/questions", require("./routes/admin/unmarkDuplicateGroup"));
 app.use("/api/admin/questions", require("./routes/admin/updateQuestion"));
-
+app.use("/api/admin/reports", require("./routes/admin/adminReports"));
 
 // Default route (serves index.html for all other routes)
 app.get("*", (req, res) => {
