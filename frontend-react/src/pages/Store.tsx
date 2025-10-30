@@ -9,7 +9,7 @@ const Store = () => {
     <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background flex flex-col">
       
       {/* Header component remains at the top */}
-      <Header logoAsTitle imageSrc={logo} showNotifications />
+      <Header title="Store" showNotifications />
 
       {/* 2. Main content container: flex-1 ensures it fills the remaining space, and flex properties center the content */}
       <div className="flex flex-col items-center justify-center flex-1 p-4 md:p-8">

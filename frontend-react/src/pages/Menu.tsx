@@ -216,7 +216,7 @@ const Menu = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background">
-      <Header logoAsTitle imageSrc={logo} showNotifications />
+      <Header title="Menu" showNotifications />
 
       <div className="mx-auto max-w-full space-y-4 px-4 pb-4 lg:px-8 lg:pb-8">
         {/* Menu Sections */}
