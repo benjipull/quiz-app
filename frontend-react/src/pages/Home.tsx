@@ -8,6 +8,7 @@ import { Header } from "@/components/layout/Header";
 import { CategoryCard } from "@/components/quiz/CategoryCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import ReactGA from "react-ga4";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Brain,
@@ -77,7 +78,7 @@ export default function Home() {
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [userLevel, setUserLevel] = useState(1);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
-  
+
   // State for AddCategory logic is now ONLY based on isGuest
   // Removed showAddCategory state as the logic is now handled by the AddCategory component itself.
 
@@ -92,7 +93,7 @@ export default function Home() {
     const initializeApp = async () => {
       const hasShownSplash = typeof window !== 'undefined' ? sessionStorage.getItem("splashShown") : null;
       const shouldShowSplash = !hasShownSplash;
-      
+
       if (shouldShowSplash) {
         setShowSplash(true);
         if (typeof window !== 'undefined') {
@@ -151,7 +152,7 @@ export default function Home() {
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
           // Check guest status from local storage fallback (using userType)
-          setIsGuest(parsedUser.userType === 'Guest'); 
+          setIsGuest(parsedUser.userType === 'Guest');
         } catch (e) {
           console.error("Failed to parse local user data:", e);
         }
@@ -161,7 +162,7 @@ export default function Home() {
       }
       return;
     }
-    
+
     try {
       const response = await fetch(`${BASE_URL}/api/getUserDetails`, {
         method: "GET",
@@ -180,7 +181,7 @@ export default function Home() {
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
           // Check guest status from local storage fallback (using userType)
-          setIsGuest(parsedUser.userType === 'Guest'); 
+          setIsGuest(parsedUser.userType === 'Guest');
         }
         return;
       }
@@ -190,7 +191,7 @@ export default function Home() {
       // 1. Update State with fresh API data
       setUserProfile(apiUser);
       setUserLevel(apiUser.level || 1);
-      
+
       // Update Guest status (using userType)
       setIsGuest(apiUser.userType === 'Guest');
 
@@ -198,21 +199,28 @@ export default function Home() {
       const avatarIndex = apiUser.avatar ? apiUser.avatar - 1 : 0;
       const calculatedAvatar = avatars[avatarIndex] || null;
       setUserAvatar(calculatedAvatar);
-      
+
       // 3. Update local storage with fresh data, using userType
       if (typeof window !== 'undefined') {
-        const userToStore = { 
-            ...apiUser, 
-            level: apiUser.level || 1, 
-            userType: apiUser.userType || 'Registered' // Ensure userType is stored
+        const userToStore = {
+          ...apiUser,
+          level: apiUser.level || 1,
+          userType: apiUser.userType || 'Registered' // Ensure userType is stored
         };
         localStorage.setItem("user", JSON.stringify(userToStore));
-        if(calculatedAvatar) {
-           localStorage.setItem("userAvatar", calculatedAvatar);
+        if (calculatedAvatar) {
+          localStorage.setItem("userAvatar", calculatedAvatar);
         }
       }
 
     } catch (error) {
+
+      ReactGA.event({
+        category: "API Error",
+        action: "fetch_failed",
+        label: "getUserDetails",
+      });
+
       console.error("Error fetching user details from API:", error);
       // Even on fetch error, try to load from local storage
       const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
@@ -222,9 +230,9 @@ export default function Home() {
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
           // Check guest status from local storage fallback (using userType)
-          setIsGuest(parsedUser.userType === 'Guest'); 
+          setIsGuest(parsedUser.userType === 'Guest');
         } catch (e) {
-           console.error("Failed to parse local user data on API error:", e);
+          console.error("Failed to parse local user data on API error:", e);
         }
       }
     }
@@ -376,9 +384,9 @@ export default function Home() {
                 Complete your registration to secure your account and save all your quiz progress.
               </p>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => navigate("/profile")}
               className="bg-purple-500 hover:bg-purple-600 text-white border-purple-500 hover:border-purple-600 flex-shrink-0"
             >
@@ -408,7 +416,7 @@ export default function Home() {
           <Button
             onClick={handleQuickQuiz}
             disabled={loading || playButtonLoading}
-            className="w-full h-16 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-2xl disabled:opacity-50 flex items-center justify-between px-6 relative overflow-hidden shadow-lg" 
+            className="w-full h-16 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-2xl disabled:opacity-50 flex items-center justify-between px-6 relative overflow-hidden shadow-lg"
           >
             {playButtonLoading ? (
               <div className="flex items-center text-xl justify-center w-full">
@@ -506,10 +514,10 @@ export default function Home() {
 
           {/* Add Category Section - Always show after quizzes or the empty state card */}
           <div className="mt-6">
-            <AddCategory 
-                fetchCategories={fetchUserCategories} 
-                isGuest={isGuest}
-                onRegistrationRequired={handleCreateCategoryAttempt}
+            <AddCategory
+              fetchCategories={fetchUserCategories}
+              isGuest={isGuest}
+              onRegistrationRequired={handleCreateCategoryAttempt}
             />
           </div>
         </div>

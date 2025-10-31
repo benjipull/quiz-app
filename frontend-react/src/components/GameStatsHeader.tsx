@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import ReactGA from "react-ga4";
 
 // Enhanced Diamond icon for Enlightenment Crystals
 const EnlightenmentDiamond = () => (
@@ -66,9 +67,9 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({ userToken, isParentLo
   useEffect(() => {
     // Return early if the main Home component is still loading
     if (isParentLoading) {
-        return;
+      return;
     }
-    
+
     // Return early if the user is not logged in
     if (!userToken) {
       setError("User not logged in");
@@ -102,6 +103,13 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({ userToken, isParentLo
         });
         setError(null);
       } catch (err: any) {
+
+        ReactGA.event({
+          category: "API Error",
+          action: "fetch_failed",
+          label: "getUserDetails",
+        });
+
         console.error("Failed to fetch user stats:", err);
         setError(err.message || "Unknown error occurred");
       }
@@ -114,7 +122,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({ userToken, isParentLo
   if (isParentLoading || !userToken) {
     return null;
   }
-  
+
   if (error) return <div className="text-red-500 font-bold">{error}</div>;
   if (!stats) return null;
 
