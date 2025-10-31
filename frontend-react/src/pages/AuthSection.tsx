@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import logo from "../assets/images/QuizicleLogo.png"; 
+import logo from "../assets/images/QuizicleLogo.png";
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
@@ -69,22 +69,35 @@ const AuthSection = () => {
         }
 
         setIsLoading(true);
+
         try {
             const response = await fetch(`${BASE_URL}/api/users/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: loginEmail, password: loginPassword }),
             });
+
             const data = await response.json();
+
             if (response.ok) {
+                // ✅ Store token + user
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("user", JSON.stringify(data.user));
+
                 toast({
                     title: "Login successful!",
                     description: "Welcome back to Quizicle!",
                 });
+
+                // ✅ Optional: set a timestamp to detect expired tokens later
+                localStorage.setItem("tokenIssuedAt", Date.now().toString());
+
                 navigate("/");
             } else {
+                // 🔹 Clear any previous bad tokens if login fails
+                localStorage.removeItem("token");
+                localStorage.removeItem("user");
+
                 toast({
                     title: "Login failed",
                     description: data.message || "Invalid credentials. Please try again.",
@@ -102,6 +115,7 @@ const AuthSection = () => {
             setIsLoading(false);
         }
     };
+
 
     const handleSignup = async () => {
         if (!signupAlias || !signupEmail || !signupPassword || !signupAge || !signupConfirmPassword) {
@@ -172,7 +186,7 @@ const AuthSection = () => {
                 // The backend should return the token and a user object which includes playerType: 'Guest'
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("user", JSON.stringify(data.user));
-                
+
                 toast({
                     title: "Welcome, Guest!",
                     description: "You are logged in as a guest. Register to save your progress!",
@@ -476,45 +490,45 @@ const AuthSection = () => {
                     </div>
 
                     {/* Sign in button - GREEN */}
-<button
-  type="submit"
-  disabled={isLoading}
-  className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
->
-  {isLoading ? (
-    <div className="flex items-center justify-center space-x-2">
-      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-      <span>Logging in...</span>
-    </div>
-  ) : (
-    <div className="flex items-center justify-center">
-      <Zap className="w-4 h-4 mr-2" />
-      Login & Start Learning
-      <ArrowRight className="w-4 h-4 ml-2" />
-    </div>
-  )}
-</button>
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+                    >
+                        {isLoading ? (
+                            <div className="flex items-center justify-center space-x-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                                <span>Logging in...</span>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-center">
+                                <Zap className="w-4 h-4 mr-2" />
+                                Login & Start Learning
+                                <ArrowRight className="w-4 h-4 ml-2" />
+                            </div>
+                        )}
+                    </button>
 
-{/* Guest Login - BLUE */}
-<button
-  type="button"
-  onClick={handleGuestLogin}
-  disabled={isLoading}
-  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
->
-  {isLoading ? (
-    <div className="flex items-center justify-center space-x-2">
-      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-      <span>Logging in as Guest...</span>
-    </div>
-  ) : (
-    <div className="flex items-center justify-center">
-      <User className="w-4 h-4 mr-2" />
-      Login as Guest
-      <ArrowRight className="w-4 h-4 ml-2" />
-    </div>
-  )}
-</button>
+                    {/* Guest Login - BLUE */}
+                    <button
+                        type="button"
+                        onClick={handleGuestLogin}
+                        disabled={isLoading}
+                        className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+                    >
+                        {isLoading ? (
+                            <div className="flex items-center justify-center space-x-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                                <span>Logging in as Guest...</span>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-center">
+                                <User className="w-4 h-4 mr-2" />
+                                Login as Guest
+                                <ArrowRight className="w-4 h-4 ml-2" />
+                            </div>
+                        )}
+                    </button>
 
                 </form>
             );
@@ -652,7 +666,7 @@ const AuthSection = () => {
                     </div>
 
                     {/* NEW: Login as Guest Button */}
-                   
+
                 </form>
             );
         }
