@@ -1,20 +1,32 @@
 const jwt = require("jsonwebtoken");
 
 module.exports = (req, res, next) => {
-    const authHeader = req.headers.authorization;
+  const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ message: "No token, authorization denied" });
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.warn("⚠️ Missing or malformed token:", req.originalUrl);
+    return res.status(401).json({ error: "Missing or malformed token" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      // Handle token-specific errors distinctly
+      if (err.name === "TokenExpiredError") {
+        console.warn("⚠️ Token expired for request:", req.originalUrl);
+        return res.status(401).json({ error: "Token expired" });
+      }
+      if (err.name === "JsonWebTokenError") {
+        console.warn("⚠️ Invalid token:", err.message);
+        return res.status(401).json({ error: "Invalid token" });
+      }
+      console.error("⚠️ Token verification error:", err);
+      return res.status(401).json({ error: "Authentication failed" });
     }
 
-    const token = authHeader.split(" ")[1];
-
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET); // Ensure you have JWT_SECRET in .env
-        req.user = decoded; // Attach user payload to request
-        console.log("Decoded Token:", req.user);
-        next();
-    } catch (error) {
-        res.status(401).json({ message: "Invalid token" });
-    }
+    // ✅ Token is valid — attach user payload to request
+    req.user = decoded;
+    next();
+  });
 };
