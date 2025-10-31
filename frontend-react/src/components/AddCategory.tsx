@@ -1,10 +1,11 @@
+"use client";
+
 import React, { useState } from "react";
 import { Plus, X } from "lucide-react";
 
-// NEW PROPS
 interface AddCategoryProps {
   fetchCategories?: () => void;
-  isGuest: boolean; 
+  isGuest: boolean;
   onRegistrationRequired: () => void;
 }
 
@@ -13,11 +14,10 @@ interface Notification {
   type: "success" | "error";
 }
 
-const AddCategory: React.FC<AddCategoryProps> = ({ 
-    fetchCategories = () => {},
-    // Destructure new props
-    isGuest,
-    onRegistrationRequired 
+const AddCategory: React.FC<AddCategoryProps> = ({
+  fetchCategories = () => {},
+  isGuest,
+  onRegistrationRequired,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [categoryName, setCategoryName] = useState("");
@@ -26,15 +26,14 @@ const AddCategory: React.FC<AddCategoryProps> = ({
 
   const showNotification = (message: string, type: "success" | "error") => {
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), 7000);
+    setTimeout(() => setNotification(null), 5000);
   };
 
   const handleCreateCategory = async () => {
-    // 1. CRITICAL: Prevent API call if user is a guest (in case Home.tsx logic was bypassed)
     if (isGuest) {
-        setIsOpen(false); // Close the modal
-        onRegistrationRequired(); // Show the registration toast
-        return;
+      setIsOpen(false);
+      onRegistrationRequired();
+      return;
     }
 
     if (!categoryName.trim()) {
@@ -68,7 +67,10 @@ const AddCategory: React.FC<AddCategoryProps> = ({
         setIsOpen(false);
         setCategoryName("");
         fetchCategories();
-        showNotification("Your category is being created. We’ll notify you once it’s done.", "success");
+        showNotification(
+          "Your category is being created. We’ll notify you once it’s done.",
+          "success"
+        );
       } else {
         showNotification(data.message || "Failed to create category.", "error");
       }
@@ -79,36 +81,34 @@ const AddCategory: React.FC<AddCategoryProps> = ({
       setLoading(false);
     }
   };
-    
-  // NEW: Handler for the main button click to check guest status
+
   const handleMainButtonClick = () => {
     if (isGuest) {
-        // If guest, show the registration required prompt/toast from Home.tsx
-        onRegistrationRequired();
+      onRegistrationRequired();
     } else {
-        // If not a guest, open the modal
-        setIsOpen(true);
+      setIsOpen(true);
     }
   };
-
 
   return (
     <div className="w-full max-w-6xl mx-auto p-4 space-y-6">
       {/* Main Card */}
-      <div className="p-5 rounded-xl bg-card text-card-foreground border border-border shadow-card flex items-center justify-between">
+      <div
+        className="p-6 rounded-2xl border border-border/40 bg-gradient-to-br from-zinc-900/80 via-zinc-900/60 to-black/70 
+        backdrop-blur-md shadow-[0_0_25px_-5px_rgba(0,150,255,0.4)] flex items-center justify-between"
+      >
         <div>
-          <h4 className="font-semibold text-foreground">Create Your Own</h4>
-          <p className="text-sm text-muted-foreground">
+          <h4 className="font-semibold text-lg text-white">Create Your Own</h4>
+          <p className="text-sm text-white/70">
             Build a custom quiz and share it with others!
           </p>
         </div>
 
         <button
-          // Use the unified click handler for guest check or modal open
           onClick={handleMainButtonClick}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-primary-foreground shadow-button
-                     bg-[linear-gradient(135deg,hsl(var(--primary)),hsl(var(--accent)))]
-                     hover:opacity-90 transition-smooth"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-white 
+          bg-[linear-gradient(135deg,#0077ff,#00d4ff)] hover:opacity-90 transition-all duration-300 
+          shadow-lg hover:shadow-[0_0_15px_#00bfff]"
         >
           <Plus className="h-4 w-4" />
           <span>Create</span>
@@ -118,22 +118,24 @@ const AddCategory: React.FC<AddCategoryProps> = ({
       {/* Modal */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4"
           onClick={() => setIsOpen(false)}
         >
           <div
-            className="bg-card text-card-foreground rounded-xl p-6 w-full max-w-md shadow-quiz border border-border"
+            className="relative bg-gradient-to-br from-zinc-900/95 via-zinc-800/90 to-black/90 border border-border/40 
+            rounded-2xl p-6 w-full max-w-md shadow-[0_0_30px_-5px_rgba(0,150,255,0.5)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-foreground">Create New Quiz</h2>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+            {/* Red Circular Close Button */}
+            <button
+              onClick={() => setIsOpen(false)}
+              className="absolute top-4 right-4 bg-red-600 hover:bg-red-700 text-white rounded-full p-2 transition-all 
+              shadow-md hover:shadow-red-500/40"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <h2 className="text-xl font-bold text-white mb-6">Create New Quiz</h2>
 
             <div className="space-y-4">
               <input
@@ -142,24 +144,25 @@ const AddCategory: React.FC<AddCategoryProps> = ({
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreateCategory()}
-                className="w-full px-4 py-3 rounded-lg bg-input text-foreground border border-border 
-                           placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
+                className="w-full px-4 py-3 rounded-lg bg-zinc-800/80 text-white border border-zinc-700 
+                placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
               />
 
               <div className="flex space-x-3">
                 <button
-                  // This button will also trigger the guest check now
                   onClick={handleCreateCategory}
                   disabled={loading || !categoryName.trim()}
-                  className="flex-1 px-4 py-2 rounded-lg font-medium text-primary-foreground
-                             bg-[linear-gradient(135deg,hsl(var(--primary)),hsl(var(--accent)))]
-                             hover:opacity-90 disabled:opacity-50 transition-smooth"
+                  className="flex-1 px-4 py-2 rounded-lg font-medium text-white 
+                  bg-[linear-gradient(135deg,#0077ff,#00d4ff)] hover:opacity-90 disabled:opacity-50 
+                  shadow-md hover:shadow-[0_0_15px_#00bfff] transition-all"
                 >
                   {loading ? "Creating..." : "Create"}
                 </button>
+
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="flex-1 px-4 py-2 rounded-lg font-medium bg-muted text-foreground hover:opacity-90 transition-smooth"
+                  className="flex-1 px-4 py-2 rounded-lg font-medium bg-zinc-700 hover:bg-zinc-600 
+                  text-white transition-all"
                 >
                   Cancel
                 </button>
@@ -172,11 +175,11 @@ const AddCategory: React.FC<AddCategoryProps> = ({
       {/* Notification */}
       {notification && (
         <div
-          className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg transition-all duration-300 ${
+          className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-xl font-medium shadow-lg transition-all duration-500 ${
             notification.type === "success"
-              ? "bg-[hsl(var(--success))]"
-              : "bg-[hsl(var(--destructive))]"
-          } text-[hsl(var(--foreground))]`}
+              ? "bg-green-600/90 shadow-green-500/40"
+              : "bg-red-600/90 shadow-red-500/40"
+          } text-white backdrop-blur-md`}
         >
           {notification.message}
         </div>
