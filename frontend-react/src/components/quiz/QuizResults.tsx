@@ -360,25 +360,27 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-5 w-5 text-cyan-400"
+                className="h-6 w-6"
               >
-                <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
-                <path d="m6 3 6 6 6-6" />
-                <path d="m2 9 10 12 10-12" />
+                {/* Back coin */}
+                <circle cx="8" cy="9" r="5" fill="#f59e0b" />
+                <circle cx="8" cy="9" r="4" fill="#fbbf24" />
+                <circle cx="8" cy="9" r="2.5" fill="#f59e0b" opacity="0.4" />
+                
+                {/* Front coin */}
+                <circle cx="14" cy="13" r="6" fill="#f59e0b" />
+                <circle cx="14" cy="13" r="5" fill="#fbbf24" />
+                <circle cx="14" cy="13" r="3" fill="#f59e0b" opacity="0.4" />
+                <text x="14" y="15.5" fontSize="6" fontWeight="bold" fill="#d97706" textAnchor="middle">$</text>
               </svg>
             </div>
             <div>
               <div className="text-base sm:text-lg font-bold text-slate-200">0</div>
             </div>
           </div>
-          
-          {/* Stat Item - XP */}
-          <div ref={headerXPRef} className="flex items-center gap-1.5 sm:gap-2">
+
+           {/* Stat Item - XP */}
+           <div ref={headerXPRef} className="flex items-center gap-1.5 sm:gap-2">
             <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center">
               <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -395,7 +397,29 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               <div className="text-base sm:text-lg font-bold text-yellow-400 tabular-nums">{animatedTotalXP}</div>
             </div>
           </div>
-          
+
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5 text-cyan-400"
+              >
+                <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
+                <path d="m6 3 6 6 6-6" />
+                <path d="m2 9 10 12 10-12" />
+              </svg>
+            </div>
+            <div>
+              <div className="text-base sm:text-lg font-bold text-slate-200">0</div>
+            </div>
+          </div>
+                
           {/* Stat Item: Gems */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
@@ -479,7 +503,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           
           {/* Close Button - Updated to Red Circle Link */}
           <Link
-            to={"/categories"}
+            to={"/"}
             // Combines the required red background, rounded shape, size, and centering
             className="absolute top-3 right-3 z-20 h-8 w-8 bg-red-600 hover:bg-red-700 
                        rounded-full transition-colors flex items-center justify-center shadow-lg"

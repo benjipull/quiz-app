@@ -183,8 +183,8 @@ interface Question {
   explanation: string;
   difficulty?: "Easy" | "Medium" | "Hard";
   difficultyName?: string;
-  difficultyValue?: number;
-  timer?: number;
+  difficultyLevel?: number;
+  timerInSeconds?: number;
 }
 
 interface AnswerStats {
@@ -225,7 +225,7 @@ export default function Quiz() {
   const navigate = useNavigate();
   const location = useLocation();
   const explanationRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerInSecondsRef = useRef<NodeJS.Timeout | null>(null);
   
   // 🔥 FIX: Ref to ensure the initial setup (startQuiz) only runs once, 
   // preventing double-fetch/double-increment in React Strict Mode.
@@ -250,7 +250,11 @@ export default function Quiz() {
   const [showExplanation, setShowExplanation] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState(false);
   const [feedbackType, setFeedbackType] = useState<"up" | "down" | null>(null);
-  const [timeLeft, setTimeLeft] = useState(30);
+  
+  // 💡 MODIFIED: Initialize timeLeft to a default of 30, but it will be overwritten 
+  // immediately upon question load by the cleanup/reset effect below.
+  const [timeLeft, setTimeLeft] = useState(30); 
+  
   const [categoryTitle, setCategoryTitle] = useState("Quiz");
   const [categoryImage, setCategoryImage] = useState<string | undefined>(undefined); // ADDED: Category Image State
   const [timeUp, setTimeUp] = useState(false);
@@ -270,8 +274,8 @@ export default function Quiz() {
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
 
   // ADDED: Start Sound
-  const startSound = new Audio("/start.mp3");
-  const correctSound = new Audio("/correct.mp3");
+  const startSound = new Audio("/intro-sound.mp3");
+  const correctSound = new Audio("/victory-beat.mp3");
   const incorrectSound = new Audio("/incorrect.mp3");
 
   // ADDED: Handle back navigation with confirmation
@@ -283,7 +287,7 @@ export default function Quiz() {
     if (location.state?.from) {
       navigate(location.state.from);
     } else {
-      navigate("/categories");
+      navigate("/");
     }
   };
   
@@ -346,27 +350,23 @@ export default function Quiz() {
     // Dependency array remains for React to warn about missing deps, but the ref controls execution
   }, [categoryId, userToken, navigate]); 
 
+  // 💡 FIX 1: Simplified timer setup. It now relies on the `useEffect` below to set `timeLeft` initially.
   useEffect(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
+    if (timerInSecondsRef.current) {
+      clearInterval(timerInSecondsRef.current);
     }
 
-    // Use timer from backend response
-    const initialTime = quizState.question?.timer || 30;
-
     if (quizState.question && !quizState.isAnswerSelected && !timeUp) {
-      if (timeLeft !== initialTime) {
-         setTimeLeft(initialTime);
-      }
-
-      timerRef.current = setInterval(() => {
+      // The initial time is now handled by the cleanup/reset effect.
+      // We start the timer from whatever timeLeft currently is.
+      timerInSecondsRef.current = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
             setTimeUp(true);
             handleTimeUp();
-            if (timerRef.current) {
-              clearInterval(timerRef.current);
-              timerRef.current = null;
+            if (timerInSecondsRef.current) {
+              clearInterval(timerInSecondsRef.current);
+              timerInSecondsRef.current = null;
             }
             return 0;
           }
@@ -376,12 +376,12 @@ export default function Quiz() {
     }
 
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
+      if (timerInSecondsRef.current) {
+        clearInterval(timerInSecondsRef.current);
+        timerInSecondsRef.current = null;
       }
     };
-  }, [quizState.question, quizState.isAnswerSelected, timeUp]);
+  }, [quizState.question, quizState.isAnswerSelected, timeUp]); // Added timeUp to dependencies to re-run on timeout
 
   useEffect(() => {
     if (showExplanation && explanationRef.current) {
@@ -403,14 +403,19 @@ export default function Quiz() {
       }, 500);
     }
   }, [showExplanation]);
-
+  
+  // 💡 FIX 2: This useEffect now handles the proper reset of all question-related states,
+  // including setting `timeLeft` using the backend value or the 30-second default.
   useEffect(() => {
     setSelectedAnswer(null);
     setShowExplanation(false);
     setFeedbackGiven(false);
     setFeedbackType(null);
-    // Use timer from backend response
-    setTimeLeft(quizState.question?.timer || 30);
+    
+    // Use timerInSeconds from backend response, defaulting to 30
+    const newTime = quizState.question?.timerInSeconds || 30;
+    setTimeLeft(newTime);
+    
     setTimeUp(false);
     setShowBars(false);
     setAnswerResponse(null);
@@ -637,9 +642,9 @@ export default function Quiz() {
   const handleAnswerSelection = async (answer: string) => {
     if (selectedAnswer !== null || timeUp || !userToken) return;
 
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+    if (timerInSecondsRef.current) {
+      clearInterval(timerInSecondsRef.current);
+      timerInSecondsRef.current = null;
     }
 
     setSelectedAnswer(answer);
@@ -770,14 +775,14 @@ export default function Quiz() {
     return "bg-muted/30 border-2 border-border"; // ADDED: Default border for unselected incorrect
   };
 
-  const getTimerColor = () => {
+  const gettimerInSecondsColor = () => {
     if (timeLeft > 20) return "text-success";
     if (timeLeft > 10) return "text-warning";
     return "text-destructive";
   };
 
   const getDifficultyColor = () => {
-    const difficulty = quizState.question?.difficultyValue;
+    const difficulty = quizState.question?.difficultyLevel;
     if (difficulty === undefined) return "";
     if (difficulty >= 1 && difficulty <= 3) return "border-success text-success bg-success/5";
     if (difficulty >= 4 && difficulty <= 5) return "border-blue-400 text-blue-400 bg-blue-400/5";
@@ -903,7 +908,7 @@ export default function Quiz() {
                 )}
                 <Badge
                   variant="outline"
-                  className={`bg-card/60 backdrop-blur-sm text-sm min-w-[40px] text-center ${getTimerColor()} ${timeLeft <= 10 ? 'animate-pulse' : ''}`}
+                  className={`bg-card/60 backdrop-blur-sm text-sm min-w-[40px] text-center ${gettimerInSecondsColor()} ${timeLeft <= 10 ? 'animate-pulse' : ''}`}
                 >
                   {timeLeft}s
                 </Badge>
