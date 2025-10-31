@@ -475,43 +475,47 @@ const AuthSection = () => {
                         </button>
                     </div>
 
-                    <Button
-                        type="submit"
-                        className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
-                        disabled={isLoading}
-                    >
-                        {isLoading ? (
-                            <div className="flex items-center space-x-2">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                                <span>Logging in...</span>
-                            </div>
-                        ) : (
-                            <>
-                                <Zap className="w-4 h-4 mr-2" />
-                                Login & Start Learning
-                                <ArrowRight className="w-4 h-4 ml-2" />
-                            </>
-                        )}
-                    </Button>
-                     <Button
-                        type="button"
-                        onClick={handleGuestLogin}
-                        className="w-full h-12 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
-                        disabled={isLoading}
-                    >
-                        {isLoading ? (
-                            <div className="flex items-center space-x-2">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                                <span>Logging in as Guest...</span>
-                            </div>
-                        ) : (
-                            <>
-                                <User className="w-4 h-4 mr-2" />
-                                Login as Guest
-                                <ArrowRight className="w-4 h-4 ml-2" />
-                            </>
-                        )}
-                    </Button>
+                    {/* Sign in button - GREEN */}
+<button
+  type="submit"
+  disabled={isLoading}
+  className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+>
+  {isLoading ? (
+    <div className="flex items-center justify-center space-x-2">
+      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+      <span>Logging in...</span>
+    </div>
+  ) : (
+    <div className="flex items-center justify-center">
+      <Zap className="w-4 h-4 mr-2" />
+      Login & Start Learning
+      <ArrowRight className="w-4 h-4 ml-2" />
+    </div>
+  )}
+</button>
+
+{/* Guest Login - BLUE */}
+<button
+  type="button"
+  onClick={handleGuestLogin}
+  disabled={isLoading}
+  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+>
+  {isLoading ? (
+    <div className="flex items-center justify-center space-x-2">
+      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+      <span>Logging in as Guest...</span>
+    </div>
+  ) : (
+    <div className="flex items-center justify-center">
+      <User className="w-4 h-4 mr-2" />
+      Login as Guest
+      <ArrowRight className="w-4 h-4 ml-2" />
+    </div>
+  )}
+</button>
+
                 </form>
             );
         } else {

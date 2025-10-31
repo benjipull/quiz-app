@@ -3,30 +3,34 @@
 import React, { useEffect, useState } from "react";
 import ReactGA from "react-ga4";
 
-// Enhanced Diamond icon for Enlightenment Crystals
-const EnlightenmentDiamond = () => (
+// --- ICONS ---
+
+// Coins icon (placeholder)
+const CoinsIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="h-5 w-5 text-cyan-400"
+    className="h-6 w-6"
   >
-    <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
-    <path d="m6 3 6 6 6-6" />
-    <path d="m2 9 10 12 10-12" />
+    {/* Back coin */}
+    <circle cx="8" cy="9" r="5" fill="#f59e0b" />
+    <circle cx="8" cy="9" r="4" fill="#fbbf24" />
+    <circle cx="8" cy="9" r="2.5" fill="#f59e0b" opacity="0.4" />
+    
+    {/* Front coin */}
+    <circle cx="14" cy="13" r="6" fill="#f59e0b" />
+    <circle cx="14" cy="13" r="5" fill="#fbbf24" />
+    <circle cx="14" cy="13" r="3" fill="#f59e0b" opacity="0.4" />
+    <text x="14" y="15.5" fontSize="6" fontWeight="bold" fill="#d97706" textAnchor="middle">$</text>
   </svg>
 );
 
-// Enhanced Knowledge Points icon (brain/lightbulb hybrid)
-const KnowledgeIcon = () => (
+// XP / Knowledge Points (brain/lightbulb hybrid)
+const XPBadge = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
     fill="currentColor"
+    viewBox="0 0 24 24"
     className="h-5 w-5 text-amber-500"
   >
     <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
@@ -35,32 +39,54 @@ const KnowledgeIcon = () => (
   </svg>
 );
 
-// Enhanced Wisdom Gems icon (gem/crystal)
-const WisdomGem = () => (
+// Gem 1 (e.g., Wisdom)
+const Gem1Icon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
     fill="currentColor"
+    viewBox="0 0 24 24"
     className="h-5 w-5 text-purple-500"
   >
     <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
-    <path d="m6 3 6 6 6-6" fill="#fff" fillOpacity="0.3" />
-    <path d="m2 9 10 12 10-12" fill="#fff" fillOpacity="0.2" />
   </svg>
 );
 
+// Gem 2 (e.g., Enlightenment)
+const Gem2Icon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    viewBox="0 0 24 24"
+    className="h-5 w-5 text-cyan-400"
+  >
+    <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
+    <path d="m6 3 6 6 6-6" />
+    <path d="m2 9 10 12 10-12" />
+  </svg>
+);
+
+// --- TYPES ---
 interface UserStats {
-  enlightenmentCrystals: number;
-  knowledgePoints: number;
-  wisdomGems: number;
+  coins: number;
+  xp: number;
+  gem1: number;
+  gem2: number;
 }
 
 interface GameStatsHeaderProps {
   userToken: string;
-  isParentLoading: boolean; // New prop to check parent's loading state
+  isParentLoading: boolean;
 }
 
-const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({ userToken, isParentLoading }) => {
+// --- COMPONENT ---
+const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
+  userToken,
+  isParentLoading,
+}) => {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,18 +116,17 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({ userToken, isParentLo
           }
         );
 
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`API returned ${res.status}: ${text}`);
-        }
+        if (!res.ok) throw new Error(`API returned ${res.status}`);
 
         const data = await res.json();
+
+        // Map API response → fixed structure
         setStats({
-          enlightenmentCrystals: data.enlightenmentCrystals ?? 0,
-          knowledgePoints: data.knowledgePoints ?? 0,
-          wisdomGems: data.wisdomGems ?? 0,
+          coins: data.coins ?? 0,
+          xp: data.knowledgePoints ?? 0,
+          gem1: data.wisdomGems ?? 0,
+          gem2: data.enlightenmentCrystals ?? 0,
         });
-        setError(null);
       } catch (err: any) {
 
         ReactGA.event({
@@ -111,12 +136,12 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({ userToken, isParentLo
         });
 
         console.error("Failed to fetch user stats:", err);
-        setError(err.message || "Unknown error occurred");
+        setError(err.message);
       }
     };
 
     fetchUserStats();
-  }, [userToken, isParentLoading]); // Add the new prop to dependencies
+  }, [userToken, isParentLoading]);
 
   // Don't render anything if the parent is still loading or if there's no token
   if (isParentLoading || !userToken) {
@@ -129,30 +154,42 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({ userToken, isParentLo
   return (
     <div className="top-0 z-10 bg-transparent">
       <div className="pt-4 flex justify-between items-center max-w-4xl mx-auto px-4">
+        {/* Left side — coins + XP */}
         <div className="flex gap-4">
-          {/* Enlightenment Crystals */}
-          <div className="flex items-center bg-card/80 backdrop-blur-sm rounded-full px-3 py-2 border border-border/50 shadow-sm hover:bg-card/90 transition-colors">
-            <EnlightenmentDiamond />
+          {/* Coins */}
+          <div className="flex items-center bg-card/80 backdrop-blur-sm rounded-full px-3 py-2 border border-border/50 shadow-sm">
+            <CoinsIcon />
             <span className="font-semibold text-foreground ml-2 text-sm">
-              {stats.enlightenmentCrystals}
+              {stats.coins}
             </span>
           </div>
 
-          {/* Knowledge Points */}
-          <div className="flex items-center bg-card/80 backdrop-blur-sm rounded-full px-3 py-2 border border-border/50 shadow-sm hover:bg-card/90 transition-colors">
-            <KnowledgeIcon />
+          {/* XP */}
+          <div className="flex items-center bg-card/80 backdrop-blur-sm rounded-full px-3 py-2 border border-border/50 shadow-sm">
+            <XPBadge />
             <span className="font-semibold text-foreground ml-2 text-sm">
-              {stats.knowledgePoints}
+              {stats.xp}
             </span>
           </div>
         </div>
 
-        {/* Wisdom Gems */}
-        <div className="flex items-center bg-card/80 backdrop-blur-sm rounded-full px-3 py-2 border border-border/50 shadow-sm hover:bg-card/90 transition-colors">
-          <WisdomGem />
-          <span className="font-semibold text-foreground ml-2 text-sm">
-            {stats.wisdomGems}
-          </span>
+        {/* Right side — Gem1 + Gem2 */}
+        <div className="flex gap-4">
+          {/* Gem1 */}
+          <div className="flex items-center bg-card/80 backdrop-blur-sm rounded-full px-3 py-2 border border-border/50 shadow-sm">
+            <Gem1Icon />
+            <span className="font-semibold text-foreground ml-2 text-sm">
+              {stats.gem1}
+            </span>
+          </div>
+
+          {/* Gem2 */}
+          <div className="flex items-center bg-card/80 backdrop-blur-sm rounded-full px-3 py-2 border border-border/50 shadow-sm">
+            <Gem2Icon />
+            <span className="font-semibold text-foreground ml-2 text-sm">
+              {stats.gem2}
+            </span>
+          </div>
         </div>
       </div>
     </div>
