@@ -119,6 +119,14 @@ export default function Home() {
         } else {
           setLoading(false);
         }
+
+        ReactGA.event({
+          category: "engagement",
+          action: "home_shown",
+          label: isGuest ? "Guest" : "Registered",
+          value: isSmallScreen ? 1 : 0, // e.g. 1 = mobile, 0 = desktop
+        });
+
       } catch (err) {
         console.error("Init error:", err);
         setLoading(false);
