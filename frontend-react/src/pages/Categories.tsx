@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Search, Plus, AlertTriangle } from "lucide-react";
 import AddCategory from "@/components/AddCategory";
 import { useToast } from "@/hooks/use-toast";
+import ReactGA from "react-ga4";
 
 interface Category {
   _id: string;
@@ -91,6 +92,13 @@ export default function Categories() {
       setIsGuest(data.userType === "Guest");
       localStorage.setItem("user", JSON.stringify(data));
     } catch (error) {
+
+      ReactGA.event({
+        category: "API Error",
+        action: "fetch_failed",
+        label: "getUserDetails",
+      });
+
       console.warn("⚠️ Failed to fetch user type, fallback to local storage:", error);
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
@@ -139,7 +147,7 @@ export default function Categories() {
         isNew:
           index < 2 ||
           new Date().getTime() - new Date(category.createdAt || 0).getTime() <
-            7 * 24 * 60 * 60 * 1000,
+          7 * 24 * 60 * 60 * 1000,
         timeEstimate: `${Math.ceil((category.questionCount || 10) * 0.6)} min`,
       }));
 
