@@ -1,10 +1,28 @@
 const jwt = require("jsonwebtoken");
 
+function logWarning(message, req) {
+  console.log(JSON.stringify({
+    severity: "WARNING",
+    message,
+    route: req?.originalUrl || "N/A",
+  }));
+}
+
+function logError(message, err, req) {
+  console.log(JSON.stringify({
+    severity: "ERROR",
+    message,
+    route: req?.originalUrl || "N/A",
+    error: err?.message || err,
+    stack: err?.stack,
+  }));
+}
+
 module.exports = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    console.warn("⚠️ Missing or malformed token:", req.originalUrl);
+    logWarning("Missing or malformed token", req);
     return res.status(401).json({ error: "Missing or malformed token" });
   }
 
@@ -12,16 +30,17 @@ module.exports = (req, res, next) => {
 
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
-      // Handle token-specific errors distinctly
       if (err.name === "TokenExpiredError") {
-        console.warn("⚠️ Token expired for request:", req.originalUrl);
+        logWarning("Token expired", req);
         return res.status(401).json({ error: "Token expired" });
       }
+
       if (err.name === "JsonWebTokenError") {
-        console.warn("⚠️ Invalid token:", err.message);
+        logWarning(`Invalid token: ${err.message}`, req);
         return res.status(401).json({ error: "Invalid token" });
       }
-      console.error("⚠️ Token verification error:", err);
+
+      logError("Unexpected token verification error", err, req);
       return res.status(401).json({ error: "Authentication failed" });
     }
 
