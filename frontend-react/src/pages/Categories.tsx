@@ -8,6 +8,8 @@ import { Card } from "@/components/ui/card";
 import { Search, Plus, AlertTriangle } from "lucide-react";
 import AddCategory from "@/components/AddCategory";
 import { useToast } from "@/hooks/use-toast";
+// ⬅️ CRITICAL: Import the apiClient utility
+import { apiClient } from "@/utils/apiClient"; 
 
 interface Category {
   _id: string;
@@ -64,10 +66,13 @@ export default function Categories() {
     }
   }, [searchQueryFromParams]);
 
-  // ✅ Load user info from API or localStorage
+  // ----------------------------------------------------------------
+  // REVISED loadUserType to use apiClient
+  // ----------------------------------------------------------------
   const loadUserType = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
+      // Logic for token-less users (Guests) remains the same
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
@@ -79,17 +84,24 @@ export default function Categories() {
     }
 
     try {
-      const res = await fetch(`${BASE_URL}/api/getUserDetails`, {
+      // ⬅️ Use apiClient instead of fetch
+      const response = await apiClient(`${BASE_URL}/api/getUserDetails`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
       });
-      if (!res.ok) throw new Error("Failed to load user info");
-      const data: User = await res.json();
+
+      // ⬅️ Check if response is undefined (401 handled by apiClient)
+      if (!response) {
+        // If apiClient redirects on 401, this function halts.
+        return; 
+      }
+      
+      if (!response.ok) throw new Error("Failed to load user info");
+      
+      const data: User = await response.json();
+      
       setIsGuest(data.userType === "Guest");
       localStorage.setItem("user", JSON.stringify(data));
+      
     } catch (error) {
       console.warn("⚠️ Failed to fetch user type, fallback to local storage:", error);
       const storedUser = localStorage.getItem("user");
@@ -100,20 +112,25 @@ export default function Categories() {
     }
   };
 
+  // ----------------------------------------------------------------
+  // REVISED fetchCategories to use apiClient
+  // ----------------------------------------------------------------
   const fetchCategories = async () => {
     setError(null);
     setLoading(true);
 
     try {
-      const userToken = localStorage.getItem("token");
-      const response = await fetch(`${BASE_URL}/api/categories`, {
+      // ⬅️ Use apiClient instead of fetch
+      const response = await apiClient(`${BASE_URL}/api/categories`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${userToken}`,
-          "Content-Type": "application/json",
-        },
       });
-
+      
+      // ⬅️ Check if response is undefined (401 handled by apiClient)
+      if (!response) {
+        setLoading(false); // Stop loading state as we're leaving the page
+        return;
+      }
+      
       if (!response.ok) {
         throw new Error(`Failed to fetch categories. Status: ${response.status}`);
       }
