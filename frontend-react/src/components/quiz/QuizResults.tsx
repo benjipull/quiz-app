@@ -348,19 +348,21 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   }
 
   return (
-    // Main container ensures scrollability for smaller screens
-    <div className="fixed inset-0 z-50 flex flex-col items-center p-3 sm:p-4 font-sans bg-slate-900/100 overflow-y-auto">
+    // Main container - Reduced p-3 to p-2 for better height
+    <div className="fixed inset-0 z-50 flex flex-col items-center p-2 sm:p-4 font-sans bg-slate-900/100 overflow-y-auto">
       
       {/* Header with Stats (max-w-lg for better mobile fit) */}
-      <div className="w-full max-w-lg mb-4 animate-fade-in-down">
-        <div className="flex items-center justify-between p-3 sm:p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 backdrop-blur-sm">
-          {/* Stat Item: Hearts */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
+      {/* Reduced mb-4 to mb-3 */}
+      <div className="w-full max-w-lg mb-3 animate-fade-in-down">
+        {/* Reduced p-3 to p-2 for smaller stats bar */}
+        <div className="flex items-center justify-between p-2 sm:p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 backdrop-blur-sm">
+          {/* Stat Item: Hearts - Reduced w-8 h-8 to w-7 h-7, w-10 h-10 to w-9 h-9, text-lg to text-base */}
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
-                className="h-6 w-6"
+                className="h-5 w-5"
               >
                 {/* Back coin */}
                 <circle cx="8" cy="9" r="5" fill="#f59e0b" />
@@ -375,18 +377,18 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               </svg>
             </div>
             <div>
-              <div className="text-base sm:text-lg font-bold text-slate-200">0</div>
+              <div className="text-sm sm:text-base font-bold text-slate-200">0</div>
             </div>
           </div>
 
-           {/* Stat Item - XP */}
-           <div ref={headerXPRef} className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center">
+           {/* Stat Item - XP - Reduced w-8 h-8 to w-7 h-7, w-10 h-10 to w-9 h-9, text-lg to text-base */}
+           <div ref={headerXPRef} className="flex items-center gap-1 sm:gap-1.5">
+            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center">
               <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="currentColor"
-              className="h-5 w-5 text-amber-500"
+              className="h-4 w-4 text-amber-500"
             >
               <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
               <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
@@ -394,12 +396,13 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             </svg>
             </div>
             <div>
-              <div className="text-base sm:text-lg font-bold text-yellow-400 tabular-nums">{animatedTotalXP}</div>
+              <div className="text-sm sm:text-base font-bold text-yellow-400 tabular-nums">{animatedTotalXP}</div>
             </div>
           </div>
-
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
+          
+          {/* Stat Item - Reduced w-8 h-8 to w-7 h-7, w-10 h-10 to w-9 h-9, text-lg to text-base */}
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
@@ -408,7 +411,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="h-5 w-5 text-cyan-400"
+                className="h-4 w-4 text-cyan-400"
               >
                 <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
                 <path d="m6 3 6 6 6-6" />
@@ -416,18 +419,18 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               </svg>
             </div>
             <div>
-              <div className="text-base sm:text-lg font-bold text-slate-200">0</div>
+              <div className="text-sm sm:text-base font-bold text-slate-200">0</div>
             </div>
           </div>
                 
-          {/* Stat Item: Gems */}
+          {/* Stat Item: Gems - Reduced w-8 h-8 to w-7 h-7, w-10 h-10 to w-9 h-9, text-lg to text-base */}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
+            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
               <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="currentColor"
-              className="h-5 w-5 text-purple-500"
+              className="h-4 w-4 text-purple-500"
             >
               <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
               <path d="m6 3 6 6 6-6" fill="#fff" fillOpacity="0.3" />
@@ -435,7 +438,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             </svg>
             </div>
             <div>
-              <div className="text-base sm:text-lg font-bold text-slate-200">0</div>
+              <div className="text-sm sm:text-base font-bold text-slate-200">0</div>
             </div>
           </div>
         </div>
@@ -495,13 +498,12 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </div>
       )}
 
-      {/* Main Results Card Container - FIX APPLIED HERE */}
-      {/* Removed flex-1 flex flex-col justify-center to top-align the card after the header */}
-      <div className="relative z-10 w-full max-w-lg mx-auto pb-12 sm:pb-0">
+      {/* Main Results Card Container - Reduced pb-12 to pb-6 */}
+      <div className="relative z-10 w-full max-w-lg mx-auto pb-6 sm:pb-0">
         <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl
          border-2 border-slate-700/50 shadow-2xl animate-scale-in">
           
-          {/* Close Button - Updated to Red Circle Link */}
+          {/* Close Button - No Change */}
           <Link
             to={"/"}
             // Combines the required red background, rounded shape, size, and centering
@@ -513,85 +515,86 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             <X className="h-5 w-5 text-white" />
           </Link>
           
-          {/* Content Wrapper */}
-          <div className="relative z-10 p-5 sm:p-8 space-y-5 sm:space-y-6">
+          {/* Content Wrapper - Reduced p-5 to p-4, p-8 to p-6, space-y-5 to space-y-4, space-y-6 to space-y-5 */}
+          <div className="relative z-10 p-4 sm:p-6 space-y-4 sm:space-y-5">
             
-            {/* Header */}
+            {/* Header - Reduced text-2xl to text-xl, text-3xl to text-2xl */}
             <div className="text-center space-y-2 sm:space-y-3 animate-fade-in-up">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-700/40 border border-slate-600/30 mb-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-700/40 border border-slate-600/30 mb-1">
                 <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                 <span className="text-xs sm:text-sm font-bold text-slate-300">{categoryName}</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-100 tracking-wide">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-100 tracking-wide">
                 MISSION COMPLETE!
               </h1>
             </div>
 
             {/* Center Content - Points Earned or Results */}
             {showPointsCenter ? (
-              <div ref={earnedPointsRef} className="py-8 sm:py-12 text-center space-y-3 sm:space-y-4 animate-pop-in">
-                <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-yellow-500/50">
-                  <Trophy className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
+              // Reduced py-8 to py-4, py-12 to py-8, text-6xl to text-5xl, text-7xl to text-6xl
+              <div ref={earnedPointsRef} className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in">
+                <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-yellow-500/50">
+                  <Trophy className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
-                  <div className="text-6xl sm:text-7xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent tabular-nums">
+                  <div className="text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent tabular-nums">
                     +{animatedKnowledge}
                   </div>
-                  <div className="text-yellow-400/80 font-bold text-base sm:text-lg mt-1 sm:mt-2">
+                  <div className="text-yellow-400/80 font-bold text-sm sm:text-base mt-1 sm:mt-2">
                     XP EARNED
                   </div>
                 </div>
               </div>
             ) : (
-              // Use slightly reduced vertical spacing for compact mobile view
-              <div className="space-y-4 sm:space-y-6 animate-fade-in">
-                {/* Results Grid */}
-                <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                  {/* Correct/Incorrect */}
-                  <Card className="bg-slate-800/40 border border-slate-700/50 p-4 sm:p-5">
-                    <div className="text-xs font-bold text-slate-500 uppercase mb-2 sm:mb-3">Result</div>
-                    <div className="space-y-2 sm:space-y-3">
-                      <div className="flex items-center gap-2 sm:gap-3">
+              // Use slightly reduced vertical spacing for compact mobile view - Reduced space-y-4 to space-y-3, space-y-6 to space-y-4
+              <div className="space-y-3 sm:space-y-4 animate-fade-in">
+                {/* Results Grid - Reduced gap-3 to gap-2, gap-4 to gap-3 */}
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                  {/* Correct/Incorrect - Reduced p-4 to p-3, p-5 to p-4, text-2xl to text-xl, text-3xl to text-2xl */}
+                  <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4">
+                    <div className="text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-2">Result</div>
+                    <div className="space-y-2 sm:space-y-2">
+                      <div className="flex items-center gap-1 sm:gap-2">
                         <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
                         <div>
-                          <div className="text-2xl sm:text-3xl font-black text-emerald-400">{correctAnswers}</div>
+                          <div className="text-xl sm:text-2xl font-black text-emerald-400">{correctAnswers}</div>
                           <div className="text-xs text-emerald-500/70">CORRECT</div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="flex items-center gap-1 sm:gap-2">
                         <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
                         <div>
-                          <div className="text-2xl sm:text-3xl font-black text-red-400">{incorrectAnswers}</div>
+                          <div className="text-xl sm:text-2xl font-black text-red-400">{incorrectAnswers}</div>
                           <div className="text-xs text-red-500/70">INCORRECT</div>
                         </div>
                       </div>
                     </div>
                   </Card>
 
-                  {/* Accuracy Circle (Scaled Down for Mobile) */}
-                  <Card className="bg-slate-800/40 border border-slate-700/50 p-4 sm:p-5 flex items-center justify-center">
+                  {/* Accuracy Circle (Scaled Down for Mobile) - Reduced p-4 to p-3, p-5 to p-4 */}
+                  <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4 flex items-center justify-center">
                     <div className="text-center">
-                      <div className="relative inline-block mb-3">
-                        {/* Reduced SVG size: w-16 h-16 (64px) for mobile, w-20 h-20 (80px) for sm+ */}
-                        <svg className="w-16 h-16 sm:w-20 sm:h-20 transform -rotate-90">
+                      <div className="relative inline-block mb-2">
+                        {/* Further reduced SVG size: w-14 h-14 (56px) for mobile, w-18 h-18 (72px) for sm+ */}
+                        <svg className="w-14 h-14 sm:w-18 sm:h-18 transform -rotate-90">
                           <circle
-                            cx="32" // Adjusted center x
-                            cy="32" // Adjusted center y
-                            r="28"  // Adjusted radius
+                            cx="28" // Adjusted center x
+                            cy="28" // Adjusted center y
+                            r="24"  // Adjusted radius
                             stroke="currentColor"
                             className="text-slate-700"
-                            strokeWidth="8"
+                            strokeWidth="6" // Reduced stroke width
                             fill="none"
                           />
                           <circle
-                            cx="32" // Adjusted center x
-                            cy="32" // Adjusted center y
-                            r="28"  // Adjusted radius
+                            cx="28" // Adjusted center x
+                            cy="28" // Adjusted center y
+                            r="24"  // Adjusted radius
                             stroke="url(#accuracyGradient)"
-                            strokeWidth="8"
+                            strokeWidth="6" // Reduced stroke width
                             fill="none"
-                            strokeDasharray={`${2 * Math.PI * 28}`} // Updated dash array calculation
-                            strokeDashoffset={`${2 * Math.PI * 28 * (1 - animatedScore / 100)}`} // Updated dash offset calculation
+                            strokeDasharray={`${2 * Math.PI * 24}`} // Updated dash array calculation
+                            strokeDashoffset={`${2 * Math.PI * 24 * (1 - animatedScore / 100)}`} // Updated dash offset calculation
                             strokeLinecap="round"
                             className="transition-all duration-1000"
                           />
@@ -602,9 +605,9 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                             </linearGradient>
                           </defs>
                         </svg>
-                        {/* Adjusting the center number position based on the smaller SVG size */}
+                        {/* Adjusting the center number position based on the smaller SVG size - text-xl to text-lg, text-2xl to text-xl */}
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-xl sm:text-2xl font-black text-slate-100">{animatedScore}%</span>
+                          <span className="text-lg sm:text-xl font-black text-slate-100">{animatedScore}%</span>
                         </div>
                       </div>
                       <div className="text-xs font-bold text-slate-400 uppercase">Accuracy</div>
@@ -613,23 +616,23 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   </Card>
                 </div>
 
-                {/* Level Badge */}
-                <div className="flex items-center justify-center gap-3 sm:gap-4 p-3 bg-slate-800/40 border border-slate-700/50 rounded-xl">
-                  <Crown className="h-6 w-6 sm:h-8 sm:w-8 text-purple-400" />
+                {/* Level Badge - Reduced p-3 to p-2, h-6 w-6 to h-5 w-5, h-8 w-8 to h-6 w-6, text-2xl to text-xl, text-3xl to text-2xl */}
+                <div className="flex items-center justify-center gap-3 sm:gap-4 p-2 bg-slate-800/40 border border-slate-700/50 rounded-xl">
+                  <Crown className="h-5 w-5 sm:h-6 text-purple-400" />
                   <div className="flex flex-row gap-3 items-center">
                     <div className="text-xs text-slate-500 uppercase">Level</div>
-                    <div className="text-2xl sm:text-3xl font-black text-slate-200">{currentLevel}</div>
+                    <div className="text-xl sm:text-2xl font-black text-slate-200">{currentLevel}</div>
                   </div>
                   {hasLeveledUp && (
-                    <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs px-3 py-1 animate-pulse">
+                    <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs px-2 py-0.5 animate-pulse">
                       UP!
                     </Badge>
                   )}
                 </div>
 
-                {/* Rating */}
-                <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4">
-                  <div className="flex items-center justify-between mb-2">
+                {/* Rating - Reduced p-3 to p-2, p-4 to p-3 */}
+                <Card className="bg-slate-800/40 border border-slate-700/50 p-2 sm:p-3">
+                  <div className="flex items-center justify-between mb-1">
                     <div className="text-xs font-bold text-slate-500 uppercase">
                       Rate This Quiz
                     </div>
@@ -647,7 +650,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                           }`}
                         >
                           <StarIcon
-                            className={`h-4 w-4 sm:h-5 sm:w-5 transition-all ${
+                            className={`h-4 w-4 transition-all ${ // Reduced h-4 w-4 to h-3 w-3 (reverted to h-4 w-4 as it's the smaller of the original options)
                               star <= (hoveredRating || rating)
                                 ? "fill-yellow-400 text-yellow-400"
                                 : "text-slate-600 hover:text-yellow-400/60"
@@ -666,12 +669,12 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   )}
                 </Card>
 
-                {/* Next Quiz Button */}
+                {/* Next Quiz Button - Reduced h-12 to h-11, h-14 to h-12, text-base to text-sm, text-lg to text-base */}
                 <Button
                   onClick={handleNextQuiz}
                   disabled={playButtonLoading}
                   size="lg"
-                  className="w-full h-12 sm:h-14 text-base sm:text-lg font-black bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-[1.02]"
+                  className="w-full h-11 sm:h-12 text-sm sm:text-base font-black bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-[1.02]"
                 >
                   {playButtonLoading ? "LOADING..." : "NEXT QUIZ"}
                 </Button>
