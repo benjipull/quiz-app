@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import ReactGA from "react-ga4";
 
 // --- ICONS ---
 
@@ -90,7 +91,12 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isParentLoading) return;
+    // Return early if the main Home component is still loading
+    if (isParentLoading) {
+      return;
+    }
+
+    // Return early if the user is not logged in
     if (!userToken) {
       setError("User not logged in");
       return;
@@ -122,6 +128,13 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
           gem2: data.enlightenmentCrystals ?? 0,
         });
       } catch (err: any) {
+
+        ReactGA.event({
+          category: "API Error",
+          action: "fetch_failed",
+          label: "getUserDetails",
+        });
+
         console.error("Failed to fetch user stats:", err);
         setError(err.message);
       }
@@ -130,7 +143,11 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
     fetchUserStats();
   }, [userToken, isParentLoading]);
 
-  if (isParentLoading || !userToken) return null;
+  // Don't render anything if the parent is still loading or if there's no token
+  if (isParentLoading || !userToken) {
+    return null;
+  }
+
   if (error) return <div className="text-red-500 font-bold">{error}</div>;
   if (!stats) return null;
 
