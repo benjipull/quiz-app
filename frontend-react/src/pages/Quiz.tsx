@@ -637,14 +637,6 @@ export default function Quiz() {
     }
   };
 
-  const handleNextQuestion = () => {
-    if (isLastQuestion) {
-      completeQuiz();
-      return;
-    }
-    fetchNextQuestion();
-  };
-  
   const handleVibration = (isCorrect: boolean) => {
     if ("vibrate" in navigator) {
       if (isCorrect) {
@@ -652,42 +644,6 @@ export default function Quiz() {
       } else {
         navigator.vibrate([200, 100, 200]);
       }
-    }
-  };
-
-  const handlePlayAgain = () => {
-    // Reset the ref when playing again to allow startQuiz to run
-    hasStartedRef.current = false;
-    if (categoryId) {
-      startQuiz(categoryId);
-    }
-  };
-
-  const handleFeedback = async (type: "up" | "down") => {
-    if (feedbackGiven || !quizState.question?._id) return;
-
-    setFeedbackGiven(true);
-    setFeedbackType(type);
-
-    try {
-      const response = await fetch(`${BASE_URL}/api/updatePopularity`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({
-          questionId: quizState.question._id,
-          action: type === "up" ? 1 : 2
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("⚠️ Failed to update popularity:", errorData.message || errorData);
-      }
-    } catch (err) {
-      console.error("⚠️ Error updating popularity:", err);
     }
   };
 
@@ -757,6 +713,50 @@ export default function Quiz() {
     } catch (error) {
       console.error("Error submitting answer:", error);
       setError("Error submitting answer. Please try again.");
+    }
+  };
+
+  const handleNextQuestion = () => {
+    if (isLastQuestion) {
+      completeQuiz();
+      return;
+    }
+    fetchNextQuestion();
+  };
+
+  const handlePlayAgain = () => {
+    // Reset the ref when playing again to allow startQuiz to run
+    hasStartedRef.current = false;
+    if (categoryId) {
+      startQuiz(categoryId);
+    }
+  };
+
+  const handleFeedback = async (type: "up" | "down") => {
+    if (feedbackGiven || !quizState.question?._id) return;
+
+    setFeedbackGiven(true);
+    setFeedbackType(type);
+
+    try {
+      const response = await fetch(`${BASE_URL}/api/updatePopularity`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({
+          questionId: quizState.question._id,
+          action: type === "up" ? 1 : 2
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("⚠️ Failed to update popularity:", errorData.message || errorData);
+      }
+    } catch (err) {
+      console.error("⚠️ Error updating popularity:", err);
     }
   };
 
@@ -882,9 +882,9 @@ export default function Quiz() {
       {/* Content wrapper */}
       <div className="relative z-10 flex flex-col min-h-screen">
         <div className="sticky top-0 z-30 bg-quiz-background/80 backdrop-blur-sm">
-          {/* 1. REDUCTION: Reduced header vertical padding from py-2 md:py-4 to py-1 md:py-3 */}
-          <div className="px-2 py-1 md:py-3 max-w-full mx-auto">
-            <div className="flex items-center justify-between gap-2 mb-2"> {/* REDUCTION: mb-3 to mb-2 */}
+          {/* MODIFIED: Reduced horizontal padding from px-4 to px-3 and removed max-width classes (lg:max-w-3xl xl:max-w-5xl) for header to use more screen space */}
+          <div className="px-2 py-2 md:py-4 max-w-full mx-auto">
+            <div className="flex items-center justify-between gap-2 mb-3">
               <Button
                 variant="ghost"
                 size="sm"
@@ -899,8 +899,8 @@ export default function Quiz() {
                 <div className="text-sm md:text-base font-semibold text-primary truncate">
                   {categoryTitle}
                 </div>
-                {/* REDUCTION: text-xs/text-sm to text-xs */}
-                <div className="text-xs text-muted-foreground"> 
+                <div className="text-xs text-muted-foreground">
+                  {/* The index is correct now because the double increment is blocked */}
                   Question {quizState.currentQuestionIndex} of {totalQuestions} 
                 </div>
               </div>
@@ -932,13 +932,13 @@ export default function Quiz() {
           </div>
         </div>
 
-        {/* Content Area */}
-        {/* REDUCTION: Reduced vertical padding from py-3 to py-2 */}
-        <div className="flex-1 overflow-y-auto px-3 py-2 mx-auto w-full max-w-2xl lg:max-w-3xl"> 
-          <div className="space-y-4"> {/* REDUCTION: space-y-6 to space-y-4 */}
-            {/* 2. REDUCTION: Reduced Question size/padding (py-3 md:py-4 to py-2) and text size (text-xl to text-lg) */}
-            <div className="px-1 py-2"> 
-              <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-foreground leading-relaxed">
+        {/* MODIFIED: Reduced horizontal padding from px-4 to px-3 and removed max-width classes (lg:max-w-3xl xl:max-w-5xl) for content to use more screen space */}
+        {/* ADDED: Max width for content on large screens */}
+        <div className="flex-1 overflow-y-auto px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-3xl"> 
+          <div className="space-y-6">
+            {/* Reduced Padding for Question (px-1 is already tight) */}
+            <div className="px-1 py-3 md:py-4">
+              <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-relaxed">
                 {quizState.question?.question}
               </h2>
             </div>
@@ -947,8 +947,8 @@ export default function Quiz() {
               {quizState.question?.answers.map((answer, index) => (
                 <Card
                   key={index}
-                  // 3. REDUCTION: Reduced vertical padding inside answer cards from p-4 to p-3 (md:p-4 kept)
-                  className={`p-3 md:p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer shadow-sm rounded-xl`}
+                  // MODIFIED: getOptionStyle now handles all border logic
+                  className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer shadow-sm rounded-xl`}
                   onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
                 >
                   {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
@@ -970,16 +970,22 @@ export default function Quiz() {
 
                   <div className="flex items-center gap-3 relative z-10">
                     <div className="flex-1 min-w-0 flex items-center justify-between">
-                      {/* REDUCTION: text-base md:text-lg to text-base md:text-base (keeping it responsive for MD but tighter on SM) */}
-                      <span className={`text-base md:text-base leading-snug break-words w-full font-medium text-left`}>
+                      {/* MODIFIED: 
+                      1. Removed conditional font-weight and set to font-medium for consistency.
+                      2. Removed flex-shrink.
+                      3. Added w-full and text-left to prevent centering/layout shifts.
+                      */}
+                      <span className={`text-base md:text-lg leading-snug break-words w-full font-medium text-left`}>
                         {answer}
                       </span>
-                      <span
-                        className="text-sm font-semibold text-foreground ml-3 animate-fade-in-delayed flex-shrink-0"
-                        style={{ animationDelay: `${1000 + (index * 150)}ms` }}
-                      >
-                        {getAnswerPercentage(answer)}%
-                      </span>
+                      {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
+                        <span
+                          className="text-sm font-semibold text-foreground ml-3 animate-fade-in-delayed flex-shrink-0"
+                          style={{ animationDelay: `${1000 + (index * 150)}ms` }}
+                        >
+                          {getAnswerPercentage(answer)}%
+                        </span>
+                      )}
                     </div>
                   </div>
                 </Card>
@@ -988,8 +994,7 @@ export default function Quiz() {
 
             {timeUp && (
               <div ref={explanationRef}>
-                {/* 3. REDUCTION: Reduced padding on explanation cards (p-6 md:p-8 to p-4 md:p-6) */}
-                <Card className="p-4 md:p-6 bg-destructive/5 animate-slide-up border-0 shadow-sm rounded-xl">
+                <Card className="p-6 md:p-8 bg-destructive/5 animate-slide-up border-0 shadow-sm rounded-xl">
                   <div className="text-center space-y-3">
                     <p className="font-semibold text-destructive text-base md:text-lg">⏰ Time's Up!</p>
                     <p className="text-sm md:text-base text-muted-foreground">
@@ -1003,12 +1008,11 @@ export default function Quiz() {
                   </div>
                 </Card>
 
-                <div className="mt-4 pb-2"> {/* REDUCTION: mt-6 pb-4 to mt-4 pb-2 */}
-                  {/* 4. REDUCTION: Reduced button height from h-14 md:h-16 to h-12 md:h-14 and font size to text-base */}
+                <div className="mt-6 pb-4">
                   <Button
                     variant="default"
                     size="lg"
-                    className="w-full h-12 md:h-14 text-base" 
+                    className="w-full h-14 md:h-16 text-base md:text-lg"
                     onClick={handleNextQuestion}
                     disabled={isCompletingQuiz}
                   >
@@ -1019,8 +1023,7 @@ export default function Quiz() {
             )}
             {showExplanation && !timeUp && answerResponse && (
               <div ref={explanationRef}>
-                {/* 3. REDUCTION: Reduced padding on explanation cards (p-6 md:p-8 to p-4 md:p-6) */}
-                <Card className="p-4 md:p-6 bg-primary/5 animate-slide-up border-0 shadow-sm rounded-xl">
+                <Card className="p-6 md:p-8 bg-primary/5 animate-slide-up border-0 shadow-sm rounded-xl">
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <Lightbulb className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-primary flex-shrink-0" />
@@ -1034,18 +1037,17 @@ export default function Quiz() {
                   </div>
                 </Card>
 
-                <div className="mt-4 space-y-3 animate-fade-in pb-2"> {/* REDUCTION: mt-6 space-y-4 pb-4 to mt-4 space-y-3 pb-2 */}
+                <div className="mt-6 space-y-4 animate-fade-in pb-4">
                   <Card className="p-4 md:p-6 bg-card/40 border-0 shadow-sm rounded-xl">
-                    <div className="space-y-3"> {/* REDUCTION: space-y-4 to space-y-3 */}
+                    <div className="space-y-4">
                       <p className="text-sm font-medium text-center">Did you like this question?</p>
-                      <div className="flex gap-3 justify-center"> {/* REDUCTION: gap-4 to gap-3 */}
-                        {/* REDUCTION: h-10 to h-9 and max-w-[120px] to max-w-[100px] */}
+                      <div className="flex gap-4 justify-center">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleFeedback("up")}
                           disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[100px] h-9 ${
+                          className={`text-sm flex-1 max-w-[120px] h-10 ${
                             feedbackType === "up"
                               ? "bg-success/20 border-success text-success hover:bg-success/20 hover:text-success"
                               : feedbackGiven
@@ -1053,16 +1055,15 @@ export default function Quiz() {
                                 : "hover:text-success"
                           }`}
                         >
-                          <ThumbsUp className="h-4 w-4" /> {/* Reduced icon size to h-4 w-4 */}
-                          <span className="ml-1 sm:ml-2 hidden sm:inline">Yes</span>
+                          <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
+                          <span className="ml-1 sm:ml-2">Yes</span>
                         </Button>
-                        {/* REDUCTION: h-10 to h-9 and max-w-[120px] to max-w-[100px] */}
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleFeedback("down")}
                           disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[100px] h-9 ${
+                          className={`text-sm flex-1 max-w-[120px] h-10 ${
                             feedbackType === "down"
                               ? "bg-destructive/20 border-destructive text-destructive hover:bg-destructive/20 hover:text-destructive"
                               : feedbackGiven
@@ -1070,28 +1071,27 @@ export default function Quiz() {
                                 : "hover:text-destructive"
                           }`}
                         >
-                          <ThumbsDown className="h-4 w-4" /> {/* Reduced icon size to h-4 w-4 */}
-                          <span className="ml-1 sm:ml-2 hidden sm:inline">No</span>
+                          <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
+                          <span className="ml-1 sm:ml-2">No</span>
                         </Button>
-                        {/* REDUCTION: h-10 to h-9 and max-w-[120px] to max-w-[100px] */}
+                        {/* UPDATED: Report Button onClick handler */}
                         <Button
                           variant="outline"
                           size="sm"
-                          className="text-sm flex-1 max-w-[100px] h-9 border-0"
+                          className="text-sm flex-1 max-w-[120px] h-10 border-0"
                           onClick={() => setShowReportDialog(true)}
                         >
-                          <Flag className="h-4 w-4" /> {/* Reduced icon size to h-4 w-4 */}
+                          <Flag className="h-4 w-4 md:h-5 md:w-5" />
                           <span className="ml-1 sm:inline">Report</span>
                         </Button>
                       </div>
                     </div>
                   </Card>
 
-                  {/* 4. REDUCTION: Reduced button height from h-14 md:h-16 to h-12 md:h-14 and font size to text-base */}
                   <Button
                     variant="default"
                     size="lg"
-                    className="w-full h-12 md:h-14 text-base"
+                    className="w-full h-14 md:h-16 text-base md:text-lg"
                     onClick={handleNextQuestion}
                     disabled={isCompletingQuiz}
                   >
