@@ -15,29 +15,54 @@ router.get("/", auth, adminAuth, async (req, res) => {
           averageRating: 1,
           createdAt: 1,
           createdBy: 1,
-          // 🧮 count only non-disabled questions
+
+          // 🧮 Count only non-disabled questions
           questionCount: {
             $size: {
               $filter: {
                 input: "$questions",
                 as: "q",
-                cond: { $eq: ["$$q.disabled", false] }
-              }
-            }
+                cond: { $eq: ["$$q.disabled", false] },
+              },
+            },
           },
-          completionCount: { $size: "$completions" }
-        }
+
+          // ✅ Only true if at least one question has a *valid string* duplicate_group_id
+          hasDuplicates: {
+            $gt: [
+              {
+                $size: {
+                  $filter: {
+                    input: "$questions",
+                    as: "q",
+                    cond: {
+                      $and: [
+                        { $eq: [{ $type: "$$q.duplicate.duplicate_group_id" }, "string"] },
+                        { $ne: ["$$q.duplicate.duplicate_group_id", ""] },
+                      ],
+                    },
+                  },
+                },
+              },
+              0,
+            ],
+          },
+
+          completionCount: { $size: "$completions" },
+        },
       },
-      { $sort: { createdAt: -1 } }
+      { $sort: { createdAt: -1 } },
     ]);
 
-
     // populate user aliases for createdBy
-    await Category.populate(categories, { path: "createdBy", select: "alias email" });
+    await Category.populate(categories, {
+      path: "createdBy",
+      select: "alias email",
+    });
 
     res.json(categories);
   } catch (err) {
-    console.error("Error fetching categories:", err);
+    console.error("❌ Error fetching categories:", err);
     res.status(500).json({ message: "Server error fetching categories" });
   }
 });

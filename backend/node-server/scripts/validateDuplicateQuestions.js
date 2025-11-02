@@ -6,7 +6,7 @@ const connectDB = require("../config/db");
 const { buildDuplicatePrompt } = require("./prompts/duplicatePrompt");
 
 const OLLAMA_URL = process.env.OLLAMA_URL;
-const DUPLICATE_VERSION = 0.17;
+const DUPLICATE_VERSION = 0.18;
 
 async function queryOllama(prompt) {
   try {
@@ -16,11 +16,12 @@ async function queryOllama(prompt) {
         model: "llama3",
         prompt,
         options: {
-          temperature: 0,
-          num_ctx: 4096,
-          num_predict: 50,
-          top_p: 0.9,
-          repeat_penalty: 1.1,
+          temperature: 0.0,      // eliminate creativity — factual only
+          top_p: 0.8,            // less diversity in sampling
+          top_k: 20,             // focus on most likely tokens
+          repeat_penalty: 1.2,   // discourage alternative phrasing loops
+          num_ctx: 4096,         // enough context for longer comparisons
+          num_predict: 60        // short, focused output
         },
         stream: false,
       },
