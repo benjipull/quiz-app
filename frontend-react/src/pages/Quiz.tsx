@@ -40,27 +40,26 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
     { 
       value: "incorrect_answer", 
       label: "Incorrect Answer",
-      description: "The provided 'correct' answer is actually wrong, outdated, or debatable.",
+    },
+    { 
+      value: "multiple_correct_answers", 
+      label: "Multiple Correct Answers",
     },
     { 
       value: "ambiguous_wording", 
       label: "Ambiguous or Poorly Worded Question",
-      description: "The question is confusing, unclear, or allows multiple valid interpretations.",
     },
     { 
       value: "duplicate_question", 
       label: "Duplicate Question",
-      description: "The question (or a very similar one) has appeared elsewhere in the quiz.",
     },
     { 
       value: "offensive_content", 
       label: "Offensive or Inappropriate Content",
-      description: "The question or answer contains offensive, biased, or otherwise inappropriate language.",
     },
     { 
       value: "other", 
       label: "Other (please describe)",
-      description: "Free-text field for users to specify an issue not covered by the options above (e.g., factual precision, typo, wrong category, etc.).",
     },
   ];
 
@@ -136,7 +135,6 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
                     />
                     <div className="flex flex-col">
                       <span className="font-semibold">{option.label}</span>
-                      <span className="text-xs text-muted-foreground font-normal mt-1">{option.description}</span>
                     </div>
                   </label>
                 </div>
@@ -184,7 +182,7 @@ interface Question {
   difficulty?: "Easy" | "Medium" | "Hard";
   difficultyName?: string;
   difficultyLevel?: number;
-  timerInSeconds?: number;
+  timerInSeconds?: number; // This will now be correctly set from the API response
 }
 
 interface AnswerStats {
@@ -413,6 +411,8 @@ export default function Quiz() {
     setFeedbackType(null);
     
     // Use timerInSeconds from backend response, defaulting to 30
+    // This now works because fetchNextQuestion correctly maps the top-level timerInSeconds 
+    // to the question object in state.
     const newTime = quizState.question?.timerInSeconds || 30;
     setTimeLeft(newTime);
     
@@ -508,6 +508,14 @@ export default function Quiz() {
       const data = await response.json();
 
       if (response.ok && data.question) {
+        
+        // 🔥 FIX: Combine top-level timerInSeconds with the question object 
+        // so the timer useEffect can find it.
+        const questionWithTimer = {
+            ...data.question,
+            timerInSeconds: data.timerInSeconds, 
+        };
+
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1; // 0 -> 1 (Correct)
           // ADDED: Play sound effect when first question starts
@@ -516,7 +524,7 @@ export default function Quiz() {
           }
           return {
             ...prev,
-            question: data.question,
+            question: questionWithTimer, // <-- Use the modified object
             currentQuestionIndex: newIndex,
             isAnswerSelected: false,
           };

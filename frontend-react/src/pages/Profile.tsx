@@ -11,6 +11,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+// ⬅️ CRITICAL: Import the apiClient utility
+import { apiClient } from "@/utils/apiClient"; 
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
@@ -56,20 +58,14 @@ const Profile = () => {
     localStorage.setItem("userAvatarIndex", index.toString());
   };
 
+  // ----------------------------------------------------------------
+  // REVISED updateUserDetails to use apiClient
+  // ----------------------------------------------------------------
   const updateUserDetails = async () => {
     setUpdating(true);
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        toast({
-          title: "Authentication Error",
-          description: "Please log in again.",
-          variant: "destructive",
-        });
-        navigate("/auth");
-        return;
-      }
-
+      // Manual token check is no longer needed; apiClient handles it.
+      
       const avatarIndex = localStorage.getItem("userAvatarIndex");
       const avatarValue = avatarIndex
         ? parseInt(avatarIndex) + 1
@@ -82,14 +78,18 @@ const Profile = () => {
         ...(userType === "Guest" && user.email ? { email: user.email } : {}),
       };
 
-      const response = await fetch(`${BASE_URL}/api/updateUserDetails`, {
+      // ⬅️ Use apiClient instead of fetch
+      const response = await apiClient(`${BASE_URL}/api/updateUserDetails`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        // apiClient automatically includes the 'Authorization' header
         body: JSON.stringify(updateData),
       });
+
+      // ⬅️ Check if response is undefined (401 handled by apiClient)
+      if (!response) {
+        setUpdating(false); // Stop loading state as we're exiting/redirecting
+        return;
+      }
 
       if (response.ok) {
         const data = await response.json();
@@ -122,6 +122,7 @@ const Profile = () => {
           setTimeout(() => navigate("/"), 1500);
         }
       } else {
+        // Handle other non-200 errors (e.g., 400 Bad Request/Validation)
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to update profile.");
       }
@@ -196,11 +197,11 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-background p-4 flex items-center justify-center">
       <Card className="w-full max-w-lg bg-card/90 backdrop-blur-sm border-border/50 shadow-xl relative">
-         <Link 
+          <Link 
             to={"/"}
             className="absolute top-3 right-3 z-20 h-8 w-8 bg-red-600 hover:bg-red-700 rounded-full transition-colors flex items-center justify-center shadow-lg"
             aria-label="Close Results and go to Categories"
-                 >
+            >
             <X className="h-5 w-5 text-white" />
             </Link>
 
