@@ -1,7 +1,5 @@
-// QuizResults.tsx
 import { useState, useEffect, useMemo, useRef } from "react";
-// Assuming you use react-router-dom for navigation:
-import { Link } from "react-router-dom"; 
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -122,7 +120,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [showPointsCenter, setShowPointsCenter] = useState(true);
   const [showFlyingTokens, setShowFlyingTokens] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
-  const [tokens, setTokens] = useState<Array<{id: number; delay: number; offsetX: number; offsetY: number}>>([]); // Added offsets
+  const [tokens, setTokens] = useState<Array<{id: number; delay: number}>>([]);
   
   const earnedPointsRef = useRef<HTMLDivElement>(null);
   const headerXPRef = useRef<HTMLDivElement>(null);
@@ -204,13 +202,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     const endX = headerRect.left + headerRect.width / 2;
     const endY = headerRect.top + headerRect.height / 2;
     
-    const tokenCount = Math.min(12, Math.max(6, knowledgeGained / 10));
+    const tokenCount = Math.min(15, Math.max(8, knowledgeGained / 8));
     const newTokens = Array.from({ length: Math.floor(tokenCount) }, (_, i) => ({
       id: i,
-      delay: 50 + i * 40,
-      // Calculate a small random offset for the start point to create scatter
-      offsetX: Math.random() * 10 - 5, // -5 to +5 pixels
-      offsetY: Math.random() * 10 - 5 
+      delay: i * 80,
     }));
 
     setTokens(newTokens);
@@ -246,10 +241,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       
       if (knowledgeGainAudio) {
         const audioClone = knowledgeGainAudio.cloneNode(true) as HTMLAudioElement;
-        audioClone.volume = 0.15;
+        audioClone.volume = 0.2;
         audioClone.play().catch(e => console.log("Audio play failed:", e));
       }
-    }, 120);
+    }, 150);
 
     document.documentElement.style.setProperty('--token-start-x', `${startX}px`);
     document.documentElement.style.setProperty('--token-start-y', `${startY}px`);
@@ -266,9 +261,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
   const handleNextQuiz = async () => {
     if (!userToken) {
-      // Use console.error instead of alert, as per best practices.
       console.error("User must be logged in to play the next quiz.");
-      // Can show a temporary message on screen instead of alert
       setRatingMessage("You must be logged in to play the next quiz.");
       return;
     }
@@ -297,7 +290,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       }
     } catch (error: any) {
       console.error("Error getting category to play:", error);
-      // Can show a temporary message on screen instead of alert
       setRatingMessage(`Error playing next quiz: ${error.message}`);
     } finally {
       setPlayButtonLoading(false);
@@ -352,15 +344,12 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   }
 
   return (
-    // Main container - Reduced p-3 to p-2 for better height
     <div className="fixed inset-0 z-50 flex flex-col items-center p-2 sm:p-4 font-sans bg-slate-900/100 overflow-y-auto">
       
-      {/* Header with Stats (max-w-lg for better mobile fit) */}
-      {/* Reduced mb-4 to mb-3 */}
+      {/* Header with Stats */}
       <div className="w-full max-w-lg mb-3 animate-fade-in-down">
-        {/* Reduced p-3 to p-2 for smaller stats bar */}
         <div className="flex items-center justify-between p-2 sm:p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 backdrop-blur-sm">
-          {/* Stat Item: Hearts - Reduced w-8 h-8 to w-7 h-7, w-10 h-10 to w-9 h-9, text-lg to text-base */}
+          {/* Stat Item: Coins */}
           <div className="flex items-center gap-1 sm:gap-1.5">
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
               <svg
@@ -368,12 +357,9 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 viewBox="0 0 24 24"
                 className="h-5 w-5"
               >
-                {/* Back coin */}
                 <circle cx="8" cy="9" r="5" fill="#f59e0b" />
                 <circle cx="8" cy="9" r="4" fill="#fbbf24" />
                 <circle cx="8" cy="9" r="2.5" fill="#f59e0b" opacity="0.4" />
-                
-                {/* Front coin */}
                 <circle cx="14" cy="13" r="6" fill="#f59e0b" />
                 <circle cx="14" cy="13" r="5" fill="#fbbf24" />
                 <circle cx="14" cy="13" r="3" fill="#f59e0b" opacity="0.4" />
@@ -385,27 +371,26 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             </div>
           </div>
 
-           {/* Stat Item - XP - Reduced w-8 h-8 to w-7 h-7, w-10 h-10 to w-9 h-9, text-lg to text-base */}
-           {/* IMPORTANT: The ref for the destination of the tokens */}
-           <div ref={headerXPRef} className="flex items-center gap-1 sm:gap-1.5">
-            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center">
+           {/* Stat Item - XP - TARGET FOR TOKENS */}
+           <div ref={headerXPRef} className="flex items-center gap-1 sm:gap-1.5 relative">
+            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center transition-all duration-300">
               <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="h-4 w-4 text-amber-500"
-            >
-              <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
-              <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
-              <circle cx="12" cy="9" r="2" fill="#fff" />
-            </svg>
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="h-4 w-4 text-amber-500"
+              >
+                <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
+                <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
+                <circle cx="12" cy="9" r="2" fill="#fff" />
+              </svg>
             </div>
             <div>
               <div className="text-sm sm:text-base font-bold text-yellow-400 tabular-nums">{animatedTotalXP}</div>
             </div>
           </div>
           
-          {/* Stat Item - Reduced w-8 h-8 to w-7 h-7, w-10 h-10 to w-9 h-9, text-lg to text-base */}
+          {/* Stat Item: Badges */}
           <div className="flex items-center gap-1 sm:gap-1.5">
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
               <svg
@@ -428,19 +413,19 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             </div>
           </div>
                 
-          {/* Stat Item: Gems - Reduced w-8 h-8 to w-7 h-7, w-10 h-10 to w-9 h-9, text-lg to text-base */}
+          {/* Stat Item: Gems */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
               <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="h-4 w-4 text-purple-500"
-            >
-              <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
-              <path d="m6 3 6 6 6-6" fill="#fff" fillOpacity="0.3" />
-              <path d="m2 9 10 12 10-12" fill="#fff" fillOpacity="0.2" />
-            </svg>
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="h-4 w-4 text-purple-500"
+              >
+                <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
+                <path d="m6 3 6 6 6-6" fill="#fff" fillOpacity="0.3" />
+                <path d="m2 9 10 12 10-12" fill="#fff" fillOpacity="0.2" />
+              </svg>
             </div>
             <div>
               <div className="text-sm sm:text-base font-bold text-slate-200">0</div>
@@ -461,15 +446,13 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         />
       )}
 
-      {/* Flying Tokens - Using the calculated offsets */}
+      {/* Flying Tokens - Enhanced animation */}
       {showFlyingTokens && tokens.map((token) => (
         <div
           key={token.id}
           className="token"
           style={{
             '--token-delay': `${token.delay}ms`,
-            '--token-offset-x': `${token.offsetX}px`, // Added new CSS variable
-            '--token-offset-y': `${token.offsetY}px`, // Added new CSS variable
           } as any}
         />
       ))}
@@ -504,27 +487,24 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </div>
       )}
 
-      {/* Main Results Card Container - Reduced pb-12 to pb-6 */}
+      {/* Main Results Card Container */}
       <div className="relative z-10 w-full max-w-lg mx-auto pb-6 sm:pb-0">
-        <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl
-         border-2 border-slate-700/50 shadow-2xl animate-scale-in">
+        <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in">
           
-          {/* Close Button - No Change */}
+          {/* Close Button */}
           <Link
             to={"/"}
-            // Combines the required red background, rounded shape, size, and centering
-            className="absolute top-3 right-3 z-20 h-8 w-8 bg-red-600 hover:bg-red-700 
-                       rounded-full transition-colors flex items-center justify-center shadow-lg"
-            onClick={onClose} // Keep the onClose functionality if it's needed for state cleanup
+            className="absolute top-3 right-3 z-20 h-8 w-8 bg-red-600 hover:bg-red-700 rounded-full transition-colors flex items-center justify-center shadow-lg"
+            onClick={onClose}
             aria-label="Close Results and go to Categories"
           >
             <X className="h-5 w-5 text-white" />
           </Link>
           
-          {/* Content Wrapper - Reduced p-5 to p-4, p-8 to p-6, space-y-5 to space-y-4, space-y-6 to space-y-5 */}
+          {/* Content Wrapper */}
           <div className="relative z-10 p-4 sm:p-6 space-y-4 sm:space-y-5">
             
-            {/* Header - Reduced text-2xl to text-xl, text-3xl to text-2xl */}
+            {/* Header */}
             <div className="text-center space-y-2 sm:space-y-3 animate-fade-in-up">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-700/40 border border-slate-600/30 mb-1">
                 <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
@@ -537,14 +517,12 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
             {/* Center Content - Points Earned or Results */}
             {showPointsCenter ? (
-              // IMPORTANT: The ref for the start point of the tokens
-              // Reduced py-8 to py-4, py-12 to py-8, text-6xl to text-5xl, text-7xl to text-6xl
               <div ref={earnedPointsRef} className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in">
-                <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-yellow-500/50">
+                <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-yellow-500/50 animate-pulse-glow">
                   <Trophy className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
-                  <div className="text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent tabular-nums">
+                  <div className="text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
                     +{animatedKnowledge}
                   </div>
                   <div className="text-yellow-400/80 font-bold text-sm sm:text-base mt-1 sm:mt-2">
@@ -553,11 +531,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 </div>
               </div>
             ) : (
-              // Use slightly reduced vertical spacing for compact mobile view - Reduced space-y-4 to space-y-3, space-y-6 to space-y-4
               <div className="space-y-3 sm:space-y-4 animate-fade-in">
-                {/* Results Grid - Reduced gap-3 to gap-2, gap-4 to gap-3 */}
+                {/* Results Grid */}
                 <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                  {/* Correct/Incorrect - Reduced p-4 to p-3, p-5 to p-4, text-2xl to text-xl, text-3xl to text-2xl */}
+                  {/* Correct/Incorrect */}
                   <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4">
                     <div className="text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-2">Result</div>
                     <div className="space-y-2 sm:space-y-2">
@@ -578,30 +555,29 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                     </div>
                   </Card>
 
-                  {/* Accuracy Circle (Scaled Down for Mobile) - Reduced p-4 to p-3, p-5 to p-4 */}
+                  {/* Accuracy Circle */}
                   <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4 flex items-center justify-center">
                     <div className="text-center">
                       <div className="relative inline-block mb-2">
-                        {/* Further reduced SVG size: w-14 h-14 (56px) for mobile, w-18 h-18 (72px) for sm+ */}
                         <svg className="w-14 h-14 sm:w-18 sm:h-18 transform -rotate-90">
                           <circle
-                            cx="28" // Adjusted center x
-                            cy="28" // Adjusted center y
-                            r="24"  // Adjusted radius
+                            cx="28"
+                            cy="28"
+                            r="24"
                             stroke="currentColor"
                             className="text-slate-700"
-                            strokeWidth="6" // Reduced stroke width
+                            strokeWidth="6"
                             fill="none"
                           />
                           <circle
-                            cx="28" // Adjusted center x
-                            cy="28" // Adjusted center y
-                            r="24"  // Adjusted radius
+                            cx="28"
+                            cy="28"
+                            r="24"
                             stroke="url(#accuracyGradient)"
-                            strokeWidth="6" // Reduced stroke width
+                            strokeWidth="6"
                             fill="none"
-                            strokeDasharray={`${2 * Math.PI * 24}`} // Updated dash array calculation
-                            strokeDashoffset={`${2 * Math.PI * 24 * (1 - animatedScore / 100)}`} // Updated dash offset calculation
+                            strokeDasharray={`${2 * Math.PI * 24}`}
+                            strokeDashoffset={`${2 * Math.PI * 24 * (1 - animatedScore / 100)}`}
                             strokeLinecap="round"
                             className="transition-all duration-1000"
                           />
@@ -612,7 +588,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                             </linearGradient>
                           </defs>
                         </svg>
-                        {/* Adjusting the center number position based on the smaller SVG size - text-xl to text-lg, text-2xl to text-xl */}
                         <div className="absolute inset-0 flex items-center justify-center">
                           <span className="text-lg sm:text-xl font-black text-slate-100">{animatedScore}%</span>
                         </div>
@@ -623,7 +598,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   </Card>
                 </div>
 
-                {/* Level Badge - Reduced p-3 to p-2, h-6 w-6 to h-5 w-5, h-8 w-8 to h-6 w-6, text-2xl to text-xl, text-3xl to text-2xl */}
+                {/* Level Badge */}
                 <div className="flex items-center justify-center gap-3 sm:gap-4 p-2 bg-slate-800/40 border border-slate-700/50 rounded-xl">
                   <Crown className="h-5 w-5 sm:h-6 text-purple-400" />
                   <div className="flex flex-row gap-3 items-center">
@@ -637,7 +612,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   )}
                 </div>
 
-                {/* Rating - Reduced p-3 to p-2, p-4 to p-3 */}
+                {/* Rating */}
                 <Card className="bg-slate-800/40 border border-slate-700/50 p-2 sm:p-3">
                   <div className="flex items-center justify-between mb-1">
                     <div className="text-xs font-bold text-slate-500 uppercase">
@@ -657,7 +632,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                           }`}
                         >
                           <StarIcon
-                            className={`h-4 w-4 transition-all ${ // Reduced h-4 w-4 to h-3 w-3 (reverted to h-4 w-4 as it's the smaller of the original options)
+                            className={`h-4 w-4 transition-all ${
                               star <= (hoveredRating || rating)
                                 ? "fill-yellow-400 text-yellow-400"
                                 : "text-slate-600 hover:text-yellow-400/60"
@@ -676,12 +651,12 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   )}
                 </Card>
 
-                {/* Next Quiz Button - Reduced h-12 to h-11, h-14 to h-12, text-base to text-sm, text-lg to text-base */}
+                {/* Next Quiz Button */}
                 <Button
                   onClick={handleNextQuiz}
                   disabled={playButtonLoading}
                   size="lg"
-                  className="w-full h-11 sm:h-12 text-sm sm:text-base font-black text-white shadow-lg  transition-all duration-300 hover:scale-[1.02]"
+                  className="w-full h-11 sm:h-12 text-sm sm:text-base font-black text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
                 >
                   {playButtonLoading ? "LOADING..." : "NEXT QUIZ"}
                 </Button>
@@ -741,55 +716,128 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           100% { transform: scale(1.2); opacity: 1; }
         }
         
-        /* Flying Token Animation */
+        @keyframes pulse-glow {
+          0%, 100% { 
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+            transform: scale(1);
+          }
+          50% { 
+            box-shadow: 0 0 40px rgba(251, 191, 36, 0.8);
+            transform: scale(1.05);
+          }
+        }
+        
+        @keyframes number-grow {
+          0% { 
+            transform: scale(0.5);
+            opacity: 0;
+          }
+          60% { 
+            transform: scale(1.1);
+          }
+          100% { 
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+        
+        .animate-pulse-glow {
+          animation: pulse-glow 2s ease-in-out infinite;
+        }
+        
+        .animate-number-grow {
+          animation: number-grow 0.8s ease-out forwards;
+        }
+        
+        /* Enhanced Flying Token Animation - Straight path to knowledge points */
         .token {
           position: fixed;
-          width: 16px;
-          height: 16px;
+          width: 20px;
+          height: 20px;
           border-radius: 50%;
-          background: radial-gradient(circle at 35% 35%, #FFF, #FCD34D 35%, #F59E0B 65%, #D97706);
-          box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.5), 0 10px 25px rgba(0, 0, 0, 0.35);
+          background: radial-gradient(circle at 30% 30%, #FFF 0%, #FCD34D 25%, #F59E0B 50%, #D97706 75%);
+          box-shadow: 
+            0 0 0 3px rgba(251, 191, 36, 0.4),
+            0 0 20px rgba(251, 191, 36, 0.6),
+            0 10px 30px rgba(0, 0, 0, 0.4);
           z-index: 60;
           opacity: 0;
           pointer-events: none;
-          /* Pass offsets via style prop in component */
-          animation: fly-token 900ms cubic-bezier(0.17, 0.67, 0.29, 1.01) var(--token-delay, 0ms) forwards;
+          animation: fly-token-direct 1200ms cubic-bezier(0.25, 0.46, 0.45, 0.94) var(--token-delay, 0ms) forwards;
         }
         
-        @keyframes fly-token {
+        .token::before {
+          content: '';
+          position: absolute;
+          inset: 2px;
+          border-radius: 50%;
+          background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8), transparent 60%);
+          opacity: 0.6;
+        }
+        
+        .token::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          background: inherit;
+          filter: blur(8px);
+          opacity: 0.5;
+          z-index: -1;
+        }
+        
+       @keyframes fly-token-direct {
           0% {
             opacity: 0;
-            /* Use the new random offsets for a slight scatter start */
-            transform: translate(
-              calc(var(--token-start-x, 50vw) - 8px + var(--token-offset-x, 0px)),
-              calc(var(--token-start-y, 50vh) - 8px + var(--token-offset-y, 0px))
-            ) scale(0.5);
+            left: var(--token-start-x, 50vw);
+            top: var(--token-start-y, 50vh);
+            transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
           }
+          
+          10% {
+            opacity: 1;
+            left: var(--token-start-x, 50vw);
+            top: var(--token-start-y, 50vh);
+            transform: translate(-50%, -50%) scale(1.2) rotate(180deg);
+          }
+          
           15% {
-            opacity: 1;
-            /* Keep the slight scatter for the initial pop */
-            transform: translate(
-              calc(var(--token-start-x, 50vw) - 8px + var(--token-offset-x, 0px)),
-              calc(var(--token-start-y, 50vh) - 8px + var(--token-offset-y, 0px))
-            ) scale(1.1);
+            left: var(--token-start-x, 50vw);
+            top: var(--token-start-y, 50vh);
+            transform: translate(-50%, -50%) scale(1) rotate(180deg);
           }
+          
           85% {
-            transform: translate(
-              /* Target the final X/Y position directly */
-              calc(var(--token-end-x, 50vw) - 8px),
-              calc(var(--token-end-y, 50vh) - 8px)
-            ) scale(0.6);
             opacity: 1;
+            left: var(--token-end-x, 50vw);
+            top: var(--token-end-y, 50vh);
+            transform: translate(-50%, -50%) scale(0.8) rotate(900deg);
           }
+          
+          95% {
+            opacity: 0.8;
+            left: var(--token-end-x, 50vw);
+            top: var(--token-end-y, 50vh);
+            transform: translate(-50%, -50%) scale(1.3) rotate(1080deg);
+          }
+          
           100% {
-            transform: translate(
-              /* Target the final X/Y position directly */
-              calc(var(--token-end-x, 50vw) - 8px),
-              calc(var(--token-end-y, 50vh) - 8px)
-            ) scale(0.1);
             opacity: 0;
+            left: var(--token-end-x, 50vw);
+            top: var(--token-end-y, 50vh);
+            transform: translate(-50%, -50%) scale(0.1) rotate(1080deg);
           }
         }
+        
+        .animate-fade-in-down { animation: fade-in-down 0.6s ease-out; }
+        .animate-scale-in { animation: scale-in 0.5s ease-out; }
+        .animate-fade-in-up { animation: fade-in-up 0.6s ease-out; }
+        .animate-pop-in { animation: pop-in 0.6s ease-out; }
+        .animate-fade-in { animation: fade-in 0.5s ease-out; }
+        .animate-level-up-popup { animation: level-up-popup 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+        .animate-crown-bounce { animation: crown-bounce 2s ease-in-out infinite; }
+        .animate-text-glow { animation: text-glow 2s ease-in-out infinite; }
+        .animate-scale-up { animation: scale-up 0.5s ease-out forwards; }
       `}</style>
     </div>
   );
