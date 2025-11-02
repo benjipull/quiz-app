@@ -2,8 +2,8 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Categories</title>
   <style>
     body {
@@ -47,6 +47,7 @@
       color: #a0a0a0;
       font-weight: 600;
       border-bottom: 1px solid #333;
+      cursor: pointer;
     }
 
     tr {
@@ -67,12 +68,38 @@
       color: #66ff88;
     }
 
+    .duplicate-yes {
+      color: #ffcc00;
+      font-weight: bold;
+    }
+
+    .duplicate-no {
+      color: #66ff88;
+    }
+
     .category-row {
       cursor: pointer;
     }
 
     .category-row:hover {
       background: #2f2f2f;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1rem;
+      color: #66aaff;
+      text-decoration: none;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    #status {
+      text-align: center;
+      margin-bottom: 1rem;
+      color: #aaa;
     }
   </style>
 </head>
@@ -81,6 +108,7 @@
   <a href="/admin/pages/admin-landing.html" class="back-link">← Back to Admin Home</a>
   <h1>📋 Category Overview</h1>
   <div id="status" class="loading">Loading categories...</div>
+
   <div class="table-container">
     <table id="categoryTable" style="display: none;">
       <thead>
@@ -91,6 +119,7 @@
           <th data-key="disabled">Disabled ⬍</th>
           <th data-key="averageRating">Average Rating ⬍</th>
           <th data-key="completionCount"># Completions ⬍</th>
+          <th data-key="hasDuplicate">Duplicates ⬍</th>
           <th data-key="createdAt">Created ⬍</th>
         </tr>
       </thead>
@@ -98,8 +127,6 @@
       <tbody id="categoryTableBody"></tbody>
     </table>
   </div>
-
-  <tbody id="categoryTableBody"></tbody>
 
   <script>
     const token = localStorage.getItem("token");
@@ -114,15 +141,14 @@
     async function fetchCategories() {
       const statusEl = document.getElementById("status");
       const table = document.getElementById("categoryTable");
-      const tbody = document.getElementById("categoryTableBody");
 
       try {
         const res = await fetch("/api/admin/categories", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
-        categories = await res.json();
 
+        categories = await res.json();
         statusEl.style.display = "none";
         table.style.display = "table";
         renderTable();
@@ -133,24 +159,35 @@
 
     function renderTable() {
       const tbody = document.getElementById("categoryTableBody");
-      const sorted = [...categories].sort((a, b) => compareValues(a, b, sortState.key, sortState.asc));
+      const sorted = [...categories].sort((a, b) =>
+        compareValues(a, b, sortState.key, sortState.asc)
+      );
 
-      tbody.innerHTML = sorted.map(cat => `
-    <tr class="category-row" data-id="${cat._id}">
-      <td>${cat.name}</td>
-      <td>${cat.questionCount ?? 0}</td>
-      <td>${cat.createdBy?.alias || cat.createdBy?.email || "—"}</td>
-      <td class="${cat.disabled ? 'disabled' : 'enabled'}">
-        ${cat.disabled ? "❌" : "✅"}
-      </td>
-      <td>${cat.averageRating?.toFixed?.(1) ?? "—"}</td>
-      <td>${cat.completionCount ?? 0}</td>
-      <td>${new Date(cat.createdAt).toLocaleDateString()}</td>
-    </tr>
-  `).join("");
+      tbody.innerHTML = sorted
+        .map((cat) => {
+          // ✅ Safely handle both `hasDuplicate` and `hasDuplicates` (future-proof)
+          const hasDup = cat.hasDuplicate ?? cat.hasDuplicates ?? false;
+
+          return `
+          <tr class="category-row" data-id="${cat._id}">
+            <td>${cat.name}</td>
+            <td>${cat.questionCount ?? 0}</td>
+            <td>${cat.createdBy?.alias || cat.createdBy?.email || "—"}</td>
+            <td class="${cat.disabled ? "disabled" : "enabled"}">
+              ${cat.disabled ? "❌" : "✅"}
+            </td>
+            <td>${cat.averageRating?.toFixed?.(1) ?? "—"}</td>
+            <td>${cat.completionCount ?? 0}</td>
+            <td class="${hasDup ? "duplicate-yes" : "duplicate-no"}">
+              ${hasDup ? "⚠️ Yes" : "✅ No"}
+            </td>
+            <td>${new Date(cat.createdAt).toLocaleDateString()}</td>
+          </tr>`;
+        })
+        .join("");
 
       // row click navigation
-      document.querySelectorAll(".category-row").forEach(row => {
+      document.querySelectorAll(".category-row").forEach((row) => {
         row.addEventListener("click", () => {
           const id = row.getAttribute("data-id");
           window.location.href = `/admin/pages/admin-category-questions.html?id=${id}`;
@@ -158,21 +195,23 @@
       });
     }
 
-    // 🔢 numeric vs string comparison
     function compareValues(a, b, key, asc) {
       let valA = a[key];
       let valB = b[key];
 
-      // nested keys (like createdBy)
       if (key === "createdBy") {
         valA = a.createdBy?.alias || a.createdBy?.email || "";
         valB = b.createdBy?.alias || b.createdBy?.email || "";
       }
 
-      // date handling
       if (key === "createdAt") {
         valA = new Date(valA).getTime();
         valB = new Date(valB).getTime();
+      }
+
+      // boolean sorting (true > false)
+      if (typeof valA === "boolean" && typeof valB === "boolean") {
+        return asc ? valA - valB : valB - valA;
       }
 
       const numA = parseFloat(valA);
@@ -183,16 +222,17 @@
       if (bothNumeric) {
         comparison = numA - numB;
       } else {
-        comparison = String(valA).localeCompare(String(valB), undefined, { sensitivity: "base" });
+        comparison = String(valA).localeCompare(String(valB), undefined, {
+          sensitivity: "base",
+        });
       }
       return asc ? comparison : -comparison;
     }
 
-    // add click sorting on header
     document.addEventListener("DOMContentLoaded", () => {
       fetchCategories();
 
-      document.querySelectorAll("th[data-key]").forEach(th => {
+      document.querySelectorAll("th[data-key]").forEach((th) => {
         th.addEventListener("click", () => {
           const key = th.dataset.key;
           if (sortState.key === key) {
@@ -206,8 +246,6 @@
       });
     });
   </script>
-
-
 </body>
 
 </html>

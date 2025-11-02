@@ -26,7 +26,7 @@ const DuplicateSchema = new mongoose.Schema({
 
 
 const QuestionSchema = new mongoose.Schema({
-    _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
+    _id: { type: mongoose.Schema.Types.ObjectId, auto: true },  
     text: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
 

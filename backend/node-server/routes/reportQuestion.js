@@ -25,6 +25,7 @@ router.post("/", authenticateToken, async (req, res) => {
       "ambiguous_wording",
       "duplicate_question",
       "offensive_content",
+      "multiple_correct_answers",
       "other",
     ];
     

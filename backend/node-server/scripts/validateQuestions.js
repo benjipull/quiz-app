@@ -5,42 +5,57 @@ const Category = require("../models/categoryModel");
 const connectDB = require("../config/db");
 
 const OLLAMA_URL = process.env.OLLAMA_URL;
-const CURRENT_VALIDATION_VERSION = 0.05;
+const CURRENT_VALIDATION_VERSION = 0.06;
 
 async function validateQuestion(question) {
   const prompt = `
-You are a *formal trivia question validator*.  
-Your job is to determine whether this question has **exactly one uniquely correct answer**.
+You are a *formal trivia question validator*.
+
+Your task is to determine if a trivia question’s "correct answer" and "explanation" are **factual, self-consistent, and unambiguous**.
 
 ---
 
-### STEP 1. Identify linguistic vagueness
-If the question contains phrases such as:
-- "a key", "a main", "one of", "commonly used", "an example of", "typically", or "usually"
-→ These imply that *multiple answers* might be correct.  
-If any such phrase appears **and** more than one listed answer fits the description, mark it as **Ambiguous**.
+## 1️⃣ FACT CHECK
+- Evaluate whether the provided "correct answer" (A_correct) matches real-world knowledge.
+- If it is factually false, mark **Incorrect**.
 
-### STEP 2. Test all options logically
-For each provided answer:
-- Ask: “Could this reasonably be considered correct or partially correct according to common factual knowledge?”
-- Count how many are valid.
-  - If more than one answer could be considered correct, list them under "other_answers_possible" and classify as **Ambiguous**.
-  - If the marked correct answer is factually wrong, classify as **Incorrect**.
-  - If exactly one answer fits perfectly and others clearly do not, classify as **Correct**.
-
-### STEP 3. Examine the explanation
-- If the explanation lists *multiple items* that align with different answer options (e.g., "made with cream, sugar, and eggs"), this implies multiple answers could be right → **Ambiguous**.
-- If the explanation does not directly justify the correct answer or is too broad, also **Ambiguous**.
-- If the explanation contradicts the correct answer, **Incorrect**.
-
-### STEP 4. Decide final verdict
-- "Correct": one unique valid answer, well-justified.
-- "Ambiguous": multiple plausible answers, vague wording, or multi-item explanation.
-- "Incorrect": correct_answer is factually wrong.
+Example:
+Q: What is the average number of lives a cat has?
+A_correct: 3
+Explanation: "Cats have nine lives..."
+→ Verdict: Incorrect — explanation and factual knowledge contradict the given correct answer.
 
 ---
 
-Return STRICT JSON ONLY:
+## 2️⃣ INTERNAL CONSISTENCY
+Compare the explanation and the correct answer:
+- If the explanation **disagrees** with the answer → "Incorrect"
+- If the explanation **does not clearly justify** the correct answer → "Ambiguous"
+- If the explanation **directly supports** the correct answer → continue
+
+---
+
+## 3️⃣ MULTIPLE VALID ANSWERS
+- If the question allows for more than one possible valid answer, mark **Ambiguous**
+(e.g., contains words like “a”, “one of”, “commonly”, “typically”, etc.)
+
+---
+
+## 4️⃣ FINAL DECISION RULES
+| Case | Verdict | Description |
+|------|----------|--------------|
+| Factual answer wrong | Incorrect | The “correct answer” is not factually true |
+| Explanation contradicts answer | Incorrect | Internal mismatch |
+| Multiple plausible answers | Ambiguous | More than one possible correct answer |
+| Explanation vague or partial | Ambiguous | Not well-justified |
+| Everything aligns factually and logically | Correct | ✅ Only one clear, factual answer |
+
+---
+
+Return ONLY valid JSON that starts with { and ends with } — no markdown, no explanations.
+
+No markdown, no prose, no code fences.
+
 {
   "is_correct_answer_valid": true|false,
   "correct_answer_reasoning": "<why correct or not>",
@@ -54,35 +69,75 @@ Question: ${question.text}
 Answers: ${question.answers.map(a => a.text).join(", ")}
 Correct Answer: ${question.correct_answer}
 Explanation: ${question.explanation || "N/A"}
-  `.trim();
+`.trim();
 
-  try {
-    const response = await axios.post(OLLAMA_URL, {
+  async function queryOllama() {
+    const res = await axios.post(OLLAMA_URL, {
       model: "llama3",
       prompt,
       options: {
-        num_ctx: 4096,
         temperature: 0.0,
-        top_p: 1.0,
-        top_k: 0,
-        repeat_penalty: 1.1,
-        repeat_last_n: 64,
-        num_predict: 600
+        top_p: 0.85,
+        top_k: 30,
+        num_ctx: 2048,
+        num_predict: 400,
+        repeat_penalty: 1.15,
       },
-      stream: false
+      stream: false,
     });
+    return res.data?.response || "";
+  }
 
-    const raw = response.data.response.trim();
-    const parsed = JSON.parse(raw);
+  function extractJson(text) {
+    if (!text) return null;
 
-    if (
-      parsed.is_correct_answer_valid === undefined ||
-      !parsed.correct_answer_reasoning ||
-      parsed.explanation_consistent === undefined ||
-      !parsed.explanation_reasoning ||
-      !parsed.final_verdict
-    ) {
+    // Remove common wrappers
+    let clean = text
+      .replace(/```json/gi, "")
+      .replace(/```/g, "")
+      .replace(/^Here.*?:/i, "")
+      .trim();
+
+    // Find the first {...} JSON block
+    const match = clean.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+
+    try {
+      return JSON.parse(match[0]);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  try {
+    let raw = (await queryOllama()).trim();
+    let parsed = extractJson(raw);
+
+    // 🔁 One retry if invalid JSON
+    if (!parsed) {
+      console.warn("⚠️ Retrying due to invalid JSON for:", question._id);
+      await new Promise(r => setTimeout(r, 1000));
+      raw = (await queryOllama()).trim();
+      parsed = extractJson(raw);
+    }
+
+    if (!parsed) {
+      console.error("❌ Still invalid JSON after retry. Raw snippet:", raw.slice(0, 400));
       throw new Error("Invalid response format");
+    }
+
+    // ✅ Structural validation
+    const requiredFields = [
+      "is_correct_answer_valid",
+      "correct_answer_reasoning",
+      "explanation_consistent",
+      "explanation_reasoning",
+      "final_verdict",
+    ];
+    for (const field of requiredFields) {
+      if (parsed[field] === undefined || parsed[field] === null) {
+        throw new Error(`Missing field: ${field}`);
+      }
     }
 
     return parsed;
@@ -91,6 +146,7 @@ Explanation: ${question.explanation || "N/A"}
     return null;
   }
 }
+
 
 async function validateAllCategories() {
   try {
