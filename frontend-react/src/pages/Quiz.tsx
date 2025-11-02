@@ -1079,11 +1079,11 @@ export default function Quiz() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="text-sm flex-1 max-w-[120px] h-10 border-0"
+                          className="text-sm flex-1 max-w-[120px] h-10 border-0 hover:bg-blue-600"
                           onClick={() => setShowReportDialog(true)}
                         >
-                          <Flag className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
-                          <span className="ml-1 sm:inline text-blue-600">Report</span>
+                          <Flag className="h-4 w-4 md:h-5 md:w-5 text-blue-600  hover:text-white" />
+                          <span className="ml-1 sm:inline text-blue-600  hover:text-white">Report</span>
                         </Button>
                       </div>
                     </div>
