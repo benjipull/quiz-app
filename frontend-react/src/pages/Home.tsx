@@ -1,29 +1,29 @@
 // Home.tsx
-
-"use client";
-
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { CategoryCard } from "@/components/quiz/CategoryCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import ReactGA from "react-ga4";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 import {
   Brain,
   Plus,
   AlertTriangle,
-  Zap, // Added back for completeness if needed elsewhere
-  TrendingUp, // Added back for completeness if needed elsewhere
-  Award, // Added back for completeness if needed elsewhere
-  Clock, // Added back for completeness if needed elsewhere
+  Zap,
+  TrendingUp,
+  Award,
+  Clock,
 } from "lucide-react";
 import logo from "../assets/images/QuizicleLogo.png";
 import SplashScreen from "../components/SplashScreen";
 import GameStatsHeader from "../components/GameStatsHeader";
 import AddCategory from "@/components/AddCategory";
 import { useToast } from "@/hooks/use-toast";
+
+// ⬅️ CRITICAL: Import the apiClient utility
+import { apiClient } from "@/utils/apiClient"; 
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
@@ -56,13 +56,12 @@ interface CategoryToPlayResponse {
   questionsCount: number;
 }
 
-// CRITICAL: Ensure playerType is now userType across the interface
 interface UserDetails {
   _id: string;
   alias: string;
   level: number;
   avatar: number;
-  userType?: "Guest" | "Registered" | "Admin"; // Changed from playerType
+  userType?: "Guest" | "Registered" | "Admin";
 }
 
 export default function Home() {
@@ -73,18 +72,16 @@ export default function Home() {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
-  // Use UserDetails type
   const [userProfile, setUserProfile] = useState<UserDetails | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [userLevel, setUserLevel] = useState(1);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
 
-  // State for AddCategory logic is now ONLY based on isGuest
-  // Removed showAddCategory state as the logic is now handled by the AddCategory component itself.
-
   const [isGuest, setIsGuest] = useState(false);
 
   const navigate = useNavigate();
+  // We no longer need userToken here as apiClient manages the header/token 
+  // but keep it for guest logic checks if you prefer.
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
   const { toast, dismiss } = useToast();
 
@@ -93,7 +90,7 @@ export default function Home() {
     const initializeApp = async () => {
       const hasShownSplash = typeof window !== 'undefined' ? sessionStorage.getItem("splashShown") : null;
       const shouldShowSplash = !hasShownSplash;
-
+      
       if (shouldShowSplash) {
         setShowSplash(true);
         if (typeof window !== 'undefined') {
@@ -119,14 +116,6 @@ export default function Home() {
         } else {
           setLoading(false);
         }
-
-        ReactGA.event({
-          category: "engagement",
-          action: "home_shown",
-          label: isGuest ? "Guest" : "Registered",
-          value: isSmallScreen ? 1 : 0, // e.g. 1 = mobile, 0 = desktop
-        });
-
       } catch (err) {
         console.error("Init error:", err);
         setLoading(false);
@@ -141,26 +130,25 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // Only fetch categories if userProfile is loaded AND we have a token (to prevent fetching for the generic 'Guest' in a token-less state)
+    // Only fetch categories if userProfile is loaded AND we have a token 
     if (userProfile && userToken) {
       fetchUserCategories();
     }
   }, [userProfile, userToken]);
 
   // ----------------------------------------------------------------
-  // REVISED loadUserProfile for 'userType'
+  // REVISED loadUserProfile to use apiClient
   // ----------------------------------------------------------------
   const loadUserProfile = async () => {
     if (!userToken) {
-      // Fallback to local storage for a token-less user (likely Guest)
+      // Logic for token-less users (Guests) remains the same
       const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
       if (storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
-          // Check guest status from local storage fallback (using userType)
-          setIsGuest(parsedUser.userType === 'Guest');
+          setIsGuest(parsedUser.userType === 'Guest'); 
         } catch (e) {
           console.error("Failed to parse local user data:", e);
         }
@@ -170,26 +158,30 @@ export default function Home() {
       }
       return;
     }
-
+    
     try {
-      const response = await fetch(`${BASE_URL}/api/getUserDetails`, {
+      // ⬅️ Use apiClient for /api/getUserDetails
+      const response = await apiClient(`${BASE_URL}/api/getUserDetails`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${userToken}`,
-          "Content-Type": "application/json",
-        },
+        // The Authorization header is now handled inside apiClient
       });
 
+      // ⬅️ Check if response is undefined (401 handled by apiClient)
+      if (!response) {
+        // If apiClient redirects on 401, this function halts.
+        // On a token-based 401, the user is redirected, so we just exit.
+        return; 
+      }
+      
       if (!response.ok) {
-        // Fallback to local storage on API failure
-        console.warn(`Failed to fetch user details. Falling back to local storage.`);
+        // Handle other non-401 non-ok responses
+        console.warn(`Failed to fetch user details (Status: ${response.status}). Falling back to local storage.`);
         const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
-          // Check guest status from local storage fallback (using userType)
-          setIsGuest(parsedUser.userType === 'Guest');
+          setIsGuest(parsedUser.userType === 'Guest'); 
         }
         return;
       }
@@ -199,64 +191,66 @@ export default function Home() {
       // 1. Update State with fresh API data
       setUserProfile(apiUser);
       setUserLevel(apiUser.level || 1);
-
-      // Update Guest status (using userType)
       setIsGuest(apiUser.userType === 'Guest');
 
       // 2. Update Avatar
       const avatarIndex = apiUser.avatar ? apiUser.avatar - 1 : 0;
       const calculatedAvatar = avatars[avatarIndex] || null;
       setUserAvatar(calculatedAvatar);
-
-      // 3. Update local storage with fresh data, using userType
+      
+      // 3. Update local storage with fresh data
       if (typeof window !== 'undefined') {
-        const userToStore = {
-          ...apiUser,
-          level: apiUser.level || 1,
-          userType: apiUser.userType || 'Registered' // Ensure userType is stored
+        const userToStore = { 
+            ...apiUser, 
+            level: apiUser.level || 1, 
+            userType: apiUser.userType || 'Registered' 
         };
         localStorage.setItem("user", JSON.stringify(userToStore));
-        if (calculatedAvatar) {
-          localStorage.setItem("userAvatar", calculatedAvatar);
+        if(calculatedAvatar) {
+           localStorage.setItem("userAvatar", calculatedAvatar);
         }
       }
 
     } catch (error) {
-
-      ReactGA.event({
-        category: "API Error",
-        action: "fetch_failed",
-        label: "getUserDetails",
-      });
-
       console.error("Error fetching user details from API:", error);
-      // Even on fetch error, try to load from local storage
+      // Fallback to local storage on general fetch error
       const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
       if (storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
-          // Check guest status from local storage fallback (using userType)
-          setIsGuest(parsedUser.userType === 'Guest');
+          setIsGuest(parsedUser.userType === 'Guest'); 
         } catch (e) {
-          console.error("Failed to parse local user data on API error:", e);
+            console.error("Failed to parse local user data on API error:", e);
         }
       }
     }
   };
 
 
+  // ----------------------------------------------------------------
+  // REVISED fetchUserCategories to use apiClient
+  // ----------------------------------------------------------------
   const fetchUserCategories = async () => {
     setCategoriesLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE_URL}/api/getUserCategories`, {
+      // ⬅️ Use apiClient for /api/getUserCategories
+      const response = await apiClient(`${BASE_URL}/api/getUserCategories`, {
         method: "GET",
-        headers: { Authorization: `Bearer ${userToken}` },
+        // The Authorization header is now handled inside apiClient
       });
-      if (!res.ok) throw new Error(`Failed: ${res.status}`);
-      const data = await res.json();
+
+      // ⬅️ Check if response is undefined (401 handled by apiClient)
+      if (!response) {
+        setCategoriesLoading(false);
+        return; 
+      }
+      
+      if (!response.ok) throw new Error(`Failed: ${response.status}`);
+      
+      const data = await response.json();
       const transformed: Category[] = data.map((c: any, i: number) => ({
         _id: c._id,
         name: c.name,
@@ -287,6 +281,9 @@ export default function Home() {
     navigate(`/quiz/${categoryId}`);
   };
 
+  // ----------------------------------------------------------------
+  // REVISED handleQuickQuiz to use apiClient
+  // ----------------------------------------------------------------
   const handleQuickQuiz = async () => {
     if (!userToken) {
       console.log("⚠️ You must be logged in to play.");
@@ -296,13 +293,17 @@ export default function Home() {
     setPlayButtonLoading(true);
 
     try {
-      const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay`, {
+      // ⬅️ Use apiClient for /api/getGetegoryToPlay
+      const response = await apiClient(`${BASE_URL}/api/getGetegoryToPlay`, {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userToken}`,
-        },
+        // The Authorization header is now handled inside apiClient
       });
+
+      // ⬅️ Check if response is undefined (401 handled by apiClient)
+      if (!response) {
+        setPlayButtonLoading(false);
+        return; 
+      }
 
       if (!response.ok) {
         throw new Error(`Failed to get category to play: ${response.status}`);
@@ -329,7 +330,6 @@ export default function Home() {
 
 
   // UNIFIED HANDLER: Handles all category creation attempts (both buttons)
-  // CRITICAL FIX: Only handles the GUEST requirement, as the AddCategory component handles the modal open.
   const handleCreateCategoryAttempt = () => {
     if (isGuest) {
       // Show the registration toast for Guest users
@@ -365,8 +365,6 @@ export default function Home() {
     // by opening its internal modal via handleMainButtonClick.
   };
 
-  // REMOVE: handleCategoryCreated is no longer needed since showAddCategory state was removed.
-
   // Conditionally render the splash screen only on initial load
   if (showSplash) {
     return <SplashScreen dataLoaded={dataLoaded} />;
@@ -382,21 +380,24 @@ export default function Home() {
       <div className="mx-auto max-w-full space-y-4 px-4 pb-4 lg:px-8 lg:pb-8">
         <GameStatsHeader userToken={userToken} isParentLoading={loading} />
 
-        {/* Guest User Registration Panel */}
+        {/* Guest User Registration Panel - REDESIGNED */}
         {isGuest && (
-          <Card className="bg-purple-100 border-purple-400 text-purple-900 p-4 shadow-md flex items-start space-x-3">
-            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <div className="flex-grow">
-              <h4 className="font-semibold leading-snug">Don't lose your progress!</h4>
-              <p className="text-sm">
-                Complete your registration to secure your account and save all your quiz progress.
-              </p>
+          <Card 
+            className="bg-gradient-to-br from-background to-quiz-background border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white p-3 shadow-lg flex items-center justify-between space-x-3"
+          >
+            <div className="flex items-center space-x-3 flex-shrink-0">
+              <AlertTriangle className="w-5 h-5 text-red-500 dark:text-purple-400" /> 
             </div>
-            <Button
-              variant="outline"
-              size="sm"
+            
+            <p className="text-sm  text-white font-semibold leading-snug flex-grow">
+              Don't lose your progress
+            </p>
+            
+            <Button 
+              variant="default" 
+              size="sm" 
               onClick={() => navigate("/profile")}
-              className="bg-purple-500 hover:bg-purple-600 text-white border-purple-500 hover:border-purple-600 flex-shrink-0"
+              className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3 py-1 flex-shrink-0"
             >
               Register Now
             </Button>
@@ -424,7 +425,7 @@ export default function Home() {
           <Button
             onClick={handleQuickQuiz}
             disabled={loading || playButtonLoading}
-            className="w-full h-16 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-2xl disabled:opacity-50 flex items-center justify-between px-6 relative overflow-hidden shadow-lg"
+            className="w-full h-16 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-2xl disabled:opacity-50 flex items-center justify-between px-6 relative overflow-hidden shadow-lg" 
           >
             {playButtonLoading ? (
               <div className="flex items-center text-xl justify-center w-full">
@@ -485,7 +486,6 @@ export default function Home() {
               ))}
             </div>
           ) : userCategories.length === 0 ? (
-            // Show 'No quizzes yet' card. The creation button is now on the AddCategory component rendered below.
             <Card className="p-8 text-center">
               <div className="space-y-3">
                 <Brain className="h-12 w-12 mx-auto text-muted-foreground" />
@@ -493,11 +493,9 @@ export default function Home() {
                 <p className="text-sm text-muted-foreground">
                   Create your first quiz to get started
                 </p>
-                {/* The create button is removed from here and is now always in the AddCategory card below */}
               </div>
             </Card>
           ) : (
-            // Show categories list
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {userCategories.map((cat) => (
@@ -522,10 +520,10 @@ export default function Home() {
 
           {/* Add Category Section - Always show after quizzes or the empty state card */}
           <div className="mt-6">
-            <AddCategory
-              fetchCategories={fetchUserCategories}
-              isGuest={isGuest}
-              onRegistrationRequired={handleCreateCategoryAttempt}
+            <AddCategory 
+                fetchCategories={fetchUserCategories} 
+                isGuest={isGuest}
+                onRegistrationRequired={handleCreateCategoryAttempt}
             />
           </div>
         </div>
