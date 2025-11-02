@@ -1,77 +1,88 @@
 function buildDuplicatePrompt(q1, q2) {
   return `
-You are an expert trivia question deduplicator.
-
-Your job is to decide if two trivia questions are TRUE duplicates.
+You are an expert in trivia question deduplication. Your task is to decide if two questions are TRUE factual duplicates.
 
 ======================
-DEFINITION OF DUPLICATE
+STRICT DEFINITION
 ======================
-- Two questions are duplicates ONLY if they ask for **the same factual answer**.
-- Their correct answers (A1 and A2) must refer to **the exact same entity, number, or phrase**.
-- If their answers differ, they are NOT duplicates.
-- If one could appear separately in a trivia deck without redundancy, mark FALSE.
-- When uncertain, choose FALSE (be conservative).
+Two questions are TRUE duplicates **only if**:
+1. They ask for **the exact same factual answer**, not just a related one.
+2. Their correct answers (A1 and A2) are **identical in meaning**, referring to the *same specific entity, date, number, or phrase*.
+3. A correct response to one question would *100% answer the other* with no difference in detail or phrasing.
+
+If they differ in *focus, granularity, context, or framing*, they are **not duplicates**.
+
+======================
+CONSERVATIVE PRINCIPLES
+======================
+- Assume **not duplicates** unless identical in factual intent and answer.
+- Similar topic ≠ duplicate.
+- Same subject ≠ duplicate.
+- Paraphrased wording with *different factual targets* ≠ duplicate.
+- If unsure, choose **{"duplicate": false}**.
 
 ======================
 HOW TO THINK
 ======================
 Ask yourself:
-1. Would both answers be identical text?  
-2. Would a person who knows one automatically know the other?  
-3. Are they asking about the same *fact*, not just the same topic?  
-If any answer is “no”, they are NOT duplicates.
+1. Do both questions ask for the **same real-world fact**?
+2. Would both be answered with **exactly the same text** (not just same category)?
+3. Are both answers the **same unique concept** (same person, same year, same event, etc.)?
+If *any* answer is “no” → mark as **not duplicate**.
 
 ======================
-EXAMPLES (topic-agnostic)
+STRICT EXAMPLES
 ======================
-✅ Duplicates
+✅ Duplicates  
 Q1: What is the capital of France?  
 Q2: Which city is France's capital?  
 → {"duplicate": true, "reason": "Both ask for same city: Paris"}
 
-✅ Duplicates
+✅ Duplicates  
 Q1: Who discovered penicillin?  
 Q2: Who invented penicillin?  
-→ {"duplicate": true, "reason": "Both ask for same person: Alexander Fleming"}
+→ {"duplicate": true, "reason": "Same person: Alexander Fleming"}
 
-❌ Not duplicates
+❌ Not duplicates  
 Q1: Who painted the Mona Lisa?  
 Q2: When was the Mona Lisa painted?  
-→ {"duplicate": false, "reason": "Different factual targets: artist vs. year"}
+→ {"duplicate": false, "reason": "Different factual target: artist vs year"}
 
-❌ Not duplicates
+❌ Not duplicates  
 Q1: What is the capital of France?  
 Q2: What is the population of France?  
-→ {"duplicate": false, "reason": "Different property of same country"}
+→ {"duplicate": false, "reason": "Different property of same entity"}
 
-❌ Not duplicates
-Q1: What is the name of the film director who made Jaws?  
-Q2: What is the name of the film director who made Casablanca?  
-→ {"duplicate": false, "reason": "Different directors, same profession"}
+❌ Not duplicates  
+Q1: What is the name of the director who made Jaws?  
+Q2: What is the name of the director who made Casablanca?  
+→ {"duplicate": false, "reason": "Different directors"}
 
-======================
-INSTRUCTIONS
-======================
-- Focus on factual identity, not thematic similarity.
-- Ignore overlapping words like “film”, “city”, “step”, “ancient”.
-- Prefer FALSE unless both the intent and the answer are the same.
-- Return ONLY strict JSON.
+❌ Not duplicates  
+Q1: What is the largest ocean on Earth?  
+Q2: What is the deepest ocean trench?  
+→ {"duplicate": false, "reason": "Different factual type"}
 
 ======================
-EVALUATE
+EVALUATION RULES
 ======================
-Q1: ${q1.text}
+- Overlap in topic or wording alone is **not enough**.
+- Two questions about the same subject are not duplicates unless they ask for *the same fact*.
+- When in doubt, **say false**.
+- Be concise and objective.
+- Output must be **only valid JSON**.
+
+======================
+QUESTIONS TO EVALUATE
+======================
+Q1: ${q1.text}  
 A1: ${q1.correct_answer}
 
-Q2: ${q2.text}
+Q2: ${q2.text}  
 A2: ${q2.correct_answer}
 
-Respond ONLY with a single line of JSON:
-{"duplicate": true|false, "reason": "<10–20 words>"}
-
-Do not include any text before or after the JSON.
-
+Respond ONLY with:
+{"duplicate": true|false, "reason": "<short reason in 10–20 words>"}
 `.trim();
 }
 
