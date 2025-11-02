@@ -155,7 +155,8 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
             )}
 
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+              <Button variant="outline" className="text-red-500 border-red-600 hover:bg-red-600"
+               onClick={onClose} disabled={isSubmitting}>Cancel</Button>
               <Button
                 variant="default"
                 onClick={handleSubmit}
@@ -1063,7 +1064,7 @@ export default function Quiz() {
                           size="sm"
                           onClick={() => handleFeedback("down")}
                           disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 ${
+                          className={`text-sm flex-1 max-w-[120px] h-10 border-red-600 ${
                             feedbackType === "down"
                               ? "bg-destructive/20 border-destructive text-destructive hover:bg-destructive/20 hover:text-destructive"
                               : feedbackGiven
@@ -1071,8 +1072,8 @@ export default function Quiz() {
                                 : "hover:text-destructive"
                           }`}
                         >
-                          <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:ml-2">No</span>
+                          <ThumbsDown className="h-4 w-4 md:h-5 md:w-5 text-red-600" />
+                          <span className="ml-1 sm:ml-2 text-red-600">No</span>
                         </Button>
                         {/* UPDATED: Report Button onClick handler */}
                         <Button
@@ -1081,8 +1082,8 @@ export default function Quiz() {
                           className="text-sm flex-1 max-w-[120px] h-10 border-0"
                           onClick={() => setShowReportDialog(true)}
                         >
-                          <Flag className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:inline">Report</span>
+                          <Flag className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+                          <span className="ml-1 sm:inline text-blue-600">Report</span>
                         </Button>
                       </div>
                     </div>

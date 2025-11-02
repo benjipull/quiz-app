@@ -1,3 +1,4 @@
+// QuizResults.tsx
 import { useState, useEffect, useMemo, useRef } from "react";
 // Assuming you use react-router-dom for navigation:
 import { Link } from "react-router-dom"; 
@@ -121,7 +122,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [showPointsCenter, setShowPointsCenter] = useState(true);
   const [showFlyingTokens, setShowFlyingTokens] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
-  const [tokens, setTokens] = useState<Array<{id: number; delay: number}>>([]);
+  const [tokens, setTokens] = useState<Array<{id: number; delay: number; offsetX: number; offsetY: number}>>([]); // Added offsets
   
   const earnedPointsRef = useRef<HTMLDivElement>(null);
   const headerXPRef = useRef<HTMLDivElement>(null);
@@ -206,7 +207,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     const tokenCount = Math.min(12, Math.max(6, knowledgeGained / 10));
     const newTokens = Array.from({ length: Math.floor(tokenCount) }, (_, i) => ({
       id: i,
-      delay: 50 + i * 40
+      delay: 50 + i * 40,
+      // Calculate a small random offset for the start point to create scatter
+      offsetX: Math.random() * 10 - 5, // -5 to +5 pixels
+      offsetY: Math.random() * 10 - 5 
     }));
 
     setTokens(newTokens);
@@ -382,6 +386,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           </div>
 
            {/* Stat Item - XP - Reduced w-8 h-8 to w-7 h-7, w-10 h-10 to w-9 h-9, text-lg to text-base */}
+           {/* IMPORTANT: The ref for the destination of the tokens */}
            <div ref={headerXPRef} className="flex items-center gap-1 sm:gap-1.5">
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center">
               <svg
@@ -456,14 +461,15 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         />
       )}
 
-      {/* Flying Tokens */}
+      {/* Flying Tokens - Using the calculated offsets */}
       {showFlyingTokens && tokens.map((token) => (
         <div
           key={token.id}
           className="token"
           style={{
             '--token-delay': `${token.delay}ms`,
-            '--token-angle': `${(Math.PI * 2) * (token.id / tokens.length)}`,
+            '--token-offset-x': `${token.offsetX}px`, // Added new CSS variable
+            '--token-offset-y': `${token.offsetY}px`, // Added new CSS variable
           } as any}
         />
       ))}
@@ -531,6 +537,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
             {/* Center Content - Points Earned or Results */}
             {showPointsCenter ? (
+              // IMPORTANT: The ref for the start point of the tokens
               // Reduced py-8 to py-4, py-12 to py-8, text-6xl to text-5xl, text-7xl to text-6xl
               <div ref={earnedPointsRef} className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in">
                 <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-yellow-500/50">
@@ -674,7 +681,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   onClick={handleNextQuiz}
                   disabled={playButtonLoading}
                   size="lg"
-                  className="w-full h-11 sm:h-12 text-sm sm:text-base font-black bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-[1.02]"
+                  className="w-full h-11 sm:h-12 text-sm sm:text-base font-black text-white shadow-lg  transition-all duration-300 hover:scale-[1.02]"
                 >
                   {playButtonLoading ? "LOADING..." : "NEXT QUIZ"}
                 </Button>
@@ -684,7 +691,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </Card>
       </div>
 
-      {/* CSS Animations (No changes needed here) */}
+      {/* CSS Animations */}
       <style>{`
         @keyframes scale-in {
           0% { transform: scale(0.9); opacity: 0; }
@@ -745,26 +752,30 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           z-index: 60;
           opacity: 0;
           pointer-events: none;
+          /* Pass offsets via style prop in component */
           animation: fly-token 900ms cubic-bezier(0.17, 0.67, 0.29, 1.01) var(--token-delay, 0ms) forwards;
         }
         
         @keyframes fly-token {
           0% {
             opacity: 0;
+            /* Use the new random offsets for a slight scatter start */
             transform: translate(
-              calc(var(--token-start-x, 50vw) - 8px + cos(var(--token-angle, 0)) * 40px),
-              calc(var(--token-start-y, 50vh) - 8px + sin(var(--token-angle, 0)) * 40px)
+              calc(var(--token-start-x, 50vw) - 8px + var(--token-offset-x, 0px)),
+              calc(var(--token-start-y, 50vh) - 8px + var(--token-offset-y, 0px))
             ) scale(0.5);
           }
           15% {
             opacity: 1;
+            /* Keep the slight scatter for the initial pop */
             transform: translate(
-              calc(var(--token-start-x, 50vw) - 8px + cos(var(--token-angle, 0)) * 25px),
-              calc(var(--token-start-y, 50vh) - 8px + sin(var(--token-angle, 0)) * 25px)
+              calc(var(--token-start-x, 50vw) - 8px + var(--token-offset-x, 0px)),
+              calc(var(--token-start-y, 50vh) - 8px + var(--token-offset-y, 0px))
             ) scale(1.1);
           }
           85% {
             transform: translate(
+              /* Target the final X/Y position directly */
               calc(var(--token-end-x, 50vw) - 8px),
               calc(var(--token-end-y, 50vh) - 8px)
             ) scale(0.6);
@@ -772,6 +783,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           }
           100% {
             transform: translate(
+              /* Target the final X/Y position directly */
               calc(var(--token-end-x, 50vw) - 8px),
               calc(var(--token-end-y, 50vh) - 8px)
             ) scale(0.1);
