@@ -35,7 +35,7 @@ router.get("/:userToken", async (req, res) => {
 
         return res.status(200).json({
             question: nextQuestion,
-            timerInSeconds: 15,
+            timerInSeconds: 20,
             remaining: userQuestions[userToken].queue.length
         });
 
