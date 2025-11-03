@@ -17,18 +17,14 @@ router.post("/:userToken", async (req, res) => {
         const currentQuestion = userQuestions[userToken].current;
         const isCorrect = currentQuestion.correct_answer === answer;
 
-        // --- 1. Increment selected answer counter ---
-        await Category.findOneAndUpdate(
+        const updatedCategory = await Category.findOneAndUpdate(
             { "questions._id": currentQuestion._id },
-            { $inc: { "questions.$.answers.$[ans].correctCount": 1 } },
-            { arrayFilters: [{ "ans.text": answer.trim() }], new: true }
-        );
-
-
-        // --- 2. Fetch updated question ---
-        const updatedCategory = await Category.findOne(
-            { "questions._id": currentQuestion._id },
-            { "questions.$": 1 }
+            { $inc: { "questions.$[ans].correctCount": 1 } },
+            {
+                arrayFilters: [{ "ans.text": answer.trim() }],
+                projection: { "questions.$": 1 },
+                new: true
+            }
         );
 
         if (!updatedCategory || !updatedCategory.questions || updatedCategory.questions.length === 0) {
