@@ -5,6 +5,14 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ThumbsUp, ThumbsDown, Flag, Lightbulb, X } from "lucide-react"; // ADDED: X for close button
 import QuizResults from "@/components/quiz/QuizResults";
+import {
+  trackQuizStart,
+  trackQuestionAnswered,
+  trackQuizComplete,
+  trackFeedback,
+  trackReport,
+} from "@/utils/analytics";
+
 
 // NOTE: Placeholder component for the required confirmation dialog
 // You would need to replace this with an actual component from your UI library (e.g., AlertDialog)
@@ -37,28 +45,28 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
 
   // MODIFIED: New report options with correct values and descriptions
   const reportOptions = [
-    { 
-      value: "incorrect_answer", 
+    {
+      value: "incorrect_answer",
       label: "Incorrect Answer",
     },
-    { 
-      value: "multiple_correct_answers", 
+    {
+      value: "multiple_correct_answers",
       label: "Multiple Correct Answers",
     },
-    { 
-      value: "ambiguous_wording", 
+    {
+      value: "ambiguous_wording",
       label: "Ambiguous or Poorly Worded Question",
     },
-    { 
-      value: "duplicate_question", 
+    {
+      value: "duplicate_question",
       label: "Duplicate Question",
     },
-    { 
-      value: "offensive_content", 
+    {
+      value: "offensive_content",
       label: "Offensive or Inappropriate Content",
     },
-    { 
-      value: "other", 
+    {
+      value: "other",
       label: "Other (please describe)",
     },
   ];
@@ -70,16 +78,16 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
       onSubmit(selectedReason, text);
     }
   };
-  
+
   // MODIFIED: Check for submit button disable condition
   const isSubmitDisabled = !selectedReason || (selectedReason === "other" && otherText.trim() === '') || isSubmitting;
 
   // STYLED: Close Button to be a Red Circle
   const CloseButton = () => (
-    <Button 
-      variant="ghost" 
-      size="icon" 
-      onClick={onClose} 
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={onClose}
       disabled={isSubmitting}
       // ADDED STYLES: Red circle background, white X, hover effect
       className="bg-red-600 hover:bg-red-700 rounded-full h-8 w-8 p-1 text-white"
@@ -95,7 +103,7 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
         <div className="flex justify-between items-center">
           <h3 className="text-xl font-bold">{isThankYou ? "Thank You!" : "Report Question Issue"}</h3>
           {/* Using the styled CloseButton component */}
-          <CloseButton /> 
+          <CloseButton />
         </div>
 
         {isThankYou ? (
@@ -116,11 +124,10 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
                 <div
                   key={option.value}
                   // MODIFIED: Use selectedReason
-                  className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                    selectedReason === option.value
-                      ? "border-primary bg-primary/10"
-                      : "hover:bg-muted border-border" // ADDED: explicit border-border for all options
-                  }`}
+                  className={`p-3 border rounded-lg cursor-pointer transition-all ${selectedReason === option.value
+                    ? "border-primary bg-primary/10"
+                    : "hover:bg-muted border-border" // ADDED: explicit border-border for all options
+                    }`}
                   onClick={() => setSelectedReason(option.value)}
                 >
                   <label className="flex items-start space-x-2 cursor-pointer font-medium text-sm">
@@ -224,10 +231,10 @@ export default function Quiz() {
   const location = useLocation();
   const explanationRef = useRef<HTMLDivElement>(null);
   const timerInSecondsRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // 🔥 FIX: Ref to ensure the initial setup (startQuiz) only runs once, 
   // preventing double-fetch/double-increment in React Strict Mode.
-  const hasStartedRef = useRef(false); 
+  const hasStartedRef = useRef(false);
 
   const [quizState, setQuizState] = useState<QuizState>({
     started: false,
@@ -248,11 +255,11 @@ export default function Quiz() {
   const [showExplanation, setShowExplanation] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState(false);
   const [feedbackType, setFeedbackType] = useState<"up" | "down" | null>(null);
-  
+
   // 💡 MODIFIED: Initialize timeLeft to a default of 30, but it will be overwritten 
   // immediately upon question load by the cleanup/reset effect below.
-  const [timeLeft, setTimeLeft] = useState(30); 
-  
+  const [timeLeft, setTimeLeft] = useState(30);
+
   const [categoryTitle, setCategoryTitle] = useState("Quiz");
   const [categoryImage, setCategoryImage] = useState<string | undefined>(undefined); // ADDED: Category Image State
   const [timeUp, setTimeUp] = useState(false);
@@ -288,7 +295,7 @@ export default function Quiz() {
       navigate("/");
     }
   };
-  
+
   // MODIFIED: Report Question Logic with new payload structure
   const handleReportQuestion = async (reason: string, otherText: string) => {
     if (!quizState.question?._id) return;
@@ -313,6 +320,7 @@ export default function Quiz() {
       });
 
       if (response.ok) {
+         trackReport(quizState.question._id, reason, userToken);
         setReportSuccess(true);
         // The dialog will now show the thank you message
       } else {
@@ -346,7 +354,7 @@ export default function Quiz() {
       navigate("/categories");
     }
     // Dependency array remains for React to warn about missing deps, but the ref controls execution
-  }, [categoryId, userToken, navigate]); 
+  }, [categoryId, userToken, navigate]);
 
   // 💡 FIX 1: Simplified timer setup. It now relies on the `useEffect` below to set `timeLeft` initially.
   useEffect(() => {
@@ -401,7 +409,7 @@ export default function Quiz() {
       }, 500);
     }
   }, [showExplanation]);
-  
+
   // 💡 FIX 2: This useEffect now handles the proper reset of all question-related states,
   // including setting `timeLeft` using the backend value or the 30-second default.
   useEffect(() => {
@@ -409,13 +417,13 @@ export default function Quiz() {
     setShowExplanation(false);
     setFeedbackGiven(false);
     setFeedbackType(null);
-    
+
     // Use timerInSeconds from backend response, defaulting to 30
     // This now works because fetchNextQuestion correctly maps the top-level timerInSeconds 
     // to the question object in state.
     const newTime = quizState.question?.timerInSeconds || 30;
     setTimeLeft(newTime);
-    
+
     setTimeUp(false);
     setShowBars(false);
     setAnswerResponse(null);
@@ -439,14 +447,14 @@ export default function Quiz() {
     setLoading(true);
     setError(null);
     setIsCompletingQuiz(false);
-    
+
     // NOTE: currentQuestionIndex is reset to 0 here.
     setQuizState({
       started: true,
       completed: false,
       selectedCategory: null,
       question: null,
-      currentQuestionIndex: 0, 
+      currentQuestionIndex: 0,
       correctAnswers: 0,
       incorrectAnswers: 0,
       results: null,
@@ -484,9 +492,13 @@ export default function Quiz() {
         body: JSON.stringify({ categoryId, numQuestions: 10, userToken }),
       });
 
-      if (!startResponse.ok) throw new Error("⚠️ Error starting quiz session.");
-
-      await fetchNextQuestion();
+      if (startResponse.ok) {
+        throw new Error("⚠️ Error starting quiz session.");
+      }
+      else {
+        trackQuizStart(categoryId, userToken);
+        await fetchNextQuestion();
+      }
 
     } catch (error: any) {
       setError(error.message);
@@ -508,19 +520,19 @@ export default function Quiz() {
       const data = await response.json();
 
       if (response.ok && data.question) {
-        
+
         // 🔥 FIX: Combine top-level timerInSeconds with the question object 
         // so the timer useEffect can find it.
         const questionWithTimer = {
-            ...data.question,
-            timerInSeconds: data.timerInSeconds, 
+          ...data.question,
+          timerInSeconds: data.timerInSeconds,
         };
 
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1; // 0 -> 1 (Correct)
           // ADDED: Play sound effect when first question starts
           if (newIndex === 1) {
-            startSound.play().catch(() => {});
+            startSound.play().catch(() => { });
           }
           return {
             ...prev,
@@ -608,7 +620,7 @@ export default function Quiz() {
 
       if (response.ok) {
         const completionData = await response.json();
-
+        trackQuizComplete(quizState.selectedCategory.id, quizState.correctAnswers, userToken);
         setQuizState((prev) => ({
           ...prev,
           completed: true,
@@ -695,10 +707,12 @@ export default function Quiz() {
         }));
 
         if (isCorrect) {
-          correctSound.play().catch(() => {});
+          correctSound.play().catch(() => { });
         } else {
-          incorrectSound.play().catch(() => {});
+          incorrectSound.play().catch(() => { });
         }
+
+        trackQuestionAnswered(quizState.question?._id || "", isCorrect, userToken);
 
         setTimeout(() => {
           setShowBars(true);
@@ -755,6 +769,7 @@ export default function Quiz() {
         const errorData = await response.json();
         console.error("⚠️ Failed to update popularity:", errorData.message || errorData);
       }
+       trackFeedback(quizState.question._id, type, userToken);
     } catch (err) {
       console.error("⚠️ Error updating popularity:", err);
     }
@@ -901,7 +916,7 @@ export default function Quiz() {
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {/* The index is correct now because the double increment is blocked */}
-                  Question {quizState.currentQuestionIndex} of {totalQuestions} 
+                  Question {quizState.currentQuestionIndex} of {totalQuestions}
                 </div>
               </div>
 
@@ -934,7 +949,7 @@ export default function Quiz() {
 
         {/* MODIFIED: Reduced horizontal padding from px-4 to px-3 and removed max-width classes (lg:max-w-3xl xl:max-w-5xl) for content to use more screen space */}
         {/* ADDED: Max width for content on large screens */}
-        <div className="flex-1 overflow-y-auto px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-3xl"> 
+        <div className="flex-1 overflow-y-auto px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-3xl">
           <div className="space-y-6">
             {/* Reduced Padding for Question (px-1 is already tight) */}
             <div className="px-1 py-3 md:py-4">
@@ -959,7 +974,7 @@ export default function Quiz() {
                           : answer === selectedAnswer
                             ? 'bg-destructive/25 border-l-4 border-destructive'
                             : 'bg-primary/15'
-                      }`}
+                        }`}
                       style={{
                         '--target-width': `${getAnswerPercentage(answer)}%`,
                         animationDelay: `${index * 150}ms`,
@@ -1047,13 +1062,12 @@ export default function Quiz() {
                           size="sm"
                           onClick={() => handleFeedback("up")}
                           disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 ${
-                            feedbackType === "up"
-                              ? "bg-success/20 border-success text-success hover:bg-success/20 hover:text-success"
-                              : feedbackGiven
-                                ? "opacity-50"
-                                : "hover:text-success"
-                          }`}
+                          className={`text-sm flex-1 max-w-[120px] h-10 ${feedbackType === "up"
+                            ? "bg-success/20 border-success text-success hover:bg-success/20 hover:text-success"
+                            : feedbackGiven
+                              ? "opacity-50"
+                              : "hover:text-success"
+                            }`}
                         >
                           <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
                           <span className="ml-1 sm:ml-2">Yes</span>
@@ -1063,13 +1077,12 @@ export default function Quiz() {
                           size="sm"
                           onClick={() => handleFeedback("down")}
                           disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 ${
-                            feedbackType === "down"
-                              ? "bg-destructive/20 border-destructive text-destructive hover:bg-destructive/20 hover:text-destructive"
-                              : feedbackGiven
-                                ? "opacity-50"
-                                : "hover:text-destructive"
-                          }`}
+                          className={`text-sm flex-1 max-w-[120px] h-10 ${feedbackType === "down"
+                            ? "bg-destructive/20 border-destructive text-destructive hover:bg-destructive/20 hover:text-destructive"
+                            : feedbackGiven
+                              ? "opacity-50"
+                              : "hover:text-destructive"
+                            }`}
                         >
                           <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
                           <span className="ml-1 sm:ml-2">No</span>
