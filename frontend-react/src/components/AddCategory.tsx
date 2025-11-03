@@ -1,3 +1,5 @@
+// AddCategory.tsx
+
 "use client";
 
 import React, { useState } from "react";
@@ -31,25 +33,28 @@ const AddCategory: React.FC<AddCategoryProps> = ({
   };
 
   const handleCreateCategory = async () => {
-    if (isGuest) {
+    const token = localStorage.getItem("token");
+
+    // 🎯 FIX 1: Rely on the token being present for authorization.
+    // If no token exists, prompt registration and exit, preventing the 403.
+    if (!token) { 
       setIsOpen(false);
+      showNotification("You need to be logged in to create a category.", "error");
       onRegistrationRequired();
       return;
     }
+    
+    // 🚫 The original 'if (isGuest)' check is removed here 
+    // because the token check is the true source of authority.
 
     if (!categoryName.trim()) {
       showNotification("Please enter a category name.", "error");
       return;
     }
 
-    const token = localStorage.getItem("token");
-    if (!token) {
-      showNotification("You need to be logged in to create a category.", "error");
-      return;
-    }
-
     setLoading(true);
     try {
+      // The token used here is now the refreshed one from Profile.tsx
       const response = await fetch(
         "https://quiz-app-node-606998948537.europe-west4.run.app/api/categories/createCategory",
         {
@@ -73,6 +78,8 @@ const AddCategory: React.FC<AddCategoryProps> = ({
           "success"
         );
       } else {
+        // If 403 Forbidden still occurs here, it means the token is bad, 
+        // and we show the error from the server.
         showNotification(data.message || "Failed to create category.", "error");
       }
     } catch (error) {
@@ -84,7 +91,10 @@ const AddCategory: React.FC<AddCategoryProps> = ({
   };
 
   const handleMainButtonClick = () => {
-    if (isGuest) {
+    const token = localStorage.getItem("token");
+
+    // 🎯 FIX 2: Check for token before opening modal.
+    if (!token) {
       onRegistrationRequired();
     } else {
       setIsOpen(true);
