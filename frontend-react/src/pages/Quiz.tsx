@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ThumbsUp, ThumbsDown, Flag, Lightbulb, X } from "lucide-react"; // ADDED: X for close button
+import { ArrowLeft, ThumbsUp, ThumbsDown, Flag, Lightbulb, X } from "lucide-react";
 import QuizResults from "@/components/quiz/QuizResults";
 import {
   trackQuizStart,
@@ -13,9 +13,6 @@ import {
   trackReport,
 } from "@/utils/analytics";
 
-
-// NOTE: Placeholder component for the required confirmation dialog
-// You would need to replace this with an actual component from your UI library (e.g., AlertDialog)
 const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmText, cancelText }: any) => (
   <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
     <Card className="max-w-sm w-full p-6 space-y-4">
@@ -29,29 +26,25 @@ const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmTe
   </div>
 );
 
-// UPDATED: Report Dialog Props for new payload structure
 interface ReportDialogProps {
   onClose: () => void;
-  onSubmit: (reason: string, otherText: string) => void; // MODIFIED: Changed signature
+  onSubmit: (reason: string, otherText: string) => void;
   isSubmitting: boolean;
   isThankYou: boolean;
 }
 
-// UPDATED: Report Dialog Component
 const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDialogProps) => {
-  // MODIFIED: Use the reason value for selection
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [otherText, setOtherText] = useState('');
 
-  // MODIFIED: New report options with correct values and descriptions
   const reportOptions = [
     {
       value: "incorrect_answer",
       label: "Incorrect Answer",
     },
-    {
-      value: "multiple_correct_answers",
-      label: "Multiple Correct Answers",
+    { 
+      value: "multiple_correct_answers", 
+      label: "Multiple Correct Answers",
     },
     {
       value: "ambiguous_wording",
@@ -73,23 +66,19 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
 
   const handleSubmit = () => {
     if (selectedReason) {
-      // MODIFIED: Pass reason and otherText directly
       const text = selectedReason === "other" ? otherText : "";
       onSubmit(selectedReason, text);
     }
   };
-
-  // MODIFIED: Check for submit button disable condition
+  
   const isSubmitDisabled = !selectedReason || (selectedReason === "other" && otherText.trim() === '') || isSubmitting;
 
-  // STYLED: Close Button to be a Red Circle
   const CloseButton = () => (
     <Button
       variant="ghost"
       size="icon"
       onClick={onClose}
       disabled={isSubmitting}
-      // ADDED STYLES: Red circle background, white X, hover effect
       className="bg-red-600 hover:bg-red-700 rounded-full h-8 w-8 p-1 text-white"
       aria-label="Close"
     >
@@ -102,8 +91,7 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
       <Card className="max-w-md w-full p-6 space-y-6">
         <div className="flex justify-between items-center">
           <h3 className="text-xl font-bold">{isThankYou ? "Thank You!" : "Report Question Issue"}</h3>
-          {/* Using the styled CloseButton component */}
-          <CloseButton />
+          <CloseButton /> 
         </div>
 
         {isThankYou ? (
@@ -123,11 +111,11 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
               {reportOptions.map((option) => (
                 <div
                   key={option.value}
-                  // MODIFIED: Use selectedReason
-                  className={`p-3 border rounded-lg cursor-pointer transition-all ${selectedReason === option.value
-                    ? "border-primary bg-primary/10"
-                    : "hover:bg-muted border-border" // ADDED: explicit border-border for all options
-                    }`}
+                  className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                    selectedReason === option.value
+                      ? "border-primary bg-primary/10"
+                      : "hover:bg-muted border-border"
+                  }`}
                   onClick={() => setSelectedReason(option.value)}
                 >
                   <label className="flex items-start space-x-2 cursor-pointer font-medium text-sm">
@@ -135,7 +123,6 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
                       type="radio"
                       name="report-issue"
                       value={option.value}
-                      // MODIFIED: Use selectedReason
                       checked={selectedReason === option.value}
                       onChange={() => setSelectedReason(option.value)}
                       className="hidden"
@@ -148,7 +135,6 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
               ))}
             </div>
 
-            {/* MODIFIED: Use selectedReason and otherText */}
             {selectedReason === "other" && (
               <div>
                 <textarea
@@ -162,7 +148,8 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
             )}
 
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+              <Button variant="outline" className="text-red-500 border-red-600 hover:bg-red-600"
+               onClick={onClose} disabled={isSubmitting}>Cancel</Button>
               <Button
                 variant="default"
                 onClick={handleSubmit}
@@ -189,7 +176,7 @@ interface Question {
   difficulty?: "Easy" | "Medium" | "Hard";
   difficultyName?: string;
   difficultyLevel?: number;
-  timerInSeconds?: number; // This will now be correctly set from the API response
+  timerInSeconds?: number;
 }
 
 interface AnswerStats {
@@ -231,10 +218,12 @@ export default function Quiz() {
   const location = useLocation();
   const explanationRef = useRef<HTMLDivElement>(null);
   const timerInSecondsRef = useRef<NodeJS.Timeout | null>(null);
-
-  // 🔥 FIX: Ref to ensure the initial setup (startQuiz) only runs once, 
-  // preventing double-fetch/double-increment in React Strict Mode.
+  const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null); // NEW: Auto-advance timer ref
   const hasStartedRef = useRef(false);
+  
+  // NEW: Store the preloaded next question
+  const nextQuestionRef = useRef<Question | null>(null);
+  const isPreloadingRef = useRef(false);
 
   const [quizState, setQuizState] = useState<QuizState>({
     started: false,
@@ -255,35 +244,27 @@ export default function Quiz() {
   const [showExplanation, setShowExplanation] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState(false);
   const [feedbackType, setFeedbackType] = useState<"up" | "down" | null>(null);
-
-  // 💡 MODIFIED: Initialize timeLeft to a default of 30, but it will be overwritten 
-  // immediately upon question load by the cleanup/reset effect below.
   const [timeLeft, setTimeLeft] = useState(30);
-
   const [categoryTitle, setCategoryTitle] = useState("Quiz");
-  const [categoryImage, setCategoryImage] = useState<string | undefined>(undefined); // ADDED: Category Image State
+  const [categoryImage, setCategoryImage] = useState<string | undefined>(undefined);
   const [timeUp, setTimeUp] = useState(false);
   const [isCompletingQuiz, setIsCompletingQuiz] = useState(false);
   const [showBars, setShowBars] = useState(false);
   const [answerResponse, setAnswerResponse] = useState<AnswerResponse | null>(null);
-  const [showExitDialog, setShowExitDialog] = useState(false); // ADDED: Exit Dialog State
-  // ADDED: State for Report Dialog
+  const [showExitDialog, setShowExitDialog] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
 
-
   const userToken = localStorage.getItem("token");
   const totalQuestions = 10;
-  // const progress = ((quizState.currentQuestionIndex - 1) / totalQuestions) * 100; // Unused
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
+  const AUTO_ADVANCE_DELAY_MS = 5000; // MODIFIED: Reduced from 10000 to 5000 ms (5 seconds)
 
-  // ADDED: Start Sound
   const startSound = new Audio("/intro-sound.mp3");
   const correctSound = new Audio("/victory-beat.mp3");
   const incorrectSound = new Audio("/incorrect.mp3");
 
-  // ADDED: Handle back navigation with confirmation
   const handleBackNavigation = () => {
     setShowExitDialog(true);
   };
@@ -295,8 +276,8 @@ export default function Quiz() {
       navigate("/");
     }
   };
-
-  // MODIFIED: Report Question Logic with new payload structure
+  
+  // MODIFIED: Don't close dialog on submit, let completion status handle it
   const handleReportQuestion = async (reason: string, otherText: string) => {
     if (!quizState.question?._id) return;
 
@@ -307,7 +288,7 @@ export default function Quiz() {
       const payload: { questionId: string; reason: string; otherText: string } = {
         questionId: quizState.question._id,
         reason: reason,
-        otherText: otherText, // Only accepted if reason is 'other'
+        otherText: otherText,
       };
 
       const response = await fetch(`${BASE_URL}/api/reportQuestion`, {
@@ -322,49 +303,93 @@ export default function Quiz() {
       if (response.ok) {
          trackReport(quizState.question._id, reason, userToken);
         setReportSuccess(true);
-        // The dialog will now show the thank you message
       } else {
         console.error("⚠️ Failed to submit report.");
-        // Optional: show a temporary error message in the dialog
         setReportSuccess(false);
       }
     } catch (err) {
       console.error("⚠️ Error submitting report:", err);
-      // Optional: show a temporary error message in the dialog
       setReportSuccess(false);
     } finally {
       setIsReporting(false);
-      // If success, the dialog will now show the thank you message, which will be closed by the user
-      // If fail, the dialog remains open with the error message
     }
   };
 
   const closeReportDialog = () => {
     setShowReportDialog(false);
-    setReportSuccess(false); // Reset success state for the next report
+    setReportSuccess(false);
   };
 
-  // 🔥 FIX IMPLEMENTATION: Use a ref to ensure startQuiz is called only once
+  // NEW: Preload next question function
+  const preloadNextQuestion = async () => {
+    if (!userToken || isPreloadingRef.current || isLastQuestion) return;
+
+    isPreloadingRef.current = true;
+    try {
+      const response = await fetch(`${BASE_URL}/api/nextQuestion/${userToken}`, {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${userToken}`,
+        },
+      });
+      const data = await response.json();
+
+      if (response.ok && data.question) {
+        const questionWithTimer = {
+          ...data.question,
+          timerInSeconds: data.timerInSeconds,
+        };
+        nextQuestionRef.current = questionWithTimer;
+      } else {
+        // No more questions, prepare to complete
+        nextQuestionRef.current = null;
+      }
+    } catch (error) {
+      console.error("Error preloading next question:", error);
+      nextQuestionRef.current = null;
+    } finally {
+      isPreloadingRef.current = false;
+    }
+  };
+
+  // MODIFIED: Effect to manage the auto-advance timer. Checks for !showReportDialog.
+  useEffect(() => {
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+
+    if (showExplanation && !timeUp && !showReportDialog) {
+      autoAdvanceTimerRef.current = setTimeout(() => {
+        handleNextQuestion();
+      }, AUTO_ADVANCE_DELAY_MS);
+    }
+
+    // Cleanup on unmount or dependency change
+    return () => {
+      if (autoAdvanceTimerRef.current) {
+        clearTimeout(autoAdvanceTimerRef.current);
+        autoAdvanceTimerRef.current = null;
+      }
+    };
+  }, [showExplanation, timeUp, showReportDialog]); // MODIFIED: Added showReportDialog to dependency array
+
   useEffect(() => {
     if (categoryId && userToken && !hasStartedRef.current) {
-      hasStartedRef.current = true; // Mark as started
+      hasStartedRef.current = true;
       startQuiz(categoryId);
     } else if (!userToken) {
       console.log("⚠️ You must be logged in to play.");
       navigate("/categories");
     }
-    // Dependency array remains for React to warn about missing deps, but the ref controls execution
   }, [categoryId, userToken, navigate]);
 
-  // 💡 FIX 1: Simplified timer setup. It now relies on the `useEffect` below to set `timeLeft` initially.
   useEffect(() => {
     if (timerInSecondsRef.current) {
       clearInterval(timerInSecondsRef.current);
     }
 
     if (quizState.question && !quizState.isAnswerSelected && !timeUp) {
-      // The initial time is now handled by the cleanup/reset effect.
-      // We start the timer from whatever timeLeft currently is.
       timerInSecondsRef.current = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
@@ -387,7 +412,7 @@ export default function Quiz() {
         timerInSecondsRef.current = null;
       }
     };
-  }, [quizState.question, quizState.isAnswerSelected, timeUp]); // Added timeUp to dependencies to re-run on timeout
+  }, [quizState.question, quizState.isAnswerSelected, timeUp]);
 
   useEffect(() => {
     if (showExplanation && explanationRef.current) {
@@ -410,17 +435,18 @@ export default function Quiz() {
     }
   }, [showExplanation]);
 
-  // 💡 FIX 2: This useEffect now handles the proper reset of all question-related states,
-  // including setting `timeLeft` using the backend value or the 30-second default.
   useEffect(() => {
     setSelectedAnswer(null);
     setShowExplanation(false);
     setFeedbackGiven(false);
     setFeedbackType(null);
+    
+    // Clear auto-advance timer on new question load
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
 
-    // Use timerInSeconds from backend response, defaulting to 30
-    // This now works because fetchNextQuestion correctly maps the top-level timerInSeconds 
-    // to the question object in state.
     const newTime = quizState.question?.timerInSeconds || 30;
     setTimeLeft(newTime);
 
@@ -447,8 +473,7 @@ export default function Quiz() {
     setLoading(true);
     setError(null);
     setIsCompletingQuiz(false);
-
-    // NOTE: currentQuestionIndex is reset to 0 here.
+    
     setQuizState({
       started: true,
       completed: false,
@@ -461,7 +486,8 @@ export default function Quiz() {
       isAnswerSelected: false,
       userAnswers: [],
     });
-    setCategoryImage(undefined); // Reset image state
+    setCategoryImage(undefined);
+    nextQuestionRef.current = null;
 
     try {
       const categoryResponse = await fetch(`${BASE_URL}/api/categories`, {
@@ -475,7 +501,7 @@ export default function Quiz() {
         const category = categories.find((cat: any) => cat._id === categoryId);
         if (category) {
           setCategoryTitle(category.name);
-          setCategoryImage(category.imageUrl || category.image); // SET Category Image
+          setCategoryImage(category.imageUrl || category.image);
           setQuizState(prev => ({
             ...prev,
             selectedCategory: { id: categoryId, name: category.name }
@@ -511,6 +537,28 @@ export default function Quiz() {
 
     setLoading(true);
     try {
+      // Check if we have a preloaded question
+      if (nextQuestionRef.current) {
+        const questionWithTimer = nextQuestionRef.current;
+        nextQuestionRef.current = null;
+
+        setQuizState((prev) => {
+          const newIndex = prev.currentQuestionIndex + 1;
+          if (newIndex === 1) {
+            startSound.play().catch(() => {});
+          }
+          return {
+            ...prev,
+            question: questionWithTimer,
+            currentQuestionIndex: newIndex,
+            isAnswerSelected: false,
+          };
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Otherwise fetch normally
       const response = await fetch(`${BASE_URL}/api/nextQuestion/${userToken}`, {
         headers: {
           "Content-Type": "application/json",
@@ -520,23 +568,19 @@ export default function Quiz() {
       const data = await response.json();
 
       if (response.ok && data.question) {
-
-        // 🔥 FIX: Combine top-level timerInSeconds with the question object 
-        // so the timer useEffect can find it.
         const questionWithTimer = {
           ...data.question,
           timerInSeconds: data.timerInSeconds,
         };
 
         setQuizState((prev) => {
-          const newIndex = prev.currentQuestionIndex + 1; // 0 -> 1 (Correct)
-          // ADDED: Play sound effect when first question starts
+          const newIndex = prev.currentQuestionIndex + 1;
           if (newIndex === 1) {
             startSound.play().catch(() => { });
           }
           return {
             ...prev,
-            question: questionWithTimer, // <-- Use the modified object
+            question: questionWithTimer,
             currentQuestionIndex: newIndex,
             isAnswerSelected: false,
           };
@@ -582,14 +626,27 @@ export default function Quiz() {
             }
           ]
         }));
+
+        // NEW: Preload next question after timeout
+        if (!isLastQuestion) {
+          preloadNextQuestion();
+        } else {
+          // FIX: If last question, complete the quiz immediately on timeout
+          completeQuiz();
+        }
       }
     } catch (error) {
       console.error("Error handling timeout:", error);
     }
   };
-
   const completeQuiz = async () => {
     if (!userToken || !quizState.selectedCategory || isCompletingQuiz) return;
+
+    // Clear auto-advance timer when completing the quiz
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
 
     setIsCompletingQuiz(true);
     setLoading(true);
@@ -603,7 +660,7 @@ export default function Quiz() {
         totalQuestions: totalQuestions,
         questionsAttempted: totalQuestions,
         correctAnswers,
-        incorrectAnswers: totalQuestions - correctAnswers, // Recalculate based on total
+        incorrectAnswers: totalQuestions - correctAnswers,
       };
 
       const response = await fetch(
@@ -666,6 +723,13 @@ export default function Quiz() {
       clearInterval(timerInSecondsRef.current);
       timerInSecondsRef.current = null;
     }
+    
+    // Clear auto-advance timer if user clicks
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+
 
     setSelectedAnswer(answer);
     setQuizState((prev) => ({
@@ -721,6 +785,14 @@ export default function Quiz() {
         setTimeout(() => {
           setShowExplanation(true);
         }, 1800);
+
+        // NEW: Preload next question after answering
+        if (!isLastQuestion) {
+          preloadNextQuestion();
+        } else {
+          // If last question, preload completion
+          completeQuiz();
+        }
       } else {
         setError("Failed to submit answer. Please try again.");
       }
@@ -731,15 +803,21 @@ export default function Quiz() {
   };
 
   const handleNextQuestion = () => {
+    // Clear auto-advance timer if user clicks the button
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+
     if (isLastQuestion) {
-      completeQuiz();
+      // If user clicks "Finish Quiz" before auto-advance, complete it now
+      completeQuiz(); 
       return;
     }
     fetchNextQuestion();
   };
 
   const handlePlayAgain = () => {
-    // Reset the ref when playing again to allow startQuiz to run
     hasStartedRef.current = false;
     if (categoryId) {
       startQuiz(categoryId);
@@ -777,25 +855,24 @@ export default function Quiz() {
 
   const getOptionStyle = (answer: string) => {
     if (timeUp) {
-      return "bg-muted/30 cursor-not-allowed opacity-50 border-2 border-border"; // ADDED: Default border for Time Up
+      return "bg-muted/30 cursor-not-allowed opacity-50 border-2 border-border";
     }
 
     if (selectedAnswer === null) {
-      return "hover:bg-primary/5 cursor-pointer transition-colors border-2 border-border"; // ADDED: Default border
+      return "hover:bg-primary/5 cursor-pointer transition-colors border-2 border-border";
     }
 
     const correctAnswer = answerResponse?.correctAnswer || quizState.question?.correct_answer;
 
     if (answer === correctAnswer) {
-      return "bg-success/10 text-success border-success/50 border-2"; // Success border
+      return "bg-success/10 text-success border-success/50 border-2";
     }
 
     if (answer === selectedAnswer && answer !== correctAnswer) {
-      return "bg-destructive/10 text-destructive border-destructive/50 border-2"; // Error border
+      return "bg-destructive/10 text-destructive border-destructive/50 border-2";
     }
 
-    // This is the style for an incorrect answer that was not selected by the user
-    return "bg-muted/30 border-2 border-border"; // ADDED: Default border for unselected incorrect
+    return "bg-muted/30 border-2 border-border";
   };
 
   const gettimerInSecondsColor = () => {
@@ -821,7 +898,6 @@ export default function Quiz() {
     return answerStat ? answerStat.percentage : 0;
   };
 
-  // Base element for the quiz (used in loading/error/completed states)
   const QuizBase = ({ children }: { children: React.ReactNode }) => (
     <div
       className="flex flex-col min-h-screen relative"
@@ -831,7 +907,6 @@ export default function Quiz() {
         backgroundPosition: 'center',
       } : {}}
     >
-      {/* Semi-transparent dark overlay for readability, replacing the gradient */}
       <div className="absolute inset-0 bg-background/90 backdrop-blur-sm z-0"></div>
       <div className="relative z-10 flex flex-col min-h-screen">
         {children}
@@ -891,13 +966,10 @@ export default function Quiz() {
         backgroundPosition: 'center',
       } : {}}
     >
-      {/* Semi-transparent dark overlay for readability */}
       <div className="absolute inset-0 bg-background/90 backdrop-blur-lg z-0"></div>
 
-      {/* Content wrapper */}
       <div className="relative z-10 flex flex-col min-h-screen">
         <div className="sticky top-0 z-30 bg-quiz-background/80 backdrop-blur-sm">
-          {/* MODIFIED: Reduced horizontal padding from px-4 to px-3 and removed max-width classes (lg:max-w-3xl xl:max-w-5xl) for header to use more screen space */}
           <div className="px-2 py-2 md:py-4 max-w-full mx-auto">
             <div className="flex items-center justify-between gap-2 mb-3">
               <Button
@@ -915,7 +987,6 @@ export default function Quiz() {
                   {categoryTitle}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {/* The index is correct now because the double increment is blocked */}
                   Question {quizState.currentQuestionIndex} of {totalQuestions}
                 </div>
               </div>
@@ -947,11 +1018,8 @@ export default function Quiz() {
           </div>
         </div>
 
-        {/* MODIFIED: Reduced horizontal padding from px-4 to px-3 and removed max-width classes (lg:max-w-3xl xl:max-w-5xl) for content to use more screen space */}
-        {/* ADDED: Max width for content on large screens */}
         <div className="flex-1 overflow-y-auto px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-3xl">
           <div className="space-y-6">
-            {/* Reduced Padding for Question (px-1 is already tight) */}
             <div className="px-1 py-3 md:py-4">
               <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-relaxed">
                 {quizState.question?.question}
@@ -962,13 +1030,12 @@ export default function Quiz() {
               {quizState.question?.answers.map((answer, index) => (
                 <Card
                   key={index}
-                  // MODIFIED: getOptionStyle now handles all border logic
                   className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer shadow-sm rounded-xl`}
                   onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
                 >
                   {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
                     <div
-                      className={`absolute top-0 left-0 h-full animate-bar-fill rounded-r-xl ${ // Updated rounded-r-md to rounded-r-xl
+                      className={`absolute top-0 left-0 h-full animate-bar-fill rounded-r-xl ${
                         answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
                           ? 'bg-success/25 border-l-4 border-success'
                           : answer === selectedAnswer
@@ -985,11 +1052,6 @@ export default function Quiz() {
 
                   <div className="flex items-center gap-3 relative z-10">
                     <div className="flex-1 min-w-0 flex items-center justify-between">
-                      {/* MODIFIED: 
-                      1. Removed conditional font-weight and set to font-medium for consistency.
-                      2. Removed flex-shrink.
-                      3. Added w-full and text-left to prevent centering/layout shifts.
-                      */}
                       <span className={`text-base md:text-lg leading-snug break-words w-full font-medium text-left`}>
                         {answer}
                       </span>
@@ -1053,60 +1115,63 @@ export default function Quiz() {
                 </Card>
 
                 <div className="mt-6 space-y-4 animate-fade-in pb-4">
-                  <Card className="p-4 md:p-6 bg-card/40 border-0 shadow-sm rounded-xl">
-                    <div className="space-y-4">
-                      <p className="text-sm font-medium text-center">Did you like this question?</p>
-                      <div className="flex gap-4 justify-center">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleFeedback("up")}
-                          disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 ${feedbackType === "up"
-                            ? "bg-success/20 border-success text-success hover:bg-success/20 hover:text-success"
+                <Card className="p-4 md:p-6 bg-card/40 border-0 shadow-sm rounded-xl">
+                  <div className="space-y-4">
+                    <p className="text-sm font-medium text-center">Did you like this question?</p>
+
+                    <div className="flex gap-4 justify-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleFeedback("up")}
+                        disabled={feedbackGiven}
+                        className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${
+                          feedbackType === "up"
+                            ? "bg-green-100 border-green-500 text-green-600"
                             : feedbackGiven
-                              ? "opacity-50"
-                              : "hover:text-success"
-                            }`}
-                        >
-                          <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:ml-2">Yes</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleFeedback("down")}
-                          disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 ${feedbackType === "down"
-                            ? "bg-destructive/20 border-destructive text-destructive hover:bg-destructive/20 hover:text-destructive"
+                              ? "opacity-50 cursor-not-allowed"
+                              : "border-green-500 text-green-600 hover:bg-green-500 hover:text-white"
+                        }`}
+                      >
+                        <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
+                        <span className="ml-1 sm:ml-2">Yes</span>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleFeedback("down")}
+                        disabled={feedbackGiven}
+                        className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${
+                          feedbackType === "down"
+                            ? "bg-red-100 border-red-600 text-red-600"
                             : feedbackGiven
-                              ? "opacity-50"
-                              : "hover:text-destructive"
-                            }`}
-                        >
-                          <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:ml-2">No</span>
-                        </Button>
-                        {/* UPDATED: Report Button onClick handler */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-sm flex-1 max-w-[120px] h-10 border-0"
-                          onClick={() => setShowReportDialog(true)}
-                        >
-                          <Flag className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:inline">Report</span>
-                        </Button>
-                      </div>
+                              ? "opacity-50 cursor-not-allowed"
+                              : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                        }`}
+                      >
+                        <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
+                        <span className="ml-1 sm:ml-2">No</span>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowReportDialog(true)}
+                        className="text-sm flex-1 max-w-[120px] h-10 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
+                      >
+                        <Flag className="h-4 w-4 md:h-5 md:w-5" />
+                        <span className="ml-1 sm:ml-2">Report</span>
+                      </Button>
                     </div>
-                  </Card>
+                  </div>
+                </Card>
 
                   <Button
                     variant="default"
                     size="lg"
                     className="w-full h-14 md:h-16 text-base md:text-lg"
                     onClick={handleNextQuestion}
-                    disabled={isCompletingQuiz}
                   >
                     {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
                   </Button>
@@ -1117,7 +1182,6 @@ export default function Quiz() {
         </div>
       </div>
 
-      {/* ADDED: Exit Confirmation Dialog */}
       {showExitDialog && (
         <ConfirmationDialog
           title="Stop Quiz?"
@@ -1129,7 +1193,6 @@ export default function Quiz() {
         />
       )}
 
-      {/* ADDED: Report Question Dialog */}
       {showReportDialog && (
         <ReportDialog
           onClose={closeReportDialog}

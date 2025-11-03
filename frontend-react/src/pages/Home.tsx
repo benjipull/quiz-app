@@ -437,8 +437,8 @@ export default function Home() {
                 <span className="text-3xl font-bold">Play</span>
                 <div className="relative">
                   <div className="bg-white rounded-full w-14 h-14 flex flex-col items-center justify-center shadow-md">
-                    <span className="text-purple-500 text-xl font-bold leading-none">{userLevel}</span>
-                    <span className="text-purple-500 text-xs font-medium uppercase leading-none">Level</span>
+                    <span className="text-green-500 text-xl font-bold leading-none">{userLevel}</span>
+                    <span className="text-green-500 text-xs font-medium uppercase leading-none">Level</span>
                   </div>
                 </div>
               </>
