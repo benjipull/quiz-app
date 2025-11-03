@@ -383,7 +383,7 @@ export default function Home() {
         {/* Guest User Registration Panel - REDESIGNED */}
         {isGuest && (
           <Card 
-            className="bg-gradient-to-br from-background to-quiz-background border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white p-3 shadow-lg flex items-center justify-between space-x-3"
+            className="bg-gradient-to-br from-background to-quiz-background border-gray-200 dark:border-gray-700 dark:text-white p-3 shadow-lg flex items-center justify-between space-x-3"
           >
             <div className="flex items-center space-x-3 flex-shrink-0">
               <AlertTriangle className="w-5 h-5 text-red-500 dark:text-purple-400" /> 
