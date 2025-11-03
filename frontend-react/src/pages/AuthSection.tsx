@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, User, Brain, Zap, ArrowRight, Calendar } from "lucide-react"; // Calendar icon kept for consistency of removal of DOB and replacement with AGE
+import { Eye, EyeOff, Mail, Lock, User, Brain, Zap, ArrowRight, Calendar } from "lucide-react"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,36 +32,29 @@ const AuthSection = () => {
     const [signupAlias, setSignupAlias] = useState("");
     const [signupEmail, setSignupEmail] = useState("");
     const [signupPassword, setSignupPassword] = useState("");
-    const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
-    const [signupAge, setSignupAge] = useState(""); // Changed from DOB to Age
     const [showSignupPassword, setShowSignupPassword] = useState(false);
-    const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false); // Corrected state name here
 
-    // Forgot/Reset password states
-    const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
-    const [resetPasswordToken, setResetPasswordToken] = useState("");
+    // Reset password states
+    const [resetEmail, setResetEmail] = useState("");
+    const [resetCode, setResetCode] = useState("");
     const [newPassword, setNewPassword] = useState("");
-    const [confirmNewPassword, setConfirmNewPassword] = useState("");
     const [showNewPassword, setShowNewPassword] = useState(false);
-    const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
 
 
     useEffect(() => {
-        // Check if there's a reset token in the URL
-        const queryParams = new URLSearchParams(location.search);
-        const token = queryParams.get("token");
-        if (token) {
-            setResetPasswordToken(token);
-            setShowResetPassword(true);
-            setIsLogin(false); // Hide login/signup
-            setShowForgotPassword(false); // Hide forgot password
+        // If user already has a token, navigate home
+        if (localStorage.getItem("token")) {
+            navigate("/");
         }
-    }, [location]);
+    }, [navigate]);
 
+    // ----------------------------------------------------------------
+    // 🔑 CORE LOGIN FUNCTION (Corrected)
+    // ----------------------------------------------------------------
     const handleLogin = async () => {
         if (!loginEmail || !loginPassword) {
             toast({
-                title: "Missing fields",
+                title: "Validation Error",
                 description: "Please enter both email and password.",
                 variant: "destructive",
             });
@@ -69,102 +62,100 @@ const AuthSection = () => {
         }
 
         setIsLoading(true);
-
         try {
             const response = await fetch(`${BASE_URL}/api/users/login`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                // 🎯 FIX: Explicitly send loginEmail and loginPassword.
+                body: JSON.stringify({ 
+                    email: loginEmail, 
+                    password: loginPassword // Ensure this state holds the value!
+                }),
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                // ✅ Store token + user
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("user", JSON.stringify(data.user));
 
                 toast({
-                    title: "Login successful!",
-                    description: "Welcome back to Quizicle!",
+                    title: "Success",
+                    description: "Login successful! Welcome back.",
                 });
 
-                // ✅ Optional: set a timestamp to detect expired tokens later
-                localStorage.setItem("tokenIssuedAt", Date.now().toString());
-
-                navigate("/");
+                // Check for redirect location (e.g., if user was trying to access /profile)
+                const from = location.state?.from?.pathname || "/";
+                navigate(from);
             } else {
-                // 🔹 Clear any previous bad tokens if login fails
-                localStorage.removeItem("token");
-                localStorage.removeItem("user");
-
-                toast({
-                    title: "Login failed",
-                    description: data.message || "Invalid credentials. Please try again.",
-                    variant: "destructive",
-                });
+                throw new Error(data.message || "Invalid credentials or login failed.");
             }
         } catch (error) {
-            console.error("Login error:", error);
+            console.error("Login Error:", error);
             toast({
-                title: "Network error",
-                description: "Could not connect to the server. Please try again.",
+                title: "Login Failed",
+                description: (error as Error).message,
                 variant: "destructive",
             });
         } finally {
             setIsLoading(false);
         }
     };
+    // ----------------------------------------------------------------
 
 
     const handleSignup = async () => {
-        if (!signupAlias || !signupEmail || !signupPassword || !signupAge || !signupConfirmPassword) {
+        if (!signupAlias || !signupEmail || !signupPassword) {
             toast({
-                title: "Missing fields",
-                description: "All fields are required.",
+                title: "Validation Error",
+                description: "Please fill out all fields.",
                 variant: "destructive",
             });
             return;
         }
-
-        if (signupPassword !== signupConfirmPassword) {
+        if (signupPassword.length < 6) {
             toast({
-                title: "Password mismatch",
-                description: "Passwords do not match. Please try again.",
+                title: "Validation Error",
+                description: "Password must be at least 6 characters.",
                 variant: "destructive",
             });
             return;
         }
-
-        // Removed password strength check as requested (signupPassword.length < 6)
 
         setIsLoading(true);
         try {
             const response = await fetch(`${BASE_URL}/api/users/register`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                },
                 body: JSON.stringify({
                     alias: signupAlias,
                     email: signupEmail,
                     password: signupPassword,
-                    age: parseInt(signupAge, 10), // Ensure age is sent as a number
+                    userType: "Registered"
                 }),
             });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message);
 
-            toast({
-                title: "Account created!",
-                description: "Welcome to Quizicle! Please log in.",
-            });
-            setIsLogin(true);
-            setLoginEmail(signupEmail);
-            setLoginPassword("");
+            const data = await response.json();
+
+            if (response.ok) {
+                toast({
+                    title: "Success",
+                    description: "Registration successful! Please log in.",
+                });
+                setIsLogin(true); // Switch to login view
+                setLoginEmail(signupEmail); // Pre-fill login email
+            } else {
+                throw new Error(data.message || "Registration failed.");
+            }
         } catch (error) {
-            console.error("Signup error:", error);
+            console.error("Signup Error:", error);
             toast({
-                title: "Registration failed",
-                description: error.message || "Something went wrong. Please try again.",
+                title: "Registration Failed",
+                description: (error as Error).message,
                 variant: "destructive",
             });
         } finally {
@@ -172,38 +163,32 @@ const AuthSection = () => {
         }
     };
 
-    // NEW: Handler for Guest Login
     const handleGuestLogin = async () => {
         setIsLoading(true);
         try {
-            // POST /api/users/guestLogin - Empty body
-            const response = await fetch(`${BASE_URL}/api/users/guestLogin`, {
+            const response = await fetch(`${BASE_URL}/api/users/guest`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
             });
+
             const data = await response.json();
+
             if (response.ok) {
-                // The backend should return the token and a user object which includes playerType: 'Guest'
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("user", JSON.stringify(data.user));
 
                 toast({
-                    title: "Welcome, Guest!",
-                    description: "You are logged in as a guest. Register to save your progress!",
+                    title: "Welcome Guest",
+                    description: "Enjoy limited access. Complete your profile to register!",
                 });
                 navigate("/");
             } else {
-                toast({
-                    title: "Guest Login Failed",
-                    description: data.message || "Something went wrong during guest login.",
-                    variant: "destructive",
-                });
+                throw new Error(data.message || "Guest login failed.");
             }
         } catch (error) {
-            console.error("Guest login error:", error);
+            console.error("Guest Login Error:", error);
             toast({
-                title: "Network error",
-                description: "Could not connect to the server. Please try again.",
+                title: "Guest Access Failed",
+                description: (error as Error).message,
                 variant: "destructive",
             });
         } finally {
@@ -211,503 +196,383 @@ const AuthSection = () => {
         }
     };
 
-    const handleForgotPasswordRequest = async () => {
-        if (!forgotPasswordEmail) {
-            toast({
-                title: "Missing email",
-                description: "Please enter your email to reset your password.",
-                variant: "destructive",
-            });
+    const handleForgotPassword = async () => {
+        if (!resetEmail) {
+            toast({ title: "Validation Error", description: "Please enter your email.", variant: "destructive" });
             return;
         }
-
         setIsLoading(true);
         try {
-            const response = await fetch(`${BASE_URL}/api/resetPassword`, {
+            const response = await fetch(`${BASE_URL}/api/users/forgotPassword`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: forgotPasswordEmail }),
+                body: JSON.stringify({ email: resetEmail }),
             });
-            const data = await response.json();
 
             if (response.ok) {
                 toast({
-                    title: "Password Reset Link Sent",
-                    description: data.message || "If your email exists, a password reset link has been sent to your inbox.",
+                    title: "Password Reset Initiated",
+                    description: "A reset code has been sent to your email.",
                 });
-                setShowForgotPassword(false); // Go back to login form
-                setLoginEmail(forgotPasswordEmail); // Pre-fill login email
+                setShowForgotPassword(false);
+                setShowResetPassword(true); // Move to the code entry screen
             } else {
-                toast({
-                    title: "Failed to Send Link",
-                    description: data.error || "Something went wrong. Please try again.",
-                    variant: "destructive",
-                });
+                const data = await response.json();
+                throw new Error(data.message || "Failed to initiate password reset.");
             }
         } catch (error) {
-            console.error("Forgot password error:", error);
-            toast({
-                title: "Network error",
-                description: "Could not connect to the server. Please try again.",
-                variant: "destructive",
-            });
+            toast({ title: "Error", description: (error as Error).message, variant: "destructive" });
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleResetPassword = async () => {
-        if (!newPassword || !confirmNewPassword) {
+        if (!resetCode || !newPassword || newPassword.length < 6) {
             toast({
-                title: "Missing fields",
-                description: "Please enter and confirm your new password.",
+                title: "Validation Error",
+                description: "Enter a valid code and a new password (min 6 chars).",
                 variant: "destructive",
             });
             return;
         }
-
-        if (newPassword !== confirmNewPassword) {
-            toast({
-                title: "Password mismatch",
-                description: "New passwords do not match. Please try again.",
-                variant: "destructive",
-            });
-            return;
-        }
-
         setIsLoading(true);
         try {
-            const response = await fetch(`${BASE_URL}/api/updatePassword`, {
+            const response = await fetch(`${BASE_URL}/api/users/resetPassword`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token: resetPasswordToken, password: newPassword }),
+                body: JSON.stringify({
+                    email: resetEmail,
+                    resetCode,
+                    newPassword,
+                }),
             });
-            const data = await response.json();
 
             if (response.ok) {
                 toast({
-                    title: "Password Updated!",
-                    description: data.message,
+                    title: "Success",
+                    description: "Your password has been reset. Please log in.",
                 });
-                navigate("/"); // Redirect to home or login page after successful reset
-                setShowResetPassword(false);
-                setIsLogin(true);
+                setShowResetPassword(false); // Hide reset screen
+                setIsLogin(true); // Switch to login
+                setLoginEmail(resetEmail); // Pre-fill login email
             } else {
-                toast({
-                    title: "Password Reset Failed",
-                    description: data.error || "Invalid or expired token. Please try again.",
-                    variant: "destructive",
-                });
+                const data = await response.json();
+                throw new Error(data.message || "Failed to reset password. Code may be invalid.");
             }
         } catch (error) {
-            console.error("Reset password error:", error);
-            toast({
-                title: "Network error",
-                description: "Could not connect to the server. Please try again.",
-                variant: "destructive",
-            });
+            toast({ title: "Error", description: (error as Error).message, variant: "destructive" });
         } finally {
             setIsLoading(false);
         }
     };
 
-    const renderAuthForm = () => {
+    // Helper to call the correct handler
+    const onSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
         if (showResetPassword) {
-            return (
-                <form onSubmit={(e) => { e.preventDefault(); handleResetPassword(); }} className="space-y-6">
-                    <h3 className="text-xl font-bold text-foreground text-center">Reset Your Password</h3>
-                    <div className="space-y-2">
-                        <Label htmlFor="newPassword" className="text-foreground font-medium">New Password</Label>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                                id="newPassword"
-                                name="newPassword"
-                                type={showNewPassword ? "text" : "password"}
-                                placeholder="Enter your new password"
-                                value={newPassword}
-                                onChange={(e) => setNewPassword(e.target.value)}
-                                className="pl-10 pr-10 h-12 bg-background/50 border-border/50 focus:border-primary transition-colors"
-                                required
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowNewPassword(!showNewPassword)}
-                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="confirmNewPassword" className="text-foreground font-medium">Confirm New Password</Label>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                                id="confirmNewPassword"
-                                name="confirmNewPassword"
-                                type={showConfirmNewPassword ? "text" : "password"}
-                                placeholder="Confirm your new password"
-                                value={confirmNewPassword}
-                                onChange={(e) => setConfirmNewPassword(e.target.value)}
-                                className="pl-10 pr-10 h-12 bg-background/50 border-border/50 focus:border-primary transition-colors"
-                                required
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)}
-                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                                {showConfirmNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                        </div>
-                    </div>
-
-                    <Button
-                        type="submit"
-                        className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
-                        disabled={isLoading}
-                    >
-                        {isLoading ? (
-                            <div className="flex items-center space-x-2">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                                <span>Resetting Password...</span>
-                            </div>
-                        ) : (
-                            <>
-                                <Lock className="w-4 h-4 mr-2" />
-                                Reset Password
-                                <ArrowRight className="w-4 h-4 ml-2" />
-                            </>
-                        )}
-                    </Button>
-                </form>
-            );
+            handleResetPassword();
         } else if (showForgotPassword) {
-            return (
-                <form onSubmit={(e) => { e.preventDefault(); handleForgotPasswordRequest(); }} className="space-y-6">
-                    <h3 className="text-xl font-bold text-foreground text-center">Forgot Your Password?</h3>
-                    <p className="text-sm text-muted-foreground text-center">
-                        Enter your email address below and we'll send you a link to reset your password.
-                    </p>
-                    <div className="space-y-2">
-                        <Label htmlFor="forgotPasswordEmail" className="text-foreground font-medium">Email</Label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                                id="forgotPasswordEmail"
-                                name="forgotPasswordEmail"
-                                type="email"
-                                placeholder="Enter your email"
-                                value={forgotPasswordEmail}
-                                onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                                className="pl-10 h-12 bg-background/50 border-border/50 focus:border-primary transition-colors"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <Button
-                        type="submit"
-                        className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
-                        disabled={isLoading}
-                    >
-                        {isLoading ? (
-                            <div className="flex items-center space-x-2">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                                <span>Sending Link...</span>
-                            </div>
-                        ) : (
-                            <>
-                                <Mail className="w-4 h-4 mr-2" />
-                                Send Reset Link
-                                <ArrowRight className="w-4 h-4 ml-2" />
-                            </>
-                        )}
-                    </Button>
-                    <div className="text-center pt-4 border-t border-border/50">
-                        <button
-                            type="button"
-                            onClick={() => setShowForgotPassword(false)}
-                            className="text-primary hover:text-primary/80 font-medium transition-colors"
-                        >
-                            Back to Login
-                        </button>
-                    </div>
-                </form>
-            );
+            handleForgotPassword();
         } else if (isLogin) {
-            return (
-                // Login Form
-                <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-6">
-                    <div className="space-y-2">
-                        <Label htmlFor="loginEmail" className="text-foreground font-medium">Email</Label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                                id="loginEmail"
-                                name="loginEmail"
-                                type="email"
-                                placeholder="Enter your email"
-                                value={loginEmail}
-                                onChange={(e) => setLoginEmail(e.target.value)}
-                                className="pl-10 h-12 bg-background/50 border-border/50 focus:border-primary transition-colors"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="loginPassword" className="text-foreground font-medium">Password</Label>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                                id="loginPassword"
-                                name="loginPassword"
-                                type={showLoginPassword ? "text" : "password"}
-                                placeholder="Enter your password"
-                                value={loginPassword}
-                                onChange={(e) => setLoginPassword(e.target.value)}
-                                className="pl-10 pr-10 h-12 bg-background/50 border-border/50 focus:border-primary transition-colors"
-                                required
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowLoginPassword(!showLoginPassword)}
-                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                                {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => setShowForgotPassword(true)}
-                            className="text-sm text-primary hover:text-primary/80 font-medium transition-colors float-right"
-                        >
-                            Forgot Password?
-                        </button>
-                    </div>
-
-                    {/* Sign in button - GREEN */}
-                    <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
-                    >
-                        {isLoading ? (
-                            <div className="flex items-center justify-center space-x-2">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                                <span>Logging in...</span>
-                            </div>
-                        ) : (
-                            <div className="flex items-center justify-center">
-                                <Zap className="w-4 h-4 mr-2" />
-                                Login & Start Learning
-                                <ArrowRight className="w-4 h-4 ml-2" />
-                            </div>
-                        )}
-                    </button>
-
-                    {/* Guest Login - BLUE */}
-                    <button
-                        type="button"
-                        onClick={handleGuestLogin}
-                        disabled={isLoading}
-                        className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
-                    >
-                        {isLoading ? (
-                            <div className="flex items-center justify-center space-x-2">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                                <span>Logging in as Guest...</span>
-                            </div>
-                        ) : (
-                            <div className="flex items-center justify-center">
-                                <User className="w-4 h-4 mr-2" />
-                                Login as Guest
-                                <ArrowRight className="w-4 h-4 ml-2" />
-                            </div>
-                        )}
-                    </button>
-
-                </form>
-            );
+            handleLogin(); // Calls the corrected function
         } else {
-            return (
-                // Sign Up Form
-                <form onSubmit={(e) => { e.preventDefault(); handleSignup(); }} className="space-y-6">
-                    <div className="space-y-2">
-                        <Label htmlFor="signupAlias" className="text-foreground font-medium">Alias</Label> {/* Changed to Alias */}
-                        <div className="relative">
-                            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                                id="signupAlias"
-                                name="signupAlias"
-                                type="text"
-                                placeholder="Choose a display name"
-                                value={signupAlias}
-                                onChange={(e) => setSignupAlias(e.target.value)}
-                                className="pl-10 h-12 bg-background/50 border-border/50 focus:border-primary transition-colors"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="signupEmail" className="text-foreground font-medium">Email</Label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                                id="signupEmail"
-                                name="signupEmail"
-                                type="email"
-                                placeholder="Enter your email"
-                                value={signupEmail}
-                                onChange={(e) => setSignupEmail(e.target.value)}
-                                className="pl-10 h-12 bg-background/50 border-border/50 focus:border-primary transition-colors"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="signupAge" className="text-foreground font-medium">Age</Label> {/* Changed from Date of Birth to Age */}
-                        <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                                id="signupAge"
-                                name="signupAge"
-                                type="number" // Changed type to number
-                                placeholder="Enter your age"
-                                value={signupAge}
-                                onChange={(e) => setSignupAge(e.target.value)}
-                                className="pl-10 h-12 bg-background/50 border-border/50 focus:border-primary transition-colors"
-                                min="1" // Minimum age
-                                max="120" // Reasonable maximum age
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="signupPassword" className="text-foreground font-medium">Password</Label>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                                id="signupPassword"
-                                name="signupPassword"
-                                type={showSignupPassword ? "text" : "password"}
-                                placeholder="Create a password"
-                                value={signupPassword}
-                                onChange={(e) => setSignupPassword(e.target.value)}
-                                className="pl-10 pr-10 h-12 bg-background/50 border-border/50 focus:border-primary transition-colors"
-                                required
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowSignupPassword(!showSignupPassword)}
-                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                                {showSignupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                            Password must be at least 6 characters long
-                        </p>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="signupConfirmPassword" className="text-foreground font-medium">Confirm Password</Label>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                                id="signupConfirmPassword"
-                                name="signupConfirmPassword"
-                                type={showSignupConfirmPassword ? "text" : "password"} // Corrected state name here
-                                placeholder="Confirm your password"
-                                value={signupConfirmPassword}
-                                onChange={(e) => setSignupConfirmPassword(e.target.value)}
-                                className="pl-10 pr-10 h-12 bg-background/50 border-border/50 focus:border-primary transition-colors"
-                                required
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowSignupConfirmPassword(!showSignupConfirmPassword)} // Corrected state name here
-                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                                {showSignupConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                        </div>
-                    </div>
-                    <Button
-                        type="submit"
-                        className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
-                        disabled={isLoading}
-                    >
-                        {isLoading ? (
-                            <div className="flex items-center space-x-2">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                                <span>Creating account...</span>
-                            </div>
-                        ) : (
-                            <>
-                                <Brain className="w-4 h-4 mr-2" />
-                                Create Account & Start
-                                <ArrowRight className="w-4 h-4 ml-2" />
-                            </>
-                        )}
-                    </Button>
-
-                    {/* NEW: Login as Guest Divider */}
-                    <div className="flex items-center space-x-2 my-4">
-                        <hr className="flex-grow border-t border-border/50" />
-                        <span className="text-muted-foreground text-sm">OR</span>
-                        <hr className="flex-grow border-t border-border/50" />
-                    </div>
-
-                    {/* NEW: Login as Guest Button */}
-
-                </form>
-            );
+            handleSignup();
         }
     };
 
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background">
-            {/* Hero Background */}
-            <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5" />
-                <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-float" />
-                <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
+    const renderLoginForm = () => (
+        <form className="space-y-4" onSubmit={onSubmit}>
+            <div className="space-y-2">
+                <Label htmlFor="loginEmail">Email</Label>
+                <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        id="loginEmail"
+                        type="email"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        placeholder="your@email.com"
+                        className="pl-10"
+                        required
+                        disabled={isLoading}
+                    />
+                </div>
             </div>
 
-            <div className="relative container mx-auto px-4 py-12">
-                <div className="max-w-md mx-auto space-y-8">
-                    {/* Header */}
-                    <div className="text-center space-y-6">
-                        <div className="flex items-center justify-center space-x-2">
-                            {/* Replaced the image import with a placeholder URL */}
-                            <img
-                                src={logo}
-                                alt="Quizicle Logo"
-                                className="h-8 w-auto object-contain"
-                            />
-                        </div>
+            <div className="space-y-2">
+                <Label htmlFor="loginPassword">Password</Label>
+                <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        id="loginPassword"
+                        type={showLoginPassword ? "text" : "password"}
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="pl-10 pr-10"
+                        required
+                        disabled={isLoading}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                        aria-label={showLoginPassword ? "Hide password" : "Show password"}
+                    >
+                        {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                </div>
+            </div>
 
-                        <div className="space-y-2">
-                            <Badge className="bg-primary/20 text-primary border border-primary/30 px-4 py-2">
-                                🧠 Challenge Your Mind
-                            </Badge>
-                            <h2 className="text-2xl font-bold text-foreground">
-                                {showResetPassword ? "Reset Your Password" : (isLogin ? "Welcome Back!" : "Join the Challenge")}
-                            </h2>
-                            <p className="text-muted-foreground">
-                                {showResetPassword ? "Set a new password for your account" : (isLogin ? "Sign in to continue your learning journey" : "Create your account and start mastering quizzes")}
-                            </p>
-                        </div>
-                    </div>
+            <Button
+                type="submit"
+                className="w-full mt-6"
+                disabled={isLoading || !loginEmail || !loginPassword}
+            >
+                {isLoading ? "Signing In..." : "Sign In"}
+            </Button>
 
-                    {/* Auth Form */}
+            <div className="text-center">
+                <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                    disabled={isLoading}
+                >
+                    Forgot Password?
+                </button>
+            </div>
+
+            <div className="relative flex justify-center items-center py-4">
+                <div className="absolute w-full border-t border-border/50"></div>
+                <span className="relative bg-card/60 px-3 text-sm text-muted-foreground">OR</span>
+            </div>
+            
+            <Button
+                type="button"
+                variant="outline"
+                onClick={handleGuestLogin}
+                className="w-full flex items-center gap-2"
+                disabled={isLoading}
+            >
+                <User className="h-4 w-4" />
+                Continue as Guest
+            </Button>
+        </form>
+    );
+
+    const renderSignupForm = () => (
+        <form className="space-y-4" onSubmit={onSubmit}>
+            {/* Alias */}
+            <div className="space-y-2">
+                <Label htmlFor="signupAlias">Username/Alias</Label>
+                <div className="relative">
+                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        id="signupAlias"
+                        type="text"
+                        value={signupAlias}
+                        onChange={(e) => setSignupAlias(e.target.value)}
+                        placeholder="Your unique alias"
+                        className="pl-10"
+                        required
+                        disabled={isLoading}
+                    />
+                </div>
+            </div>
+            
+            {/* Email */}
+            <div className="space-y-2">
+                <Label htmlFor="signupEmail">Email</Label>
+                <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        id="signupEmail"
+                        type="email"
+                        value={signupEmail}
+                        onChange={(e) => setSignupEmail(e.target.value)}
+                        placeholder="your@email.com"
+                        className="pl-10"
+                        required
+                        disabled={isLoading}
+                    />
+                </div>
+            </div>
+
+            {/* Password */}
+            <div className="space-y-2">
+                <Label htmlFor="signupPassword">Password</Label>
+                <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        id="signupPassword"
+                        type={showSignupPassword ? "text" : "password"}
+                        value={signupPassword}
+                        onChange={(e) => setSignupPassword(e.target.value)}
+                        placeholder="•••••••• (min 6 chars)"
+                        className="pl-10 pr-10"
+                        required
+                        disabled={isLoading}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setShowSignupPassword(!showSignupPassword)}
+                        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                        aria-label={showSignupPassword ? "Hide password" : "Show password"}
+                    >
+                        {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                </div>
+            </div>
+
+            <Button
+                type="submit"
+                className="w-full mt-6 bg-green-600 hover:bg-green-700"
+                disabled={isLoading || !signupAlias || !signupEmail || !signupPassword}
+            >
+                {isLoading ? "Signing Up..." : "Sign Up"}
+            </Button>
+        </form>
+    );
+
+    const renderForgotPasswordForm = () => (
+        <form className="space-y-4" onSubmit={onSubmit}>
+            <p className="text-sm text-muted-foreground text-center">
+                Enter your email and we'll send you a code to reset your password.
+            </p>
+            <div className="space-y-2">
+                <Label htmlFor="resetEmail">Email</Label>
+                <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        id="resetEmail"
+                        type="email"
+                        value={resetEmail}
+                        onChange={(e) => setResetEmail(e.target.value)}
+                        placeholder="your@email.com"
+                        className="pl-10"
+                        required
+                        disabled={isLoading}
+                    />
+                </div>
+            </div>
+            
+            <Button
+                type="submit"
+                className="w-full mt-6"
+                disabled={isLoading || !resetEmail}
+            >
+                {isLoading ? "Sending Code..." : "Send Reset Code"}
+            </Button>
+            
+            <div className="text-center pt-4 border-t border-border/50">
+                <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(false)}
+                    className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
+                >
+                    Back to Sign In
+                </button>
+            </div>
+        </form>
+    );
+
+    const renderResetPasswordForm = () => (
+        <form className="space-y-4" onSubmit={onSubmit}>
+            <p className="text-sm text-muted-foreground text-center">
+                Enter the code sent to **{resetEmail}** and your new password.
+            </p>
+            <div className="space-y-2">
+                <Label htmlFor="resetCode">Reset Code</Label>
+                <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        id="resetCode"
+                        type="text"
+                        value={resetCode}
+                        onChange={(e) => setResetCode(e.target.value)}
+                        placeholder="Enter 6-digit code"
+                        className="pl-10"
+                        required
+                        disabled={isLoading}
+                    />
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="newPassword">New Password</Label>
+                <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        id="newPassword"
+                        type={showNewPassword ? "text" : "password"}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="New password (min 6 chars)"
+                        className="pl-10 pr-10"
+                        required
+                        disabled={isLoading}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                        aria-label={showNewPassword ? "Hide password" : "Show password"}
+                    >
+                        {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                </div>
+            </div>
+            
+            <Button
+                type="submit"
+                className="w-full mt-6"
+                disabled={isLoading || !resetCode || !newPassword}
+            >
+                {isLoading ? "Resetting..." : "Reset Password"}
+            </Button>
+            
+            <div className="text-center pt-4 border-t border-border/50">
+                <button
+                    type="button"
+                    onClick={() => {
+                        setShowResetPassword(false); 
+                        setShowForgotPassword(true);
+                    }}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                    Resend Code
+                </button>
+            </div>
+        </form>
+    );
+
+    const renderAuthForm = () => {
+        if (showResetPassword) return renderResetPasswordForm();
+        if (showForgotPassword) return renderForgotPasswordForm();
+        return isLogin ? renderLoginForm() : renderSignupForm();
+    };
+
+
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-900/90 py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-md w-full space-y-8">
+                <div className="text-center">
+                    <img
+                        className="mx-auto h-12 w-auto filter drop-shadow-lg"
+                        src={logo}
+                        alt="Quizicle Logo"
+                    />
+                    <h2 className="mt-6 text-3xl font-extrabold text-white">
+                        {showResetPassword ? "Reset Password" : showForgotPassword ? "Forgot Password" : isLogin ? "Sign In to your Account" : "Create a New Account"}
+                    </h2>
+                    <p className="mt-2 text-sm text-gray-400">
+                        {isLogin ? "Welcome back!" : "Start quizzing today!"}
+                    </p>
+                </div>
+                
+                <div className="flex justify-center">
                     <Card className="bg-card/60 backdrop-blur-sm border-border/50 shadow-xl">
                         <div className="p-8 space-y-6">
                             {renderAuthForm()}

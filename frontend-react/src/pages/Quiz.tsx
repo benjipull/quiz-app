@@ -217,7 +217,7 @@ export default function Quiz() {
   const location = useLocation();
   const explanationRef = useRef<HTMLDivElement>(null);
   const timerInSecondsRef = useRef<NodeJS.Timeout | null>(null);
-  const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null); // Kept for manual clearing on user action
+  const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null); 
   const hasStartedRef = useRef(false);
   
   // Store the preloaded next question
