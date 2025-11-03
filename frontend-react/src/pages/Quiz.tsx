@@ -42,8 +42,8 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
       value: "incorrect_answer",
       label: "Incorrect Answer",
     },
-    { 
-      value: "multiple_correct_answers", 
+    {
+      value: "multiple_correct_answers",
       label: "Multiple Correct Answers",
     },
     {
@@ -70,7 +70,7 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
       onSubmit(selectedReason, text);
     }
   };
-  
+
   const isSubmitDisabled = !selectedReason || (selectedReason === "other" && otherText.trim() === '') || isSubmitting;
 
   const CloseButton = () => (
@@ -91,7 +91,7 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
       <Card className="max-w-md w-full p-6 space-y-6">
         <div className="flex justify-between items-center">
           <h3 className="text-xl font-bold">{isThankYou ? "Thank You!" : "Report Question Issue"}</h3>
-          <CloseButton /> 
+          <CloseButton />
         </div>
 
         {isThankYou ? (
@@ -111,11 +111,10 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
               {reportOptions.map((option) => (
                 <div
                   key={option.value}
-                  className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                    selectedReason === option.value
+                  className={`p-3 border rounded-lg cursor-pointer transition-all ${selectedReason === option.value
                       ? "border-primary bg-primary/10"
                       : "hover:bg-muted border-border"
-                  }`}
+                    }`}
                   onClick={() => setSelectedReason(option.value)}
                 >
                   <label className="flex items-start space-x-2 cursor-pointer font-medium text-sm">
@@ -149,7 +148,7 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
 
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="outline" className="text-red-500 border-red-600 hover:bg-red-600"
-               onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+                onClick={onClose} disabled={isSubmitting}>Cancel</Button>
               <Button
                 variant="default"
                 onClick={handleSubmit}
@@ -220,7 +219,7 @@ export default function Quiz() {
   const timerInSecondsRef = useRef<NodeJS.Timeout | null>(null);
   const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null); // NEW: Auto-advance timer ref
   const hasStartedRef = useRef(false);
-  
+
   // NEW: Store the preloaded next question
   const nextQuestionRef = useRef<Question | null>(null);
   const isPreloadingRef = useRef(false);
@@ -276,7 +275,7 @@ export default function Quiz() {
       navigate("/");
     }
   };
-  
+
   // MODIFIED: Don't close dialog on submit, let completion status handle it
   const handleReportQuestion = async (reason: string, otherText: string) => {
     if (!quizState.question?._id) return;
@@ -301,7 +300,7 @@ export default function Quiz() {
       });
 
       if (response.ok) {
-         trackReport(quizState.question._id, reason, userToken);
+        trackReport(quizState.question._id, reason, userToken);
         setReportSuccess(true);
       } else {
         console.error("⚠️ Failed to submit report.");
@@ -440,7 +439,7 @@ export default function Quiz() {
     setShowExplanation(false);
     setFeedbackGiven(false);
     setFeedbackType(null);
-    
+
     // Clear auto-advance timer on new question load
     if (autoAdvanceTimerRef.current) {
       clearTimeout(autoAdvanceTimerRef.current);
@@ -473,7 +472,7 @@ export default function Quiz() {
     setLoading(true);
     setError(null);
     setIsCompletingQuiz(false);
-    
+
     setQuizState({
       started: true,
       completed: false,
@@ -518,10 +517,9 @@ export default function Quiz() {
         body: JSON.stringify({ categoryId, numQuestions: 10, userToken }),
       });
 
-      if (startResponse.ok) {
+      if (!startResponse.ok) {
         throw new Error("⚠️ Error starting quiz session.");
-      }
-      else {
+      } else {
         trackQuizStart(categoryId, userToken);
         await fetchNextQuestion();
       }
@@ -545,7 +543,7 @@ export default function Quiz() {
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1;
           if (newIndex === 1) {
-            startSound.play().catch(() => {});
+            startSound.play().catch(() => { });
           }
           return {
             ...prev,
@@ -723,7 +721,7 @@ export default function Quiz() {
       clearInterval(timerInSecondsRef.current);
       timerInSecondsRef.current = null;
     }
-    
+
     // Clear auto-advance timer if user clicks
     if (autoAdvanceTimerRef.current) {
       clearTimeout(autoAdvanceTimerRef.current);
@@ -811,7 +809,7 @@ export default function Quiz() {
 
     if (isLastQuestion) {
       // If user clicks "Finish Quiz" before auto-advance, complete it now
-      completeQuiz(); 
+      completeQuiz();
       return;
     }
     fetchNextQuestion();
@@ -847,7 +845,7 @@ export default function Quiz() {
         const errorData = await response.json();
         console.error("⚠️ Failed to update popularity:", errorData.message || errorData);
       }
-       trackFeedback(quizState.question._id, type, userToken);
+      trackFeedback(quizState.question._id, type, userToken);
     } catch (err) {
       console.error("⚠️ Error updating popularity:", err);
     }
@@ -1035,8 +1033,7 @@ export default function Quiz() {
                 >
                   {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
                     <div
-                      className={`absolute top-0 left-0 h-full animate-bar-fill rounded-r-xl ${
-                        answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
+                      className={`absolute top-0 left-0 h-full animate-bar-fill rounded-r-xl ${answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
                           ? 'bg-success/25 border-l-4 border-success'
                           : answer === selectedAnswer
                             ? 'bg-destructive/25 border-l-4 border-destructive'
@@ -1115,57 +1112,55 @@ export default function Quiz() {
                 </Card>
 
                 <div className="mt-6 space-y-4 animate-fade-in pb-4">
-                <Card className="p-4 md:p-6 bg-card/40 border-0 shadow-sm rounded-xl">
-                  <div className="space-y-4">
-                    <p className="text-sm font-medium text-center">Did you like this question?</p>
+                  <Card className="p-4 md:p-6 bg-card/40 border-0 shadow-sm rounded-xl">
+                    <div className="space-y-4">
+                      <p className="text-sm font-medium text-center">Did you like this question?</p>
 
-                    <div className="flex gap-4 justify-center">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleFeedback("up")}
-                        disabled={feedbackGiven}
-                        className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${
-                          feedbackType === "up"
-                            ? "bg-green-100 border-green-500 text-green-600"
-                            : feedbackGiven
-                              ? "opacity-50 cursor-not-allowed"
-                              : "border-green-500 text-green-600 hover:bg-green-500 hover:text-white"
-                        }`}
-                      >
-                        <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
-                        <span className="ml-1 sm:ml-2">Yes</span>
-                      </Button>
+                      <div className="flex gap-4 justify-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleFeedback("up")}
+                          disabled={feedbackGiven}
+                          className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${feedbackType === "up"
+                              ? "bg-green-100 border-green-500 text-green-600"
+                              : feedbackGiven
+                                ? "opacity-50 cursor-not-allowed"
+                                : "border-green-500 text-green-600 hover:bg-green-500 hover:text-white"
+                            }`}
+                        >
+                          <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
+                          <span className="ml-1 sm:ml-2">Yes</span>
+                        </Button>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleFeedback("down")}
-                        disabled={feedbackGiven}
-                        className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${
-                          feedbackType === "down"
-                            ? "bg-red-100 border-red-600 text-red-600"
-                            : feedbackGiven
-                              ? "opacity-50 cursor-not-allowed"
-                              : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
-                        }`}
-                      >
-                        <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
-                        <span className="ml-1 sm:ml-2">No</span>
-                      </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleFeedback("down")}
+                          disabled={feedbackGiven}
+                          className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${feedbackType === "down"
+                              ? "bg-red-100 border-red-600 text-red-600"
+                              : feedbackGiven
+                                ? "opacity-50 cursor-not-allowed"
+                                : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                            }`}
+                        >
+                          <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
+                          <span className="ml-1 sm:ml-2">No</span>
+                        </Button>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowReportDialog(true)}
-                        className="text-sm flex-1 max-w-[120px] h-10 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
-                      >
-                        <Flag className="h-4 w-4 md:h-5 md:w-5" />
-                        <span className="ml-1 sm:ml-2">Report</span>
-                      </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowReportDialog(true)}
+                          className="text-sm flex-1 max-w-[120px] h-10 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
+                        >
+                          <Flag className="h-4 w-4 md:h-5 md:w-5" />
+                          <span className="ml-1 sm:ml-2">Report</span>
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </Card>
+                  </Card>
 
                   <Button
                     variant="default"
