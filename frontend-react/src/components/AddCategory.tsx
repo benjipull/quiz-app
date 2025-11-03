@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Plus, X } from "lucide-react";
+import { Button } from "@/components/ui/button"; // ✅ Use themed button
 
 interface AddCategoryProps {
   fetchCategories?: () => void;
@@ -104,15 +105,14 @@ const AddCategory: React.FC<AddCategoryProps> = ({
           </p>
         </div>
 
-        <button
+        {/* ✅ Themed Create Button */}
+        <Button
           onClick={handleMainButtonClick}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-white 
-          bg-[linear-gradient(135deg,#0077ff,#00d4ff)] hover:opacity-90 transition-all duration-300 
-          shadow-lg hover:shadow-[0_0_15px_#00bfff]"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white shadow-lg"
         >
           <Plus className="h-4 w-4" />
           <span>Create</span>
-        </button>
+        </Button>
       </div>
 
       {/* Modal */}
@@ -126,14 +126,15 @@ const AddCategory: React.FC<AddCategoryProps> = ({
             rounded-2xl p-6 w-full max-w-md shadow-[0_0_30px_-5px_rgba(0,150,255,0.5)]"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Red Circular Close Button */}
-            <button
+            {/* ✅ Themed close button */}
+            <Button
               onClick={() => setIsOpen(false)}
-              className="absolute top-4 right-4 bg-red-600 hover:bg-red-700 text-white rounded-full p-2 transition-all 
-              shadow-md hover:shadow-red-500/40"
+              variant="destructive"
+              size="icon"
+              className="absolute top-4 right-4 rounded-full p-2 shadow-md"
             >
               <X className="w-4 h-4" />
-            </button>
+            </Button>
 
             <h2 className="text-xl font-bold text-white mb-6">Create New Quiz</h2>
 
@@ -145,27 +146,27 @@ const AddCategory: React.FC<AddCategoryProps> = ({
                 onChange={(e) => setCategoryName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreateCategory()}
                 className="w-full px-4 py-3 rounded-lg bg-zinc-800/80 text-white border border-zinc-700 
-                placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
+                placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
               />
 
               <div className="flex space-x-3">
-                <button
+                {/* ✅ Themed Create button */}
+                <Button
                   onClick={handleCreateCategory}
                   disabled={loading || !categoryName.trim()}
-                  className="flex-1 px-4 py-2 rounded-lg font-medium text-white 
-                  bg-[linear-gradient(135deg,#0077ff,#00d4ff)] hover:opacity-90 disabled:opacity-50 
-                  shadow-md hover:shadow-[0_0_15px_#00bfff] transition-all"
+                  className="flex-1"
                 >
                   {loading ? "Creating..." : "Create"}
-                </button>
+                </Button>
 
-                <button
+                {/* ✅ Themed Cancel button */}
+                <Button
                   onClick={() => setIsOpen(false)}
-                  className="flex-1 px-4 py-2 rounded-lg font-medium bg-zinc-700 hover:bg-zinc-600 
-                  text-white transition-all"
+                  variant="outline"
+                  className="flex-1 border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           </div>
