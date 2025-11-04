@@ -19,6 +19,7 @@ const reportSchema = new mongoose.Schema(
         "ambiguous_wording",
         "duplicate_question",
         "offensive_content",
+        "multiple_correct_answers",
         "other",
       ],
       required: true,

@@ -29,3 +29,7 @@ export function trackFeedback(questionId: string, type: "up" | "down", userId?: 
 export function trackReport(questionId: string, reason: string, userId?: string) {
   ReactGA.event("question_reported", { question_id: questionId, reason, user_id: userId });
 }
+
+export function setAnalyticsUserId(userId: string) {
+  ReactGA.set({ user_id: userId });
+}

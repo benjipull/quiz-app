@@ -254,6 +254,9 @@ export default function Quiz() {
   const [reportSuccess, setReportSuccess] = useState(false);
 
   const userToken = localStorage.getItem("token");
+  const storedUser = localStorage.getItem("user");
+  const userId = storedUser ? JSON.parse(storedUser)._id : null;
+
   const totalQuestions = 10;
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
 
@@ -296,7 +299,7 @@ export default function Quiz() {
       });
 
       if (response.ok) {
-        trackReport(quizState.question._id, reason, userToken);
+        trackReport(quizState.question._id, reason, userId);
         setReportSuccess(true);
       } else {
         console.error("⚠️ Failed to submit report.");
@@ -497,7 +500,7 @@ export default function Quiz() {
       if (!startResponse.ok) {
         throw new Error("⚠️ Error starting quiz session.");
       } else {
-        trackQuizStart(categoryId, userToken);
+        trackQuizStart(categoryId, userId);
         await fetchNextQuestion();
       }
 
@@ -649,7 +652,7 @@ export default function Quiz() {
 
       if (response.ok) {
         const completionData = await response.json();
-        trackQuizComplete(quizState.selectedCategory.id, quizState.correctAnswers, userToken);
+        trackQuizComplete(quizState.selectedCategory.id, quizState.correctAnswers, userId);
         setQuizState((prev) => ({
           ...prev,
           completed: true,
@@ -743,7 +746,7 @@ export default function Quiz() {
           incorrectSound.play().catch(() => { });
         }
 
-        trackQuestionAnswered(quizState.question?._id || "", isCorrect, userToken);
+        trackQuestionAnswered(quizState.question?._id || "", isCorrect, userId);
 
         setTimeout(() => {
           setShowBars(true);
@@ -804,7 +807,7 @@ export default function Quiz() {
         const errorData = await response.json();
         console.error("⚠️ Failed to update popularity:", errorData.message || errorData);
       }
-      trackFeedback(quizState.question._id, type, userToken);
+      trackFeedback(quizState.question._id, type, userId);
     } catch (err) {
       console.error("⚠️ Error updating popularity:", err);
     }

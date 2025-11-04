@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, User, Brain, Zap, ArrowRight, Calendar } from "lucide-react"; 
+import { Eye, EyeOff, Mail, Lock, User, Brain, Zap, ArrowRight, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import logo from "../assets/images/QuizicleLogo.png";
+import ReactGA from "react-ga4";
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
@@ -69,8 +70,8 @@ const AuthSection = () => {
                     "Content-Type": "application/json",
                 },
                 // 🎯 FIX: Explicitly send loginEmail and loginPassword.
-                body: JSON.stringify({ 
-                    email: loginEmail, 
+                body: JSON.stringify({
+                    email: loginEmail,
                     password: loginPassword // Ensure this state holds the value!
                 }),
             });
@@ -80,6 +81,11 @@ const AuthSection = () => {
             if (response.ok) {
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("user", JSON.stringify(data.user));
+                ReactGA.set({ userId: data.user._id });
+                ReactGA.event("login", {
+                    method: "user_login",
+                    user_id: data.user._id,
+                });
 
                 toast({
                     title: "Success",
@@ -175,6 +181,12 @@ const AuthSection = () => {
             if (response.ok) {
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("user", JSON.stringify(data.user));
+                
+                ReactGA.set({ userId: data.user._id });
+                ReactGA.event("login", {
+                    method: "guest_login",
+                    user_id: data.user._id,
+                });
 
                 toast({
                     title: "Welcome Guest",
@@ -348,7 +360,7 @@ const AuthSection = () => {
                 <div className="absolute w-full border-t border-border/50"></div>
                 <span className="relative bg-card/60 px-3 text-sm text-muted-foreground">OR</span>
             </div>
-            
+
             <Button
                 type="button"
                 variant="outline"
@@ -381,7 +393,7 @@ const AuthSection = () => {
                     />
                 </div>
             </div>
-            
+
             {/* Email */}
             <div className="space-y-2">
                 <Label htmlFor="signupEmail">Email</Label>
@@ -457,7 +469,7 @@ const AuthSection = () => {
                     />
                 </div>
             </div>
-            
+
             <Button
                 type="submit"
                 className="w-full mt-6"
@@ -465,7 +477,7 @@ const AuthSection = () => {
             >
                 {isLoading ? "Sending Code..." : "Send Reset Code"}
             </Button>
-            
+
             <div className="text-center pt-4 border-t border-border/50">
                 <button
                     type="button"
@@ -524,7 +536,7 @@ const AuthSection = () => {
                     </button>
                 </div>
             </div>
-            
+
             <Button
                 type="submit"
                 className="w-full mt-6"
@@ -532,12 +544,12 @@ const AuthSection = () => {
             >
                 {isLoading ? "Resetting..." : "Reset Password"}
             </Button>
-            
+
             <div className="text-center pt-4 border-t border-border/50">
                 <button
                     type="button"
                     onClick={() => {
-                        setShowResetPassword(false); 
+                        setShowResetPassword(false);
                         setShowForgotPassword(true);
                     }}
                     className="text-sm text-muted-foreground hover:text-primary transition-colors"
@@ -571,7 +583,7 @@ const AuthSection = () => {
                         {isLogin ? "Welcome back!" : "Start quizzing today!"}
                     </p>
                 </div>
-                
+
                 <div className="flex justify-center">
                     <Card className="bg-card/60 backdrop-blur-sm border-border/50 shadow-xl">
                         <div className="p-8 space-y-6">
