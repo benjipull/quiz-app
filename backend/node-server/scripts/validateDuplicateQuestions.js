@@ -31,7 +31,7 @@ async function queryOllama(prompt) {
     const raw = String(res.data.response || "").trim();
 
     // Extract everything from the first { to the end
-    const jsonMatch = raw.match(/\{[\s\S]*$/);
+    const jsonMatch = raw.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) {
       console.error("⚠️ Invalid JSON from model:", raw.slice(0, 200));
       return { duplicate: false, reason: "Invalid JSON (no { found)" };
