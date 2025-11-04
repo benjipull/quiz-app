@@ -2,53 +2,95 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const Category = require("./models/categoryModel");
 const connectDB = require("./config/db");
+const { populateCategoryLoop } = require("./scripts/populateCategories");
 
-const { populateCategoryLoop } = require("./scripts/populateCategories"); // Import the function
+// --- Config ---
+const BATCH_SIZE = 10;          // how many categories to process each iteration
+const QUESTIONS_TO_FILL = 20;   // how many questions to add per category
+const THRESHOLD = 100;           // only categories with <10 enabled questions
 
-async function populateAllCategories() {
-    try {
-
-        //console.log("🔍 MONGO_URI:", process.env.MONGO_URI);
-
-        await connectDB();
-
-        const categories = await Category.aggregate([
-            {
-                $project: {
-                    name: 1,
-                    questionCount: {
-                        $size: {
-                            $filter: {
-                                input: "$questions",
-                                as: "q",
-                                cond: { $eq: ["$$q.disabled", false] } // only enabled
-                            }
-                        }
-                    }
-                }
+/**
+ * Get categories with the lowest enabled-question count
+ */
+async function getLowestQuestionCategories(limit = BATCH_SIZE, threshold = THRESHOLD) {
+  return Category.aggregate([
+    {
+      $project: {
+        name: 1,
+        questionCount: {
+          $size: {
+            $filter: {
+              input: "$questions",
+              as: "q",
+              cond: { $eq: ["$$q.disabled", false] }, // count only enabled questions
             },
-            { $sort: { questionCount: 1 } }, // Sort by enabled question count (ascending)
-            { $limit: 20 } // Get only the lowest
-        ]);
-
-        if (categories.length === 0) {
-            console.error("❌ No categories found.");
-            return;
-        }
-
-        console.log(`🔹 Populating the categories with the lowest quesiton count.`);
-
-        for (const category of categories) {
-            await populateCategoryLoop(category._id, 40, "easy");
-        }
-
-        console.log("🎉 All categories populated successfully!");
-        mongoose.connection.close();
-    } catch (error) {
-        console.error("❌ Error populating categories:", error.message);
-        mongoose.connection.close();
-    }
+          },
+        },
+      },
+    },
+    { $match: { questionCount: { $lt: threshold } } }, // only low/empty categories
+    { $sort: { questionCount: 1 } },                   // lowest first
+    { $limit: limit },
+  ]);
 }
 
-// Execute the function
+/**
+ * Main population process
+ */
+async function populateAllCategories() {
+  try {
+    await connectDB();
+    console.log("🚀 Connected to MongoDB");
+    console.log("🔹 Starting category population loop...");
+
+    let totalNewQuestions = 0;
+    let iteration = 0;
+
+    while (true) {
+      iteration++;
+      console.log(`\n🔁 Iteration ${iteration}: checking for low-question categories...`);
+
+      const categories = await getLowestQuestionCategories();
+
+      if (categories.length === 0) {
+        console.log("✅ No categories need population — exiting.");
+        break;
+      }
+
+      let newQuestionsAdded = 0;
+
+      for (const category of categories) {
+        console.log(
+          `📘 Populating "${category.name}" (${category.questionCount} enabled questions)...`
+        );
+
+        // Call your AI population logic
+        const added = await populateCategoryLoop(category._id, QUESTIONS_TO_FILL, "easy");
+
+        if (added > 0) {
+          newQuestionsAdded += added;
+          totalNewQuestions += added;
+          console.log(`   ➕ Added ${added} questions`);
+        } else {
+          console.log(`   ⚠️ No new questions added for ${category.name}`);
+        }
+      }
+
+      if (newQuestionsAdded === 0) {
+        console.log("✅ No new questions added — all categories appear filled.");
+        break;
+      }
+
+    }
+
+    console.log(`🎉 Finished populating. Total new questions added: ${totalNewQuestions}`);
+  } catch (err) {
+    console.error("❌ Error populating categories:", err);
+  } finally {
+    await mongoose.connection.close();
+    console.log("🔒 MongoDB connection closed.");
+  }
+}
+
+// Run the script
 populateAllCategories();
