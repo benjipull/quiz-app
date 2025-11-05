@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, User, Brain, Zap, ArrowRight, Calendar } from "lucide-react";
+// Assuming these are imports for your Shadcn/UI components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,10 +70,9 @@ const AuthSection = () => {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                // 🎯 FIX: Explicitly send loginEmail and loginPassword.
                 body: JSON.stringify({
                     email: loginEmail,
-                    password: loginPassword // Ensure this state holds the value!
+                    password: loginPassword
                 }),
             });
 
@@ -169,10 +169,13 @@ const AuthSection = () => {
         }
     };
 
+    // ----------------------------------------------------------------
+    // 👤 CORE GUEST LOGIN FUNCTION (URL Corrected)
+    // ----------------------------------------------------------------
     const handleGuestLogin = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch(`${BASE_URL}/api/users/guest`, {
+            const response = await fetch(`${BASE_URL}/api/users/guestLogin`, { 
                 method: "POST",
             });
 
@@ -207,6 +210,7 @@ const AuthSection = () => {
             setIsLoading(false);
         }
     };
+    // ----------------------------------------------------------------
 
     const handleForgotPassword = async () => {
         if (!resetEmail) {
@@ -293,6 +297,32 @@ const AuthSection = () => {
         }
     };
 
+    // ----------------------------------------------------------------
+    // 🎨 RENDER GUEST BUTTON (Styling and moved for reuse)
+    // ----------------------------------------------------------------
+    const renderGuestButton = () => (
+        <>
+            <div className="relative flex justify-center items-center py-4">
+                <div className="absolute w-full border-t border-border/50"></div>
+                <span className="relative bg-card/60 px-3 text-sm text-muted-foreground">OR</span>
+            </div>
+
+           <Button
+            type="button"
+            onClick={handleGuestLogin}
+            variant="ghost"
+            className="w-full flex items-center justify-center gap-2 
+                        !bg-blue-600 hover:!bg-blue-700 !text-white 
+                        !border-blue-700 shadow-lg transition-all duration-200"
+            disabled={isLoading}
+            >
+            <User className="h-4 w-4" />
+            Continue as Guest
+            </Button>
+
+        </>
+    );
+
     const renderLoginForm = () => (
         <form className="space-y-4" onSubmit={onSubmit}>
             <div className="space-y-2">
@@ -339,7 +369,7 @@ const AuthSection = () => {
 
             <Button
                 type="submit"
-                className="w-full mt-6"
+                className="w-full mt-6 bg-green-600 hover:bg-green-700" // Kept green for primary action
                 disabled={isLoading || !loginEmail || !loginPassword}
             >
                 {isLoading ? "Signing In..." : "Sign In"}
@@ -349,28 +379,16 @@ const AuthSection = () => {
                 <button
                     type="button"
                     onClick={() => setShowForgotPassword(true)}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                    // CHANGE: Added purple color, underline, and font weight for link look
+                    className="text-sm text-purple-400 hover:text-purple-300 transition-colors font-medium underline-offset-4 hover:underline"
                     disabled={isLoading}
                 >
                     Forgot Password?
                 </button>
             </div>
 
-            <div className="relative flex justify-center items-center py-4">
-                <div className="absolute w-full border-t border-border/50"></div>
-                <span className="relative bg-card/60 px-3 text-sm text-muted-foreground">OR</span>
-            </div>
-
-            <Button
-                type="button"
-                variant="outline"
-                onClick={handleGuestLogin}
-                className="w-full flex items-center gap-2"
-                disabled={isLoading}
-            >
-                <User className="h-4 w-4" />
-                Continue as Guest
-            </Button>
+            {/* ADDED: Guest button via separate renderer */}
+            {renderGuestButton()}
         </form>
     );
 
@@ -445,6 +463,9 @@ const AuthSection = () => {
             >
                 {isLoading ? "Signing Up..." : "Sign Up"}
             </Button>
+
+            {/* ADDED: Guest button on Sign Up screen */}
+            {renderGuestButton()}
         </form>
     );
 
@@ -472,7 +493,7 @@ const AuthSection = () => {
 
             <Button
                 type="submit"
-                className="w-full mt-6"
+                className="w-full mt-6 bg-green-600 hover:bg-green-700" // Using primary green color
                 disabled={isLoading || !resetEmail}
             >
                 {isLoading ? "Sending Code..." : "Send Reset Code"}
@@ -539,7 +560,7 @@ const AuthSection = () => {
 
             <Button
                 type="submit"
-                className="w-full mt-6"
+                className="w-full mt-6 bg-green-600 hover:bg-green-700" // Using primary green color
                 disabled={isLoading || !resetCode || !newPassword}
             >
                 {isLoading ? "Resetting..." : "Reset Password"}
@@ -577,16 +598,14 @@ const AuthSection = () => {
                         alt="Quizicle Logo"
                     />
                     <h2 className="mt-6 text-3xl font-extrabold text-white">
-                        {showResetPassword ? "Reset Password" : showForgotPassword ? "Forgot Password" : isLogin ? "Sign In to your Account" : "Create a New Account"}
+                        {showResetPassword ? "Reset Password" : showForgotPassword ? "Forgot Password" : isLogin ? "Sign In" : "Create a New Account"}
                     </h2>
-                    <p className="mt-2 text-sm text-gray-400">
-                        {isLogin ? "Welcome back!" : "Start quizzing today!"}
-                    </p>
                 </div>
 
                 <div className="flex justify-center">
-                    <Card className="bg-card/60 backdrop-blur-sm border-border/50 shadow-xl">
-                        <div className="p-8 space-y-6">
+                    <Card className="bg-card/60 backdrop-blur-sm border-border/50 shadow-xl w-full">
+                        {/* Adjusted padding for better mobile fit, reducing "borders" */}
+                        <div className="p-6 sm:p-8 space-y-6"> 
                             {renderAuthForm()}
 
                             {/* Switch Form - only show if not in reset password mode */}
