@@ -222,6 +222,13 @@ export default function Quiz() {
   const nextQuestionRef = useRef<Question | null>(null);
   const isPreloadingRef = useRef(false);
 
+  // Audio refs for better performance
+  const startSoundRef = useRef<HTMLAudioElement | null>(null);
+  const correctSoundRef = useRef<HTMLAudioElement | null>(null);
+  const incorrectSoundRef = useRef<HTMLAudioElement | null>(null);
+  const tickingSoundRef = useRef<HTMLAudioElement | null>(null);
+  const buttonClickSoundRef = useRef<HTMLAudioElement | null>(null);
+
   const [quizState, setQuizState] = useState<QuizState>({
     started: false,
     completed: false,
@@ -252,6 +259,7 @@ export default function Quiz() {
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
+  const [isTickingPlaying, setIsTickingPlaying] = useState(false);
 
   const userToken = localStorage.getItem("token");
   const storedUser = localStorage.getItem("user");
@@ -260,9 +268,53 @@ export default function Quiz() {
   const totalQuestions = 10;
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
 
-  const startSound = new Audio("/intro-sound.mp3");
-  const correctSound = new Audio("/victory-beat.mp3");
-  const incorrectSound = new Audio("/incorrect.mp3");
+  // Initialize audio elements on mount
+  useEffect(() => {
+    startSoundRef.current = new Audio("/intro-sound.mp3");
+    correctSoundRef.current = new Audio("/victory-beat.mp3");
+    incorrectSoundRef.current = new Audio("/incorrect.mp3");
+    tickingSoundRef.current = new Audio("/success_bell.mp3");
+    buttonClickSoundRef.current = new Audio("/button-click.mp3");
+
+    // Set loop for ticking sound
+    if (tickingSoundRef.current) {
+      tickingSoundRef.current.loop = true;
+    }
+
+    // Preload all sounds
+    [startSoundRef, correctSoundRef, incorrectSoundRef, tickingSoundRef, buttonClickSoundRef].forEach(ref => {
+      if (ref.current) {
+        ref.current.load();
+      }
+    });
+
+    return () => {
+      // Cleanup
+      if (tickingSoundRef.current) {
+        tickingSoundRef.current.pause();
+        tickingSoundRef.current = null;
+      }
+    };
+  }, []);
+
+  // Handle ticking sound when time reaches 5 seconds
+  useEffect(() => {
+    if (timeLeft === 5 && !quizState.isAnswerSelected && !timeUp && !isTickingPlaying) {
+      if (tickingSoundRef.current) {
+        tickingSoundRef.current.currentTime = 0;
+        tickingSoundRef.current.play().catch(() => {});
+        setIsTickingPlaying(true);
+      }
+    }
+
+    if ((timeLeft === 0 || quizState.isAnswerSelected) && isTickingPlaying) {
+      if (tickingSoundRef.current) {
+        tickingSoundRef.current.pause();
+        tickingSoundRef.current.currentTime = 0;
+      }
+      setIsTickingPlaying(false);
+    }
+  }, [timeLeft, quizState.isAnswerSelected, timeUp, isTickingPlaying]);
 
   const handleBackNavigation = () => {
     setShowExitDialog(true);
@@ -316,15 +368,10 @@ export default function Quiz() {
   const closeReportDialog = () => {
     const wasSuccessful = reportSuccess; 
 
-    // Reset dialog states
     setShowReportDialog(false);
     setReportSuccess(false);
 
-    // If the report was successful, proceed to the next question or complete the quiz
     if (wasSuccessful) {
-      // Check if there are remaining questions (less than totalQuestions) or if we are at the last one
-      // Since reporting is done after answering (isAnswerSelected is true), calling handleNextQuestion 
-      // is the correct action to either fetch the next or complete the quiz.
       handleNextQuestion();
     }
   };
@@ -432,6 +479,13 @@ export default function Quiz() {
     setTimeUp(false);
     setShowBars(false);
     setAnswerResponse(null);
+    setIsTickingPlaying(false);
+    
+    // Stop ticking sound when changing questions
+    if (tickingSoundRef.current) {
+      tickingSoundRef.current.pause();
+      tickingSoundRef.current.currentTime = 0;
+    }
   }, [quizState.question, quizState.currentQuestionIndex]);
 
   useEffect(() => {
@@ -521,8 +575,8 @@ export default function Quiz() {
 
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1;
-          if (newIndex === 1) {
-            startSound.play().catch(() => { });
+          if (newIndex === 1 && startSoundRef.current) {
+            startSoundRef.current.play().catch(() => { });
           }
           return {
             ...prev,
@@ -551,8 +605,8 @@ export default function Quiz() {
 
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1;
-          if (newIndex === 1) {
-            startSound.play().catch(() => { });
+          if (newIndex === 1 && startSoundRef.current) {
+            startSoundRef.current.play().catch(() => { });
           }
           return {
             ...prev,
@@ -574,6 +628,13 @@ export default function Quiz() {
   const handleTimeUp = async () => {
     if (!userToken || !quizState.question) return;
 
+    // Stop ticking sound
+    if (tickingSoundRef.current) {
+      tickingSoundRef.current.pause();
+      tickingSoundRef.current.currentTime = 0;
+    }
+    setIsTickingPlaying(false);
+
     try {
       const response = await fetch(`${BASE_URL}/api/answerQuestion/${userToken}`, {
         method: "POST",
@@ -587,6 +648,12 @@ export default function Quiz() {
       if (response.ok) {
         const answerData: AnswerResponse = await response.json();
         setAnswerResponse(answerData);
+
+        // Play incorrect sound immediately
+        if (incorrectSoundRef.current) {
+          incorrectSoundRef.current.currentTime = 0;
+          incorrectSoundRef.current.play().catch(() => {});
+        }
 
         setQuizState((prevState) => ({
           ...prevState,
@@ -701,6 +768,13 @@ export default function Quiz() {
       timerInSecondsRef.current = null;
     }
 
+    // Stop ticking sound
+    if (tickingSoundRef.current) {
+      tickingSoundRef.current.pause();
+      tickingSoundRef.current.currentTime = 0;
+    }
+    setIsTickingPlaying(false);
+
     setSelectedAnswer(answer);
     setQuizState((prev) => ({
       ...prev,
@@ -723,6 +797,15 @@ export default function Quiz() {
 
         const isCorrect = answerData.isCorrect;
 
+        // Play sound and vibrate immediately
+        if (isCorrect && correctSoundRef.current) {
+          correctSoundRef.current.currentTime = 0;
+          correctSoundRef.current.play().catch(() => {});
+        } else if (!isCorrect && incorrectSoundRef.current) {
+          incorrectSoundRef.current.currentTime = 0;
+          incorrectSoundRef.current.play().catch(() => {});
+        }
+
         handleVibration(isCorrect);
 
         setQuizState((prev) => ({
@@ -739,12 +822,6 @@ export default function Quiz() {
             }
           ]
         }));
-
-        if (isCorrect) {
-          correctSound.play().catch(() => { });
-        } else {
-          incorrectSound.play().catch(() => { });
-        }
 
         trackQuestionAnswered(quizState.question?._id || "", isCorrect, userId);
 
@@ -770,6 +847,16 @@ export default function Quiz() {
   };
 
   const handleNextQuestion = () => {
+    // Play button click sound and vibrate
+    if (buttonClickSoundRef.current) {
+      buttonClickSoundRef.current.currentTime = 0;
+      buttonClickSoundRef.current.play().catch(() => {});
+    }
+    
+    if ("vibrate" in navigator) {
+      navigator.vibrate(50);
+    }
+
     if (isLastQuestion) {
       completeQuiz();
       return;
@@ -786,6 +873,16 @@ export default function Quiz() {
 
   const handleFeedback = async (type: "up" | "down") => {
     if (feedbackGiven || !quizState.question?._id) return;
+
+    // Play button click sound and vibrate
+    if (buttonClickSoundRef.current) {
+      buttonClickSoundRef.current.currentTime = 0;
+      buttonClickSoundRef.current.play().catch(() => {});
+    }
+    
+    if ("vibrate" in navigator) {
+      navigator.vibrate(50);
+    }
 
     setFeedbackGiven(true);
     setFeedbackType(type);
@@ -1030,7 +1127,7 @@ export default function Quiz() {
 
             {timeUp && (
               <div ref={explanationRef}>
-                <Card className="p-6 md:p-8 bg-destructive/5 animate-slide-up border-0 shadow-sm rounded-xl">
+                <Card className="p-6 md:p-8 bg-destructive/5 animate-slide-up border-4 border-destructive/30 shadow-lg rounded-xl">
                   <div className="text-center space-y-3">
                     <p className="font-semibold text-destructive text-base md:text-lg">⏰ Time's Up!</p>
                     <p className="text-sm md:text-base text-muted-foreground">
@@ -1059,7 +1156,7 @@ export default function Quiz() {
             )}
             {showExplanation && !timeUp && answerResponse && (
               <div ref={explanationRef}>
-                <Card className="p-6 md:p-8 bg-primary/5 animate-slide-up border-0 shadow-sm rounded-xl">
+                <Card className="p-6 md:p-8 bg-primary/5 animate-slide-up border-4 border-primary/40 shadow-lg rounded-xl">
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <Lightbulb className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-primary flex-shrink-0" />
