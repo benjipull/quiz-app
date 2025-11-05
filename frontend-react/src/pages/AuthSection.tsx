@@ -34,6 +34,7 @@ const AuthSection = () => {
     const [signupAlias, setSignupAlias] = useState("");
     const [signupEmail, setSignupEmail] = useState("");
     const [signupPassword, setSignupPassword] = useState("");
+    const [signupConfirmPassword, setSignupConfirmPassword] = useState(""); // NEW
     const [showSignupPassword, setShowSignupPassword] = useState(false);
 
     // Reset password states
@@ -51,7 +52,7 @@ const AuthSection = () => {
     }, [navigate]);
 
     // ----------------------------------------------------------------
-    // 🔑 CORE LOGIN FUNCTION (Corrected)
+    // 🔑 CORE LOGIN FUNCTION
     // ----------------------------------------------------------------
     const handleLogin = async () => {
         if (!loginEmail || !loginPassword) {
@@ -113,7 +114,7 @@ const AuthSection = () => {
 
 
     const handleSignup = async () => {
-        if (!signupAlias || !signupEmail || !signupPassword) {
+        if (!signupAlias || !signupEmail || !signupPassword || !signupConfirmPassword) {
             toast({
                 title: "Validation Error",
                 description: "Please fill out all fields.",
@@ -125,6 +126,15 @@ const AuthSection = () => {
             toast({
                 title: "Validation Error",
                 description: "Password must be at least 6 characters.",
+                variant: "destructive",
+            });
+            return;
+        }
+        // NEW: Check for password match
+        if (signupPassword !== signupConfirmPassword) {
+            toast({
+                title: "Validation Error",
+                description: "Passwords do not match.",
                 variant: "destructive",
             });
             return;
@@ -170,7 +180,7 @@ const AuthSection = () => {
     };
 
     // ----------------------------------------------------------------
-    // 👤 CORE GUEST LOGIN FUNCTION (URL Corrected)
+    // 👤 CORE GUEST LOGIN FUNCTION
     // ----------------------------------------------------------------
     const handleGuestLogin = async () => {
         setIsLoading(true);
@@ -298,7 +308,7 @@ const AuthSection = () => {
     };
 
     // ----------------------------------------------------------------
-    // 🎨 RENDER GUEST BUTTON (Styling and moved for reuse)
+    // 🎨 RENDER GUEST BUTTON
     // ----------------------------------------------------------------
     const renderGuestButton = () => (
         <>
@@ -456,10 +466,37 @@ const AuthSection = () => {
                 </div>
             </div>
 
+            {/* NEW: Confirm Password */}
+            <div className="space-y-2">
+                <Label htmlFor="signupConfirmPassword">Confirm Password</Label>
+                <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        id="signupConfirmPassword"
+                        type={showSignupPassword ? "text" : "password"} // Re-using showSignupPassword state
+                        value={signupConfirmPassword}
+                        onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                        placeholder="Confirm your password"
+                        className="pl-10 pr-10"
+                        required
+                        disabled={isLoading}
+                    />
+                    {/* Re-using the toggle button for confirm password visibility */}
+                    <button
+                        type="button"
+                        onClick={() => setShowSignupPassword(!showSignupPassword)}
+                        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                        aria-label={showSignupPassword ? "Hide password" : "Show password"}
+                    >
+                        {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                </div>
+            </div>
+
             <Button
                 type="submit"
                 className="w-full mt-6 bg-green-600 hover:bg-green-700"
-                disabled={isLoading || !signupAlias || !signupEmail || !signupPassword}
+                disabled={isLoading || !signupAlias || !signupEmail || !signupPassword || !signupConfirmPassword}
             >
                 {isLoading ? "Signing Up..." : "Sign Up"}
             </Button>
@@ -557,7 +594,7 @@ const AuthSection = () => {
                     </button>
                 </div>
             </div>
-
+            
             <Button
                 type="submit"
                 className="w-full mt-6 bg-green-600 hover:bg-green-700" // Using primary green color
