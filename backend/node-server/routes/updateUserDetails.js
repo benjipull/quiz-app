@@ -3,13 +3,14 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
 const authenticateToken = require("../middleware/auth");
+const bcrypt = require("bcryptjs");
 
 const router = express.Router();
 
 router.post("/", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { alias, age, avatar, email } = req.body;
+    const { alias, age, avatar, email, password } = req.body;
 
     // Find user
     const user = await User.findById(userId);
@@ -36,14 +37,25 @@ router.post("/", authenticateToken, async (req, res) => {
     if (age) user.age = age;
     if (avatar) user.avatar = avatar;
 
-    // 🧭 If user was Guest and provides a new email → upgrade to Registered
     if (email) {
       user.email = email.toLowerCase().trim();
 
+      // upgrading from Guest to Registered
       if (wasGuest) {
+        if (!password || password.length < 6) {
+          return res.status(400).json({
+            error: "Password is required and must be at least 6 characters long when registering.",
+          });
+        }
+        user.password = password;
         user.userType = "Registered";
       }
+      // allow registered users to change password too
+      else if (password) {
+        user.password = password;
+      }
     }
+
 
     user.lastupdated_at = new Date();
     await user.save();
