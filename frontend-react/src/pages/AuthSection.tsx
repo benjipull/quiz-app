@@ -33,6 +33,7 @@ const AuthSection = () => {
     const [signupAlias, setSignupAlias] = useState("");
     const [signupEmail, setSignupEmail] = useState("");
     const [signupPassword, setSignupPassword] = useState("");
+    const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
     const [showSignupPassword, setShowSignupPassword] = useState(false);
 
     // Reset password states
@@ -41,17 +42,12 @@ const AuthSection = () => {
     const [newPassword, setNewPassword] = useState("");
     const [showNewPassword, setShowNewPassword] = useState(false);
 
-
     useEffect(() => {
-        // If user already has a token, navigate home
         if (localStorage.getItem("token")) {
             navigate("/");
         }
     }, [navigate]);
 
-    // ----------------------------------------------------------------
-    // 🔑 CORE LOGIN FUNCTION (Corrected)
-    // ----------------------------------------------------------------
     const handleLogin = async () => {
         if (!loginEmail || !loginPassword) {
             toast({
@@ -69,10 +65,9 @@ const AuthSection = () => {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                // 🎯 FIX: Explicitly send loginEmail and loginPassword.
                 body: JSON.stringify({
                     email: loginEmail,
-                    password: loginPassword // Ensure this state holds the value!
+                    password: loginPassword
                 }),
             });
 
@@ -92,7 +87,6 @@ const AuthSection = () => {
                     description: "Login successful! Welcome back.",
                 });
 
-                // Check for redirect location (e.g., if user was trying to access /profile)
                 const from = location.state?.from?.pathname || "/";
                 navigate(from);
             } else {
@@ -109,11 +103,9 @@ const AuthSection = () => {
             setIsLoading(false);
         }
     };
-    // ----------------------------------------------------------------
-
 
     const handleSignup = async () => {
-        if (!signupAlias || !signupEmail || !signupPassword) {
+        if (!signupAlias || !signupEmail || !signupPassword || !signupConfirmPassword) {
             toast({
                 title: "Validation Error",
                 description: "Please fill out all fields.",
@@ -125,6 +117,14 @@ const AuthSection = () => {
             toast({
                 title: "Validation Error",
                 description: "Password must be at least 6 characters.",
+                variant: "destructive",
+            });
+            return;
+        }
+        if (signupPassword !== signupConfirmPassword) {
+            toast({
+                title: "Validation Error",
+                description: "Passwords do not match.",
                 variant: "destructive",
             });
             return;
@@ -148,12 +148,21 @@ const AuthSection = () => {
             const data = await response.json();
 
             if (response.ok) {
+                // Auto-login after registration
+                localStorage.setItem("token", data.token);
+                localStorage.setItem("user", JSON.stringify(data.user));
+                ReactGA.set({ userId: data.user._id });
+                ReactGA.event("signup", {
+                    method: "user_registration",
+                    user_id: data.user._id,
+                });
+
                 toast({
                     title: "Success",
-                    description: "Registration successful! Please log in.",
+                    description: "Registration successful! Welcome to Quizicle.",
                 });
-                setIsLogin(true); // Switch to login view
-                setLoginEmail(signupEmail); // Pre-fill login email
+                
+                navigate("/");
             } else {
                 throw new Error(data.message || "Registration failed.");
             }
@@ -172,7 +181,7 @@ const AuthSection = () => {
     const handleGuestLogin = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch(`${BASE_URL}/api/users/guest`, {
+            const response = await fetch(`${BASE_URL}/api/users/guestLogin`, { 
                 method: "POST",
             });
 
@@ -227,7 +236,7 @@ const AuthSection = () => {
                     description: "A reset code has been sent to your email.",
                 });
                 setShowForgotPassword(false);
-                setShowResetPassword(true); // Move to the code entry screen
+                setShowResetPassword(true);
             } else {
                 const data = await response.json();
                 throw new Error(data.message || "Failed to initiate password reset.");
@@ -265,9 +274,9 @@ const AuthSection = () => {
                     title: "Success",
                     description: "Your password has been reset. Please log in.",
                 });
-                setShowResetPassword(false); // Hide reset screen
-                setIsLogin(true); // Switch to login
-                setLoginEmail(resetEmail); // Pre-fill login email
+                setShowResetPassword(false);
+                setIsLogin(true);
+                setLoginEmail(resetEmail);
             } else {
                 const data = await response.json();
                 throw new Error(data.message || "Failed to reset password. Code may be invalid.");
@@ -279,7 +288,6 @@ const AuthSection = () => {
         }
     };
 
-    // Helper to call the correct handler
     const onSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (showResetPassword) {
@@ -287,11 +295,33 @@ const AuthSection = () => {
         } else if (showForgotPassword) {
             handleForgotPassword();
         } else if (isLogin) {
-            handleLogin(); // Calls the corrected function
+            handleLogin();
         } else {
             handleSignup();
         }
     };
+
+    const renderGuestButton = () => (
+        <>
+            <div className="relative flex justify-center items-center py-4">
+                <div className="absolute w-full border-t border-border/50"></div>
+                <span className="relative bg-card/60 px-3 text-sm text-muted-foreground">OR</span>
+            </div>
+
+            <Button
+                type="button"
+                onClick={handleGuestLogin}
+                variant="ghost"
+                className="w-full flex items-center justify-center gap-2 
+                            !bg-blue-600 hover:!bg-blue-700 !text-white 
+                            !border-blue-700 shadow-lg transition-all duration-200"
+                disabled={isLoading}
+            >
+                <User className="h-4 w-4" />
+                Continue as Guest
+            </Button>
+        </>
+    );
 
     const renderLoginForm = () => (
         <form className="space-y-4" onSubmit={onSubmit}>
@@ -339,7 +369,7 @@ const AuthSection = () => {
 
             <Button
                 type="submit"
-                className="w-full mt-6"
+                className="w-full mt-6 bg-green-600 hover:bg-green-700"
                 disabled={isLoading || !loginEmail || !loginPassword}
             >
                 {isLoading ? "Signing In..." : "Sign In"}
@@ -349,34 +379,19 @@ const AuthSection = () => {
                 <button
                     type="button"
                     onClick={() => setShowForgotPassword(true)}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                    className="text-sm text-purple-400 hover:text-purple-300 transition-colors font-medium underline-offset-4 hover:underline"
                     disabled={isLoading}
                 >
                     Forgot Password?
                 </button>
             </div>
 
-            <div className="relative flex justify-center items-center py-4">
-                <div className="absolute w-full border-t border-border/50"></div>
-                <span className="relative bg-card/60 px-3 text-sm text-muted-foreground">OR</span>
-            </div>
-
-            <Button
-                type="button"
-                variant="outline"
-                onClick={handleGuestLogin}
-                className="w-full flex items-center gap-2"
-                disabled={isLoading}
-            >
-                <User className="h-4 w-4" />
-                Continue as Guest
-            </Button>
+            {renderGuestButton()}
         </form>
     );
 
     const renderSignupForm = () => (
         <form className="space-y-4" onSubmit={onSubmit}>
-            {/* Alias */}
             <div className="space-y-2">
                 <Label htmlFor="signupAlias">Username/Alias</Label>
                 <div className="relative">
@@ -394,7 +409,6 @@ const AuthSection = () => {
                 </div>
             </div>
 
-            {/* Email */}
             <div className="space-y-2">
                 <Label htmlFor="signupEmail">Email</Label>
                 <div className="relative">
@@ -412,7 +426,6 @@ const AuthSection = () => {
                 </div>
             </div>
 
-            {/* Password */}
             <div className="space-y-2">
                 <Label htmlFor="signupPassword">Password</Label>
                 <div className="relative">
@@ -438,13 +451,40 @@ const AuthSection = () => {
                 </div>
             </div>
 
+            <div className="space-y-2">
+                <Label htmlFor="signupConfirmPassword">Confirm Password</Label>
+                <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        id="signupConfirmPassword"
+                        type={showSignupPassword ? "text" : "password"}
+                        value={signupConfirmPassword}
+                        onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                        placeholder="Confirm your password"
+                        className="pl-10 pr-10"
+                        required
+                        disabled={isLoading}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setShowSignupPassword(!showSignupPassword)}
+                        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                        aria-label={showSignupPassword ? "Hide password" : "Show password"}
+                    >
+                        {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                </div>
+            </div>
+
             <Button
                 type="submit"
                 className="w-full mt-6 bg-green-600 hover:bg-green-700"
-                disabled={isLoading || !signupAlias || !signupEmail || !signupPassword}
+                disabled={isLoading || !signupAlias || !signupEmail || !signupPassword || !signupConfirmPassword}
             >
                 {isLoading ? "Signing Up..." : "Sign Up"}
             </Button>
+
+            {renderGuestButton()}
         </form>
     );
 
@@ -472,7 +512,7 @@ const AuthSection = () => {
 
             <Button
                 type="submit"
-                className="w-full mt-6"
+                className="w-full mt-6 bg-green-600 hover:bg-green-700"
                 disabled={isLoading || !resetEmail}
             >
                 {isLoading ? "Sending Code..." : "Send Reset Code"}
@@ -493,7 +533,7 @@ const AuthSection = () => {
     const renderResetPasswordForm = () => (
         <form className="space-y-4" onSubmit={onSubmit}>
             <p className="text-sm text-muted-foreground text-center">
-                Enter the code sent to **{resetEmail}** and your new password.
+                Enter the code sent to <span className="font-semibold">{resetEmail}</span> and your new password.
             </p>
             <div className="space-y-2">
                 <Label htmlFor="resetCode">Reset Code</Label>
@@ -536,10 +576,10 @@ const AuthSection = () => {
                     </button>
                 </div>
             </div>
-
+            
             <Button
                 type="submit"
-                className="w-full mt-6"
+                className="w-full mt-6 bg-green-600 hover:bg-green-700"
                 disabled={isLoading || !resetCode || !newPassword}
             >
                 {isLoading ? "Resetting..." : "Reset Password"}
@@ -566,48 +606,41 @@ const AuthSection = () => {
         return isLogin ? renderLoginForm() : renderSignupForm();
     };
 
-
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-900/90 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-md w-full space-y-8">
+        <div className="min-h-screen flex items-center justify-center bg-gray-900/90 py-8 px-4 sm:py-12 sm:px-6 lg:px-8">
+            <div className="max-w-md w-full space-y-6 sm:space-y-8">
                 <div className="text-center">
                     <img
-                        className="mx-auto h-12 w-auto filter drop-shadow-lg"
+                        className="mx-auto h-10 sm:h-12 w-auto filter drop-shadow-lg"
                         src={logo}
                         alt="Quizicle Logo"
                     />
-                    <h2 className="mt-6 text-3xl font-extrabold text-white">
-                        {showResetPassword ? "Reset Password" : showForgotPassword ? "Forgot Password" : isLogin ? "Sign In to your Account" : "Create a New Account"}
+                    <h2 className="mt-4 sm:mt-6 text-2xl sm:text-3xl font-extrabold text-white">
+                        {showResetPassword ? "Reset Password" : showForgotPassword ? "Forgot Password" : isLogin ? "Sign In" : "Create Account"}
                     </h2>
-                    <p className="mt-2 text-sm text-gray-400">
-                        {isLogin ? "Welcome back!" : "Start quizzing today!"}
-                    </p>
                 </div>
 
-                <div className="flex justify-center">
-                    <Card className="bg-card/60 backdrop-blur-sm border-border/50 shadow-xl">
-                        <div className="p-8 space-y-6">
-                            {renderAuthForm()}
+                <Card className="bg-card/60 backdrop-blur-sm border-border/50 shadow-xl w-full">
+                    <div className="p-4 sm:p-6 md:p-8 space-y-5 sm:space-y-6"> 
+                        {renderAuthForm()}
 
-                            {/* Switch Form - only show if not in reset password mode */}
-                            {!showResetPassword && (
-                                <div className="text-center pt-4 border-t border-border/50">
-                                    <p className="text-muted-foreground">
-                                        {isLogin && !showForgotPassword ? "Don't have an account? " : "Already have an account? "}
-                                        {!showForgotPassword && (
-                                            <button
-                                                onClick={() => setIsLogin(!isLogin)}
-                                                className="text-primary hover:text-primary/80 font-medium transition-colors"
-                                            >
-                                                {isLogin ? "Sign up here" : "Sign in here"}
-                                            </button>
-                                        )}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </Card>
-                </div>
+                        {!showResetPassword && (
+                            <div className="text-center pt-4 border-t border-border/50">
+                                <p className="text-sm text-muted-foreground">
+                                    {isLogin && !showForgotPassword ? "Don't have an account? " : "Already have an account? "}
+                                    {!showForgotPassword && (
+                                        <button
+                                            onClick={() => setIsLogin(!isLogin)}
+                                            className="text-primary hover:text-primary/80 font-medium transition-colors"
+                                        >
+                                            {isLogin ? "Sign up here" : "Sign in here"}
+                                        </button>
+                                    )}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </Card>
             </div>
         </div>
     );

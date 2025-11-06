@@ -217,14 +217,17 @@ export default function Quiz() {
   const location = useLocation();
   const explanationRef = useRef<HTMLDivElement>(null);
   const timerInSecondsRef = useRef<NodeJS.Timeout | null>(null);
-  const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null); 
   const hasStartedRef = useRef(false);
   
-  // Store the preloaded next question
-
-  // NEW: Store the preloaded next question
   const nextQuestionRef = useRef<Question | null>(null);
   const isPreloadingRef = useRef(false);
+
+  // Audio refs for better performance
+  const startSoundRef = useRef<HTMLAudioElement | null>(null);
+  const correctSoundRef = useRef<HTMLAudioElement | null>(null);
+  const incorrectSoundRef = useRef<HTMLAudioElement | null>(null);
+  const tickingSoundRef = useRef<HTMLAudioElement | null>(null);
+  const buttonClickSoundRef = useRef<HTMLAudioElement | null>(null);
 
   const [quizState, setQuizState] = useState<QuizState>({
     started: false,
@@ -256,6 +259,7 @@ export default function Quiz() {
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
+  const [isTickingPlaying, setIsTickingPlaying] = useState(false);
 
   const userToken = localStorage.getItem("token");
   const storedUser = localStorage.getItem("user");
@@ -263,11 +267,54 @@ export default function Quiz() {
 
   const totalQuestions = 10;
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
-  const AUTO_COMPLETE_DELAY_MS = 5000; // NEW: Delay before auto-completing the quiz
 
-  const startSound = new Audio("/intro-sound.mp3");
-  const correctSound = new Audio("/victory-beat.mp3");
-  const incorrectSound = new Audio("/incorrect.mp3");
+  // Initialize audio elements on mount
+  useEffect(() => {
+    startSoundRef.current = new Audio("/intro-sound.mp3");
+    correctSoundRef.current = new Audio("/victory-beat.mp3");
+    incorrectSoundRef.current = new Audio("/incorrect.mp3");
+    tickingSoundRef.current = new Audio("/success_bell.mp3");
+    buttonClickSoundRef.current = new Audio("/button-click.mp3");
+
+    // Set loop for ticking sound
+    if (tickingSoundRef.current) {
+      tickingSoundRef.current.loop = true;
+    }
+
+    // Preload all sounds
+    [startSoundRef, correctSoundRef, incorrectSoundRef, tickingSoundRef, buttonClickSoundRef].forEach(ref => {
+      if (ref.current) {
+        ref.current.load();
+      }
+    });
+
+    return () => {
+      // Cleanup
+      if (tickingSoundRef.current) {
+        tickingSoundRef.current.pause();
+        tickingSoundRef.current = null;
+      }
+    };
+  }, []);
+
+  // Handle ticking sound when time reaches 5 seconds
+  useEffect(() => {
+    if (timeLeft === 5 && !quizState.isAnswerSelected && !timeUp && !isTickingPlaying) {
+      if (tickingSoundRef.current) {
+        tickingSoundRef.current.currentTime = 0;
+        tickingSoundRef.current.play().catch(() => {});
+        setIsTickingPlaying(true);
+      }
+    }
+
+    if ((timeLeft === 0 || quizState.isAnswerSelected) && isTickingPlaying) {
+      if (tickingSoundRef.current) {
+        tickingSoundRef.current.pause();
+        tickingSoundRef.current.currentTime = 0;
+      }
+      setIsTickingPlaying(false);
+    }
+  }, [timeLeft, quizState.isAnswerSelected, timeUp, isTickingPlaying]);
 
   const handleBackNavigation = () => {
     setShowExitDialog(true);
@@ -281,7 +328,6 @@ export default function Quiz() {
     }
   };
 
-  // MODIFIED: Don't close dialog on submit, let completion status handle it
   const handleReportQuestion = async (reason: string, otherText: string) => {
     if (!quizState.question?._id) return;
 
@@ -320,19 +366,16 @@ export default function Quiz() {
   };
 
   const closeReportDialog = () => {
-    // Check if the report was successfully submitted before resetting state
-    const shouldAdvance = reportSuccess; 
+    const wasSuccessful = reportSuccess; 
 
     setShowReportDialog(false);
-    setReportSuccess(false); // Reset success state
+    setReportSuccess(false);
 
-    // NEW: If the report was successful and the user closed the dialog, advance the quiz.
-    if (shouldAdvance) {
+    if (wasSuccessful) {
       handleNextQuestion();
     }
   };
 
-  // NEW: Preload next question function
   const preloadNextQuestion = async () => {
     if (!userToken || isPreloadingRef.current || isLastQuestion) return;
 
@@ -353,7 +396,6 @@ export default function Quiz() {
         };
         nextQuestionRef.current = questionWithTimer;
       } else {
-        // No more questions, prepare to complete
         nextQuestionRef.current = null;
       }
     } catch (error) {
@@ -423,20 +465,7 @@ export default function Quiz() {
         }
       }, 500);
     }
-    // NEW: Trigger auto-complete if it's the last question and explanation is shown
-    if (showExplanation && isLastQuestion && !isCompletingQuiz) {
-        autoAdvanceTimerRef.current = setTimeout(() => {
-            completeQuiz();
-        }, AUTO_COMPLETE_DELAY_MS);
-    }
-
-    return () => {
-      if (autoAdvanceTimerRef.current) {
-        clearTimeout(autoAdvanceTimerRef.current);
-        autoAdvanceTimerRef.current = null;
-      }
-    };
-  }, [showExplanation, isLastQuestion, isCompletingQuiz]);
+  }, [showExplanation]);
 
   useEffect(() => {
     setSelectedAnswer(null);
@@ -444,18 +473,19 @@ export default function Quiz() {
     setFeedbackGiven(false);
     setFeedbackType(null);
 
-    // Clear auto-advance timer on new question load
-    if (autoAdvanceTimerRef.current) {
-      clearTimeout(autoAdvanceTimerRef.current);
-      autoAdvanceTimerRef.current = null;
-    }
-
     const newTime = quizState.question?.timerInSeconds || 30;
     setTimeLeft(newTime);
 
     setTimeUp(false);
     setShowBars(false);
     setAnswerResponse(null);
+    setIsTickingPlaying(false);
+    
+    // Stop ticking sound when changing questions
+    if (tickingSoundRef.current) {
+      tickingSoundRef.current.pause();
+      tickingSoundRef.current.currentTime = 0;
+    }
   }, [quizState.question, quizState.currentQuestionIndex]);
 
   useEffect(() => {
@@ -537,23 +567,16 @@ export default function Quiz() {
   const fetchNextQuestion = async () => {
     if (!userToken || quizState.completed || isCompletingQuiz) return;
 
-    // Clear auto-complete timer on manual next
-    if (autoAdvanceTimerRef.current) {
-      clearTimeout(autoAdvanceTimerRef.current);
-      autoAdvanceTimerRef.current = null;
-    }
-
     setLoading(true);
     try {
-      // Check if we have a preloaded question
       if (nextQuestionRef.current) {
         const questionWithTimer = nextQuestionRef.current;
         nextQuestionRef.current = null;
 
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1;
-          if (newIndex === 1) {
-            startSound.play().catch(() => { });
+          if (newIndex === 1 && startSoundRef.current) {
+            startSoundRef.current.play().catch(() => { });
           }
           return {
             ...prev,
@@ -566,7 +589,6 @@ export default function Quiz() {
         return;
       }
 
-      // Otherwise fetch normally
       const response = await fetch(`${BASE_URL}/api/nextQuestion/${userToken}`, {
         headers: {
           "Content-Type": "application/json",
@@ -583,8 +605,8 @@ export default function Quiz() {
 
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1;
-          if (newIndex === 1) {
-            startSound.play().catch(() => { });
+          if (newIndex === 1 && startSoundRef.current) {
+            startSoundRef.current.play().catch(() => { });
           }
           return {
             ...prev,
@@ -606,6 +628,13 @@ export default function Quiz() {
   const handleTimeUp = async () => {
     if (!userToken || !quizState.question) return;
 
+    // Stop ticking sound
+    if (tickingSoundRef.current) {
+      tickingSoundRef.current.pause();
+      tickingSoundRef.current.currentTime = 0;
+    }
+    setIsTickingPlaying(false);
+
     try {
       const response = await fetch(`${BASE_URL}/api/answerQuestion/${userToken}`, {
         method: "POST",
@@ -619,6 +648,12 @@ export default function Quiz() {
       if (response.ok) {
         const answerData: AnswerResponse = await response.json();
         setAnswerResponse(answerData);
+
+        // Play incorrect sound immediately
+        if (incorrectSoundRef.current) {
+          incorrectSoundRef.current.currentTime = 0;
+          incorrectSoundRef.current.play().catch(() => {});
+        }
 
         setQuizState((prevState) => ({
           ...prevState,
@@ -635,7 +670,6 @@ export default function Quiz() {
           ]
         }));
         
-        // Timeout counts as an answer, show bars and explanation
         setTimeout(() => {
           setShowBars(true);
         }, 300);
@@ -644,12 +678,8 @@ export default function Quiz() {
           setShowExplanation(true);
         }, 1800);
 
-        // NEW: Preload next question after timeout
         if (!isLastQuestion) {
           preloadNextQuestion();
-        } else {
-          // FIX: If last question, let the explanation effect handle completion
-          // completeQuiz(); // REMOVED: Let useEffect handle it for consistency
         }
       }
     } catch (error) {
@@ -658,15 +688,7 @@ export default function Quiz() {
   };
   
   const completeQuiz = async () => {
-    // START FIX: Added quizState.completed check to prevent re-entry after success
     if (quizState.completed || isCompletingQuiz || !userToken || !quizState.selectedCategory) return;
-    // END FIX
-
-    // Clear auto-advance timer when completing the quiz
-    if (autoAdvanceTimerRef.current) {
-      clearTimeout(autoAdvanceTimerRef.current);
-      autoAdvanceTimerRef.current = null;
-    }
 
     setIsCompletingQuiz(true);
     setLoading(true);
@@ -722,11 +744,9 @@ export default function Quiz() {
       setError("Error completing quiz. Please try again.");
     } finally {
       setLoading(false);
-      // START FIX: Only clear isCompletingQuiz if the quiz wasn't successfully completed (i.e., an error occurred)
       if (!quizState.completed) { 
-          setIsCompletingQuiz(false); 
+        setIsCompletingQuiz(false); 
       }
-      // END FIX
     }
   };
 
@@ -748,12 +768,12 @@ export default function Quiz() {
       timerInSecondsRef.current = null;
     }
 
-    // Clear auto-advance timer if user clicks
-    if (autoAdvanceTimerRef.current) {
-      clearTimeout(autoAdvanceTimerRef.current);
-      autoAdvanceTimerRef.current = null;
+    // Stop ticking sound
+    if (tickingSoundRef.current) {
+      tickingSoundRef.current.pause();
+      tickingSoundRef.current.currentTime = 0;
     }
-
+    setIsTickingPlaying(false);
 
     setSelectedAnswer(answer);
     setQuizState((prev) => ({
@@ -777,6 +797,15 @@ export default function Quiz() {
 
         const isCorrect = answerData.isCorrect;
 
+        // Play sound and vibrate immediately
+        if (isCorrect && correctSoundRef.current) {
+          correctSoundRef.current.currentTime = 0;
+          correctSoundRef.current.play().catch(() => {});
+        } else if (!isCorrect && incorrectSoundRef.current) {
+          incorrectSoundRef.current.currentTime = 0;
+          incorrectSoundRef.current.play().catch(() => {});
+        }
+
         handleVibration(isCorrect);
 
         setQuizState((prev) => ({
@@ -794,12 +823,6 @@ export default function Quiz() {
           ]
         }));
 
-        if (isCorrect) {
-          correctSound.play().catch(() => { });
-        } else {
-          incorrectSound.play().catch(() => { });
-        }
-
         trackQuestionAnswered(quizState.question?._id || "", isCorrect, userId);
 
         setTimeout(() => {
@@ -808,15 +831,11 @@ export default function Quiz() {
 
         setTimeout(() => {
           setShowExplanation(true);
-          // Auto-completion for the last question is now handled in the useEffect
         }, 300);
 
-        // NEW: Preload next question after answering
         if (!isLastQuestion) {
           preloadNextQuestion();
-        } 
-        // NOTE: Removed the call to completeQuiz() here.
-        // It's now moved to useEffect based on showExplanation + isLastQuestion.
+        }
 
       } else {
         setError("Failed to submit answer. Please try again.");
@@ -828,14 +847,17 @@ export default function Quiz() {
   };
 
   const handleNextQuestion = () => {
-    // Clear auto-advance timer if user clicks the button or is manually advancing
-    if (autoAdvanceTimerRef.current) {
-      clearTimeout(autoAdvanceTimerRef.current);
-      autoAdvanceTimerRef.current = null;
+    // Play button click sound and vibrate
+    if (buttonClickSoundRef.current) {
+      buttonClickSoundRef.current.currentTime = 0;
+      buttonClickSoundRef.current.play().catch(() => {});
+    }
+    
+    if ("vibrate" in navigator) {
+      navigator.vibrate(50);
     }
 
     if (isLastQuestion) {
-      // If user clicks "Finish Quiz" before auto-advance, complete it now
       completeQuiz();
       return;
     }
@@ -851,6 +873,16 @@ export default function Quiz() {
 
   const handleFeedback = async (type: "up" | "down") => {
     if (feedbackGiven || !quizState.question?._id) return;
+
+    // Play button click sound and vibrate
+    if (buttonClickSoundRef.current) {
+      buttonClickSoundRef.current.currentTime = 0;
+      buttonClickSoundRef.current.play().catch(() => {});
+    }
+    
+    if ("vibrate" in navigator) {
+      navigator.vibrate(50);
+    }
 
     setFeedbackGiven(true);
     setFeedbackType(type);
@@ -1095,7 +1127,7 @@ export default function Quiz() {
 
             {timeUp && (
               <div ref={explanationRef}>
-                <Card className="p-6 md:p-8 bg-destructive/5 animate-slide-up border-0 shadow-sm rounded-xl">
+                <Card className="p-6 md:p-8 bg-destructive/5 animate-slide-up border-4 border-destructive/30 shadow-lg rounded-xl">
                   <div className="text-center space-y-3">
                     <p className="font-semibold text-destructive text-base md:text-lg">⏰ Time's Up!</p>
                     <p className="text-sm md:text-base text-muted-foreground">
@@ -1115,7 +1147,7 @@ export default function Quiz() {
                     size="lg"
                     className="w-full h-14 md:h-16 text-base md:text-lg"
                     onClick={handleNextQuestion}
-                    disabled={isCompletingQuiz || (isLastQuestion && showExplanation)} // Disable when last question and waiting for auto-complete
+                    disabled={isCompletingQuiz}
                   >
                     {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
                   </Button>
@@ -1124,7 +1156,7 @@ export default function Quiz() {
             )}
             {showExplanation && !timeUp && answerResponse && (
               <div ref={explanationRef}>
-                <Card className="p-6 md:p-8 bg-primary/5 animate-slide-up border-0 shadow-sm rounded-xl">
+                <Card className="p-6 md:p-8 bg-primary/5 animate-slide-up border-4 border-primary/40 shadow-lg rounded-xl">
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <Lightbulb className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-primary flex-shrink-0" />
@@ -1194,7 +1226,7 @@ export default function Quiz() {
                     size="lg"
                     className="w-full h-14 md:h-16 text-base md:text-lg"
                     onClick={handleNextQuestion}
-                    disabled={isCompletingQuiz || (isLastQuestion && showExplanation)} // Disable when last question and waiting for auto-complete
+                    disabled={isCompletingQuiz}
                   >
                     {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
                   </Button>
