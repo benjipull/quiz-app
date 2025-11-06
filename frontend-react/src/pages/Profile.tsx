@@ -99,10 +99,10 @@ const Profile = () => {
       };
 
       // 2. Send combined request to updateUserDetails endpoint
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("token");8
       if (!token) throw new Error("Authentication token missing.");
       
-      const response = await fetch(`${BASE_URL}/api/users/updateUserDetails`, {
+      const response = await fetch(`${BASE_URL}/api/updateUserDetails`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
