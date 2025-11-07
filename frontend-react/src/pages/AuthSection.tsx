@@ -1,5 +1,3 @@
-// AuthSection.tsx
-
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, User, Brain, Zap, ArrowRight, Calendar } from "lucide-react";
@@ -31,12 +29,13 @@ const AuthSection = () => {
     const [loginPassword, setLoginPassword] = useState("");
     const [showLoginPassword, setShowLoginPassword] = useState(false);
 
-    // Signup form states
+    // Signup form states - CORRECTED: Added signupAge state
     const [signupAlias, setSignupAlias] = useState("");
     const [signupEmail, setSignupEmail] = useState("");
     const [signupPassword, setSignupPassword] = useState("");
     const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
     const [showSignupPassword, setShowSignupPassword] = useState(false);
+    const [signupAge, setSignupAge] = useState(""); 
 
     // Reset password states
     const [resetEmail, setResetEmail] = useState("");
@@ -104,75 +103,85 @@ const AuthSection = () => {
     };
 
     const handleSignup = async () => {
-        if (!signupAlias || !signupEmail || !signupPassword || !signupConfirmPassword) {
-            toast({
-                title: "Validation Error",
-                description: "Please fill out all fields.",
-                variant: "destructive",
-            });
-            return;
-        }
-        if (signupPassword.length < 6) {
-            toast({
-                title: "Validation Error",
-                description: "Password must be at least 6 characters.",
-                variant: "destructive",
-            });
-            return;
-        }
-        if (signupPassword !== signupConfirmPassword) {
-            toast({
-                title: "Validation Error",
-                description: "Passwords do not match.",
-                variant: "destructive",
-            });
-            return;
-        }
+  if (!signupAlias || !signupEmail || !signupPassword || !signupConfirmPassword || !signupAge) {
+    toast({
+      title: "Validation Error",
+      description: "Please fill out all fields.",
+      variant: "destructive",
+    });
+    return;
+  }
 
-        setIsLoading(true);
-        try {
-            const response = await fetch(`${BASE_URL}/api/users/register`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    alias: signupAlias,
-                    email: signupEmail,
-                    password: signupPassword,
-                    userType: "Registered"
-                }),
-            });
+  const ageNum = parseInt(signupAge);
+  if (isNaN(ageNum) || ageNum < 5) {
+    toast({
+      title: "Validation Error",
+      description: "You must be at least 5 years old to sign up.",
+      variant: "destructive",
+    });
+    return;
+  }
 
-            const data = await response.json();
+  if (signupPassword.length < 6) {
+    toast({
+      title: "Validation Error",
+      description: "Password must be at least 6 characters.",
+      variant: "destructive",
+    });
+    return;
+  }
 
-            if (response.ok) {
-                // Auto-login after registration
-                localStorage.setItem("token", data.token);
-                localStorage.setItem("user", JSON.stringify(data.user));
-                setGAUser(data.user._id);
-                trackLogin("user_login", data.user._id);
+  if (signupPassword !== signupConfirmPassword) {
+    toast({
+      title: "Validation Error",
+      description: "Passwords do not match.",
+      variant: "destructive",
+    });
+    return;
+  }
 
-                toast({
-                    title: "Success",
-                    description: "Registration successful! Welcome to Quizicle.",
-                });
-                
-                navigate("/");
-            } else {
-                throw new Error(data.message || "Registration failed.");
-            }
-        } catch (error) {
-            console.error("Signup Error:", error);
-            toast({
-                title: "Registration Failed",
-                description: (error as Error).message,
-                variant: "destructive",
-            });
-        } finally {
-            setIsLoading(false);
-        }
-    };
+  setIsLoading(true);
+  try {
+    const response = await fetch(`${BASE_URL}/api/users/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        alias: signupAlias,
+        email: signupEmail,
+        password: signupPassword,
+        age: ageNum,
+        userType: "Registered",
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      toast({
+        title: "Success",
+        description: "Registration successful! Please sign in to continue.",
+      });
+
+      // 🧠 Instead of auto-login, just switch to login mode
+      setIsLogin(true);
+      setLoginEmail(signupEmail);
+      setLoginPassword("");
+    } else {
+      throw new Error(data.message || "Registration failed.");
+    }
+  } catch (error) {
+    console.error("Signup Error:", error);
+    toast({
+      title: "Registration Failed",
+      description: (error as Error).message,
+      variant: "destructive",
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
     const handleGuestLogin = async () => {
         setIsLoading(true);
@@ -469,10 +478,32 @@ const AuthSection = () => {
                 </div>
             </div>
 
+             {/* Age Input Section */}
+             <div className="space-y-2">
+                 <Label htmlFor="signupAge" className="text-foreground font-medium">Age</Label>
+                 <div className="relative">
+                     <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                     <Input
+                         id="signupAge"
+                         name="signupAge"
+                         type="number" 
+                         placeholder="Enter your age (Min 5)" 
+                         value={signupAge}
+                         onChange={(e) => setSignupAge(e.target.value)}
+                         className="pl-10 h-12 bg-background/50 border-border/50 focus:border-primary transition-colors"
+                         min="5"
+                         max="120"
+                         required
+                         disabled={isLoading}
+                     />
+                 </div>
+             </div>
+             {/* End Age Input Section */}
+
             <Button
                 type="submit"
                 className="w-full mt-6 bg-green-600 hover:bg-green-700"
-                disabled={isLoading || !signupAlias || !signupEmail || !signupPassword || !signupConfirmPassword}
+                disabled={isLoading || !signupAlias || !signupEmail || !signupPassword || !signupConfirmPassword || !signupAge} // **CORRECTION: Added !signupAge check**
             >
                 {isLoading ? "Signing Up..." : "Sign Up"}
             </Button>
