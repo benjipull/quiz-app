@@ -16,3 +16,16 @@ export const trackQuizComplete = (categoryId: string, score: number, userId?: st
     score,
     user_id: userId
   });
+
+export const trackLogin = (method: string, userId?: string) => {
+  ReactGA.event("login", {
+    method,
+    user_id: userId,
+  });
+};
+
+export const trackSignup = (userId?: string) => {
+  ReactGA.event("signup", {
+    user_id: userId,
+  });
+};
