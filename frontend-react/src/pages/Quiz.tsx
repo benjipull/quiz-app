@@ -9,8 +9,6 @@ import {
   trackQuizStart,
   trackQuestionAnswered,
   trackQuizComplete,
-  trackFeedback,
-  trackReport,
 } from "@/utils/analytics";
 
 const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmText, cancelText }: any) => (
@@ -351,7 +349,6 @@ export default function Quiz() {
       });
 
       if (response.ok) {
-        trackReport(quizState.question._id, reason, userId);
         setReportSuccess(true);
       } else {
         console.error("⚠️ Failed to submit report.");
@@ -904,7 +901,6 @@ export default function Quiz() {
         const errorData = await response.json();
         console.error("⚠️ Failed to update popularity:", errorData.message || errorData);
       }
-      trackFeedback(quizState.question._id, type, userId);
     } catch (err) {
       console.error("⚠️ Error updating popularity:", err);
     }
