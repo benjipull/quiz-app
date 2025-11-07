@@ -134,6 +134,7 @@ export default function Home() {
   useEffect(() => {
     // Only fetch categories if userProfile is loaded AND we have a token 
     if (userProfile && userToken) {
+      trackHomeScreen(userProfile._id);
       fetchUserCategories();
     }
   }, [userProfile, userToken]);
@@ -148,7 +149,6 @@ export default function Home() {
       if (storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
-          trackHomeScreen(parsedUser._id);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
           setIsGuest(parsedUser.userType === 'Guest');
