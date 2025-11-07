@@ -106,10 +106,6 @@ export default function Home() {
         await loadUserProfile();
         setDataLoaded(true);
 
-        if (userProfile?._id) {
-          trackHomeScreen(userProfile._id);
-        }
-
         if (shouldShowSplash) {
           const elapsedTime = Date.now() - startTime;
           const remainingTime = Math.max(0, minSplashDuration - elapsedTime);
@@ -152,6 +148,7 @@ export default function Home() {
       if (storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
+          trackHomeScreen(parsedUser._id);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
           setIsGuest(parsedUser.userType === 'Guest');
