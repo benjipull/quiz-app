@@ -29,3 +29,9 @@ export const trackSignup = (userId?: string) => {
     user_id: userId,
   });
 };
+
+export const trackHomeScreen = (userId?: string) => {
+  ReactGA.event("home_screen", {
+    user_id: userId,
+  });
+};
