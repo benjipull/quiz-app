@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/utils/apiClient"; 
 // Note: We no longer need Dialog/DialogContent/DialogHeader/DialogTitle
 
-const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 // Avatar images are still loaded to display the *current* avatar, 
 // but selection logic is removed for guests.

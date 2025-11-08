@@ -214,7 +214,7 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
   );
 };
 
-const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 interface Question {
   _id: string;

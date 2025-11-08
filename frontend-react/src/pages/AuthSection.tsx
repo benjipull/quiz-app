@@ -12,7 +12,7 @@ import logo from "../assets/images/QuizicleLogo.png";
 import { setGAUser } from "@/utils/gaClient";
 import { trackLogin, trackSignup } from "@/utils/analytics";
 
-const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 const AuthSection = () => {
     const navigate = useNavigate();
