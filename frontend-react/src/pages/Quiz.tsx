@@ -13,14 +13,84 @@ import {
   trackReport,
 } from "@/utils/analytics";
 
+// Starfield background component with fewer stars
+const StarfieldBackground = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const stars: Array<{ x: number; y: number; size: number; speed: number; opacity: number }> = [];
+    const numStars = 50; // Reduced from 150 to 50
+
+    for (let i = 0; i < numStars; i++) {
+      stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2 + 0.5,
+        speed: Math.random() * 0.3 + 0.05, // Slower speed
+        opacity: Math.random() * 0.4 + 0.3 // Lower opacity
+      });
+    }
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      stars.forEach(star => {
+        ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+        
+        star.y += star.speed;
+        if (star.y > canvas.height) {
+          star.y = 0;
+          star.x = Math.random() * canvas.width;
+        }
+      });
+      
+      requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    const handleResize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="fixed inset-0 pointer-events-none"
+      style={{ zIndex: 1 }}
+    />
+  );
+};
+
 const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmText, cancelText }: any) => (
   <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <Card className="max-w-sm w-full p-6 space-y-4">
-      <h3 className="text-lg font-bold">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
+    <Card className="max-w-sm w-full p-6 space-y-4 bg-gradient-to-br from-purple-900/95 to-indigo-900/95 border-2 border-purple-400/50 backdrop-blur-md">
+      <h3 className="text-lg font-bold text-white">{title}</h3>
+      <p className="text-sm text-purple-100">{description}</p>
       <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={onCancel}>{cancelText}</Button>
-        <Button variant="destructive" onClick={onConfirm}>{confirmText}</Button>
+        <Button variant="outline" onClick={onCancel} className="border-2 border-purple-400 text-purple-200 hover:bg-purple-500/30">
+          {cancelText}
+        </Button>
+        <Button onClick={onConfirm} className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white border-0">
+          {confirmText}
+        </Button>
       </div>
     </Card>
   </div>
@@ -38,30 +108,12 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
   const [otherText, setOtherText] = useState('');
 
   const reportOptions = [
-    {
-      value: "incorrect_answer",
-      label: "Incorrect Answer",
-    },
-    {
-      value: "multiple_correct_answers",
-      label: "Multiple Correct Answers",
-    },
-    {
-      value: "ambiguous_wording",
-      label: "Ambiguous or Poorly Worded Question",
-    },
-    {
-      value: "duplicate_question",
-      label: "Duplicate Question",
-    },
-    {
-      value: "offensive_content",
-      label: "Offensive or Inappropriate Content",
-    },
-    {
-      value: "other",
-      label: "Other (please describe)",
-    },
+    { value: "incorrect_answer", label: "Incorrect Answer" },
+    { value: "multiple_correct_answers", label: "Multiple Correct Answers" },
+    { value: "ambiguous_wording", label: "Ambiguous or Poorly Worded Question" },
+    { value: "duplicate_question", label: "Duplicate Question" },
+    { value: "offensive_content", label: "Offensive or Inappropriate Content" },
+    { value: "other", label: "Other (please describe)" },
   ];
 
   const handleSubmit = () => {
@@ -73,37 +125,34 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
 
   const isSubmitDisabled = !selectedReason || (selectedReason === "other" && otherText.trim() === '') || isSubmitting;
 
-  const CloseButton = () => (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={onClose}
-      disabled={isSubmitting}
-      className="bg-red-600 hover:bg-red-700 rounded-full h-8 w-8 p-1 text-white"
-      aria-label="Close"
-    >
-      <X className="h-5 w-5" />
-    </Button>
-  );
-
   return (
     <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <Card className="max-w-md w-full p-6 space-y-6">
+      <Card className="max-w-md w-full p-6 space-y-6 bg-gradient-to-br from-purple-900/95 to-indigo-900/95 border-2 border-purple-400/50 backdrop-blur-md">
         <div className="flex justify-between items-center">
-          <h3 className="text-xl font-bold">{isThankYou ? "Thank You!" : "Report Question Issue"}</h3>
-          <CloseButton />
+          <h3 className="text-xl font-bold text-white">{isThankYou ? "Thank You!" : "Report Question Issue"}</h3>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="bg-red-600 hover:bg-red-700 rounded-full h-8 w-8 p-1 text-white"
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
 
         {isThankYou ? (
           <div className="text-center space-y-4">
-            <p className="text-base text-muted-foreground">
+            <p className="text-base text-purple-100">
               Thank you for helping us improve our quiz! Your feedback is highly appreciated.
             </p>
-            <Button onClick={onClose} variant="default">Close</Button>
+            <Button onClick={onClose} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white border-0">
+              Close
+            </Button>
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-purple-100">
               Please select the issue that best describes the problem with this question.
             </p>
 
@@ -111,13 +160,14 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
               {reportOptions.map((option) => (
                 <div
                   key={option.value}
-                  className={`p-3 border rounded-lg cursor-pointer transition-all ${selectedReason === option.value
-                      ? "border-primary bg-primary/10"
-                      : "hover:bg-muted border-border"
-                    }`}
+                  className={`p-3 border-2 rounded-xl cursor-pointer transition-all ${
+                    selectedReason === option.value
+                      ? "border-purple-400 bg-purple-500/30 shadow-lg shadow-purple-500/20"
+                      : "hover:bg-purple-500/20 border-purple-500/40 hover:border-purple-400"
+                  }`}
                   onClick={() => setSelectedReason(option.value)}
                 >
-                  <label className="flex items-start space-x-2 cursor-pointer font-medium text-sm">
+                  <label className="flex items-start space-x-2 cursor-pointer font-medium text-sm text-white">
                     <input
                       type="radio"
                       name="report-issue"
@@ -126,33 +176,35 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
                       onChange={() => setSelectedReason(option.value)}
                       className="hidden"
                     />
-                    <div className="flex flex-col">
-                      <span className="font-semibold">{option.label}</span>
-                    </div>
+                    <span>{option.label}</span>
                   </label>
                 </div>
               ))}
             </div>
 
             {selectedReason === "other" && (
-              <div>
-                <textarea
-                  placeholder="Describe the issue..."
-                  value={otherText}
-                  onChange={(e) => setOtherText(e.target.value)}
-                  className="w-full p-3 border rounded-lg resize-none text-sm text-gray-900 focus:ring-primary focus:border-primary mt-2"
-                  rows={3}
-                />
-              </div>
+              <textarea
+                placeholder="Describe the issue..."
+                value={otherText}
+                onChange={(e) => setOtherText(e.target.value)}
+                className="w-full p-3 border-2 border-purple-500/50 rounded-xl resize-none text-sm text-white bg-purple-950/50 focus:ring-2 focus:ring-purple-400 focus:border-purple-400 placeholder-purple-300 mt-2"
+                rows={3}
+              />
             )}
 
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" className="text-red-500 border-red-600 hover:bg-red-600"
-                onClick={onClose} disabled={isSubmitting}>Cancel</Button>
               <Button
-                variant="default"
+                variant="outline"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="border-2 border-red-500 text-red-400 hover:bg-red-600 hover:text-white"
+              >
+                Cancel
+              </Button>
+              <Button
                 onClick={handleSubmit}
                 disabled={isSubmitDisabled}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white border-0"
               >
                 {isSubmitting ? "Submitting..." : "Submit Report"}
               </Button>
@@ -222,13 +274,6 @@ export default function Quiz() {
   const nextQuestionRef = useRef<Question | null>(null);
   const isPreloadingRef = useRef(false);
 
-  // Audio refs for better performance
-  const startSoundRef = useRef<HTMLAudioElement | null>(null);
-  const correctSoundRef = useRef<HTMLAudioElement | null>(null);
-  const incorrectSoundRef = useRef<HTMLAudioElement | null>(null);
-  const tickingSoundRef = useRef<HTMLAudioElement | null>(null);
-  const buttonClickSoundRef = useRef<HTMLAudioElement | null>(null);
-
   const [quizState, setQuizState] = useState<QuizState>({
     started: false,
     completed: false,
@@ -259,7 +304,6 @@ export default function Quiz() {
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
-  const [isTickingPlaying, setIsTickingPlaying] = useState(false);
 
   const userToken = localStorage.getItem("token");
   const storedUser = localStorage.getItem("user");
@@ -268,53 +312,9 @@ export default function Quiz() {
   const totalQuestions = 10;
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
 
-  // Initialize audio elements on mount
-  useEffect(() => {
-    startSoundRef.current = new Audio("/intro-sound.mp3");
-    correctSoundRef.current = new Audio("/victory-beat.mp3");
-    incorrectSoundRef.current = new Audio("/incorrect.mp3");
-    tickingSoundRef.current = new Audio("/success_bell.mp3");
-    buttonClickSoundRef.current = new Audio("/button-click.mp3");
-
-    // Set loop for ticking sound
-    if (tickingSoundRef.current) {
-      tickingSoundRef.current.loop = true;
-    }
-
-    // Preload all sounds
-    [startSoundRef, correctSoundRef, incorrectSoundRef, tickingSoundRef, buttonClickSoundRef].forEach(ref => {
-      if (ref.current) {
-        ref.current.load();
-      }
-    });
-
-    return () => {
-      // Cleanup
-      if (tickingSoundRef.current) {
-        tickingSoundRef.current.pause();
-        tickingSoundRef.current = null;
-      }
-    };
-  }, []);
-
-  // Handle ticking sound when time reaches 5 seconds
-  useEffect(() => {
-    if (timeLeft === 5 && !quizState.isAnswerSelected && !timeUp && !isTickingPlaying) {
-      if (tickingSoundRef.current) {
-        tickingSoundRef.current.currentTime = 0;
-        tickingSoundRef.current.play().catch(() => {});
-        setIsTickingPlaying(true);
-      }
-    }
-
-    if ((timeLeft === 0 || quizState.isAnswerSelected) && isTickingPlaying) {
-      if (tickingSoundRef.current) {
-        tickingSoundRef.current.pause();
-        tickingSoundRef.current.currentTime = 0;
-      }
-      setIsTickingPlaying(false);
-    }
-  }, [timeLeft, quizState.isAnswerSelected, timeUp, isTickingPlaying]);
+  const startSound = new Audio("/intro-sound.mp3");
+  const correctSound = new Audio("/victory-beat.mp3");
+  const incorrectSound = new Audio("/incorrect.mp3");
 
   const handleBackNavigation = () => {
     setShowExitDialog(true);
@@ -479,13 +479,6 @@ export default function Quiz() {
     setTimeUp(false);
     setShowBars(false);
     setAnswerResponse(null);
-    setIsTickingPlaying(false);
-    
-    // Stop ticking sound when changing questions
-    if (tickingSoundRef.current) {
-      tickingSoundRef.current.pause();
-      tickingSoundRef.current.currentTime = 0;
-    }
   }, [quizState.question, quizState.currentQuestionIndex]);
 
   useEffect(() => {
@@ -575,8 +568,8 @@ export default function Quiz() {
 
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1;
-          if (newIndex === 1 && startSoundRef.current) {
-            startSoundRef.current.play().catch(() => { });
+          if (newIndex === 1) {
+            startSound.play().catch(() => { });
           }
           return {
             ...prev,
@@ -605,8 +598,8 @@ export default function Quiz() {
 
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1;
-          if (newIndex === 1 && startSoundRef.current) {
-            startSoundRef.current.play().catch(() => { });
+          if (newIndex === 1) {
+            startSound.play().catch(() => { });
           }
           return {
             ...prev,
@@ -628,13 +621,6 @@ export default function Quiz() {
   const handleTimeUp = async () => {
     if (!userToken || !quizState.question) return;
 
-    // Stop ticking sound
-    if (tickingSoundRef.current) {
-      tickingSoundRef.current.pause();
-      tickingSoundRef.current.currentTime = 0;
-    }
-    setIsTickingPlaying(false);
-
     try {
       const response = await fetch(`${BASE_URL}/api/answerQuestion/${userToken}`, {
         method: "POST",
@@ -648,12 +634,6 @@ export default function Quiz() {
       if (response.ok) {
         const answerData: AnswerResponse = await response.json();
         setAnswerResponse(answerData);
-
-        // Play incorrect sound immediately
-        if (incorrectSoundRef.current) {
-          incorrectSoundRef.current.currentTime = 0;
-          incorrectSoundRef.current.play().catch(() => {});
-        }
 
         setQuizState((prevState) => ({
           ...prevState,
@@ -768,13 +748,6 @@ export default function Quiz() {
       timerInSecondsRef.current = null;
     }
 
-    // Stop ticking sound
-    if (tickingSoundRef.current) {
-      tickingSoundRef.current.pause();
-      tickingSoundRef.current.currentTime = 0;
-    }
-    setIsTickingPlaying(false);
-
     setSelectedAnswer(answer);
     setQuizState((prev) => ({
       ...prev,
@@ -797,15 +770,6 @@ export default function Quiz() {
 
         const isCorrect = answerData.isCorrect;
 
-        // Play sound and vibrate immediately
-        if (isCorrect && correctSoundRef.current) {
-          correctSoundRef.current.currentTime = 0;
-          correctSoundRef.current.play().catch(() => {});
-        } else if (!isCorrect && incorrectSoundRef.current) {
-          incorrectSoundRef.current.currentTime = 0;
-          incorrectSoundRef.current.play().catch(() => {});
-        }
-
         handleVibration(isCorrect);
 
         setQuizState((prev) => ({
@@ -822,6 +786,12 @@ export default function Quiz() {
             }
           ]
         }));
+
+        if (isCorrect) {
+          correctSound.play().catch(() => { });
+        } else {
+          incorrectSound.play().catch(() => { });
+        }
 
         trackQuestionAnswered(quizState.question?._id || "", isCorrect, userId);
 
@@ -847,16 +817,6 @@ export default function Quiz() {
   };
 
   const handleNextQuestion = () => {
-    // Play button click sound and vibrate
-    if (buttonClickSoundRef.current) {
-      buttonClickSoundRef.current.currentTime = 0;
-      buttonClickSoundRef.current.play().catch(() => {});
-    }
-    
-    if ("vibrate" in navigator) {
-      navigator.vibrate(50);
-    }
-
     if (isLastQuestion) {
       completeQuiz();
       return;
@@ -873,16 +833,6 @@ export default function Quiz() {
 
   const handleFeedback = async (type: "up" | "down") => {
     if (feedbackGiven || !quizState.question?._id) return;
-
-    // Play button click sound and vibrate
-    if (buttonClickSoundRef.current) {
-      buttonClickSoundRef.current.currentTime = 0;
-      buttonClickSoundRef.current.play().catch(() => {});
-    }
-    
-    if ("vibrate" in navigator) {
-      navigator.vibrate(50);
-    }
 
     setFeedbackGiven(true);
     setFeedbackType(type);
@@ -912,39 +862,40 @@ export default function Quiz() {
 
   const getOptionStyle = (answer: string) => {
     if (timeUp) {
-      return "bg-muted/30 cursor-not-allowed opacity-50 border-2 border-border";
+      return "bg-purple-900/30 border-2 border-purple-500/40";
     }
 
     if (selectedAnswer === null) {
-      return "hover:bg-primary/5 cursor-pointer transition-colors border-2 border-border";
+      return "hover:bg-purple-700/30 hover:border-purple-400 hover:shadow-xl hover:shadow-purple-500/30 cursor-pointer transition-all duration-300 border-2 border-purple-500/50"; 
     }
 
     const correctAnswer = answerResponse?.correctAnswer || quizState.question?.correct_answer;
 
     if (answer === correctAnswer) {
-      return "bg-success/10 text-success border-success/50 border-2";
+      return "bg-gradient-to-r from-green-600/30 to-green-500/30 text-green-100 border-green-400 border-2 shadow-xl shadow-green-500/40";
     }
 
     if (answer === selectedAnswer && answer !== correctAnswer) {
-      return "bg-destructive/10 text-destructive border-destructive/50 border-2";
+      return "bg-gradient-to-r from-red-600/30 to-red-500/30 text-red-100 border-red-400 border-2 shadow-xl shadow-red-500/40";
     }
 
-    return "bg-muted/30 border-2 border-border";
+    // Non-selected options remain visible with normal styling
+    return "bg-purple-900/30 border-2 border-purple-500/40";
   };
 
   const gettimerInSecondsColor = () => {
-    if (timeLeft > 20) return "text-success";
-    if (timeLeft > 10) return "text-warning";
-    return "text-destructive";
+    if (timeLeft > 20) return "text-green-400 border-green-400";
+    if (timeLeft > 10) return "text-yellow-400 border-yellow-400";
+    return "text-red-400 border-red-400";
   };
 
   const getDifficultyColor = () => {
     const difficulty = quizState.question?.difficultyLevel;
     if (difficulty === undefined) return "";
-    if (difficulty >= 1 && difficulty <= 3) return "border-success text-success bg-success/5";
-    if (difficulty >= 4 && difficulty <= 5) return "border-blue-400 text-blue-400 bg-blue-400/5";
-    if (difficulty >= 6 && difficulty <= 7) return "border-orange-400 text-orange-400 bg-orange-400/5";
-    if (difficulty >= 8 && difficulty <= 10) return "border-destructive text-destructive bg-destructive/5";
+    if (difficulty >= 1 && difficulty <= 3) return "border-green-400 text-green-300 bg-green-500/20";
+    if (difficulty >= 4 && difficulty <= 5) return "border-blue-400 text-blue-300 bg-blue-500/20";
+    if (difficulty >= 6 && difficulty <= 7) return "border-orange-400 text-orange-300 bg-orange-500/20";
+    if (difficulty >= 8 && difficulty <= 10) return "border-red-400 text-red-300 bg-red-500/20";
     return "";
   };
 
@@ -956,15 +907,20 @@ export default function Quiz() {
   };
 
   const QuizBase = ({ children }: { children: React.ReactNode }) => (
-    <div
-      className="flex flex-col min-h-screen relative"
-      style={categoryImage ? {
-        backgroundImage: `url(${categoryImage})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      } : {}}
-    >
-      <div className="absolute inset-0 bg-background/90 backdrop-blur-sm z-0"></div>
+    <div className="flex flex-col min-h-screen relative overflow-hidden">
+      <div className="fixed inset-0 bg-gradient-to-br from-[#1a0b2e] via-[#2d1b4e] to-[#4a2c6b]" style={{ zIndex: 0 }} />
+      <StarfieldBackground />
+      {categoryImage && (
+        <div 
+          className="fixed inset-0 opacity-10"
+          style={{
+            backgroundImage: `url(${categoryImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            zIndex: 0,
+          }}
+        />
+      )}
       <div className="relative z-10 flex flex-col min-h-screen">
         {children}
       </div>
@@ -976,9 +932,9 @@ export default function Quiz() {
       <QuizBase>
         <div className="flex-1 flex items-center justify-center px-4">
           <div className="text-center space-y-4 max-w-md">
-            <h2 className="text-xl md:text-2xl font-bold text-red-500">Error</h2>
-            <p className="text-sm md:text-base text-gray-400">{error}</p>
-            <Link to='/categories' className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-md inline-block mt-4">
+            <h2 className="text-xl md:text-2xl font-bold text-red-400">Error</h2>
+            <p className="text-sm md:text-base text-purple-200">{error}</p>
+            <Link to='/categories' className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl inline-block mt-4 border-0">
               Back to Categories
             </Link>
           </div>
@@ -992,8 +948,8 @@ export default function Quiz() {
       <QuizBase>
         <div className="flex-1 flex items-center justify-center px-4">
           <div className="text-center space-y-4">
-            <div className="animate-spin rounded-full h-8 w-8 md:h-12 md:w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="text-sm md:text-base text-muted-foreground">
+            <div className="animate-spin rounded-full h-8 w-8 md:h-12 md:w-12 border-b-2 border-purple-400 mx-auto"></div>
+            <p className="text-sm md:text-base text-purple-200">
               {isCompletingQuiz ? "Completing quiz..." : "Loading quiz questions..."}
             </p>
           </div>
@@ -1015,35 +971,40 @@ export default function Quiz() {
   }
 
   return (
-    <div
-      className="flex flex-col min-h-screen relative"
-      style={categoryImage ? {
-        backgroundImage: `url(${categoryImage})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      } : {}}
-    >
-      <div className="absolute inset-0 bg-background/90 backdrop-blur-lg z-0"></div>
+    <div className="flex flex-col min-h-screen relative overflow-hidden">
+      <div className="fixed inset-0 bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67]" style={{ zIndex: 0 }} />
+      <StarfieldBackground />
+      {categoryImage && (
+        <div 
+          className="fixed inset-0 opacity-5"
+          style={{
+            backgroundImage: `url(${categoryImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            zIndex: 0,
+          }}
+        />
+      )}
 
       <div className="relative z-10 flex flex-col min-h-screen">
-        <div className="sticky top-0 z-30 bg-quiz-background/80 backdrop-blur-sm">
+        <div className="sticky top-0 z-30 bg-black/40 backdrop-blur-md border-b-2 border-purple-500/30">
           <div className="px-2 py-2 md:py-4 max-w-full mx-auto">
             <div className="flex items-center justify-between gap-2 mb-3">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleBackNavigation}
-                className="flex items-center gap-1 hover:bg-card/60 text-sm md:text-base px-2 py-1 flex-shrink-0 min-w-0"
+                className="flex items-center gap-1 hover:bg-purple-500/30 text-purple-100 text-sm md:text-base px-2 py-1 flex-shrink-0 min-w-0"
               >
                 <ArrowLeft className="h-4 w-4 flex-shrink-0" />
                 <span className="hidden sm:inline truncate">Back</span>
               </Button>
 
               <div className="text-center flex-1 min-w-0 px-2">
-                <div className="text-sm md:text-base font-semibold text-primary truncate">
+                <div className="text-sm md:text-base font-semibold text-purple-200 truncate">
                   {categoryTitle}
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs text-purple-300">
                   Question {quizState.currentQuestionIndex} of {totalQuestions}
                 </div>
               </div>
@@ -1052,51 +1013,54 @@ export default function Quiz() {
                 {(quizState.question?.difficultyName || quizState.question?.difficulty) && (
                   <Badge
                     variant="outline"
-                    className={`text-xs ${getDifficultyColor()}`}
+                    className={`text-xs border-2 ${getDifficultyColor()}`}
                   >
                     {quizState.question?.difficultyName || quizState.question?.difficulty}
                   </Badge>
                 )}
                 <Badge
                   variant="outline"
-                  className={`bg-card/60 backdrop-blur-sm text-sm min-w-[40px] text-center ${gettimerInSecondsColor()} ${timeLeft <= 10 ? 'animate-pulse' : ''}`}
+                  className={`backdrop-blur-sm text-sm min-w-[40px] text-center border-2 font-bold ${gettimerInSecondsColor()} ${timeLeft <= 10 ? 'animate-pulse' : ''}`}
                 >
                   {timeLeft}s
                 </Badge>
               </div>
             </div>
 
-            <div className="w-full bg-secondary rounded-full h-2 mb-2">
+            <div className="w-full bg-purple-950/50 rounded-full h-3 overflow-hidden border-2 border-purple-500/40">
               <div
-                className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
-                style={{ width: `${((quizState.currentQuestionIndex - 1) / totalQuestions) * 100}%` }}
+                className="h-full rounded-full transition-all duration-300 ease-out bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 shadow-lg shadow-yellow-500/60"
+                style={{ 
+                  width: `${((quizState.currentQuestionIndex - 1) / totalQuestions) * 100}%`,
+                }}
               />
             </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-3xl">
+        <div className="flex-1 overflow-y-auto px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-4xl">
           <div className="space-y-6">
-            <div className="px-1 py-3 md:py-4">
-              <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-relaxed">
+            <div className="px-1 py-3 md:py-6 text-center">
+              <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-relaxed drop-shadow-lg">
                 {quizState.question?.question}
               </h2>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {quizState.question?.answers.map((answer, index) => (
                 <Card
                   key={index}
-                  className={`p-4 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:shadow-md'} relative overflow-hidden cursor-pointer shadow-sm rounded-xl`}
+                  className={`p-5 md:p-6 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:scale-[1.02]'} relative overflow-hidden cursor-pointer backdrop-blur-sm`}
                   onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
+                  style={{ borderRadius: '1.5rem' }}
                 >
                   {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
                     <div
-                      className={`absolute top-0 left-0 h-full animate-bar-fill rounded-r-xl ${answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
-                          ? 'bg-success/25 border-l-4 border-success'
+                      className={`absolute top-0 left-0 h-full animate-bar-fill rounded-l-3xl ${answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
+                          ? 'bg-green-500/30 border-r-4 border-green-400'
                           : answer === selectedAnswer
-                            ? 'bg-destructive/25 border-l-4 border-destructive'
-                            : 'bg-primary/15'
+                            ? 'bg-red-500/30 border-r-4 border-red-400'
+                            : 'bg-purple-400/20'
                         }`}
                       style={{
                         '--target-width': `${getAnswerPercentage(answer)}%`,
@@ -1108,12 +1072,12 @@ export default function Quiz() {
 
                   <div className="flex items-center gap-3 relative z-10">
                     <div className="flex-1 min-w-0 flex items-center justify-between">
-                      <span className={`text-base md:text-lg leading-snug break-words w-full font-medium text-left`}>
+                      <span className={`text-base md:text-xl leading-snug break-words w-full font-semibold text-left text-white`}>
                         {answer}
                       </span>
                       {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
                         <span
-                          className="text-sm font-semibold text-foreground ml-3 animate-fade-in-delayed flex-shrink-0"
+                          className="text-sm md:text-base font-bold text-white ml-3 animate-fade-in-delayed flex-shrink-0 bg-black/30 px-3 py-1 rounded-lg"
                           style={{ animationDelay: `${1000 + (index * 150)}ms` }}
                         >
                           {getAnswerPercentage(answer)}%
@@ -1127,15 +1091,15 @@ export default function Quiz() {
 
             {timeUp && (
               <div ref={explanationRef}>
-                <Card className="p-6 md:p-8 bg-destructive/5 animate-slide-up border-4 border-destructive/30 shadow-lg rounded-xl">
+                <Card className="p-6 md:p-8 bg-gradient-to-r from-red-600/30 to-red-500/30 animate-slide-up border-2 border-red-400 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
                   <div className="text-center space-y-3">
-                    <p className="font-semibold text-destructive text-base md:text-lg">⏰ Time's Up!</p>
-                    <p className="text-sm md:text-base text-muted-foreground">
+                    <p className="font-semibold text-red-300 text-base md:text-lg">⏰ Time's Up!</p>
+                    <p className="text-sm md:text-base text-red-100">
                       You didn't answer in time. This question is marked as incorrect.
                     </p>
                     {answerResponse?.correctAnswer && (
-                      <p className="text-sm md:text-base text-muted-foreground">
-                        The correct answer was: <span className="font-semibold text-success">{answerResponse.correctAnswer}</span>
+                      <p className="text-sm md:text-base text-red-100">
+                        The correct answer was: <span className="font-semibold text-green-300">{answerResponse.correctAnswer}</span>
                       </p>
                     )}
                   </div>
@@ -1143,11 +1107,11 @@ export default function Quiz() {
 
                 <div className="mt-6 pb-4">
                   <Button
-                    variant="default"
                     size="lg"
-                    className="w-full h-14 md:h-16 text-base md:text-lg"
+                    className="w-full h-14 md:h-16 text-base md:text-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold border-0 shadow-lg shadow-purple-500/30"
                     onClick={handleNextQuestion}
                     disabled={isCompletingQuiz}
+                    style={{ borderRadius: '1rem' }}
                   >
                     {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
                   </Button>
@@ -1156,36 +1120,36 @@ export default function Quiz() {
             )}
             {showExplanation && !timeUp && answerResponse && (
               <div ref={explanationRef}>
-                <Card className="p-6 md:p-8 bg-primary/5 animate-slide-up border-4 border-primary/40 shadow-lg rounded-xl">
+                <Card className="p-6 md:p-8 bg-gradient-to-r from-purple-700/40 to-indigo-700/40 animate-slide-up border-2 border-purple-400 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
-                      <Lightbulb className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-primary flex-shrink-0" />
-                      <span className="font-semibold text-primary text-base md:text-lg lg:text-xl">
+                      <Lightbulb className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-yellow-400 flex-shrink-0" />
+                      <span className="font-semibold text-purple-100 text-base md:text-lg lg:text-xl">
                         {answerResponse.isCorrect ? "Correct!" : "Incorrect!"}
                       </span>
                     </div>
-                    <p className="text-sm md:text-base text-foreground leading-relaxed">
+                    <p className="text-sm md:text-base text-white leading-relaxed">
                       {answerResponse.explanation}
                     </p>
                   </div>
                 </Card>
 
                 <div className="mt-6 space-y-4 animate-fade-in pb-4">
-                  <Card className="p-4 md:p-6 bg-card/40 border-0 shadow-sm rounded-xl">
+                  <Card className="p-4 md:p-6 bg-gradient-to-r from-purple-800/40 to-indigo-800/40 border-2 border-purple-500/40 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
                     <div className="space-y-4">
-                      <p className="text-sm font-medium text-center">Did you like this question?</p>
+                      <p className="text-sm font-medium text-center text-white">Did you like this question?</p>
 
-                      <div className="flex gap-4 justify-center">
+                      <div className="flex gap-3 md:gap-4 justify-center">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleFeedback("up")}
                           disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${feedbackType === "up"
-                              ? "bg-green-100 border-green-500 text-green-600"
+                          className={`text-sm flex-1 max-w-[120px] h-10 md:h-12 border-2 transition-all ${feedbackType === "up"
+                              ? "bg-green-500/30 border-green-400 text-green-200 shadow-lg shadow-green-500/30"
                               : feedbackGiven
-                                ? "opacity-50 cursor-not-allowed"
-                                : "border-green-500 text-green-600 hover:bg-green-500 hover:text-white"
+                                ? "opacity-50 cursor-not-allowed border-gray-500 text-gray-400"
+                                : "border-green-400 text-green-300 hover:bg-green-500/20 hover:shadow-lg hover:shadow-green-500/20"
                             }`}
                         >
                           <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
@@ -1197,11 +1161,11 @@ export default function Quiz() {
                           size="sm"
                           onClick={() => handleFeedback("down")}
                           disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${feedbackType === "down"
-                              ? "bg-red-100 border-red-600 text-red-600"
+                          className={`text-sm flex-1 max-w-[120px] h-10 md:h-12 border-2 transition-all ${feedbackType === "down"
+                              ? "bg-red-500/30 border-red-400 text-red-200 shadow-lg shadow-red-500/30"
                               : feedbackGiven
-                                ? "opacity-50 cursor-not-allowed"
-                                : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                                ? "opacity-50 cursor-not-allowed border-gray-500 text-gray-400"
+                                : "border-red-400 text-red-300 hover:bg-red-500/20 hover:shadow-lg hover:shadow-red-500/20"
                             }`}
                         >
                           <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
@@ -1212,7 +1176,7 @@ export default function Quiz() {
                           variant="outline"
                           size="sm"
                           onClick={() => setShowReportDialog(true)}
-                          className="text-sm flex-1 max-w-[120px] h-10 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
+                          className="text-sm flex-1 max-w-[120px] h-10 md:h-12 border-2 border-blue-400 text-blue-300 hover:bg-blue-500/20 hover:shadow-lg hover:shadow-blue-500/20 transition-all"
                         >
                           <Flag className="h-4 w-4 md:h-5 md:w-5" />
                           <span className="ml-1 sm:ml-2">Report</span>
@@ -1222,11 +1186,11 @@ export default function Quiz() {
                   </Card>
 
                   <Button
-                    variant="default"
                     size="lg"
-                    className="w-full h-14 md:h-16 text-base md:text-lg"
+                    className="w-full h-14 md:h-16 text-base md:text-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold border-0 shadow-lg shadow-purple-500/30"
                     onClick={handleNextQuestion}
                     disabled={isCompletingQuiz}
+                    style={{ borderRadius: '1rem' }}
                   >
                     {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
                   </Button>
