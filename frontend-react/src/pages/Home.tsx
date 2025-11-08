@@ -6,6 +6,7 @@ import { CategoryCard } from "@/components/quiz/CategoryCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { trackHomeScreen } from "@/utils/analytics";
 
 import {
   Brain,
@@ -23,7 +24,7 @@ import AddCategory from "@/components/AddCategory";
 import { useToast } from "@/hooks/use-toast";
 
 // ⬅️ CRITICAL: Import the apiClient utility
-import { apiClient } from "@/utils/apiClient"; 
+import { apiClient } from "@/utils/apiClient";
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
@@ -90,7 +91,7 @@ export default function Home() {
     const initializeApp = async () => {
       const hasShownSplash = typeof window !== 'undefined' ? sessionStorage.getItem("splashShown") : null;
       const shouldShowSplash = !hasShownSplash;
-      
+
       if (shouldShowSplash) {
         setShowSplash(true);
         if (typeof window !== 'undefined') {
@@ -116,6 +117,7 @@ export default function Home() {
         } else {
           setLoading(false);
         }
+
       } catch (err) {
         console.error("Init error:", err);
         setLoading(false);
@@ -132,6 +134,7 @@ export default function Home() {
   useEffect(() => {
     // Only fetch categories if userProfile is loaded AND we have a token 
     if (userProfile && userToken) {
+      trackHomeScreen(userProfile._id);
       fetchUserCategories();
     }
   }, [userProfile, userToken]);
@@ -148,7 +151,7 @@ export default function Home() {
           const parsedUser = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
-          setIsGuest(parsedUser.userType === 'Guest'); 
+          setIsGuest(parsedUser.userType === 'Guest');
         } catch (e) {
           console.error("Failed to parse local user data:", e);
         }
@@ -158,7 +161,7 @@ export default function Home() {
       }
       return;
     }
-    
+
     try {
       // ⬅️ Use apiClient for /api/getUserDetails
       const response = await apiClient(`${BASE_URL}/api/getUserDetails`, {
@@ -170,9 +173,9 @@ export default function Home() {
       if (!response) {
         // If apiClient redirects on 401, this function halts.
         // On a token-based 401, the user is redirected, so we just exit.
-        return; 
+        return;
       }
-      
+
       if (!response.ok) {
         // Handle other non-401 non-ok responses
         console.warn(`Failed to fetch user details (Status: ${response.status}). Falling back to local storage.`);
@@ -181,7 +184,7 @@ export default function Home() {
           const parsedUser = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
-          setIsGuest(parsedUser.userType === 'Guest'); 
+          setIsGuest(parsedUser.userType === 'Guest');
         }
         return;
       }
@@ -197,17 +200,17 @@ export default function Home() {
       const avatarIndex = apiUser.avatar ? apiUser.avatar - 1 : 0;
       const calculatedAvatar = avatars[avatarIndex] || null;
       setUserAvatar(calculatedAvatar);
-      
+
       // 3. Update local storage with fresh data
       if (typeof window !== 'undefined') {
-        const userToStore = { 
-            ...apiUser, 
-            level: apiUser.level || 1, 
-            userType: apiUser.userType || 'Registered' 
+        const userToStore = {
+          ...apiUser,
+          level: apiUser.level || 1,
+          userType: apiUser.userType || 'Registered'
         };
         localStorage.setItem("user", JSON.stringify(userToStore));
-        if(calculatedAvatar) {
-           localStorage.setItem("userAvatar", calculatedAvatar);
+        if (calculatedAvatar) {
+          localStorage.setItem("userAvatar", calculatedAvatar);
         }
       }
 
@@ -220,9 +223,9 @@ export default function Home() {
           const parsedUser = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
-          setIsGuest(parsedUser.userType === 'Guest'); 
+          setIsGuest(parsedUser.userType === 'Guest');
         } catch (e) {
-            console.error("Failed to parse local user data on API error:", e);
+          console.error("Failed to parse local user data on API error:", e);
         }
       }
     }
@@ -245,11 +248,11 @@ export default function Home() {
       // ⬅️ Check if response is undefined (401 handled by apiClient)
       if (!response) {
         setCategoriesLoading(false);
-        return; 
+        return;
       }
-      
+
       if (!response.ok) throw new Error(`Failed: ${response.status}`);
-      
+
       const data = await response.json();
       const transformed: Category[] = data.map((c: any, i: number) => ({
         _id: c._id,
@@ -302,7 +305,7 @@ export default function Home() {
       // ⬅️ Check if response is undefined (401 handled by apiClient)
       if (!response) {
         setPlayButtonLoading(false);
-        return; 
+        return;
       }
 
       if (!response.ok) {
@@ -382,20 +385,20 @@ export default function Home() {
 
         {/* Guest User Registration Panel - REDESIGNED */}
         {isGuest && (
-          <Card 
+          <Card
             className="bg-gradient-to-br from-background to-quiz-background border-gray-200 dark:border-gray-700 dark:text-white p-3 shadow-lg flex items-center justify-between space-x-3"
           >
             <div className="flex items-center space-x-3 flex-shrink-0">
-              <AlertTriangle className="w-5 h-5 text-red-500 dark:text-purple-400" /> 
+              <AlertTriangle className="w-5 h-5 text-red-500 dark:text-purple-400" />
             </div>
-            
+
             <p className="text-sm  text-white font-semibold leading-snug flex-grow">
               Don't lose your progress
             </p>
-            
-            <Button 
-              variant="default" 
-              size="sm" 
+
+            <Button
+              variant="default"
+              size="sm"
               onClick={() => navigate("/profile")}
               className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3 py-1 flex-shrink-0"
             >
@@ -425,7 +428,7 @@ export default function Home() {
           <Button
             onClick={handleQuickQuiz}
             disabled={loading || playButtonLoading}
-            className="w-full h-16 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-2xl disabled:opacity-50 flex items-center justify-between px-6 relative overflow-hidden shadow-lg" 
+            className="w-full h-16 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-2xl disabled:opacity-50 flex items-center justify-between px-6 relative overflow-hidden shadow-lg"
           >
             {playButtonLoading ? (
               <div className="flex items-center text-xl justify-center w-full">
@@ -520,10 +523,10 @@ export default function Home() {
 
           {/* Add Category Section - Always show after quizzes or the empty state card */}
           <div className="mt-6">
-            <AddCategory 
-                fetchCategories={fetchUserCategories} 
-                isGuest={isGuest}
-                onRegistrationRequired={handleCreateCategoryAttempt}
+            <AddCategory
+              fetchCategories={fetchUserCategories}
+              isGuest={isGuest}
+              onRegistrationRequired={handleCreateCategoryAttempt}
             />
           </div>
         </div>
