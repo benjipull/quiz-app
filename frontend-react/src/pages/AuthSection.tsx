@@ -8,7 +8,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import logo from "../assets/images/QuizicleLogo.png";
-import ReactGA from "react-ga4";
+
+import { setGAUser } from "@/utils/gaClient";
+import { trackLogin, trackSignup } from "@/utils/analytics";
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
@@ -75,11 +77,8 @@ const AuthSection = () => {
             if (response.ok) {
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("user", JSON.stringify(data.user));
-                ReactGA.set({ userId: data.user._id });
-                ReactGA.event("login", {
-                    method: "user_login",
-                    user_id: data.user._id,
-                });
+                setGAUser(data.user._id);
+                trackLogin("user_login", data.user._id);
 
                 toast({
                     title: "Success",
@@ -197,11 +196,8 @@ const AuthSection = () => {
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("user", JSON.stringify(data.user));
                 
-                ReactGA.set({ userId: data.user._id });
-                ReactGA.event("login", {
-                    method: "guest_login",
-                    user_id: data.user._id,
-                });
+                setGAUser(data.user._id);
+                trackLogin("user_login", data.user._id);
 
                 toast({
                     title: "Welcome Guest",
