@@ -344,7 +344,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center p-2 sm:p-4 font-sans bg-slate-900/100 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex flex-col items-center p-2 sm:p-4 font-sans bg-gradient-to-br from-[#100221] via-[#4f187a] to-[#380d67] overflow-y-auto">
       
       {/* Header with Stats */}
       <div className="w-full max-w-lg mb-3 animate-fade-in-down">
@@ -489,7 +489,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
       {/* Main Results Card Container */}
       <div className="relative z-10 w-full max-w-lg mx-auto pb-6 sm:pb-0">
-        <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in">
+        <Card className="relative overflow-hidden bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in">
           
           {/* Close Button */}
           <Link
