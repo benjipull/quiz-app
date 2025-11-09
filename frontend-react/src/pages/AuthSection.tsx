@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, User, Brain, Zap, ArrowRight, Calendar } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, Brain, Zap, ArrowRight, Calendar, Sparkles, Trophy, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +19,8 @@ const AuthSection = () => {
     const { toast } = useToast();
     const location = useLocation();
 
-    const [isLogin, setIsLogin] = useState(true);
+    const [showAuthOptions, setShowAuthOptions] = useState(true);
+    const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [showForgotPassword, setShowForgotPassword] = useState(false);
     const [showResetPassword, setShowResetPassword] = useState(false);
@@ -29,13 +30,13 @@ const AuthSection = () => {
     const [loginPassword, setLoginPassword] = useState("");
     const [showLoginPassword, setShowLoginPassword] = useState(false);
 
-    // Signup form states - CORRECTED: Added signupAge state
+    // Signup form states
     const [signupAlias, setSignupAlias] = useState("");
     const [signupEmail, setSignupEmail] = useState("");
     const [signupPassword, setSignupPassword] = useState("");
     const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
     const [showSignupPassword, setShowSignupPassword] = useState(false);
-    const [signupAge, setSignupAge] = useState(""); 
+    const [signupAge, setSignupAge] = useState("");
 
     // Reset password states
     const [resetEmail, setResetEmail] = useState("");
@@ -103,90 +104,90 @@ const AuthSection = () => {
     };
 
     const handleSignup = async () => {
-  if (!signupAlias || !signupEmail || !signupPassword || !signupConfirmPassword || !signupAge) {
-    toast({
-      title: "Validation Error",
-      description: "Please fill out all fields.",
-      variant: "destructive",
-    });
-    return;
-  }
+        if (!signupAlias || !signupEmail || !signupPassword || !signupConfirmPassword || !signupAge) {
+            toast({
+                title: "Validation Error",
+                description: "Please fill out all fields.",
+                variant: "destructive",
+            });
+            return;
+        }
 
-  const ageNum = parseInt(signupAge);
-  if (isNaN(ageNum) || ageNum < 5) {
-    toast({
-      title: "Validation Error",
-      description: "You must be at least 5 years old to sign up.",
-      variant: "destructive",
-    });
-    return;
-  }
+        const ageNum = parseInt(signupAge);
+        if (isNaN(ageNum) || ageNum < 5) {
+            toast({
+                title: "Validation Error",
+                description: "You must be at least 5 years old to sign up.",
+                variant: "destructive",
+            });
+            return;
+        }
 
-  if (signupPassword.length < 6) {
-    toast({
-      title: "Validation Error",
-      description: "Password must be at least 6 characters.",
-      variant: "destructive",
-    });
-    return;
-  }
+        if (signupPassword.length < 6) {
+            toast({
+                title: "Validation Error",
+                description: "Password must be at least 6 characters.",
+                variant: "destructive",
+            });
+            return;
+        }
 
-  if (signupPassword !== signupConfirmPassword) {
-    toast({
-      title: "Validation Error",
-      description: "Passwords do not match.",
-      variant: "destructive",
-    });
-    return;
-  }
+        if (signupPassword !== signupConfirmPassword) {
+            toast({
+                title: "Validation Error",
+                description: "Passwords do not match.",
+                variant: "destructive",
+            });
+            return;
+        }
 
-  setIsLoading(true);
-  try {
-    const response = await fetch(`${BASE_URL}/api/users/register`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        alias: signupAlias,
-        email: signupEmail,
-        password: signupPassword,
-        age: ageNum,
-        userType: "Registered",
-      }),
-    });
+        setIsLoading(true);
+        try {
+            const response = await fetch(`${BASE_URL}/api/users/register`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    alias: signupAlias,
+                    email: signupEmail,
+                    password: signupPassword,
+                    age: ageNum,
+                    userType: "Registered",
+                }),
+            });
 
-    const data = await response.json();
+            const data = await response.json();
 
-    if (response.ok) {
-      toast({
-        title: "Success",
-        description: "Registration successful! Please sign in to continue.",
-      });
+            if (response.ok) {
+                toast({
+                    title: "Success",
+                    description: "Registration successful! Please sign in to continue.",
+                });
 
-      // 🧠 Instead of auto-login, just switch to login mode
-      setIsLogin(true);
-      setLoginEmail(signupEmail);
-      setLoginPassword("");
-    } else {
-      throw new Error(data.message || "Registration failed.");
-    }
-  } catch (error) {
-    console.error("Signup Error:", error);
-    toast({
-      title: "Registration Failed",
-      description: (error as Error).message,
-      variant: "destructive",
-    });
-  } finally {
-    setIsLoading(false);
-  }
-};
+                setAuthMode('login');
+                setShowAuthOptions(false);
+                setLoginEmail(signupEmail);
+                setLoginPassword("");
+            } else {
+                throw new Error(data.message || "Registration failed.");
+            }
+        } catch (error) {
+            console.error("Signup Error:", error);
+            toast({
+                title: "Registration Failed",
+                description: (error as Error).message,
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleGuestLogin = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch(`${BASE_URL}/api/users/guestLogin`, { 
+            const response = await fetch(`${BASE_URL}/api/users/guestLogin`, {
                 method: "POST",
             });
 
@@ -195,7 +196,7 @@ const AuthSection = () => {
             if (response.ok) {
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("user", JSON.stringify(data.user));
-                
+
                 setGAUser(data.user._id);
                 trackLogin("user_login", data.user._id);
 
@@ -277,7 +278,8 @@ const AuthSection = () => {
                     description: "Your password has been reset. Please log in.",
                 });
                 setShowResetPassword(false);
-                setIsLogin(true);
+                setAuthMode('login');
+                setShowAuthOptions(false);
                 setLoginEmail(resetEmail);
             } else {
                 const data = await response.json();
@@ -296,33 +298,81 @@ const AuthSection = () => {
             handleResetPassword();
         } else if (showForgotPassword) {
             handleForgotPassword();
-        } else if (isLogin) {
+        } else if (authMode === 'login') {
             handleLogin();
-        } else {
+        } else if (authMode === 'signup') {
             handleSignup();
         }
     };
 
-    const renderGuestButton = () => (
-        <>
-            <div className="relative flex justify-center items-center py-4">
-                <div className="absolute w-full border-t border-border/50"></div>
-                <span className="relative bg-card/60 px-3 text-sm text-muted-foreground">OR</span>
+    const renderWelcomeOptions = () => (
+        <div className="space-y-4">
+            {/* Hero Section */}
+            <div className="text-center space-y-3 mb-8">
+                <div className="flex justify-center gap-2 mb-4">
+                    <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/50 px-3 py-1">
+                        <Brain className="w-3 h-3 mr-1" />
+                        AI-Powered
+                    </Badge>
+                    <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/50 px-3 py-1">
+                        <Zap className="w-3 h-3 mr-1" />
+                        Fun Learning
+                    </Badge>
+                </div>
+                <p className="text-sm text-gray-400">Test your knowledge and compete with friends</p>
             </div>
 
+            {/* Primary CTA - Guest Login */}
             <Button
                 type="button"
                 onClick={handleGuestLogin}
-                variant="ghost"
-                className="w-full flex items-center justify-center gap-2 
-                            !bg-blue-600 hover:!bg-blue-700 !text-white 
-                            !border-blue-700 shadow-lg transition-all duration-200"
+                className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white border-0 shadow-lg shadow-blue-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-blue-500/40"
                 disabled={isLoading}
             >
-                <User className="h-4 w-4" />
-                Continue as Guest
+                <div className="flex items-center justify-center gap-3">
+                    <User className="h-5 w-5" />
+                    <span>Continue as Guest</span>
+                    <ArrowRight className="h-5 w-5 animate-pulse" />
+                </div>
             </Button>
-        </>
+
+            <p className="text-center text-xs text-gray-500">No registration required • Start playing instantly</p>
+
+            <div className="relative flex justify-center items-center py-4">
+                <div className="absolute w-full border-t border-gray-700"></div>
+                <span className="relative bg-gray-900 px-4 text-sm text-gray-400 font-medium">or create an account for more features</span>
+            </div>
+
+            {/* Secondary CTA - Sign Up */}
+            <Button
+                type="button"
+                onClick={() => {
+                    setShowAuthOptions(false);
+                    setAuthMode('signup');
+                }}
+                className="w-full h-12 font-semibold bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white border-0 shadow-md transition-all duration-300 hover:scale-105"
+                disabled={isLoading}
+            >
+                <div className="flex items-center justify-center gap-2">
+                    <Trophy className="h-5 w-5" />
+                    <span>Sign Up for Free</span>
+                </div>
+            </Button>
+
+            {/* Tertiary Option - Sign In */}
+            <div className="text-center pt-6 border-t border-gray-800">
+                <p className="text-sm text-gray-400 mb-2">Already have an account?</p>
+                <button
+                    onClick={() => {
+                        setShowAuthOptions(false);
+                        setAuthMode('login');
+                    }}
+                    className="text-blue-400 hover:text-blue-300 font-medium transition-colors underline-offset-4 hover:underline"
+                >
+                    Sign In
+                </button>
+            </div>
+        </div>
     );
 
     const renderLoginForm = () => (
@@ -371,7 +421,7 @@ const AuthSection = () => {
 
             <Button
                 type="submit"
-                className="w-full mt-6 bg-green-600 hover:bg-green-700"
+                className="w-full mt-6 h-12 bg-green-600 hover:bg-green-700 font-semibold"
                 disabled={isLoading || !loginEmail || !loginPassword}
             >
                 {isLoading ? "Signing In..." : "Sign In"}
@@ -388,7 +438,30 @@ const AuthSection = () => {
                 </button>
             </div>
 
-            {renderGuestButton()}
+            <div className="text-center pt-4 border-t border-border/50">
+                <p className="text-sm text-muted-foreground">
+                    Don't have an account?{" "}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setAuthMode('signup');
+                        }}
+                        className="text-primary hover:text-primary/80 font-medium transition-colors"
+                    >
+                        Sign up here
+                    </button>
+                </p>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setShowAuthOptions(true);
+                        setAuthMode(null);
+                    }}
+                    className="text-sm text-gray-400 hover:text-gray-300 transition-colors mt-2"
+                >
+                    ← Back to options
+                </button>
+            </div>
         </form>
     );
 
@@ -478,37 +551,58 @@ const AuthSection = () => {
                 </div>
             </div>
 
-             {/* Age Input Section */}
-             <div className="space-y-2">
-                 <Label htmlFor="signupAge" className="text-foreground font-medium">Age</Label>
-                 <div className="relative">
-                     <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                     <Input
-                         id="signupAge"
-                         name="signupAge"
-                         type="number" 
-                         placeholder="Enter your age (Min 5)" 
-                         value={signupAge}
-                         onChange={(e) => setSignupAge(e.target.value)}
-                         className="pl-10 h-12 bg-background/50 border-border/50 focus:border-primary transition-colors"
-                         min="5"
-                         max="120"
-                         required
-                         disabled={isLoading}
-                     />
-                 </div>
-             </div>
-             {/* End Age Input Section */}
+            <div className="space-y-2">
+                <Label htmlFor="signupAge" className="text-foreground font-medium">Age</Label>
+                <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                        id="signupAge"
+                        name="signupAge"
+                        type="number"
+                        placeholder="Enter your age (Min 5)"
+                        value={signupAge}
+                        onChange={(e) => setSignupAge(e.target.value)}
+                        className="pl-10 h-12 bg-background/50 border-border/50 focus:border-primary transition-colors"
+                        min="5"
+                        max="120"
+                        required
+                        disabled={isLoading}
+                    />
+                </div>
+            </div>
 
             <Button
                 type="submit"
-                className="w-full mt-6 bg-green-600 hover:bg-green-700"
-                disabled={isLoading || !signupAlias || !signupEmail || !signupPassword || !signupConfirmPassword || !signupAge} // **CORRECTION: Added !signupAge check**
+                className="w-full mt-6 h-12 bg-green-600 hover:bg-green-700 font-semibold"
+                disabled={isLoading || !signupAlias || !signupEmail || !signupPassword || !signupConfirmPassword || !signupAge}
             >
                 {isLoading ? "Signing Up..." : "Sign Up"}
             </Button>
 
-            {renderGuestButton()}
+            <div className="text-center pt-4 border-t border-border/50">
+                <p className="text-sm text-muted-foreground">
+                    Already have an account?{" "}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setAuthMode('login');
+                        }}
+                        className="text-primary hover:text-primary/80 font-medium transition-colors"
+                    >
+                        Sign in here
+                    </button>
+                </p>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setShowAuthOptions(true);
+                        setAuthMode(null);
+                    }}
+                    className="text-sm text-gray-400 hover:text-gray-300 transition-colors mt-2"
+                >
+                    ← Back to options
+                </button>
+            </div>
         </form>
     );
 
@@ -545,7 +639,10 @@ const AuthSection = () => {
             <div className="text-center pt-4 border-t border-border/50">
                 <button
                     type="button"
-                    onClick={() => setShowForgotPassword(false)}
+                    onClick={() => {
+                        setShowForgotPassword(false);
+                        setAuthMode('login');
+                    }}
                     className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
                 >
                     Back to Sign In
@@ -600,7 +697,7 @@ const AuthSection = () => {
                     </button>
                 </div>
             </div>
-            
+
             <Button
                 type="submit"
                 className="w-full mt-6 bg-green-600 hover:bg-green-700"
@@ -627,42 +724,59 @@ const AuthSection = () => {
     const renderAuthForm = () => {
         if (showResetPassword) return renderResetPasswordForm();
         if (showForgotPassword) return renderForgotPasswordForm();
-        return isLogin ? renderLoginForm() : renderSignupForm();
+        if (showAuthOptions) return renderWelcomeOptions();
+        if (authMode === 'login') return renderLoginForm();
+        if (authMode === 'signup') return renderSignupForm();
+        return renderWelcomeOptions();
+    };
+
+    const getTitle = () => {
+        if (showResetPassword) return "Reset Password";
+        if (showForgotPassword) return "Forgot Password";
+        if (authMode === 'login') return "Welcome Back";
+        if (authMode === 'signup') return "Create Account";
+        return "Welcome to Quizicle";
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-900/90 py-8 px-4 sm:py-12 sm:px-6 lg:px-8">
-            <div className="max-w-md w-full space-y-6 sm:space-y-8">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20 py-8 px-4 sm:py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+            {/* Animated Background Elements */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
+                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+                <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-green-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+            </div>
+
+            {/* Floating Icons Animation - Continuation */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <Brain className="absolute top-20 left-10 text-purple-500/20 w-8 h-8 animate-bounce" style={{ animationDuration: '3s' }} />
+                <Sparkles className="absolute top-40 right-20 text-blue-500/20 w-6 h-6 animate-bounce" style={{ animationDuration: '4s', animationDelay: '1s' }} />
+                <Trophy className="absolute bottom-32 left-20 text-yellow-500/20 w-7 h-7 animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '2s' }} />
+                <Target className="absolute bottom-20 right-16 text-green-500/20 w-6 h-6 animate-bounce" style={{ animationDuration: '4.5s' }} />
+                <Zap className="absolute top-1/3 right-1/4 text-purple-500/20 w-5 h-5 animate-bounce" style={{ animationDuration: '3.8s', animationDelay: '0.5s' }} />
+            </div>
+
+            <div className="max-w-md w-full space-y-6 sm:space-y-8 relative z-10">
                 <div className="text-center">
-                    <img
-                        className="mx-auto h-10 sm:h-12 w-auto filter drop-shadow-lg"
-                        src={logo}
-                        alt="Quizicle Logo"
-                    />
-                    <h2 className="mt-4 sm:mt-6 text-2xl sm:text-3xl font-extrabold text-white">
-                        {showResetPassword ? "Reset Password" : showForgotPassword ? "Forgot Password" : isLogin ? "Sign In" : "Create Account"}
+                    <div className="relative inline-block">
+                        <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full blur-xl opacity-50 animate-pulse"></div>
+                        <img
+                            className="relative mx-auto h-12 sm:h-16 w-auto filter drop-shadow-2xl"
+                            src={logo}
+                            alt="Quizicle Logo"
+                        />
+                    </div>
+                    <h2 className="mt-6 sm:mt-8 text-3xl sm:text-4xl font-extrabold text-white bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-purple-100">
+                        {getTitle()}
                     </h2>
                 </div>
 
-                <Card className="bg-card/60 backdrop-blur-sm border-border/50 shadow-xl w-full">
-                    <div className="p-4 sm:p-6 md:p-8 space-y-5 sm:space-y-6"> 
-                        {renderAuthForm()}
+                <Card className="bg-gray-800/40 backdrop-blur-xl border-gray-700/50 shadow-2xl w-full relative overflow-hidden">
+                    {/* Card glow effect */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-blue-500/5 pointer-events-none"></div>
 
-                        {!showResetPassword && (
-                            <div className="text-center pt-4 border-t border-border/50">
-                                <p className="text-sm text-muted-foreground">
-                                    {isLogin && !showForgotPassword ? "Don't have an account? " : "Already have an account? "}
-                                    {!showForgotPassword && (
-                                        <button
-                                            onClick={() => setIsLogin(!isLogin)}
-                                            className="text-primary hover:text-primary/80 font-medium transition-colors"
-                                        >
-                                            {isLogin ? "Sign up here" : "Sign in here"}
-                                        </button>
-                                    )}
-                                </p>
-                            </div>
-                        )}
+                    <div className="p-6 sm:p-8 md:p-10 space-y-6 relative z-10">
+                        {renderAuthForm()}
                     </div>
                 </Card>
             </div>
