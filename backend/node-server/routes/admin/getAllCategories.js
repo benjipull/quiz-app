@@ -27,7 +27,6 @@ router.get("/", auth, adminAuth, async (req, res) => {
             },
           },
 
-          // ✅ Only true if at least one question has a *valid string* duplicate_group_id
           hasDuplicates: {
             $gt: [
               {
@@ -37,6 +36,10 @@ router.get("/", auth, adminAuth, async (req, res) => {
                     as: "q",
                     cond: {
                       $and: [
+                        // ✅ Must not be disabled
+                        { $eq: ["$$q.disabled", false] },
+
+                        // ✅ Must have a valid duplicate_group_id (string and not empty)
                         { $eq: [{ $type: "$$q.duplicate.duplicate_group_id" }, "string"] },
                         { $ne: ["$$q.duplicate.duplicate_group_id", ""] },
                       ],
@@ -47,6 +50,7 @@ router.get("/", auth, adminAuth, async (req, res) => {
               0,
             ],
           },
+
 
           completionCount: { $size: "$completions" },
         },
