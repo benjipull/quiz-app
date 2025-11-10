@@ -857,26 +857,33 @@ export default function Quiz() {
   };
 
   const getOptionStyle = (answer: string) => {
+    const baseStyle = "border-2 transition-all duration-300 backdrop-blur-sm";
+    const baseColor = "border-purple-500/50 text-white";
+    const hoverStyle = "hover:scale-[1.02] hover:shadow-xl hover:shadow-purple-500/30 cursor-pointer";
+    const selectedStyle = "pointer-events-none";
+
     if (timeUp) {
-      return "bg-purple-900/30 border-2 border-purple-500/40";
+      return `${baseStyle} ${baseColor} pointer-events-none`;
     }
 
     if (selectedAnswer === null) {
-      return "hover:bg-purple-700/30 hover:border-purple-400 hover:shadow-xl hover:shadow-purple-500/30 cursor-pointer transition-all duration-300 border-2 border-purple-500/50"; 
+      // Default/Hover Style (The "Aura" effect is applied via Card styles below)
+      return `${baseStyle} ${baseColor} ${hoverStyle}`;
     }
 
+    // Answer Selected Style
     const correctAnswer = answerResponse?.correctAnswer || quizState.question?.correct_answer;
 
     if (answer === correctAnswer) {
-      return "bg-gradient-to-r from-green-600/30 to-green-500/30 text-green-100 border-green-400 border-2 shadow-xl shadow-green-500/40";
+      return `${baseStyle} ${selectedStyle} border-green-400 bg-gradient-to-r from-green-600/30 to-green-500/30 text-green-100 shadow-xl shadow-green-500/40`;
     }
 
     if (answer === selectedAnswer && answer !== correctAnswer) {
-      return "bg-gradient-to-r from-red-600/30 to-red-500/30 text-red-100 border-red-400 border-2 shadow-xl shadow-red-500/40";
+      return `${baseStyle} ${selectedStyle} border-red-400 bg-gradient-to-r from-red-600/30 to-red-500/30 text-red-100 shadow-xl shadow-red-500/40`;
     }
 
-    // Non-selected options remain visible with normal styling
-    return "bg-purple-900/30 border-2 border-purple-500/40";
+    // Non-selected/Incorrect option after selection
+    return `${baseStyle} ${selectedStyle} border-purple-500/40 bg-purple-900/30`;
   };
 
   const gettimerInSecondsColor = () => {
@@ -901,10 +908,25 @@ export default function Quiz() {
     const answerStat = answerResponse.answerStats.find(stat => stat.text === answer);
     return answerStat ? answerStat.percentage : 0;
   };
+  
+  // New function to apply the aura look to options before selection
+  const getInitialOptionAuraStyle = (answer: string) => {
+      if (selectedAnswer !== null || timeUp) return {};
+
+      // This creates the deep, vibrant purple/pink glow effect
+      return {
+          background: 'linear-gradient(90deg, rgba(30, 0, 60, 0.8), rgba(40, 0, 80, 0.8))',
+          border: '2px solid rgba(147, 51, 234, 0.6)', // purple-500/60
+          boxShadow: '0 0 15px rgba(192, 38, 211, 0.5), inset 0 0 8px rgba(232, 121, 249, 0.4)', // Pink/Purple glow
+          // Add a subtle hover effect via style for a smoother transition
+          transition: 'transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease',
+      };
+  }
 
   const QuizBase = ({ children }: { children: React.ReactNode }) => (
     <div className="flex flex-col min-h-screen relative overflow-hidden">
-      <div className="fixed inset-0 bg-gradient-to-br from-[#1a0b2e] via-[#2d1b4e] to-[#4a2c6b]" style={{ zIndex: 0 }} />
+      {/* Updated Background to darker, more vibrant space theme */}
+      <div className="fixed inset-0 bg-gradient-to-br from-[#0c031c] via-[#1a0b2e] to-[#2d1b4e]" style={{ zIndex: 0 }} />
       <StarfieldBackground />
       {categoryImage && (
         <div 
@@ -968,7 +990,8 @@ export default function Quiz() {
 
   return (
     <div className="flex flex-col min-h-screen relative overflow-hidden">
-      <div className="fixed inset-0 bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67]" style={{ zIndex: 0 }} />
+      {/* Updated Background to darker, more vibrant space theme */}
+      <div className="fixed inset-0 bg-gradient-to-br from-[#0c031c] via-[#1a0b2e] to-[#2d1b4e]" style={{ zIndex: 0 }} />
       <StarfieldBackground />
       {categoryImage && (
         <div 
@@ -1046,9 +1069,12 @@ export default function Quiz() {
               {quizState.question?.answers.map((answer, index) => (
                 <Card
                   key={index}
-                  className={`p-5 md:p-6 transition-all duration-300 ${getOptionStyle(answer)} ${!quizState.isAnswerSelected && 'hover:scale-[1.02]'} relative overflow-hidden cursor-pointer backdrop-blur-sm`}
+                  className={`p-5 md:p-6 transition-all duration-300 ${getOptionStyle(answer)} relative overflow-hidden cursor-pointer`}
                   onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
-                  style={{ borderRadius: '1.5rem' }}
+                  style={{ 
+                    borderRadius: '1.5rem',
+                    ...getInitialOptionAuraStyle(answer) // Apply the aura/glow style here
+                  }}
                 >
                   {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
                     <div
@@ -1071,16 +1097,6 @@ export default function Quiz() {
                       <span className={`text-base md:text-xl leading-snug break-words w-full font-semibold text-left text-white`}>
                         {answer}
                       </span>
-                      {/* REMOVED: Percentage display text as requested 
-                      {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
-                        <span
-                          className="text-sm md:text-base font-bold text-white ml-3 animate-fade-in-delayed flex-shrink-0 bg-black/30 px-3 py-1 rounded-lg"
-                          style={{ animationDelay: `${1000 + (index * 150)}ms` }}
-                        >
-                          {getAnswerPercentage(answer)}%
-                        </span>
-                      )}
-                      */}
                     </div>
                   </div>
                 </Card>
