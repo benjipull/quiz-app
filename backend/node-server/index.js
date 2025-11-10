@@ -38,7 +38,8 @@ app.use("/api/resetPassword", require("./routes/resetPassword"));
 app.use("/api/updatePassword", require("./routes/updatePassword"));
 app.use("/api/getUserDetails", require("./routes/getUserDetails"));
 app.use("/api/updateUserDetails", require("./routes/updateUserDetails"));
-app.use("/api/users", require("./routes/users")); 
+app.use("/api/users", require("./routes/users"));
+app.use("/api/interests", require("./routes/interestRoutes")); 
 
 //Quiz
 app.use("/api/startQuiz", require("./routes/startQuiz")); 

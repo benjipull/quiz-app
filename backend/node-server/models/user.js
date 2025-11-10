@@ -2,51 +2,64 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
 const UserSchema = new mongoose.Schema({
-    alias: { type: String, required: true, unique: true, trim: true },
-    email: { type: String, required: true, unique: true, trim: true, lowercase: true },
-    avatar: { type: Number, required: true, default: 1},
-    
-    password: { type: String, required: true },
-    age: { type: Number, required: true, min: 1 },
+  alias: { type: String, required: true, unique: true, trim: true },
+  email: { type: String, required: true, unique: true, trim: true, lowercase: true },
+  avatar: { type: Number, required: true, default: 1 },
+  password: { type: String, required: true },
+  age: { type: Number, required: true, min: 1 },
 
-    knowledgePoints: { type: Number, required: true, default: 0 },
-    wisdomGems: { type: Number, required: true, default: 0 },
-    enlightenmentCrystals: { type: Number, required: true, default: 0 },
-    coins: { type: Number, required: true, default: 0 },
-    level: { type: Number, required: true, default: 1 },
-       
-    created_at: { type: Date, default: Date.now },
-    lastupdated_at: { type: Date, default: Date.now, required: true },
-    lastlogin_at: { type: Date },
-    
-    userType: { 
-        type: String,
-        enum: ["Guest", "Registered", "Admin"],
-        required: true,
-        default: "Registered"
+  // 🧠 Player stats
+  knowledgePoints: { type: Number, required: true, default: 0 },
+  wisdomGems: { type: Number, required: true, default: 0 },
+  enlightenmentCrystals: { type: Number, required: true, default: 0 },
+  coins: { type: Number, required: true, default: 0 },
+  level: { type: Number, required: true, default: 1 },
+
+  // 🏷️ New: Player interests
+  interests: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Interest",
+      default: [],
     },
-    resetPasswordToken: { type: String, default: null },
-    resetPasswordExpires: { type: Date, default: null },
+  ],
+
+  // 🕒 Timestamps
+  created_at: { type: Date, default: Date.now },
+  lastupdated_at: { type: Date, default: Date.now, required: true },
+  lastlogin_at: { type: Date },
+
+  // 👥 User type
+  userType: {
+    type: String,
+    enum: ["Guest", "Registered", "Admin"],
+    required: true,
+    default: "Registered",
+  },
+
+  // 🔑 Password reset
+  resetPasswordToken: { type: String, default: null },
+  resetPasswordExpires: { type: Date, default: null },
 });
 
-// 🔐 Hash password before saving and update lastupdated_at
+// 🔐 Hash password before saving
 UserSchema.pre("save", async function (next) {
-    if (this.isModified("password")) {
-        const salt = await bcrypt.genSalt(10);
-        this.password = await bcrypt.hash(this.password, salt);
-    }
+  if (this.isModified("password")) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
 
-    // 🔄 Always recalculate level before saving
-    this.level = this.calculateLevel();
+  // 📈 Always recalculate level before saving
+  this.level = this.calculateLevel();
 
-    this.lastupdated_at = new Date();
-    next();
+  this.lastupdated_at = new Date();
+  next();
 });
 
-// 📈 Method to calculate level based on knowledge points
+// 📊 Level calculation
 UserSchema.methods.calculateLevel = function () {
-    // 👇 start at level 1, +1 for each 1000 points
-    return Math.floor(this.knowledgePoints / 1000) + 1;
+  // Start at level 1, +1 for each 1000 knowledge points
+  return Math.floor(this.knowledgePoints / 1000) + 1;
 };
 
 module.exports = mongoose.model("User", UserSchema);

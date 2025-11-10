@@ -32,7 +32,7 @@ const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
 });
 const avatars: string[] = Object.values(avatarImages) as string[];
 
-const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 interface Category {
   _id: string;
@@ -377,7 +377,7 @@ export default function Home() {
   const avatarImage = userAvatar || undefined;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background">
+    <div className="min-h-screen bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67]">
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
       <div className="mx-auto max-w-full space-y-4 px-4 pb-4 lg:px-8 lg:pb-8">
@@ -386,7 +386,7 @@ export default function Home() {
         {/* Guest User Registration Panel - REDESIGNED */}
         {isGuest && (
           <Card
-            className="bg-gradient-to-br from-background to-quiz-background border-gray-200 dark:border-gray-700 dark:text-white p-3 shadow-lg flex items-center justify-between space-x-3"
+            className="bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] border-gray-200 dark:border-gray-700 dark:text-white p-3 shadow-lg flex items-center justify-between space-x-3"
           >
             <div className="flex items-center space-x-3 flex-shrink-0">
               <AlertTriangle className="w-5 h-5 text-red-500 dark:text-purple-400" />
