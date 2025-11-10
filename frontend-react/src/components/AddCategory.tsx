@@ -1,10 +1,8 @@
-// AddCategory.tsx
-
 "use client";
 
 import React, { useState } from "react";
 import { Plus, X } from "lucide-react";
-import { Button } from "@/components/ui/button"; // ✅ Use themed button
+import { Button } from "@/components/ui/button"; // ✅ Themed button
 
 interface AddCategoryProps {
   fetchCategories?: () => void;
@@ -27,6 +25,9 @@ const AddCategory: React.FC<AddCategoryProps> = ({
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState<Notification | null>(null);
 
+  // ✅ Base URL from .env
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const showNotification = (message: string, type: "success" | "error") => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 5000);
@@ -35,17 +36,13 @@ const AddCategory: React.FC<AddCategoryProps> = ({
   const handleCreateCategory = async () => {
     const token = localStorage.getItem("token");
 
-    // 🎯 FIX 1: Rely on the token being present for authorization.
-    // If no token exists, prompt registration and exit, preventing the 403.
-    if (!token) { 
+    // ✅ Prevent creation without a token
+    if (!token) {
       setIsOpen(false);
       showNotification("You need to be logged in to create a category.", "error");
       onRegistrationRequired();
       return;
     }
-    
-    // 🚫 The original 'if (isGuest)' check is removed here 
-    // because the token check is the true source of authority.
 
     if (!categoryName.trim()) {
       showNotification("Please enter a category name.", "error");
@@ -53,19 +50,16 @@ const AddCategory: React.FC<AddCategoryProps> = ({
     }
 
     setLoading(true);
+
     try {
-      // The token used here is now the refreshed one from Profile.tsx
-      const response = await fetch(
-        "https://quiz-app-node-606998948537.europe-west4.run.app/api/categories/createCategory",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ name: categoryName }),
-        }
-      );
+      const response = await fetch(`${BASE_URL}/api/categories/createCategory`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: categoryName }),
+      });
 
       const data = await response.json();
 
@@ -78,8 +72,6 @@ const AddCategory: React.FC<AddCategoryProps> = ({
           "success"
         );
       } else {
-        // If 403 Forbidden still occurs here, it means the token is bad, 
-        // and we show the error from the server.
         showNotification(data.message || "Failed to create category.", "error");
       }
     } catch (error) {
@@ -93,7 +85,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({
   const handleMainButtonClick = () => {
     const token = localStorage.getItem("token");
 
-    // 🎯 FIX 2: Check for token before opening modal.
+    // ✅ Only allow modal if logged in
     if (!token) {
       onRegistrationRequired();
     } else {
@@ -115,7 +107,6 @@ const AddCategory: React.FC<AddCategoryProps> = ({
           </p>
         </div>
 
-        {/* ✅ Themed Create Button */}
         <Button
           onClick={handleMainButtonClick}
           className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white shadow-lg"
@@ -136,7 +127,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({
             rounded-2xl p-6 w-full max-w-md shadow-[0_0_30px_-5px_rgba(0,150,255,0.5)]"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* ✅ Themed close button */}
+            {/* Close Button */}
             <Button
               onClick={() => setIsOpen(false)}
               variant="destructive"
@@ -160,7 +151,6 @@ const AddCategory: React.FC<AddCategoryProps> = ({
               />
 
               <div className="flex space-x-3">
-                {/* ✅ Themed Create button */}
                 <Button
                   onClick={handleCreateCategory}
                   disabled={loading || !categoryName.trim()}
@@ -169,7 +159,6 @@ const AddCategory: React.FC<AddCategoryProps> = ({
                   {loading ? "Creating..." : "Create"}
                 </Button>
 
-                {/* ✅ Themed Cancel button */}
                 <Button
                   onClick={() => setIsOpen(false)}
                   variant="outline"
