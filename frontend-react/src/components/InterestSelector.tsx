@@ -1,3 +1,4 @@
+// InterestSelector.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -11,23 +12,24 @@ interface Interest {
 }
 
 interface InterestSelectorProps {
-  userId: string;
-  initialSelectedIds?: string[];
-  onSelectionChange?: (selectedIds: string[]) => void;
+  // We use `currentSelectedIds` instead of `initialSelectedIds`
+  currentSelectedIds: string[];
+  // Handler to update the selected IDs in the parent component's temporary state
+  onSelectionChange: (selectedIds: string[]) => void;
 }
 
 const InterestSelector: React.FC<InterestSelectorProps> = ({
-  userId,
-  initialSelectedIds = [],
+  currentSelectedIds,
   onSelectionChange,
 }) => {
   const [interests, setInterests] = useState<Interest[]>([]);
-  const [selectedInterests, setSelectedInterests] = useState<string[]>(initialSelectedIds);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // --- Data Fetching ---
   useEffect(() => {
     const fetchInterests = async () => {
+      // (Same API call to get all available interests)
       try {
         const res = await fetch(`${BASE_URL}/api/interests`);
         if (!res.ok) throw new Error("Failed to fetch interests");
@@ -46,15 +48,19 @@ const InterestSelector: React.FC<InterestSelectorProps> = ({
     fetchInterests();
   }, [toast]);
 
+  // --- Toggling Logic ---
   const toggleInterest = (id: string) => {
-    setSelectedInterests((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
+    // Determine if the ID is currently selected
+    const isCurrentlySelected = currentSelectedIds.includes(id);
 
-  useEffect(() => {
-    if (onSelectionChange) onSelectionChange(selectedInterests);
-  }, [selectedInterests, onSelectionChange]);
+    // Calculate the new set of selected IDs
+    const newSelectedIds = isCurrentlySelected
+      ? currentSelectedIds.filter((i) => i !== id) // Remove if already selected
+      : [...currentSelectedIds, id]; // Add if not selected
+
+    // Notify the parent component of the change
+    onSelectionChange(newSelectedIds);
+  };
 
   if (loading) {
     return (
@@ -69,11 +75,12 @@ const InterestSelector: React.FC<InterestSelectorProps> = ({
       {/* Grid - 3 columns on all screens */}
       <div className="grid grid-cols-3 gap-2 w-full max-w-full">
         {interests.map((interest) => {
-          const isSelected = selectedInterests.includes(interest._id);
+          const isSelected = currentSelectedIds.includes(interest._id);
           return (
             <button
               key={interest._id}
               onClick={() => toggleInterest(interest._id)}
+              // (Tailwind classes remain the same for styling)
               className={`
                 px-1.5 py-2.5
                 flex items-center justify-center text-center text-xs font-medium leading-tight
@@ -95,7 +102,7 @@ const InterestSelector: React.FC<InterestSelectorProps> = ({
 
       {/* Compact Count */}
       <p className="text-xs text-gray-400 mt-3">
-        {selectedInterests.length} selected
+        {currentSelectedIds.length} selected
       </p>
     </div>
   );
