@@ -1,8 +1,22 @@
-// src/utils/apiClient.ts
 import { toast } from "@/hooks/use-toast";
 
+// Automatically load the base URL from .env
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
+// ✅ Optional: Log once which environment you're using (for debugging)
+if (import.meta.env.DEV) {
+  console.log(`🌍 Using DEV backend: ${BASE_URL}`);
+} else {
+  console.log(`🚀 Using PRODUCTION backend: ${BASE_URL}`);
+}
+
+/**
+ * Universal API client with token + toast + auto env URL
+ * @param endpoint e.g. "/api/getUserDetails"
+ * @param options fetch options
+ */
 export const apiClient = async (
-  url: string,
+  endpoint: string,
   options: RequestInit = {}
 ): Promise<Response | void> => {
   const token = localStorage.getItem("token");
@@ -13,7 +27,12 @@ export const apiClient = async (
     ...(options.headers || {}),
   };
 
-  const response = await fetch(url, { ...options, headers });
+  // ✅ Automatically prepend BASE_URL if only a relative endpoint is passed
+  const fullUrl = endpoint.startsWith("http")
+    ? endpoint
+    : `${BASE_URL}${endpoint}`;
+
+  const response = await fetch(fullUrl, { ...options, headers });
 
   if (response.status === 401) {
     const data = await response.json().catch(() => ({} as any));
@@ -22,17 +41,17 @@ export const apiClient = async (
       localStorage.removeItem("token");
       localStorage.removeItem("user");
 
-      // 🔔 Show toast using ShadCN hook
       toast({
         title: "Session expired",
         description: "Please log in again to continue.",
         variant: "destructive",
       });
 
-      // Small delay so user sees toast before redirect
+      // Delay redirect slightly so toast is visible
       setTimeout(() => {
         window.location.href = "/auth";
       }, 1000);
+
       return;
     }
   }

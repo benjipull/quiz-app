@@ -5,8 +5,9 @@ import { Wrench, ShoppingBag } from "lucide-react"; // Import a relevant icon
 
 const Store = () => {
   return (
-    // 1. Set up min-height screen, background gradient, and use flex-col to stack header and content
-    <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background flex flex-col">
+    // 1. Set up min-height screen, background gradient, and use flex-col to stack header and content 
+    //bg-gradient-to-br from-background to-quiz-background
+    <div className="min-h-screen bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] flex flex-col">
       
       {/* Header component remains at the top */}
       <Header title="Store" showNotifications />

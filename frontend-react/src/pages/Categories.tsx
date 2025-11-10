@@ -38,7 +38,7 @@ interface User {
   level?: number;
 }
 
-const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 export default function Categories() {
   const navigate = useNavigate();
@@ -228,7 +228,7 @@ export default function Categories() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] flex items-center justify-center">
         <div className="text-center space-y-4">
           <h2 className="text-2xl font-bold text-red-500">
             Error Loading Categories
@@ -241,7 +241,7 @@ export default function Categories() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] pb-20">
       <Header title="Quizzes" showSearch />
 
       <div className="px-4 lg:px-8 space-y-6 max-w-full mx-auto">
