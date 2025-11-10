@@ -519,6 +519,7 @@ const Profile = () => {
             <Button
               variant="outline"
               onClick={() => setIsInterestModalOpen(false)}
+              className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
               disabled={savingInterests}
             >
               Cancel
