@@ -79,16 +79,12 @@ const StarfieldBackground = () => {
 
 const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmText, cancelText }: any) => (
   <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <Card className="max-w-sm w-full p-6 space-y-4 bg-gradient-to-br from-purple-900/95 to-indigo-900/95 border-2 border-purple-400/50 backdrop-blur-md">
-      <h3 className="text-lg font-bold text-white">{title}</h3>
-      <p className="text-sm text-purple-100">{description}</p>
+    <Card className="max-w-sm w-full p-6 space-y-4 bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67]">
+      <h3 className="text-lg font-bold">{title}</h3>
+      <p className="text-sm text-muted-foreground">{description}</p>
       <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={onCancel} className="border-2 border-purple-400 text-purple-200 hover:bg-purple-500/30">
-          {cancelText}
-        </Button>
-        <Button onClick={onConfirm} className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white border-0">
-          {confirmText}
-        </Button>
+        <Button variant="outline" onClick={onCancel}>{cancelText}</Button>
+        <Button variant="destructive" onClick={onConfirm}>{confirmText}</Button>
       </div>
     </Card>
   </div>
@@ -106,12 +102,30 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
   const [otherText, setOtherText] = useState('');
 
   const reportOptions = [
-    { value: "incorrect_answer", label: "Incorrect Answer" },
-    { value: "multiple_correct_answers", label: "Multiple Correct Answers" },
-    { value: "ambiguous_wording", label: "Ambiguous or Poorly Worded Question" },
-    { value: "duplicate_question", label: "Duplicate Question" },
-    { value: "offensive_content", label: "Offensive or Inappropriate Content" },
-    { value: "other", label: "Other (please describe)" },
+    {
+      value: "incorrect_answer",
+      label: "Incorrect Answer",
+    },
+    {
+      value: "multiple_correct_answers",
+      label: "Multiple Correct Answers",
+    },
+    {
+      value: "ambiguous_wording",
+      label: "Ambiguous or Poorly Worded Question",
+    },
+    {
+      value: "duplicate_question",
+      label: "Duplicate Question",
+    },
+    {
+      value: "offensive_content",
+      label: "Offensive or Inappropriate Content",
+    },
+    {
+      value: "other",
+      label: "Other (please describe)",
+    },
   ];
 
   const handleSubmit = () => {
@@ -123,34 +137,37 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
 
   const isSubmitDisabled = !selectedReason || (selectedReason === "other" && otherText.trim() === '') || isSubmitting;
 
+  const CloseButton = () => (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={onClose}
+      disabled={isSubmitting}
+      className="bg-red-600 hover:bg-red-700 rounded-full h-8 w-8 p-1 text-white"
+      aria-label="Close"
+    >
+      <X className="h-5 w-5" />
+    </Button>
+  );
+
   return (
     <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <Card className="max-w-md w-full p-6 space-y-6 bg-gradient-to-br from-purple-900/95 to-indigo-900/95 border-2 border-purple-400/50 backdrop-blur-md">
+      <Card className="max-w-md w-full p-6 space-y-6">
         <div className="flex justify-between items-center">
-          <h3 className="text-xl font-bold text-white">{isThankYou ? "Thank You!" : "Report Question Issue"}</h3>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="bg-red-600 hover:bg-red-700 rounded-full h-8 w-8 p-1 text-white"
-          >
-            <X className="h-5 w-5" />
-          </Button>
+          <h3 className="text-xl font-bold">{isThankYou ? "Thank You!" : "Report Question Issue"}</h3>
+          <CloseButton />
         </div>
 
         {isThankYou ? (
           <div className="text-center space-y-4">
-            <p className="text-base text-purple-100">
+            <p className="text-base text-muted-foreground">
               Thank you for helping us improve our quiz! Your feedback is highly appreciated.
             </p>
-            <Button onClick={onClose} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white border-0">
-              Close
-            </Button>
+            <Button onClick={onClose} variant="default">Close</Button>
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-purple-100">
+            <p className="text-sm text-muted-foreground">
               Please select the issue that best describes the problem with this question.
             </p>
 
@@ -158,14 +175,13 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
               {reportOptions.map((option) => (
                 <div
                   key={option.value}
-                  className={`p-3 border-2 rounded-xl cursor-pointer transition-all ${
-                    selectedReason === option.value
-                      ? "border-purple-400 bg-purple-500/30 shadow-lg shadow-purple-500/20"
-                      : "hover:bg-purple-500/20 border-purple-500/40 hover:border-purple-400"
-                  }`}
+                  className={`p-3 border rounded-lg cursor-pointer transition-all ${selectedReason === option.value
+                      ? "border-primary bg-primary/10"
+                      : "hover:bg-muted border-border"
+                    }`}
                   onClick={() => setSelectedReason(option.value)}
                 >
-                  <label className="flex items-start space-x-2 cursor-pointer font-medium text-sm text-white">
+                  <label className="flex items-start space-x-2 cursor-pointer font-medium text-sm">
                     <input
                       type="radio"
                       name="report-issue"
@@ -174,35 +190,33 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
                       onChange={() => setSelectedReason(option.value)}
                       className="hidden"
                     />
-                    <span>{option.label}</span>
+                    <div className="flex flex-col">
+                      <span className="font-semibold">{option.label}</span>
+                    </div>
                   </label>
                 </div>
               ))}
             </div>
 
             {selectedReason === "other" && (
-              <textarea
-                placeholder="Describe the issue..."
-                value={otherText}
-                onChange={(e) => setOtherText(e.target.value)}
-                className="w-full p-3 border-2 border-purple-500/50 rounded-xl resize-none text-sm text-white bg-purple-950/50 focus:ring-2 focus:ring-purple-400 focus:border-purple-400 placeholder-purple-300 mt-2"
-                rows={3}
-              />
+              <div>
+                <textarea
+                  placeholder="Describe the issue..."
+                  value={otherText}
+                  onChange={(e) => setOtherText(e.target.value)}
+                  className="w-full p-3 border rounded-lg resize-none text-sm text-gray-900 focus:ring-primary focus:border-primary mt-2"
+                  rows={3}
+                />
+              </div>
             )}
 
             <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" className="text-red-500 border-red-600 hover:bg-red-600"
+                onClick={onClose} disabled={isSubmitting}>Cancel</Button>
               <Button
-                variant="outline"
-                onClick={onClose}
-                disabled={isSubmitting}
-                className="border-2 border-red-500 text-red-400 hover:bg-red-600 hover:text-white"
-              >
-                Cancel
-              </Button>
-              <Button
+                variant="default"
                 onClick={handleSubmit}
                 disabled={isSubmitDisabled}
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white border-0"
               >
                 {isSubmitting ? "Submitting..." : "Submit Report"}
               </Button>
@@ -443,26 +457,24 @@ export default function Quiz() {
     };
   }, [quizState.question, quizState.isAnswerSelected, timeUp]);
 
+  // --- MODIFIED SCROLL EFFECT ---
   useEffect(() => {
     if (showExplanation && explanationRef.current) {
+      // Small delay to ensure the explanation content is rendered
       setTimeout(() => {
         if (explanationRef.current) {
-          const viewportHeight = window.innerHeight;
-          const elementRect = explanationRef.current.getBoundingClientRect();
-          const isElementBelowFold = elementRect.top > viewportHeight * 0.8;
-          const isElementCutOff = elementRect.bottom > viewportHeight;
-
-          if (isElementBelowFold || isElementCutOff) {
-            explanationRef.current.scrollIntoView({
-              behavior: 'smooth',
-              block: 'start',
-              inline: 'nearest'
-            });
-          }
+          // Changed to always scroll when explanation appears for a smoother experience
+          // without the complexity of checking the viewport fold.
+          explanationRef.current.scrollIntoView({
+            behavior: 'smooth', // Ensure smooth scrolling
+            block: 'start',
+            inline: 'nearest'
+          });
         }
-      }, 500);
+      }, 300); // 300ms delay after state update for element render
     }
   }, [showExplanation]);
+  // ------------------------------
 
   useEffect(() => {
     setSelectedAnswer(null);
@@ -651,9 +663,13 @@ export default function Quiz() {
           setShowBars(true);
         }, 300);
 
+        // --- MODIFIED DELAY ---
+        // Give the user 1.2 seconds to see the "Time's Up!" and correct answer.
         setTimeout(() => {
-          setShowExplanation(true);
-        }, 1800);
+          // No separate explanation needed for time up, as the info is in the 'timeUp' block.
+          // This call is redundant here, but keeping the structure simple.
+        }, 1200); 
+        // ----------------------
 
         if (!isLastQuestion) {
           preloadNextQuestion();
@@ -796,9 +812,12 @@ export default function Quiz() {
           setShowBars(true);
         }, 300);
 
+        // --- MODIFIED DELAY ---
+        // Give the user 1.2 seconds to see the answer feedback and bars.
         setTimeout(() => {
           setShowExplanation(true);
-        }, 300);
+        }, 1200);
+        // ----------------------
 
         if (!isLastQuestion) {
           preloadNextQuestion();
@@ -1060,7 +1079,7 @@ export default function Quiz() {
         <div className="flex-1 overflow-y-auto px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-4xl">
           <div className="space-y-6">
             <div className="px-1 py-3 md:py-6 text-center">
-              <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-relaxed drop-shadow-lg">
+              <h2 className="text-xl md:text-2xl lg:text-4xl font-bold text-white leading-relaxed drop-shadow-lg">
                 {quizState.question?.question}
               </h2>
             </div>
@@ -1073,7 +1092,7 @@ export default function Quiz() {
                   onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
                   style={{ 
                     borderRadius: '1.5rem',
-                    ...getInitialOptionAuraStyle(answer) // Apply the aura/glow style here
+                    ...getInitialOptionAuraStyle(answer) // Applied the aura/glow style here
                   }}
                 >
                   {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
@@ -1119,13 +1138,13 @@ export default function Quiz() {
                   </div>
                 </Card>
 
-                <div className="mt-6 pb-4">
+               <div className="mt-6 pb-4">
                   <Button
+                    variant="default"
                     size="lg"
-                    className="w-full h-14 md:h-16 text-base md:text-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold border-0 shadow-lg shadow-purple-500/30"
+                    className="w-full h-14 md:h-16 text-base md:text-lg"
                     onClick={handleNextQuestion}
                     disabled={isCompletingQuiz}
-                    style={{ borderRadius: '1rem' }}
                   >
                     {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
                   </Button>
@@ -1134,7 +1153,7 @@ export default function Quiz() {
             )}
             {showExplanation && !timeUp && answerResponse && (
               <div ref={explanationRef}>
-                <Card className="p-6 md:p-8 bg-gradient-to-r from-purple-700/40 to-indigo-700/40 animate-slide-up border-2 border-purple-400 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
+                <Card className="p-6 md:p-8  animate-slide-up border-2 border-purple-400 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <Lightbulb className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-yellow-400 flex-shrink-0" />
@@ -1149,7 +1168,7 @@ export default function Quiz() {
                 </Card>
 
                 <div className="mt-6 space-y-4 animate-fade-in pb-4">
-                  <Card className="p-4 md:p-6 bg-gradient-to-r from-purple-800/40 to-indigo-800/40 border-2 border-purple-500/40 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
+                  <Card className="p-4 md:p-6 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
                     <div className="space-y-4">
                       <p className="text-sm font-medium text-center text-white">Did you like this question?</p>
 
@@ -1159,11 +1178,11 @@ export default function Quiz() {
                           size="sm"
                           onClick={() => handleFeedback("up")}
                           disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 md:h-12 border-2 transition-all ${feedbackType === "up"
-                              ? "bg-green-500/30 border-green-400 text-green-200 shadow-lg shadow-green-500/30"
+                          className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${feedbackType === "up"
+                              ? "bg-green-100 border-green-500 text-green-600"
                               : feedbackGiven
-                                ? "opacity-50 cursor-not-allowed border-gray-500 text-gray-400"
-                                : "border-green-400 text-green-300 hover:bg-green-500/20 hover:shadow-lg hover:shadow-green-500/20"
+                                ? "opacity-50 cursor-not-allowed"
+                                : "border-green-500 text-green-600 hover:bg-green-500 hover:text-white"
                             }`}
                         >
                           <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
@@ -1175,11 +1194,11 @@ export default function Quiz() {
                           size="sm"
                           onClick={() => handleFeedback("down")}
                           disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 md:h-12 border-2 transition-all ${feedbackType === "down"
-                              ? "bg-red-500/30 border-red-400 text-red-200 shadow-lg shadow-red-500/30"
+                          className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${feedbackType === "down"
+                              ? "bg-red-100 border-red-600 text-red-600"
                               : feedbackGiven
-                                ? "opacity-50 cursor-not-allowed border-gray-500 text-gray-400"
-                                : "border-red-400 text-red-300 hover:bg-red-500/20 hover:shadow-lg hover:shadow-red-500/20"
+                                ? "opacity-50 cursor-not-allowed"
+                                : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
                             }`}
                         >
                           <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
@@ -1190,8 +1209,7 @@ export default function Quiz() {
                           variant="outline"
                           size="sm"
                           onClick={() => setShowReportDialog(true)}
-                          className="text-sm flex-1 max-w-[120px] h-10 md:h-12 border-2 border-blue-400 text-blue-300 hover:bg-blue-500/20 hover:shadow-lg hover:shadow-blue-500/20 transition-all"
-                        >
+                          className="text-sm flex-1 max-w-[120px] h-10 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"             >
                           <Flag className="h-4 w-4 md:h-5 md:w-5" />
                           <span className="ml-1 sm:ml-2">Report</span>
                         </Button>
@@ -1201,7 +1219,7 @@ export default function Quiz() {
 
                   <Button
                     size="lg"
-                    className="w-full h-14 md:h-16 text-base md:text-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold border-0 shadow-lg shadow-purple-500/30"
+                    className="w-full h-14 md:h-16 text-base md:text-lg text-white font-bold border-0"
                     onClick={handleNextQuestion}
                     disabled={isCompletingQuiz}
                     style={{ borderRadius: '1rem' }}
