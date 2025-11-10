@@ -1071,6 +1071,7 @@ export default function Quiz() {
                       <span className={`text-base md:text-xl leading-snug break-words w-full font-semibold text-left text-white`}>
                         {answer}
                       </span>
+                      {/* REMOVED: Percentage display text as requested 
                       {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
                         <span
                           className="text-sm md:text-base font-bold text-white ml-3 animate-fade-in-delayed flex-shrink-0 bg-black/30 px-3 py-1 rounded-lg"
@@ -1079,6 +1080,7 @@ export default function Quiz() {
                           {getAnswerPercentage(answer)}%
                         </span>
                       )}
+                      */}
                     </div>
                   </div>
                 </Card>

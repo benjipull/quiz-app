@@ -4,21 +4,24 @@
 
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-// ADDED: Eye/EyeOff for password visibility
-import { X, User, LogIn, Lock, Eye, EyeOff } from "lucide-react"; 
+import { X, User, LogIn, Eye, EyeOff, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiClient } from "@/utils/apiClient"; 
-// Note: We no longer need Dialog/DialogContent/DialogHeader/DialogTitle
+import InterestSelector from "@/components/InterestSelector";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
-// Avatar images are still loaded to display the *current* avatar, 
-// but selection logic is removed for guests.
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
   import: "default",
@@ -30,14 +33,17 @@ const Profile = () => {
   const [alias, setAlias] = useState("");
   const [age, setAge] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [updating, setUpdating] = useState(false);
+  // New state for interest-specific saving
+  const [savingInterests, setSavingInterests] = useState(false); 
   const [userType, setUserType] = useState<"Guest" | "Registered" | "Admin">(
     "Registered"
   );
-  // State for the password input (only used by Guests now)
-  const [password, setPassword] = useState(""); 
-  const [confirmPassword, setConfirmPassword] = useState(""); // NEW: Confirm password
-  const [showPassword, setShowPassword] = useState(false); // NEW: Toggle visibility
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isInterestModalOpen, setIsInterestModalOpen] = useState(false);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -51,14 +57,15 @@ const Profile = () => {
       setAge(parsedUser.age || "");
       setUserType(parsedUser.userType || "Registered");
       
-      // Determine the initial avatar URL
+      // Set initial interests
+      setSelectedInterests(parsedUser.interests || []);
+      
       const avatarIndex = parsedUser.avatar - 1;
       const initialAvatar = avatars[avatarIndex] || avatars[0] || null;
       setAvatar(initialAvatar);
       
-      // Ensure the avatar index is stored for API if a Guest is registering
       if (parsedUser.userType === "Guest" && !localStorage.getItem("userAvatarIndex")) {
-        const defaultIndex = 0; // Default to the first avatar for guests
+        const defaultIndex = 0;
         localStorage.setItem("userAvatar", avatars[defaultIndex]);
         localStorage.setItem("userAvatarIndex", defaultIndex.toString());
       }
@@ -67,94 +74,147 @@ const Profile = () => {
     }
   }, [navigate]);
 
-  // Avatar selection is only for registered users
   const handleAvatarSelection = (selectedAvatar: string, index: number) => {
-      // Only allow selection if the user is not a guest
-      if (userType === "Registered" || userType === "Admin") {
-          setAvatar(selectedAvatar);
-          localStorage.setItem("userAvatar", selectedAvatar);
-          localStorage.setItem("userAvatarIndex", index.toString());
-      }
+    if (userType === "Registered" || userType === "Admin") {
+      setAvatar(selectedAvatar);
+      localStorage.setItem("userAvatar", selectedAvatar);
+      localStorage.setItem("userAvatarIndex", index.toString());
+    }
   };
 
-  // ----------------------------------------------------------------
-  // CONSOLIDATED updateUserDetails to handle password for Guest
-  // ----------------------------------------------------------------
+  const handleInterestChange = (newSelectedIds: string[]) => {
+    setSelectedInterests(newSelectedIds);
+  };
+
+  // NEW FUNCTION: Save interests directly from the modal
+  const saveInterestsToBackend = async (interestsToSave: string[]) => {
+    if (!user?._id) return;
+    setSavingInterests(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Authentication token missing.");
+
+      const interestsResponse = await fetch(
+        `${BASE_URL}/api/interests/user/${user._id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({ interests: interestsToSave }),
+        }
+      );
+
+      if (!interestsResponse.ok) {
+        throw new Error("Failed to update interests.");
+      }
+
+      const updatedUser = {
+        ...user,
+        interests: interestsToSave,
+      };
+
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      
+      toast({
+        title: "Success",
+        description: `Interests updated successfully! (${interestsToSave.length} selected)`,
+      });
+
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to save interests: ${(error as Error).message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingInterests(false);
+    }
+  };
+
+
+  const handleSaveInterests = async () => {
+    await saveInterestsToBackend(selectedInterests);
+    setIsInterestModalOpen(false);
+  };
+
+  // Modified updateUserDetails to remove the separate interest API call
   const updateUserDetails = async (isRegistration: boolean) => {
     setUpdating(true);
     try {
-      // 1. Prepare data
       const avatarIndex = localStorage.getItem("userAvatarIndex");
-      // Use the stored index + 1 for the API call. 
       const avatarValue = avatarIndex
         ? parseInt(avatarIndex) + 1
-        : user.avatar || 1; // Fallback to existing or 1
+        : user.avatar || 1;
 
       const updateData = {
         alias,
         age: parseInt(age),
         avatar: avatarValue,
-        // Include email and password ONLY if it's a Guest completing registration
-        ...(isRegistration ? { email: user.email, password } : {}),
+        // Interests are NOT sent here anymore, as they were saved previously
+        ...(isRegistration ? { email: user.email, password, interests: selectedInterests } : {}),
       };
-
-      // 2. Send combined request to updateUserDetails endpoint
-      const token = localStorage.getItem("token");8
+      
+      // If it's registration, interests are sent with the registration payload.
+      // If it's just an update, interests are assumed to be saved by the modal function.
+      
+      const token = localStorage.getItem("token");
       if (!token) throw new Error("Authentication token missing.");
       
+      // Update basic user details
       const response = await fetch(`${BASE_URL}/api/updateUserDetails`, {
         method: "POST",
         headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify(updateData),
       });
 
-      if (!response) {
-        setUpdating(false);
-        return;
-      }
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        // 🎯 CRITICAL FIX: SAVE THE NEW TOKEN
-        if (data.token) {
-            localStorage.setItem("token", data.token); 
-        }
-
-        const newType: "Guest" | "Registered" | "Admin" =
-          data.user?.userType || "Registered";
-
-        const updatedUser = {
-          ...user,
-          ...data.user,
-          alias,
-          age: parseInt(age),
-          avatar: avatarValue,
-          userType: newType,
-        };
-
-        setUser(updatedUser);
-        localStorage.setItem("user", JSON.stringify(updatedUser));
-        setUserType(newType);
-
-        if (newType === "Registered" && isRegistration) {
-           toast({
-             title: "Registration Complete",
-             description: "Welcome! Your account is now fully registered.",
-           });
-           setTimeout(() => navigate("/"), 1500);
-        } else {
-           toast({
-             title: "Success",
-             description: "Profile updated successfully!",
-           });
-        }
-      } else {
+      if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to update profile.");
+      }
+
+      const data = await response.json();
+      
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+      }
+      
+      // The separate interestsResponse PUT call is REMOVED from here
+
+      const newType: "Guest" | "Registered" | "Admin" =
+        data.user?.userType || "Registered";
+
+      const updatedUser = {
+        ...user,
+        ...data.user,
+        alias,
+        age: parseInt(age),
+        avatar: avatarValue,
+        userType: newType,
+        // Retain local interests state
+        interests: selectedInterests, 
+      };
+
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      setUserType(newType);
+
+      if (newType === "Registered" && isRegistration) {
+        toast({
+          title: "Registration Complete",
+          description: "Welcome! Your account is now fully registered.",
+        });
+        setTimeout(() => navigate("/"), 1500);
+      } else {
+        toast({
+          title: "Success",
+          description: "Profile updated successfully!",
+        });
       }
     } catch (error) {
       toast({
@@ -167,17 +227,12 @@ const Profile = () => {
     }
   };
 
-  // ----------------------------------------------------------------
-  // REVISED: Main Form Submission Handler
-  // ----------------------------------------------------------------
   const handleSaveClick = async (e: React.FormEvent) => {
     e.preventDefault();
     const isGuest = userType === "Guest";
 
-    // Basic Validation: alias, age
     if (!validateBasicFields(isGuest)) return;
 
-    // Guest Registration Validation (Email, Password, Confirm Password)
     if (isGuest) {
       if (!user.email || !user.email.includes("@")) {
         toast({ title: "Validation Error", description: "Enter a valid email.", variant: "destructive" });
@@ -187,18 +242,18 @@ const Profile = () => {
         toast({ title: "Validation Error", description: "Password must be at least 6 characters long.", variant: "destructive" });
         return;
       }
-      // CHECK FOR PASSWORD MATCH IS CRITICAL
       if (password !== confirmPassword) {
         toast({ title: "Validation Error", description: "Passwords do not match.", variant: "destructive" });
         return;
       }
     }
-
-    // Call updateUserDetails: true for Guest, false for Registered
-    await updateUserDetails(isGuest); 
+    
+    // IMPORTANT: For registered users, interests should already be saved by the modal.
+    // For guests, interests are sent with the registration payload in updateUserDetails.
+    
+    await updateUserDetails(isGuest);
   };
   
-  // Basic Field Validation remains the same, adjusted for Guest simplicity
   const validateBasicFields = (isRegistration: boolean) => {
     if (!alias.trim()) {
       toast({ title: "Validation Error", description: "Enter a valid username.", variant: "destructive" });
@@ -208,7 +263,6 @@ const Profile = () => {
       toast({ title: "Validation Error", description: "Enter a valid age.", variant: "destructive" });
       return false;
     }
-    // Only check for avatar if it's a Registered user editing their profile
     if (!isRegistration && !avatar) {
       toast({ title: "Validation Error", description: "Please select an avatar.", variant: "destructive" });
       return false;
@@ -233,7 +287,7 @@ const Profile = () => {
           to={"/"}
           className="absolute top-3 right-3 z-20 h-8 w-8 bg-red-600 hover:bg-red-700 rounded-full transition-colors flex items-center justify-center shadow-lg"
           aria-label="Close Profile and go to Categories"
-          >
+        >
           <X className="h-5 w-5 text-white" />
         </Link>
 
@@ -251,14 +305,13 @@ const Profile = () => {
             </span>
           </CardTitle>
           {isGuest && (
-             <p className="text-sm text-muted-foreground">
-               Please fill out the fields below to secure and register your account.
-             </p>
+            <p className="text-sm text-muted-foreground">
+              Please fill out the fields below to secure and register your account.
+            </p>
           )}
         </CardHeader>
 
         <CardContent>
-          {/* Display User's Current Avatar (uses the default for guests) */}
           <div className="flex justify-center mb-6">
             <Avatar className="w-20 h-20 border-4 border-primary shadow-xl">
               <AvatarImage 
@@ -273,8 +326,6 @@ const Profile = () => {
           </div>
 
           <form className="space-y-4" onSubmit={handleSaveClick}>
-            
-            {/* 1. Username/Alias */}
             <div className="space-y-2">
               <Label htmlFor="alias">Username</Label>
               <Input
@@ -286,7 +337,6 @@ const Profile = () => {
               />
             </div>
 
-            {/* 2. Email (always shown) */}
             <div className="space-y-2">
               <Label>Email</Label>
               <Input
@@ -306,60 +356,56 @@ const Profile = () => {
               </p>
             </div>
             
-            {/* 3. Password (ONLY for Guests) */}
             {isGuest && (
               <>
                 <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <div className="relative">
-                        <Input
-                            id="password"
-                            type={showPassword ? "text" : "password"}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Enter a strong password (min 6 chars)"
-                            required
-                            className="pr-10"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
-                            aria-label={showPassword ? "Hide password" : "Show password"}
-                        >
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                    </div>
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter a strong password (min 6 chars)"
+                      required
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
 
-                {/* ADDED: Confirm Password Field */}
                 <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm Password</Label>
-                    <div className="relative">
-                        <Input
-                            id="confirmPassword"
-                            type={showPassword ? "text" : "password"}
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            placeholder="Re-enter password"
-                            required
-                            className="pr-10"
-                        />
-                         {/* Reusing the toggle button for confirm password visibility */}
-                         <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
-                            aria-label={showPassword ? "Hide password" : "Show password"}
-                        >
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                    </div>
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="confirmPassword"
+                      type={showPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter password"
+                      required
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
               </>
             )}
 
-            {/* 4. Age (always shown) */}
             <div className="space-y-2">
               <Label htmlFor="age">Age</Label>
               <Input
@@ -374,8 +420,28 @@ const Profile = () => {
               />
             </div>
 
-            {/* 5. Avatar Selection (ONLY for Registered Users editing profile) */}
-            {/* REMOVED for Guest users as requested */}
+            {/* Interest Selection Button */}
+            <div className="space-y-2">
+              <Label>Your Interests</Label>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => setIsInterestModalOpen(true)}
+                disabled={savingInterests} // Disable if interests are currently saving
+              >
+                <Heart className="w-4 h-4 mr-2" />
+                {savingInterests ? (
+                  "Saving Interests..."
+                ) : selectedInterests.length > 0
+                  ? `${selectedInterests.length} interest(s) selected`
+                  : "Select Your Interests"}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Choose topics you're interested in to personalize your experience.
+              </p>
+            </div>
+
             {!isGuest && (
               <div className="space-y-2">
                 <Label>Select Avatar</Label>
@@ -398,26 +464,26 @@ const Profile = () => {
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                    Guests receive a default avatar upon registration and can change it here later.
+                  Guests receive a default avatar upon registration and can change it here later.
                 </p>
               </div>
             )}
 
             <Button
               type="submit"
-              disabled={updating}
+              disabled={updating || savingInterests} // Disable if saving profile or interests
               className={`w-full ${isGuest ? "bg-amber-500 hover:bg-amber-600" : "bg-primary hover:bg-primary/80"}`}
             >
               {updating ? (
                 <div className="flex items-center space-x-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                  <span>Saving...</span>
+                  <span>Saving Profile...</span>
                 </div>
               ) : isGuest ? (
-                 <>
-                   <LogIn className="w-4 h-4 mr-2" />
-                   Complete Registration
-                 </>
+                <>
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Complete Registration
+                </>
               ) : (
                 "Save Changes"
               )}
@@ -425,6 +491,54 @@ const Profile = () => {
           </form>
         </CardContent>
       </Card>
+
+      {/* Interest Selection Modal */}
+      <Dialog open={isInterestModalOpen} onOpenChange={setIsInterestModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Heart className="w-5 h-5" />
+              <span>Select Your Interests</span>
+            </DialogTitle>
+            <DialogDescription>
+              Choose the topics you're interested in. You can select multiple interests.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {user._id && (
+              <InterestSelector
+                userId={user._id}
+                initialSelectedIds={selectedInterests}
+                onSelectionChange={handleInterestChange}
+              />
+            )}
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setIsInterestModalOpen(false)}
+              disabled={savingInterests}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveInterests}
+              disabled={savingInterests}
+            >
+              {savingInterests ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  <span>Saving...</span>
+                </div>
+              ) : (
+                `Save Interests (${selectedInterests.length})`
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
