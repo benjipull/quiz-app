@@ -94,9 +94,10 @@ const InterestSelector: React.FC<InterestSelectorProps> = ({
               `}
               title={interest.name} // Show full text on hover
             >
-              <span className="break-words line-clamp-2 px-0.5">
-                {truncateText(interest.name, 18)}
-              </span>
+             <span className="break-words text-center leading-snug px-1 overflow-hidden">
+            {interest.name}
+          </span>
+
             </button>
           );
         })}
