@@ -7,15 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { trackHomeScreen } from "@/utils/analytics";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import InterestSelector from "@/components/InterestSelector";
+import { trackEvent } from "@/utils/analytics";
 
 import {
   Brain,
-  Plus,
   AlertTriangle,
-  Zap,
-  TrendingUp,
-  Award,
-  Clock,
+  Heart,
 } from "lucide-react";
 import logo from "../assets/images/QuizicleLogo.png";
 import SplashScreen from "../components/SplashScreen";
@@ -23,7 +28,6 @@ import GameStatsHeader from "../components/GameStatsHeader";
 import AddCategory from "@/components/AddCategory";
 import { useToast } from "@/hooks/use-toast";
 
-// ⬅️ CRITICAL: Import the apiClient utility
 import { apiClient } from "@/utils/apiClient";
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
@@ -63,6 +67,7 @@ interface UserDetails {
   level: number;
   avatar: number;
   userType?: "Guest" | "Registered" | "Admin";
+  interests?: string[];
 }
 
 export default function Home() {
@@ -77,12 +82,14 @@ export default function Home() {
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [userLevel, setUserLevel] = useState(1);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
-
   const [isGuest, setIsGuest] = useState(false);
+  
+  // Interest modal state
+  const [isInterestModalOpen, setIsInterestModalOpen] = useState(false);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [savingInterests, setSavingInterests] = useState(false);
 
   const navigate = useNavigate();
-  // We no longer need userToken here as apiClient manages the header/token 
-  // but keep it for guest logic checks if you prefer.
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
   const { toast, dismiss } = useToast();
 
@@ -132,19 +139,26 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // Only fetch categories if userProfile is loaded AND we have a token 
     if (userProfile && userToken) {
       trackHomeScreen(userProfile._id);
       fetchUserCategories();
+      
+      // Check if user has no interests selected - show modal if needed
+      if (!userProfile.interests || userProfile.interests.length === 0) {
+        // Small delay to ensure smooth UI load
+        setTimeout(() => {
+          setIsInterestModalOpen(true);
+          trackEvent("view_interests", {
+            user_id: userProfile._id,
+            context: "first_login_prompt",
+          });
+        }, 500);
+      }
     }
   }, [userProfile, userToken]);
 
-  // ----------------------------------------------------------------
-  // REVISED loadUserProfile to use apiClient
-  // ----------------------------------------------------------------
   const loadUserProfile = async () => {
     if (!userToken) {
-      // Logic for token-less users (Guests) remains the same
       const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
       if (storedUser) {
         try {
@@ -152,32 +166,24 @@ export default function Home() {
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
           setIsGuest(parsedUser.userType === 'Guest');
+          setSelectedInterests(parsedUser.interests || []);
         } catch (e) {
           console.error("Failed to parse local user data:", e);
         }
       } else {
-        // If no token AND no local user, redirect to auth
         navigate("/auth");
       }
       return;
     }
 
     try {
-      // ⬅️ Use apiClient for /api/getUserDetails
       const response = await apiClient(`${BASE_URL}/api/getUserDetails`, {
         method: "GET",
-        // The Authorization header is now handled inside apiClient
       });
 
-      // ⬅️ Check if response is undefined (401 handled by apiClient)
-      if (!response) {
-        // If apiClient redirects on 401, this function halts.
-        // On a token-based 401, the user is redirected, so we just exit.
-        return;
-      }
+      if (!response) return;
 
       if (!response.ok) {
-        // Handle other non-401 non-ok responses
         console.warn(`Failed to fetch user details (Status: ${response.status}). Falling back to local storage.`);
         const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
         if (storedUser) {
@@ -185,28 +191,28 @@ export default function Home() {
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
           setIsGuest(parsedUser.userType === 'Guest');
+          setSelectedInterests(parsedUser.interests || []);
         }
         return;
       }
 
       const apiUser: UserDetails = await response.json();
 
-      // 1. Update State with fresh API data
       setUserProfile(apiUser);
       setUserLevel(apiUser.level || 1);
       setIsGuest(apiUser.userType === 'Guest');
+      setSelectedInterests(apiUser.interests || []);
 
-      // 2. Update Avatar
       const avatarIndex = apiUser.avatar ? apiUser.avatar - 1 : 0;
       const calculatedAvatar = avatars[avatarIndex] || null;
       setUserAvatar(calculatedAvatar);
 
-      // 3. Update local storage with fresh data
       if (typeof window !== 'undefined') {
         const userToStore = {
           ...apiUser,
           level: apiUser.level || 1,
-          userType: apiUser.userType || 'Registered'
+          userType: apiUser.userType || 'Registered',
+          interests: apiUser.interests || [],
         };
         localStorage.setItem("user", JSON.stringify(userToStore));
         if (calculatedAvatar) {
@@ -216,7 +222,6 @@ export default function Home() {
 
     } catch (error) {
       console.error("Error fetching user details from API:", error);
-      // Fallback to local storage on general fetch error
       const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
       if (storedUser) {
         try {
@@ -224,6 +229,7 @@ export default function Home() {
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
           setIsGuest(parsedUser.userType === 'Guest');
+          setSelectedInterests(parsedUser.interests || []);
         } catch (e) {
           console.error("Failed to parse local user data on API error:", e);
         }
@@ -231,21 +237,14 @@ export default function Home() {
     }
   };
 
-
-  // ----------------------------------------------------------------
-  // REVISED fetchUserCategories to use apiClient
-  // ----------------------------------------------------------------
   const fetchUserCategories = async () => {
     setCategoriesLoading(true);
     setError(null);
     try {
-      // ⬅️ Use apiClient for /api/getUserCategories
       const response = await apiClient(`${BASE_URL}/api/getUserCategories`, {
         method: "GET",
-        // The Authorization header is now handled inside apiClient
       });
 
-      // ⬅️ Check if response is undefined (401 handled by apiClient)
       if (!response) {
         setCategoriesLoading(false);
         return;
@@ -275,7 +274,6 @@ export default function Home() {
     }
   };
 
-
   const handlePlayQuiz = (categoryId: string) => {
     if (!userToken) {
       console.log("⚠️ You must be logged in to play.");
@@ -284,9 +282,6 @@ export default function Home() {
     navigate(`/quiz/${categoryId}`);
   };
 
-  // ----------------------------------------------------------------
-  // REVISED handleQuickQuiz to use apiClient
-  // ----------------------------------------------------------------
   const handleQuickQuiz = async () => {
     if (!userToken) {
       console.log("⚠️ You must be logged in to play.");
@@ -296,13 +291,10 @@ export default function Home() {
     setPlayButtonLoading(true);
 
     try {
-      // ⬅️ Use apiClient for /api/getGetegoryToPlay
       const response = await apiClient(`${BASE_URL}/api/getGetegoryToPlay`, {
         method: "GET",
-        // The Authorization header is now handled inside apiClient
       });
 
-      // ⬅️ Check if response is undefined (401 handled by apiClient)
       if (!response) {
         setPlayButtonLoading(false);
         return;
@@ -331,11 +323,8 @@ export default function Home() {
     }
   };
 
-
-  // UNIFIED HANDLER: Handles all category creation attempts (both buttons)
   const handleCreateCategoryAttempt = () => {
     if (isGuest) {
-      // Show the registration toast for Guest users
       const { id: toastId } = toast({
         title: "🔒 Registration Required",
         description: "You must complete your registration to create a quiz.",
@@ -346,7 +335,7 @@ export default function Home() {
               variant="default"
               size="sm"
               onClick={() => {
-                navigate("/profile"); // Navigate to profile screen
+                navigate("/profile");
                 dismiss(toastId);
               }}
               className="bg-primary hover:bg-primary/80"
@@ -364,11 +353,67 @@ export default function Home() {
         ),
       });
     }
-    // No else block needed; the AddCategory component handles the non-guest flow 
-    // by opening its internal modal via handleMainButtonClick.
   };
 
-  // Conditionally render the splash screen only on initial load
+  const handleInterestChange = (newSelectedIds: string[]) => {
+    setSelectedInterests(newSelectedIds);
+  };
+
+  const handleSaveInterests = async () => {
+    if (!userProfile?._id) return;
+    setSavingInterests(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Authentication token missing.");
+
+      const interestsResponse = await fetch(
+        `${BASE_URL}/api/interests/user/${userProfile._id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({ interests: selectedInterests }),
+        }
+      );
+
+      if (!interestsResponse.ok) {
+        throw new Error("Failed to update interests.");
+      }
+
+      const updatedUser = {
+        ...userProfile,
+        interests: selectedInterests,
+      };
+
+      setUserProfile(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      
+      trackEvent("update_interests", {
+        user_id: userProfile._id,
+        interest_count: selectedInterests.length,
+        context: "home_screen_modal",
+      });
+      
+      toast({
+        title: "Success",
+        description: `Interests updated successfully! (${selectedInterests.length} selected)`,
+      });
+
+      setIsInterestModalOpen(false);
+
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to save interests: ${(error as Error).message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingInterests(false);
+    }
+  };
+
   if (showSplash) {
     return <SplashScreen dataLoaded={dataLoaded} />;
   }
@@ -383,7 +428,7 @@ export default function Home() {
       <div className="mx-auto max-w-full space-y-4 px-4 pb-4 lg:px-8 lg:pb-8">
         <GameStatsHeader userToken={userToken} isParentLoading={loading} />
 
-        {/* Guest User Registration Panel - REDESIGNED */}
+        {/* Guest User Registration Panel */}
         {isGuest && (
           <Card
             className="bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] border-gray-200 dark:border-gray-700 dark:text-white p-3 shadow-lg flex items-center justify-between space-x-3"
@@ -392,7 +437,7 @@ export default function Home() {
               <AlertTriangle className="w-5 h-5 text-red-500 dark:text-purple-400" />
             </div>
 
-            <p className="text-sm  text-white font-semibold leading-snug flex-grow">
+            <p className="text-sm text-white font-semibold leading-snug flex-grow">
               Don't lose your progress
             </p>
 
@@ -521,7 +566,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Add Category Section - Always show after quizzes or the empty state card */}
           <div className="mt-6">
             <AddCategory
               fetchCategories={fetchUserCategories}
@@ -531,6 +575,55 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Interest Selection Modal */}
+      <Dialog open={isInterestModalOpen} onOpenChange={setIsInterestModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[100vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Heart className="w-5 h-5" />
+              <span>Select Your Interests</span>
+            </DialogTitle>
+            <DialogDescription>
+              Help us personalize your experience by selecting topics you're interested in.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {userProfile?._id && (
+              <InterestSelector
+                userId={userProfile._id}
+                initialSelectedIds={selectedInterests}
+                onSelectionChange={handleInterestChange}
+              />
+            )}
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setIsInterestModalOpen(false)}
+              className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+              disabled={savingInterests}
+            >
+              Skip for Now
+            </Button>
+            <Button 
+              onClick={handleSaveInterests}
+              disabled={savingInterests || selectedInterests.length === 0}
+            >
+              {savingInterests ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  <span>Saving...</span>
+                </div>
+              ) : (
+                `Save Interests (${selectedInterests.length})`
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

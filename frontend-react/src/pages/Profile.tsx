@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import InterestSelector from "@/components/InterestSelector";
+import { trackEvent } from "@/utils/analytics";
 import {
   Dialog,
   DialogContent,
@@ -28,18 +29,21 @@ const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
 });
 const avatars = Object.values(avatarImages) as string[];
 
+interface Interest {
+  _id: string;
+  name: string;
+}
+
 const Profile = () => {
   const [user, setUser] = useState<any | null>(null);
   const [alias, setAlias] = useState("");
   const [age, setAge] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [allInterests, setAllInterests] = useState<Interest[]>([]);
   const [updating, setUpdating] = useState(false);
-  // New state for interest-specific saving
   const [savingInterests, setSavingInterests] = useState(false); 
-  const [userType, setUserType] = useState<"Guest" | "Registered" | "Admin">(
-    "Registered"
-  );
+  const [userType, setUserType] = useState<"Guest" | "Registered" | "Admin">("Registered");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -47,6 +51,22 @@ const Profile = () => {
 
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Fetch all interests for display
+  useEffect(() => {
+    const fetchAllInterests = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/interests`);
+        if (res.ok) {
+          const data = await res.json();
+          setAllInterests(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch interests:", err);
+      }
+    };
+    fetchAllInterests();
+  }, []);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -57,7 +77,6 @@ const Profile = () => {
       setAge(parsedUser.age || "");
       setUserType(parsedUser.userType || "Registered");
       
-      // Set initial interests
       setSelectedInterests(parsedUser.interests || []);
       
       const avatarIndex = parsedUser.avatar - 1;
@@ -86,7 +105,6 @@ const Profile = () => {
     setSelectedInterests(newSelectedIds);
   };
 
-  // NEW FUNCTION: Save interests directly from the modal
   const saveInterestsToBackend = async (interestsToSave: string[]) => {
     if (!user?._id) return;
     setSavingInterests(true);
@@ -118,6 +136,12 @@ const Profile = () => {
       setUser(updatedUser);
       localStorage.setItem("user", JSON.stringify(updatedUser));
       
+      // Track interest update
+      trackEvent("update_interests", {
+        user_id: user._id,
+        interest_count: interestsToSave.length,
+      });
+      
       toast({
         title: "Success",
         description: `Interests updated successfully! (${interestsToSave.length} selected)`,
@@ -134,13 +158,11 @@ const Profile = () => {
     }
   };
 
-
   const handleSaveInterests = async () => {
     await saveInterestsToBackend(selectedInterests);
     setIsInterestModalOpen(false);
   };
 
-  // Modified updateUserDetails to remove the separate interest API call
   const updateUserDetails = async (isRegistration: boolean) => {
     setUpdating(true);
     try {
@@ -153,17 +175,12 @@ const Profile = () => {
         alias,
         age: parseInt(age),
         avatar: avatarValue,
-        // Interests are NOT sent here anymore, as they were saved previously
         ...(isRegistration ? { email: user.email, password, interests: selectedInterests } : {}),
       };
-      
-      // If it's registration, interests are sent with the registration payload.
-      // If it's just an update, interests are assumed to be saved by the modal function.
       
       const token = localStorage.getItem("token");
       if (!token) throw new Error("Authentication token missing.");
       
-      // Update basic user details
       const response = await fetch(`${BASE_URL}/api/updateUserDetails`, {
         method: "POST",
         headers: {
@@ -183,8 +200,6 @@ const Profile = () => {
       if (data.token) {
         localStorage.setItem("token", data.token);
       }
-      
-      // The separate interestsResponse PUT call is REMOVED from here
 
       const newType: "Guest" | "Registered" | "Admin" =
         data.user?.userType || "Registered";
@@ -196,7 +211,6 @@ const Profile = () => {
         age: parseInt(age),
         avatar: avatarValue,
         userType: newType,
-        // Retain local interests state
         interests: selectedInterests, 
       };
 
@@ -248,9 +262,6 @@ const Profile = () => {
       }
     }
     
-    // IMPORTANT: For registered users, interests should already be saved by the modal.
-    // For guests, interests are sent with the registration payload in updateUserDetails.
-    
     await updateUserDetails(isGuest);
   };
   
@@ -270,6 +281,21 @@ const Profile = () => {
     return true;
   };
 
+  // Get selected interest names for display
+  const getSelectedInterestNames = () => {
+    return allInterests
+      .filter(interest => selectedInterests.includes(interest._id))
+      .map(interest => interest.name);
+  };
+
+  const handleOpenInterestModal = () => {
+    setIsInterestModalOpen(true);
+    trackEvent("view_interests", {
+      user_id: user?._id,
+      context: "profile_page",
+    });
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
@@ -279,6 +305,7 @@ const Profile = () => {
   }
 
   const isGuest = userType === "Guest";
+  const selectedInterestNames = getSelectedInterestNames();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] p-4 flex items-center justify-center">
@@ -420,21 +447,36 @@ const Profile = () => {
               />
             </div>
 
-            {/* Interest Selection Button */}
+            {/* Interest Selection with Tags */}
             <div className="space-y-2">
               <Label>Your Interests</Label>
+              
+              {/* Display selected interests as tags */}
+              {selectedInterestNames.length > 0 && (
+                <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-lg border border-border/50 min-h-[60px]">
+                  {selectedInterestNames.map((name, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-200 border border-purple-500/30"
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              )}
+              
+              {/* Blue button to open modal */}
               <Button
                 type="button"
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => setIsInterestModalOpen(true)}
-                disabled={savingInterests} // Disable if interests are currently saving
+                variant="blue"
+                onClick={handleOpenInterestModal}
+                disabled={savingInterests}
               >
                 <Heart className="w-4 h-4 mr-2" />
                 {savingInterests ? (
                   "Saving Interests..."
                 ) : selectedInterests.length > 0
-                  ? `${selectedInterests.length} interest(s) selected`
+                  ? `Update Interests (${selectedInterests.length} selected)`
                   : "Select Your Interests"}
               </Button>
               <p className="text-xs text-muted-foreground">
@@ -471,7 +513,7 @@ const Profile = () => {
 
             <Button
               type="submit"
-              disabled={updating || savingInterests} // Disable if saving profile or interests
+              disabled={updating || savingInterests}
               className={`w-full ${isGuest ? "bg-amber-500 hover:bg-amber-600" : "bg-primary hover:bg-primary/80"}`}
             >
               {updating ? (

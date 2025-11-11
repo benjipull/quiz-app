@@ -5,6 +5,13 @@ function logEventDebug(eventName: string, params: Record<string, any>) {
   console.log(`[GA] Event: ${eventName}`, { userId, ...params });
 }
 
+// === NEW GENERIC TRACKING FUNCTION ===
+export const trackEvent = (eventName: string, params: Record<string, any> = {}) => {
+  ReactGA.event(eventName, params);
+  logEventDebug(eventName, params);
+};
+// ======================================
+
 export const trackQuizStart = (categoryId: string, userId?: string) => {
   const params = { quiz_category_id: categoryId, user_id: userId };
   ReactGA.event("quiz_start", params);

@@ -12,24 +12,23 @@ interface Interest {
 }
 
 interface InterestSelectorProps {
-  // We use `currentSelectedIds` instead of `initialSelectedIds`
-  currentSelectedIds: string[];
-  // Handler to update the selected IDs in the parent component's temporary state
-  onSelectionChange: (selectedIds: string[]) => void;
+  userId: string;
+  initialSelectedIds?: string[];
+  onSelectionChange?: (selectedIds: string[]) => void;
 }
 
 const InterestSelector: React.FC<InterestSelectorProps> = ({
-  currentSelectedIds,
+  userId,
+  initialSelectedIds = [],
   onSelectionChange,
 }) => {
   const [interests, setInterests] = useState<Interest[]>([]);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>(initialSelectedIds);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // --- Data Fetching ---
   useEffect(() => {
     const fetchInterests = async () => {
-      // (Same API call to get all available interests)
       try {
         const res = await fetch(`${BASE_URL}/api/interests`);
         if (!res.ok) throw new Error("Failed to fetch interests");
@@ -48,18 +47,20 @@ const InterestSelector: React.FC<InterestSelectorProps> = ({
     fetchInterests();
   }, [toast]);
 
-  // --- Toggling Logic ---
   const toggleInterest = (id: string) => {
-    // Determine if the ID is currently selected
-    const isCurrentlySelected = currentSelectedIds.includes(id);
+    setSelectedInterests((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
 
-    // Calculate the new set of selected IDs
-    const newSelectedIds = isCurrentlySelected
-      ? currentSelectedIds.filter((i) => i !== id) // Remove if already selected
-      : [...currentSelectedIds, id]; // Add if not selected
+  useEffect(() => {
+    if (onSelectionChange) onSelectionChange(selectedInterests);
+  }, [selectedInterests, onSelectionChange]);
 
-    // Notify the parent component of the change
-    onSelectionChange(newSelectedIds);
+  // Truncate text to fit consistently
+  const truncateText = (text: string, maxLength: number = 20) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength - 3) + "...";
   };
 
   if (loading) {
@@ -72,28 +73,29 @@ const InterestSelector: React.FC<InterestSelectorProps> = ({
 
   return (
     <div className="w-full flex flex-col items-center">
-      {/* Grid - 3 columns on all screens */}
+      {/* Grid - 3 columns on all screens with consistent sizing */}
       <div className="grid grid-cols-3 gap-2 w-full max-w-full">
         {interests.map((interest) => {
-          const isSelected = currentSelectedIds.includes(interest._id);
+          const isSelected = selectedInterests.includes(interest._id);
           return (
             <button
               key={interest._id}
               onClick={() => toggleInterest(interest._id)}
-              // (Tailwind classes remain the same for styling)
               className={`
-                px-1.5 py-2.5
+                px-2 py-3
                 flex items-center justify-center text-center text-xs font-medium leading-tight
                 rounded-xl border-2 transition-all duration-200
+                min-h-[60px] h-[60px]
                 ${
                   isSelected
                     ? "bg-gradient-to-b from-purple-500 to-fuchsia-600 text-white border-purple-300/60 shadow-[0_4px_20px_rgba(168,85,247,0.4)]"
                     : "bg-transparent text-purple-100 border-purple-500/40 hover:border-purple-400 hover:bg-purple-800/20"
                 }
               `}
+              title={interest.name} // Show full text on hover
             >
-              <span className="line-clamp-3 px-1">
-                {interest.name}
+              <span className="break-words line-clamp-2 px-0.5">
+                {truncateText(interest.name, 18)}
               </span>
             </button>
           );
@@ -102,7 +104,7 @@ const InterestSelector: React.FC<InterestSelectorProps> = ({
 
       {/* Compact Count */}
       <p className="text-xs text-gray-400 mt-3">
-        {currentSelectedIds.length} selected
+        {selectedInterests.length} selected
       </p>
     </div>
   );
