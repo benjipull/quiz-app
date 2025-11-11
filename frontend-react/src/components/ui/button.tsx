@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 // ✅ Preload the sound file
 const clickSound = new Audio("/clicksound.m4a");
-clickSound.volume = 0.5; 
+clickSound.volume = 0.5;
 
 // ✅ Button Variants with Bold Borders
 const buttonVariants = cva(
@@ -33,6 +33,7 @@ const buttonVariants = cva(
           "border-yellow-500 bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:shadow-lg hover:scale-105 active:scale-95",
         hero:
           "border-green-600 bg-gradient-to-r from-green-400 via-green-500 to-green-600 text-white hover:shadow-2xl hover:shadow-green-500/25 hover:scale-110 active:scale-95 animate-pulse-glow",
+        // ✅ NEW BLUE VARIANT
         blue:
           "border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 active:scale-95",
       },
