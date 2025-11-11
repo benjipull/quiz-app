@@ -494,7 +494,7 @@ const Profile = () => {
 
       {/* Interest Selection Modal */}
       <Dialog open={isInterestModalOpen} onOpenChange={setIsInterestModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[100vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <Heart className="w-5 h-5" />
@@ -519,6 +519,7 @@ const Profile = () => {
             <Button
               variant="outline"
               onClick={() => setIsInterestModalOpen(false)}
+              className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
               disabled={savingInterests}
             >
               Cancel
