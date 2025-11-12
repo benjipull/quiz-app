@@ -2,38 +2,36 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const axios = require("axios");
 const Category = require("../models/categoryModel");
-const connectDB = require("../config/db");
-
 
 const OLLAMA_URL = process.env.OLLAMA_URL;
 
-if (!process.env.MONGO_URI) {
-  console.error("❌ Missing MONGO_URI in .env");
+if (!OLLAMA_URL) {
+  console.error("❌ Missing OLLAMA_URL in .env");
   process.exit(1);
 }
 
-console.log(`🚀 Ollama API set to: ${OLLAMA_URL}`);
-
-async function run(questionId) {
+async function populateDifficulty(categoryId, questionId) {
   try {
-    // 1. Connect to DB
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("✅ Connected to MongoDB");
-
-    // 2. Find category containing the question
-    const category = await Category.findOne(
-      { "questions._id": questionId },
-      { "questions.$": 1 } // project only the matching question
-    );
-
-    if (!category || category.questions.length === 0) {
-      console.error("❌ Question not found");
-      process.exit(1);
+    // 1️⃣ Fetch the category
+    const category = await Category.findById(categoryId);
+    if (!category) {
+      console.error(`❌ Category not found: ${categoryId}`);
+      return false;
     }
 
-    const question = category.questions[0];
+    // 2️⃣ Locate question inside it
+    const question = category.questions.find(
+      q => q._id.equals(new mongoose.Types.ObjectId(questionId)) && q.disabled !== true
+    );
 
-    // 3. Build prompt
+
+    if (!question) {
+      console.error(`❌ Question not found: ${questionId}`);
+      console.log("👉 Available question IDs:", category.questions.map(q => q._id.toString()).slice(0, 5), "...");
+      return false;
+    }
+
+    // 3️⃣ Build prompt
     const prompt = `
 You are an assistant that classifies trivia questions into difficulty levels.
 
@@ -61,44 +59,37 @@ Respond in strict JSON:
 {
   "difficulty_level": <integer 1-10>,
   "difficulty_rationale": "<string explaining reasoning>"
-}
-    `.trim();
+}`.trim();
 
-    // 4. Send to Ollama
-    const response = await axios.post(OLLAMA_URL, {
-      model: "mistral",
-      prompt,
-      options: {
-        // Context & prompt handling
-        num_ctx: 4096,       // plenty for your prompt + question + answers
-        num_keep: 200,       // keeps the rubric/system part "sticky"
-
-        // Output stability
-        temperature: 0.0,    // force deterministic outputs (avoid randomness)
-        top_p: 0.9,          // still lets the model rank tokens well
-        top_k: 40,           // wider candidate pool, but fine at 40
-        min_p: 0.05,         // don't prune too aggressively
-
-        // Prevent repetition/noise
-        repeat_penalty: 1.1, // mild penalty is enough here
-        repeat_last_n: 64,   // short repetition window (JSON only needs short)
-
-        // Output length
-        num_predict: 200     // your JSON will be <200 tokens
+    // 4️⃣ Query Ollama
+    const response = await axios.post(
+      OLLAMA_URL,
+      {
+        model: "llama3",
+        prompt,
+        stream: false,
+        options: {
+          num_ctx: 2048,
+          num_keep: 100,
+          temperature: 0.0,
+          top_p: 0.9,
+          top_k: 30,
+          repeat_penalty: 1.1,
+          repeat_last_n: 32,
+          num_predict: 120,
+        },
       },
-      stream: false
-    });
+      { timeout: 180_000 }
+    );
 
-    let raw = response.data.response.trim();
-    console.log("🔍 Raw model response:", raw);
-
-    // 5. Parse JSON safely
+    const raw = String(response.data.response || "").trim();
     let parsed;
+
     try {
       parsed = JSON.parse(raw);
-    } catch (err) {
-      console.error("❌ Failed to parse JSON:", err.message);
-      process.exit(1);
+    } catch {
+      console.error(`❌ Failed to parse JSON for ${questionId}:`, raw);
+      return false;
     }
 
     if (
@@ -106,38 +97,28 @@ Respond in strict JSON:
       typeof parsed.difficulty_level !== "number" ||
       !parsed.difficulty_rationale
     ) {
-      console.error("❌ Invalid response format from model.");
-      process.exit(1);
+      console.error(`❌ Invalid model response for ${questionId}`);
+      return false;
     }
 
-    // 6. Update question
-    const updatedCategory = await Category.findOneAndUpdate(
+    // 5️⃣ Save results into MongoDB
+    await Category.updateOne(
       { "questions._id": questionId },
       {
         $set: {
           "questions.$.difficulty_level": parsed.difficulty_level,
           "questions.$.difficulty_rationale": parsed.difficulty_rationale,
-          "questions.$.difficultyConfirmedVersion": 0.01
-        }
-      },
-      { new: true }
+          "questions.$.difficultyConfirmedVersion": 0.01,
+        },
+      }
     );
 
-    console.log("✅ Question updated successfully!");
-    console.log(updatedCategory.questions.find(q => q._id.toString() === questionId.toString()));
-
-    process.exit(0);
+    console.log(`✅ Updated question ${questionId} → level ${parsed.difficulty_level}`);
+    return true;
   } catch (err) {
-    console.error("❌ Error:", err);
-    process.exit(1);
+    console.error(`❌ Error processing ${questionId}:`, err.message);
+    return false;
   }
 }
 
-// Accept questionId from command line
-const questionId = process.argv[2];
-if (!questionId) {
-  console.error("Usage: node setDifficulty.js <questionId>");
-  process.exit(1);
-}
-
-run(questionId);
+module.exports = { populateDifficulty };

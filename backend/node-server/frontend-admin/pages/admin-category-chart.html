@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Category Question Counts</title>
+  <title>Category & Difficulty Charts</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
@@ -15,14 +15,13 @@
       text-align: center;
     }
 
-    h1 {
-      margin-bottom: 2rem;
+    h1, h2 {
       color: #5ea6ff;
     }
 
     .chart-container {
       max-width: 1000px;
-      margin: 0 auto;
+      margin: 2rem auto;
       background: #1a1a1a;
       padding: 1.5rem;
       border-radius: 12px;
@@ -40,14 +39,24 @@
       color: #5ea6ff;
       text-decoration: none;
     }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
   <a href="/admin/pages/admin-landing.html" class="back-link">← Back to Admin Home</a>
-  <h1>📊 Questions per Category</h1>
+  <h1>📊 Questions Overview</h1>
 
+  <!-- Category Chart -->
   <div class="chart-container">
     <canvas id="categoryChart"></canvas>
+  </div>
+
+  <!-- Difficulty Chart -->
+  <div class="chart-container">
+    <canvas id="difficultyChart"></canvas>
   </div>
 
   <script>
@@ -57,24 +66,21 @@
 
     async function loadChart() {
       try {
+        // --- CATEGORY CHART ---
         const res = await fetch("/api/admin/categories", {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (!res.ok) throw new Error("Failed to fetch categories");
         const data = await res.json();
 
-        // 🧠 Sort categories by descending question count
         const sorted = [...data].sort((a, b) => (b.questionCount || 0) - (a.questionCount || 0));
-
         const labels = sorted.map(c => c.name);
         const values = sorted.map(c => c.questionCount || 0);
 
-        // 🧩 Dynamically resize canvas based on number of categories
-        const canvas = document.getElementById("categoryChart");
-        const barHeight = 25; // px per category
-        canvas.height = Math.max(400, sorted.length * barHeight);
-
-        const ctx = canvas.getContext("2d");
+        const categoryCanvas = document.getElementById("categoryChart");
+        const barHeight = 25;
+        categoryCanvas.height = Math.max(400, sorted.length * barHeight);
+        const ctx = categoryCanvas.getContext("2d");
 
         new Chart(ctx, {
           type: "bar",
@@ -90,7 +96,7 @@
             ]
           },
           options: {
-            indexAxis: "y", // horizontal bars
+            indexAxis: "y",
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
@@ -117,6 +123,67 @@
               y: {
                 ticks: { color: "#ccc", autoSkip: false },
                 grid: { color: "#222" }
+              }
+            }
+          }
+        });
+
+        // --- DIFFICULTY CHART ---
+        const diffRes = await fetch("/api/admin/questions/difficulty", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!diffRes.ok) throw new Error("Failed to fetch difficulty data");
+        const diffData = await diffRes.json();
+
+        const diffLabels = diffData.map(d => d._id || "Unknown");
+        const diffValues = diffData.map(d => d.count);
+        const diffCtx = document.getElementById("difficultyChart").getContext("2d");
+
+        new Chart(diffCtx, {
+          type: "bar",
+          data: {
+            labels: diffLabels,
+            datasets: [
+              {
+                label: "Question Count",
+                data: diffValues,
+                backgroundColor: diffLabels.map(label => {
+                  if (label.toLowerCase().includes("easy")) return "#4caf50";
+                  if (label.toLowerCase().includes("medium")) return "#ffb300";
+                  if (label.toLowerCase().includes("hard")) return "#f44336";
+                  return "#5ea6ff";
+                }),
+                borderRadius: 6
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              title: {
+                display: true,
+                text: "Questions by Difficulty Level",
+                color: "#eee",
+                font: { size: 18 }
+              },
+              tooltip: {
+                backgroundColor: "#222",
+                borderColor: "#5ea6ff",
+                borderWidth: 1,
+                titleColor: "#fff",
+                bodyColor: "#ccc"
+              }
+            },
+            scales: {
+              x: {
+                ticks: { color: "#ccc" },
+                grid: { color: "#333" }
+              },
+              y: {
+                ticks: { color: "#ccc", precision: 0 },
+                grid: { color: "#333" }
               }
             }
           }
