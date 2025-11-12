@@ -501,14 +501,6 @@ export default function Home() {
               <Brain className="w-5 h-5 mr-2" />
               Your Quizzes
             </h3>
-            <Button
-              onClick={() => navigate("/categories")}
-              variant="outline"
-              size="sm"
-              className="text-xs"
-            >
-              View All Quizzes
-            </Button>
           </div>
 
           {error ? (
@@ -534,16 +526,30 @@ export default function Home() {
               ))}
             </div>
           ) : userCategories.length === 0 ? (
-            <Card className="p-8 text-center">
-              <div className="space-y-3">
-                <Brain className="h-12 w-12 mx-auto text-muted-foreground" />
-                <h4 className="font-semibold text-foreground">No quizzes yet</h4>
-                <p className="text-sm text-muted-foreground">
-                  Create your first quiz to get started
+            // START: Consolidated Empty State Card
+            <Card className="p-8 text-center bg-zinc-900 border-zinc-700/50 shadow-2xl transition-all duration-300 transform hover:scale-[1.01] hover:shadow-[0_0_30px_-5px_rgba(0,150,255,0.2)]">
+              <div className="space-y-4">
+                <Brain className="h-12 w-12 mx-auto text-purple-400" />
+                <h4 className="font-bold text-2xl text-white">
+                  Ready to Quiz?
+                </h4>
+                <p className="text-base text-zinc-400 max-w-sm mx-auto">
+                  It looks like you haven't created any quizzes yet. Start building your first custom quiz now!
                 </p>
+
+                <div className="pt-2">
+                  <AddCategory
+                    fetchCategories={fetchUserCategories}
+                    isGuest={isGuest}
+                    onRegistrationRequired={handleCreateCategoryAttempt}
+                    isEmbeddedInEmptyState={true} // Renders simplified button only
+                  />
+                </div>
               </div>
             </Card>
+            // END: Consolidated Empty State Card
           ) : (
+            // Display existing categories
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {userCategories.map((cat) => (
@@ -566,13 +572,17 @@ export default function Home() {
             </div>
           )}
 
-          <div className="mt-6">
-            <AddCategory
-              fetchCategories={fetchUserCategories}
-              isGuest={isGuest}
-              onRegistrationRequired={handleCreateCategoryAttempt}
-            />
-          </div>
+          {/* Renders the full, separate AddCategory card *below* the list when categories exist */}
+          {userCategories.length > 0 && (
+            <div className="mt-6">
+              <AddCategory
+                fetchCategories={fetchUserCategories}
+                isGuest={isGuest}
+                onRegistrationRequired={handleCreateCategoryAttempt}
+                isEmbeddedInEmptyState={false} // Renders the full card
+              />
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,14 +1,16 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Grid3X3, PlayCircle, User, Trophy, Clock, ShoppingCart, Menu } from "lucide-react";
+import { Home, Grid3X3, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+// Reordered tabs: Home is now at index 1 for the center position.
 const tabs = [
+  // index 0: Profile (Left)
   { icon: User, label: "Profile", path: "/profile" },
-  { icon: Grid3X3, label: "Quizzes", path: "/categories" },
+  // index 1: Home (Center)
   { icon: Home, label: "Home", path: "/" },
-  { icon: ShoppingCart, label: "Store", path: "/store" },
-  { icon: Menu, label: "Menu", path: "/menu" },
+  // index 2: Quizzes (Right)
+  { icon: Grid3X3, label: "Quizzes", path: "/categories" },
 ];
 
 export const BottomTabs = () => {
@@ -20,7 +22,9 @@ export const BottomTabs = () => {
       <div className="flex items-center justify-between h-20 px-6 max-w-full mx-auto">
         {tabs.map((tab, index) => {
           const isActive = location.pathname === tab.path;
-          const isCenter = index === 2; // Home is in the center
+          
+          // CRITICAL FIX: Home is now at index 1 to be in the center.
+          const isCenter = index === 1; 
           
           return (
             <NavLink
@@ -28,7 +32,8 @@ export const BottomTabs = () => {
               to={tab.path}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 transition-all duration-300",
-                isCenter ? "transform -translate-y-2" : ""
+                // This class applies the lift/transform to the center icon
+                isCenter ? "transform -translate-y-2" : "" 
               )}
             >
               <div
@@ -36,16 +41,21 @@ export const BottomTabs = () => {
                   "flex items-center justify-center rounded-full transition-all duration-300 shadow-lg",
                   isCenter
                     ? isActive
+                      // Center Icon Active Styling (Large, Gradient)
                       ? "w-16 h-16 bg-gradient-to-r from-primary to-accent text-primary-foreground scale-110 shadow-xl"
+                      // Center Icon Inactive Styling (Large, Border)
                       : "w-16 h-16 bg-background border-2 border-primary/30 text-primary hover:scale-105 shadow-xl"
                     : isActive
+                    // Side Icons Active Styling
                     ? "w-12 h-12 bg-primary text-primary-foreground"
+                    // Side Icons Inactive Styling
                     : "w-12 h-12 bg-muted/60 text-muted-foreground hover:bg-primary/20 hover:text-primary hover:scale-105"
                 )}
               >
                 <tab.icon className={cn(
                   "transition-all duration-300",
-                  isCenter ? "h-6 w-6" : "h-5 w-5"
+                  // Center Icon size
+                  isCenter ? "h-6 w-6" : "h-5 w-5" 
                 )} />
               </div>
               
