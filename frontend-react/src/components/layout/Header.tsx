@@ -18,8 +18,8 @@ const navTabs = [
   { icon: Home, label: "Home", path: "/" },
   { icon: Grid3X3, label: "Quizzes", path: "/categories" },
   { icon: User, label: "Profile", path: "/profile" },
-  { icon: ShoppingBag, label: "Store", path: "/store" },
-  { icon: Menu, label: "Menu", path: "/menu" },
+  // { icon: ShoppingBag, label: "Store", path: "/store" },
+  // { icon: Menu, label: "Menu", path: "/menu" },
 ];
 
 interface HeaderProps {
