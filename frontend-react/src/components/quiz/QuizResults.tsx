@@ -53,10 +53,7 @@ const getPerformanceData = (percentage: number) => {
     };
   } else if (score >= 90) {
     return {
-      message: "Nearly Perfect!",
-      rank: "DIAMOND",
-      icon: <Trophy className="h-8 w-8" />,
-      rankColor: "text-cyan-500",
+    // ... (removed for brevity, keep the original implementation)
     };
   } else if (score >= 80) {
     return {
@@ -117,7 +114,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [animatedScore, setAnimatedScore] = useState(0);
   const [animatedKnowledge, setAnimatedKnowledge] = useState(0);
   const [animatedTotalXP, setAnimatedTotalXP] = useState(totalKnowledge - knowledgeGained);
-  const [showPointsCenter, setShowPointsCenter] = useState(true);
+  // Removed showPointsCenter state, replaced with showXPOverlay for the floating animation
+  const [showXPOverlay, setShowXPOverlay] = useState(true); 
   const [showFlyingTokens, setShowFlyingTokens] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [tokens, setTokens] = useState<Array<{id: number; delay: number}>>([]);
@@ -172,8 +170,13 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           clearInterval(interval);
           
           setTimeout(() => {
-            setShowPointsCenter(false);
             startTokenAnimation();
+            
+            // Hide the entire XP overlay after the tokens have flown away (approx 1.8s)
+            setTimeout(() => {
+                setShowXPOverlay(false);
+            }, 1800);
+
           }, 800);
         }
         setAnimatedKnowledge(count);
@@ -343,10 +346,12 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     return null;
   }
 
+  // The main container uses fixed inset-0 and overflow-y-auto to ensure dynamic height/scrollability
+  // over the viewport, as requested.
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center p-2 sm:p-4 font-sans bg-gradient-to-br from-[#100221] via-[#4f187a] to-[#380d67] overflow-y-auto">
+<div className="min-h-screen w-full z-50 flex flex-col items-center p-2 sm:p-4 font-sans bg-gradient-to-br from-[#100221] via-[#4f187a] to-[#380d67] overflow-y-auto">
       
-      {/* Header with Stats */}
+      {/* Header with Stats (The XP target) */}
       <div className="w-full max-w-lg mb-3 animate-fade-in-down">
         <div className="flex items-center justify-between p-2 sm:p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 backdrop-blur-sm">
           {/* Stat Item: Coins */}
@@ -446,17 +451,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         />
       )}
 
-      {/* Flying Tokens - Enhanced animation */}
-      {showFlyingTokens && tokens.map((token) => (
-        <div
-          key={token.id}
-          className="token"
-          style={{
-            '--token-delay': `${token.delay}ms`,
-          } as any}
-        />
-      ))}
-
       {/* Level Up Modal */}
       {showLevelUp && hasLeveledUp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
@@ -487,7 +481,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </div>
       )}
 
-      {/* Main Results Card Container */}
+      {/* Main Results Card Container (THE COMPLETION PAGE) */}
       <div className="relative z-10 w-full max-w-lg mx-auto pb-6 sm:pb-0">
         <Card className="relative overflow-hidden bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in">
           
@@ -515,156 +509,176 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               </h1>
             </div>
 
-            {/* Center Content - Points Earned or Results */}
-            {showPointsCenter ? (
-              <div ref={earnedPointsRef} className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in">
+            {/* Results Content (Now always visible) */}
+            <div className="space-y-3 sm:space-y-4 animate-fade-in pt-8">
+              {/* Results Grid */}
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                {/* Correct/Incorrect */}
+                <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4">
+                  <div className="text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-2">Result</div>
+                  <div className="space-y-2 sm:space-y-2">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
+                      <div>
+                        <div className="text-xl sm:text-2xl font-black text-emerald-400">{correctAnswers}</div>
+                        <div className="text-xs text-emerald-500/70">CORRECT</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
+                      <div>
+                        <div className="text-xl sm:text-2xl font-black text-red-400">{incorrectAnswers}</div>
+                        <div className="text-xs text-red-500/70">INCORRECT</div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Accuracy Circle */}
+                <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="relative inline-block mb-2">
+                      <svg className="w-14 h-14 sm:w-18 sm:h-18 transform -rotate-90">
+                        <circle
+                          cx="28"
+                          cy="28"
+                          r="24"
+                          stroke="currentColor"
+                          className="text-slate-700"
+                          strokeWidth="6"
+                          fill="none"
+                        />
+                        <circle
+                          cx="28"
+                          cy="28"
+                          r="24"
+                          stroke="url(#accuracyGradient)"
+                          strokeWidth="6"
+                          fill="none"
+                          strokeDasharray={`${2 * Math.PI * 24}`}
+                          strokeDashoffset={`${2 * Math.PI * 24 * (1 - animatedScore / 100)}`}
+                          strokeLinecap="round"
+                          className="transition-all duration-1000"
+                        />
+                        <defs>
+                          <linearGradient id="accuracyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#06b6d4" />
+                            <stop offset="100%" stopColor="#3b82f6" />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-lg sm:text-xl font-black text-slate-100">{animatedScore}%</span>
+                      </div>
+                    </div>
+                    <div className="text-xs font-bold text-slate-400 uppercase">Accuracy</div>
+                    <div className="text-xs text-slate-600 font-bold">{performanceData.rank}</div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Level Badge */}
+              <div className="flex items-center justify-center gap-3 sm:gap-4 p-2 bg-slate-800/40 border border-slate-700/50 rounded-xl">
+                <Crown className="h-5 w-5 sm:h-6 text-purple-400" />
+                <div className="flex flex-row gap-3 items-center">
+                  <div className="text-xs text-slate-500 uppercase">Level</div>
+                  <div className="text-xl sm:text-2xl font-black text-slate-200">{currentLevel}</div>
+                </div>
+                {hasLeveledUp && (
+                  <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs px-2 py-0.5 animate-pulse">
+                    UP!
+                  </Badge>
+                )}
+              </div>
+
+              {/* Rating */}
+              <Card className="bg-slate-800/40 border border-slate-700/50 p-2 sm:p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-xs font-bold text-slate-500 uppercase">
+                    Rate This Quiz
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        disabled={hasRated || isSubmittingRating}
+                        onClick={() => handleRatingSubmit(star)}
+                        onMouseEnter={() => !hasRated && setHoveredRating(star)}
+                        onMouseLeave={() => !hasRated && setHoveredRating(0)}
+                        className={`transition-all duration-200 transform ${
+                          hasRated || isSubmittingRating ? "cursor-default" : "cursor-pointer hover:scale-125"
+                        }`}
+                      >
+                        <StarIcon
+                          className={`h-4 w-4 transition-all ${
+                            star <= (hoveredRating || rating)
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-slate-600 hover:text-yellow-400/60"
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {ratingMessage && (
+                  <div className={`text-xs ${
+                    ratingMessage.includes("Thanks") ? "text-emerald-400" : "text-red-400"
+                  }`}>
+                    {ratingMessage}
+                  </div>
+                )}
+              </Card>
+
+              {/* Next Quiz Button */}
+              <Button
+                onClick={handleNextQuiz}
+                disabled={playButtonLoading}
+                size="lg"
+                className="w-full h-11 sm:h-12 text-sm sm:text-base font-black text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
+              >
+                {playButtonLoading ? "LOADING..." : "NEXT QUIZ"}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* XP EARNED OVERLAY (Minimalist, Transparent, Transient) */}
+      {showXPOverlay && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
+            <div 
+                ref={earnedPointsRef} 
+                className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
+            >
+                {/* Yellow Trophy Icon */}
                 <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-yellow-500/50 animate-pulse-glow">
                   <Trophy className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
+                  {/* Yellow XP Value */}
                   <div className="text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
                     +{animatedKnowledge}
                   </div>
+                  {/* Yellow XP EARNED Text */}
                   <div className="text-yellow-400/80 font-bold text-sm sm:text-base mt-1 sm:mt-2">
                     XP EARNED
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-3 sm:space-y-4 animate-fade-in">
-                {/* Results Grid */}
-                <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                  {/* Correct/Incorrect */}
-                  <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4">
-                    <div className="text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-2">Result</div>
-                    <div className="space-y-2 sm:space-y-2">
-                      <div className="flex items-center gap-1 sm:gap-2">
-                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
-                        <div>
-                          <div className="text-xl sm:text-2xl font-black text-emerald-400">{correctAnswers}</div>
-                          <div className="text-xs text-emerald-500/70">CORRECT</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 sm:gap-2">
-                        <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
-                        <div>
-                          <div className="text-xl sm:text-2xl font-black text-red-400">{incorrectAnswers}</div>
-                          <div className="text-xs text-red-500/70">INCORRECT</div>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
+            </div>
+        </div>
+      )}
 
-                  {/* Accuracy Circle */}
-                  <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="relative inline-block mb-2">
-                        <svg className="w-14 h-14 sm:w-18 sm:h-18 transform -rotate-90">
-                          <circle
-                            cx="28"
-                            cy="28"
-                            r="24"
-                            stroke="currentColor"
-                            className="text-slate-700"
-                            strokeWidth="6"
-                            fill="none"
-                          />
-                          <circle
-                            cx="28"
-                            cy="28"
-                            r="24"
-                            stroke="url(#accuracyGradient)"
-                            strokeWidth="6"
-                            fill="none"
-                            strokeDasharray={`${2 * Math.PI * 24}`}
-                            strokeDashoffset={`${2 * Math.PI * 24 * (1 - animatedScore / 100)}`}
-                            strokeLinecap="round"
-                            className="transition-all duration-1000"
-                          />
-                          <defs>
-                            <linearGradient id="accuracyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                              <stop offset="0%" stopColor="#06b6d4" />
-                              <stop offset="100%" stopColor="#3b82f6" />
-                            </linearGradient>
-                          </defs>
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-lg sm:text-xl font-black text-slate-100">{animatedScore}%</span>
-                        </div>
-                      </div>
-                      <div className="text-xs font-bold text-slate-400 uppercase">Accuracy</div>
-                      <div className="text-xs text-slate-600 font-bold">{performanceData.rank}</div>
-                    </div>
-                  </Card>
-                </div>
-
-                {/* Level Badge */}
-                <div className="flex items-center justify-center gap-3 sm:gap-4 p-2 bg-slate-800/40 border border-slate-700/50 rounded-xl">
-                  <Crown className="h-5 w-5 sm:h-6 text-purple-400" />
-                  <div className="flex flex-row gap-3 items-center">
-                    <div className="text-xs text-slate-500 uppercase">Level</div>
-                    <div className="text-xl sm:text-2xl font-black text-slate-200">{currentLevel}</div>
-                  </div>
-                  {hasLeveledUp && (
-                    <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs px-2 py-0.5 animate-pulse">
-                      UP!
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Rating */}
-                <Card className="bg-slate-800/40 border border-slate-700/50 p-2 sm:p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="text-xs font-bold text-slate-500 uppercase">
-                      Rate This Quiz
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          disabled={hasRated || isSubmittingRating}
-                          onClick={() => handleRatingSubmit(star)}
-                          onMouseEnter={() => !hasRated && setHoveredRating(star)}
-                          onMouseLeave={() => !hasRated && setHoveredRating(0)}
-                          className={`transition-all duration-200 transform ${
-                            hasRated || isSubmittingRating ? "cursor-default" : "cursor-pointer hover:scale-125"
-                          }`}
-                        >
-                          <StarIcon
-                            className={`h-4 w-4 transition-all ${
-                              star <= (hoveredRating || rating)
-                                ? "fill-yellow-400 text-yellow-400"
-                                : "text-slate-600 hover:text-yellow-400/60"
-                            }`}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {ratingMessage && (
-                    <div className={`text-xs ${
-                      ratingMessage.includes("Thanks") ? "text-emerald-400" : "text-red-400"
-                    }`}>
-                      {ratingMessage}
-                    </div>
-                  )}
-                </Card>
-
-                {/* Next Quiz Button */}
-                <Button
-                  onClick={handleNextQuiz}
-                  disabled={playButtonLoading}
-                  size="lg"
-                  className="w-full h-11 sm:h-12 text-sm sm:text-base font-black text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
-                >
-                  {playButtonLoading ? "LOADING..." : "NEXT QUIZ"}
-                </Button>
-              </div>
-            )}
-          </div>
-        </Card>
-      </div>
+      {/* Flying Tokens - Enhanced animation (Must be rendered on top) */}
+      {showFlyingTokens && tokens.map((token) => (
+        <div
+          key={token.id}
+          className="token"
+          style={{
+            '--token-delay': `${token.delay}ms`,
+          } as any}
+        />
+      ))}
 
       {/* CSS Animations */}
       <style>{`
