@@ -53,7 +53,10 @@ const getPerformanceData = (percentage: number) => {
     };
   } else if (score >= 90) {
     return {
-    // ... (removed for brevity, keep the original implementation)
+      message: "Outstanding Performance!",
+      rank: "DIAMOND",
+      icon: <Trophy className="h-8 w-8" />,
+      rankColor: "text-blue-400",
     };
   } else if (score >= 80) {
     return {
@@ -132,14 +135,23 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   );
 
   useEffect(() => {
+    // FIX: Scroll to top when the component mounts
+    if (typeof window !== "undefined") {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth' // Smooth scrolling for better user experience
+        });
+    }
+    
     setMounted(true);
+    // Setup for dynamic window size tracking, essential for the Confetti component
     const updateSize = () => {
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
     };
     updateSize();
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
-  }, []);
+  }, []); // Empty dependency array ensures this runs once on mount
 
   // Animated score counter
   useEffect(() => {
@@ -346,9 +358,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     return null;
   }
 
-  // The main container uses fixed inset-0 and overflow-y-auto to ensure dynamic height/scrollability
-  // over the viewport, as requested.
   return (
+    // The min-h-screen class ensures the height is at least the viewport height.
+    // overflow-y-auto enables vertical scrolling if content exceeds the viewport height,
+    // making the height dynamically adapt to the content size.
 <div className="min-h-screen w-full z-50 flex flex-col items-center p-2 sm:p-4 font-sans bg-gradient-to-br from-[#100221] via-[#4f187a] to-[#380d67] overflow-y-auto">
       
       {/* Header with Stats (The XP target) */}
