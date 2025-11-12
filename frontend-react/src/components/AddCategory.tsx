@@ -183,7 +183,6 @@ const AddCategory: React.FC<AddCategoryProps> = ({
 
         <Button
           onClick={handleMainButtonClick}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white shadow-lg bg-purple-600 hover:bg-purple-700 transition-all"
         >
           <Plus className="h-4 w-4" />
           <span>Create Quiz</span>
