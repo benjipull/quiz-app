@@ -421,11 +421,25 @@ export default function Home() {
   const alias = userProfile?.alias || "Guest";
   const avatarImage = userAvatar || undefined;
 
+  // Improved background style with better positioning
+  const backgroundStyle = {
+    backgroundImage: `url('/homebg.jpg')`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center center',
+    backgroundRepeat: 'no-repeat',
+    backgroundAttachment: 'fixed',
+    backgroundColor: '#100321',
+    minHeight: '100vh',
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67]">
+    <div
+      className="min-h-screen"
+      style={backgroundStyle}
+    >
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
-      <div className="mx-auto max-w-full space-y-4 px-4 pb-4 lg:px-8 lg:pb-8">
+      <div className="mx-auto max-w-full space-y-4 px-4 pb-20 lg:px-8 lg:pb-8">
         <GameStatsHeader userToken={userToken} isParentLoading={loading} />
 
         {/* Guest User Registration Panel */}
@@ -445,7 +459,6 @@ export default function Home() {
               variant="default"
               size="sm"
               onClick={() => navigate("/profile")}
-              className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3 py-1 flex-shrink-0"
             >
               Register Now
             </Button>
@@ -456,16 +469,16 @@ export default function Home() {
         <div className="flex flex-col items-center space-y-2 py-3">
           <div className="relative">
             <Link to="/profile" className="no-underline">
-              <Avatar className="w-20 h-20">
+              <Avatar className="w-24 h-24 md:w-32 md:h-32 border-4 border-white/10">
                 <AvatarImage src={avatarImage} alt={alias} />
-                <AvatarFallback className="bg-gradient-to-br from-primary/20 to-accent/20 border-4 border-primary/20 text-2xl font-bold text-primary">
+                <AvatarFallback className="bg-transparent border-none text-white text-2xl md:text-3xl font-bold">
                   {alias.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             </Link>
-            <div className="absolute bottom-0 right-0 w-5 h-5 bg-success rounded-full border-2 border-background"></div>
+            <div className="absolute bottom-0 right-0 w-5 h-5 md:w-6 md:h-6 bg-success rounded-full border-2 border-background"></div>
           </div>
-          <h2 className="text-lg font-bold">{alias}</h2>
+          <h2 className="text-lg md:text-xl font-bold text-white">{alias}</h2>
         </div>
 
         {/* Play Button */}
@@ -473,19 +486,19 @@ export default function Home() {
           <Button
             onClick={handleQuickQuiz}
             disabled={loading || playButtonLoading}
-            className="w-full h-16 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-2xl disabled:opacity-50 flex items-center justify-between px-6 relative overflow-hidden shadow-lg"
+            className="w-full h-16 md:h-20 flex items-center justify-between px-6 relative overflow-hidden rounded-full shadow-lg"
           >
             {playButtonLoading ? (
-              <div className="flex items-center text-xl justify-center w-full">
+              <div className="flex items-center text-xl md:text-2xl justify-center w-full">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
                 Starting Quiz...
               </div>
             ) : (
               <>
-                <span className="text-3xl font-bold">Play</span>
+                <span className="text-3xl md:text-4xl font-bold text-white">Play</span>
                 <div className="relative">
-                  <div className="bg-white rounded-full w-14 h-14 flex flex-col items-center justify-center shadow-md">
-                    <span className="text-green-500 text-xl font-bold leading-none">{userLevel}</span>
+                  <div className="bg-white rounded-full w-14 h-14 md:w-16 md:h-16 flex flex-col items-center justify-center shadow-md">
+                    <span className="text-green-500 text-xl md:text-2xl font-bold leading-none">{userLevel}</span>
                     <span className="text-green-500 text-xs font-medium uppercase leading-none">Level</span>
                   </div>
                 </div>
@@ -495,16 +508,16 @@ export default function Home() {
         </div>
 
         {/* My Categories */}
-        <div className="mt-4">
+        <div className="mt-4 pb-20">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-bold flex items-center">
+            <h3 className="text-lg md:text-xl font-bold flex items-center text-white">
               <Brain className="w-5 h-5 mr-2" />
               Your Quizzes
             </h3>
           </div>
 
           {error ? (
-            <Card className="p-8 text-center">
+            <Card className="p-8 text-center bg-white/5 backdrop-blur-sm border-white/10">
               <div className="space-y-3">
                 <p className="text-red-500">Error: {error}</p>
                 <Button onClick={fetchUserCategories} variant="outline" size="sm">
@@ -515,7 +528,7 @@ export default function Home() {
           ) : categoriesLoading ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i} className="p-4 animate-pulse">
+                <Card key={i} className="p-4 animate-pulse bg-white/5 backdrop-blur-sm border-white/10">
                   <div className="h-32 bg-muted/20 rounded mb-4" />
                   <div className="space-y-2">
                     <div className="h-4 bg-muted/20 rounded w-3/4" />
@@ -526,28 +539,15 @@ export default function Home() {
               ))}
             </div>
           ) : userCategories.length === 0 ? (
-            // START: Consolidated Empty State Card
-            <Card className="p-8 text-center bg-zinc-900 border-zinc-700/50 shadow-2xl transition-all duration-300 transform hover:scale-[1.01] hover:shadow-[0_0_30px_-5px_rgba(0,150,255,0.2)]">
-              <div className="space-y-4">
-                <Brain className="h-12 w-12 mx-auto text-purple-400" />
-                <h4 className="font-bold text-2xl text-white">
-                  Ready to Quiz?
-                </h4>
-                <p className="text-base text-zinc-400 max-w-sm mx-auto">
-                  It looks like you haven't created any quizzes yet. Start building your first custom quiz now!
-                </p>
-
-                <div className="pt-2">
-                  <AddCategory
-                    fetchCategories={fetchUserCategories}
-                    isGuest={isGuest}
-                    onRegistrationRequired={handleCreateCategoryAttempt}
-                    isEmbeddedInEmptyState={true} // Renders simplified button only
-                  />
-                </div>
-              </div>
-            </Card>
-            // END: Consolidated Empty State Card
+            // Empty State with Better Centering
+            <div className="flex justify-center items-center min-h-[200px]">
+              <AddCategory
+                fetchCategories={fetchUserCategories}
+                isGuest={isGuest}
+                onRegistrationRequired={handleCreateCategoryAttempt}
+                isEmbeddedInEmptyState={true} 
+              />
+            </div>
           ) : (
             // Display existing categories
             <div className="space-y-4">
@@ -569,18 +569,16 @@ export default function Home() {
                   />
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* Renders the full, separate AddCategory card *below* the list when categories exist */}
-          {userCategories.length > 0 && (
-            <div className="mt-6">
-              <AddCategory
-                fetchCategories={fetchUserCategories}
-                isGuest={isGuest}
-                onRegistrationRequired={handleCreateCategoryAttempt}
-                isEmbeddedInEmptyState={false} // Renders the full card
-              />
+              
+              {/* Add Category Button below existing categories */}
+              <div className="mt-6">
+                <AddCategory
+                  fetchCategories={fetchUserCategories}
+                  isGuest={isGuest}
+                  onRegistrationRequired={handleCreateCategoryAttempt}
+                  isEmbeddedInEmptyState={false}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -588,7 +586,7 @@ export default function Home() {
 
       {/* Interest Selection Modal */}
       <Dialog open={isInterestModalOpen} onOpenChange={setIsInterestModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[100vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <Heart className="w-5 h-5" />

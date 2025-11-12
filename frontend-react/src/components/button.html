@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mystical Play Button</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap');
+
+    body {
+      background: radial-gradient(circle at center, #1c003a 0%, #090018 100%);
+      height: 100vh;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .play-button {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 320px;
+      height: 90px;
+      padding: 0 35px;
+      border: none;
+      border-radius: 60px;
+      cursor: pointer;
+      background: linear-gradient(180deg, #00ff80 0%, #00b946 100%);
+      box-shadow:
+        0 0 0 2px #00ff80,
+        0 0 20px rgba(0, 255, 100, 0.7),
+        0 0 40px rgba(0, 255, 100, 0.3),
+        inset 0 0 6px rgba(255, 255, 255, 0.25);
+      color: white;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      transition: all 0.25s ease;
+    }
+
+    .play-button:hover {
+      transform: scale(1.03);
+      box-shadow:
+        0 0 0 2px #00ff9d,
+        0 0 25px rgba(0, 255, 100, 0.9),
+        0 0 60px rgba(0, 255, 100, 0.6),
+        inset 0 0 8px rgba(255, 255, 255, 0.3);
+    }
+
+    .play-text {
+      flex: 1;
+      text-align: left;
+    }
+
+    .level-badge {
+      position: relative;
+      background: radial-gradient(circle at 40% 30%, #ffffff 0%, #e6ffe6 100%);
+      color: #00b946;
+      width: 74px;
+      height: 74px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      box-shadow:
+        0 0 6px rgba(0, 255, 100, 0.6),
+        inset 0 0 10px rgba(0, 255, 100, 0.15);
+    }
+
+    .level-badge strong {
+      font-size: 1.8rem;
+      line-height: 1;
+    }
+
+    /* Optional subtle glow pulse for ambience */
+    @keyframes button-glow {
+      0%, 100% {
+        box-shadow:
+          0 0 0 2px #00ff80,
+          0 0 20px rgba(0, 255, 100, 0.7),
+          0 0 40px rgba(0, 255, 100, 0.3),
+          inset 0 0 6px rgba(255, 255, 255, 0.25);
+      }
+      50% {
+        box-shadow:
+          0 0 0 2px #00ffaa,
+          0 0 28px rgba(0, 255, 140, 0.9),
+          0 0 60px rgba(0, 255, 120, 0.5),
+          inset 0 0 8px rgba(255, 255, 255, 0.3);
+      }
+    }
+
+    .play-button {
+      animation: button-glow 3.5s ease-in-out infinite;
+    }
+
+  </style>
+</head>
+<body>
+  <button class="play-button">
+    <span class="play-text">Play</span>
+    <span class="level-badge">
+      <strong>1</strong>
+      LEVEL
+    </span>
+  </button>
+</body>
+</html>

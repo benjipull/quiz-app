@@ -1,50 +1,34 @@
+"use client";
+
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-// ✅ Preload the sound file
-const clickSound = new Audio("/clicksound.m4a");
-clickSound.volume = 0.5;
+// ✅ Preload the click sound
+const clickSound = typeof Audio !== "undefined" ? new Audio("/clicksound.m4a") : null;
+if (clickSound) clickSound.volume = 0.5;
 
-// ✅ Button Variants with Bold Borders
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold border-4 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-bold transition-all duration-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 font-poppins shadow-sm hover:shadow-md hover:scale-105 active:scale-95",
   {
     variants: {
       variant: {
-        default:
-          "border-green-600 bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-lg hover:scale-105 active:scale-95",
-        destructive:
-          "border-red-700 bg-red-600 text-white hover:bg-red-700 active:scale-95",
-        outline:
-          "border-green-500 text-green-600 bg-transparent hover:bg-green-500 hover:text-white hover:shadow-md",
-        secondary:
-          "border-green-500 bg-gradient-to-r from-green-400 to-green-500 text-white hover:shadow-lg hover:scale-105 active:scale-95",
-        ghost:
-          "border-green-500 hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900/20",
-        link:
-          "border-transparent text-green-600 underline-offset-4 hover:underline",
-        quiz:
-          "border-green-600 bg-green-600 text-white hover:bg-green-700 hover:scale-105 active:scale-95",
-        success:
-          "border-green-600 bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-lg hover:scale-105 active:scale-95",
-        warning:
-          "border-yellow-500 bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:shadow-lg hover:scale-105 active:scale-95",
-        hero:
-          "border-green-600 bg-gradient-to-r from-green-400 via-green-500 to-green-600 text-white hover:shadow-2xl hover:shadow-green-500/25 hover:scale-110 active:scale-95 animate-pulse-glow",
-        // ✅ Existing BLUE VARIANT
-        blue:
-          "border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 active:scale-95",
-        // 🟣 NEW PURPLE VARIANT
-        purple:
-          "border-purple-700 bg-gradient-to-r from-purple-600 to-purple-700 text-white hover:shadow-lg hover:scale-105 active:scale-95",
+        default: "bg-gradient-to-b from-[#00ff41] via-[#00ee00] to-[#00cc00] text-white [color:#FFFFFF] focus-visible:ring-[#00ff41] border-2 border-[#00ff41]",
+        secondary: "bg-gradient-to-b from-[#00ff41] via-[#00ee00] to-[#00cc00] text-white [color:#00ff41] focus-visible:ring-[#00ff41] border-2 border-[#00ff41]",
+        destructive: "bg-gradient-to-b from-[#ff00ff] via-[#ff00cc] to-[#cc0099] text-white [color:#ff00ff] focus-visible:ring-[#ff00ff] border-2 border-[#ff00ff]",
+        blue: "bg-gradient-to-b from-[#00ffff] via-[#00ccff] to-[#0099ff] text-white [color:#00ffff] focus-visible:ring-[#00ffff] border-2 border-[#00ffff]",
+        purple: "bg-gradient-to-b from-[#dd00ff] via-[#cc00ff] to-[#9900cc] text-white [color:#dd00ff] focus-visible:ring-[#dd00ff] border-2 border-[#dd00ff]",
+        warning: "bg-gradient-to-b from-[#ff4d4d] via-[#ff1a1a] to-[#d60000] text-white [color:#ff4d4d] focus-visible:ring-[#ff4d4d] border-2 border-[#ff4d4d]",
+        outline: "bg-transparent text-[#00ff41] focus-visible:ring-[#00ff41] border-2 border-[#00ff41]",
+        ghost: "bg-gradient-to-b from-[#00ff41] via-[#00ee00] to-[#00cc00] text-white [color:#00ff41] focus-visible:ring-[#00ff41] border-2 border-[#00ff41]",
+        link: "bg-gradient-to-b from-[#00ff41] via-[#00ee00] to-[#00cc00] text-white [color:#00ff41] shadow-none hover:shadow-[0_0_15px_currentColor] focus-visible:ring-[#00ff41] border-2 border-[#00ff41]"
       },
       size: {
-        default: "h-12 px-6 py-3",
-        sm: "h-9 rounded-lg px-4",
-        lg: "h-14 rounded-xl px-8 text-base",
-        xl: "h-16 rounded-2xl px-10 text-lg",
+        default: "h-12 px-6 py-3 text-sm",
+        sm: "h-9 px-4 text-sm",
+        lg: "h-14 px-8 text-base",
+        xl: "h-16 px-10 text-lg",
         icon: "h-12 w-12",
       },
     },
@@ -54,6 +38,7 @@ const buttonVariants = cva(
     },
   }
 );
+
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
@@ -68,8 +53,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
       try {
         // ✅ Play click sound
-        clickSound.currentTime = 0;
-        clickSound.play().catch(() => {});
+        if (clickSound) {
+          clickSound.currentTime = 0;
+          clickSound.play().catch(() => {});
+        }
 
         // ✅ Short vibration (30ms)
         if (navigator.vibrate) {
