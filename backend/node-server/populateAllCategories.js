@@ -6,8 +6,8 @@ const { populateCategoryLoop } = require("./scripts/populateCategories");
 
 // --- Config ---
 const BATCH_SIZE = 10;          // how many categories to process each iteration
-const QUESTIONS_TO_FILL = 20;   // how many questions to add per category
-const THRESHOLD = 100;           // only categories with <10 enabled questions
+const QUESTIONS_TO_FILL = 30;   // how many questions to add per category
+const THRESHOLD = 100;           // only categories with <100 enabled questions
 
 /**
  * Get categories with the lowest enabled-question count
@@ -65,7 +65,7 @@ async function populateAllCategories() {
         );
 
         // Call your AI population logic
-        const added = await populateCategoryLoop(category._id, QUESTIONS_TO_FILL, "easy");
+        const added = await populateCategoryLoop(category._id, QUESTIONS_TO_FILL, "very easy");
 
         if (added > 0) {
           newQuestionsAdded += added;
