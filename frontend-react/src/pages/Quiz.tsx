@@ -84,7 +84,7 @@ const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmTe
       <p className="text-sm text-muted-foreground">{description}</p>
       <div className="flex justify-end gap-3">
         <Button variant="outline" onClick={onCancel}>{cancelText}</Button>
-        <Button variant="destructive" onClick={onConfirm}>{confirmText}</Button>
+        <Button variant="warning" className="text-white" onClick={onConfirm}>{confirmText}</Button>
       </div>
     </Card>
   </div>
@@ -211,7 +211,7 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
             )}
 
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" className="text-red-500 border-red-600 hover:bg-red-600"
+              <Button variant="outline" className="text-red-500 border-red-600 hover:bg-red-600 hover:text-white"
                 onClick={onClose} disabled={isSubmitting}>Cancel</Button>
               <Button
                 variant="default"
@@ -1079,7 +1079,7 @@ export default function Quiz() {
         <div className="flex-1 overflow-y-auto px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-4xl">
           <div className="space-y-6">
             <div className="px-1 py-3 md:py-6 text-center">
-              <h2 className="text-xl md:text-2xl lg:text-4xl font-bold text-white leading-relaxed drop-shadow-lg">
+              <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-white leading-relaxed drop-shadow-lg">
                 {quizState.question?.question}
               </h2>
             </div>
@@ -1164,7 +1164,7 @@ export default function Quiz() {
             )}
             {showExplanation && !timeUp && answerResponse && (
               <div ref={explanationRef}>
-                <Card className="p-6 md:p-8  animate-slide-up border-2 border-purple-400 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
+                <Card className="p-4 md:p-6  animate-slide-up border-2 border-purple-400 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
                   <div className="space-y-4">
                     <p className="text-sm md:text-base text-white leading-relaxed">
                       {answerResponse.explanation}
@@ -1223,11 +1223,9 @@ export default function Quiz() {
                   </Card>
 
                   <Button
-                    size="lg"
-                    className="w-full h-14 md:h-16 text-base md:text-lg text-white font-bold border-0"
+                    className="w-full h-14 md:h-16 text-base md:text-lg text-white font-bold"
                     onClick={handleNextQuestion}
                     disabled={isCompletingQuiz}
-                    style={{ borderRadius: '1rem' }}
                   >
                     {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
                   </Button>

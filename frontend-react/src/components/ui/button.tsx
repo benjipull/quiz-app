@@ -14,15 +14,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-gradient-to-b from-[#00ff41] via-[#00ee00] to-[#00cc00] text-white [color:#FFFFFF] focus-visible:ring-[#00ff41] border-2 border-[#00ff41]",
-        secondary: "bg-gradient-to-b from-[#00ff41] via-[#00ee00] to-[#00cc00] text-white [color:#00ff41] focus-visible:ring-[#00ff41] border-2 border-[#00ff41]",
-        destructive: "bg-gradient-to-b from-[#ff00ff] via-[#ff00cc] to-[#cc0099] text-white [color:#ff00ff] focus-visible:ring-[#ff00ff] border-2 border-[#ff00ff]",
-        blue: "bg-gradient-to-b from-[#00ffff] via-[#00ccff] to-[#0099ff] text-white [color:#00ffff] focus-visible:ring-[#00ffff] border-2 border-[#00ffff]",
-        purple: "bg-gradient-to-b from-[#dd00ff] via-[#cc00ff] to-[#9900cc] text-white [color:#dd00ff] focus-visible:ring-[#dd00ff] border-2 border-[#dd00ff]",
-        warning: "bg-gradient-to-b from-[#ff4d4d] via-[#ff1a1a] to-[#d60000] text-white [color:#ff4d4d] focus-visible:ring-[#ff4d4d] border-2 border-[#ff4d4d]",
-        outline: "bg-transparent text-[#00ff41] focus-visible:ring-[#00ff41] border-2 border-[#00ff41]",
-        ghost: "bg-gradient-to-b from-[#00ff41] via-[#00ee00] to-[#00cc00] text-white [color:#00ff41] focus-visible:ring-[#00ff41] border-2 border-[#00ff41]",
-        link: "bg-gradient-to-b from-[#00ff41] via-[#00ee00] to-[#00cc00] text-white [color:#00ff41] shadow-none hover:shadow-[0_0_15px_currentColor] focus-visible:ring-[#00ff41] border-2 border-[#00ff41]"
+        default: "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white shadow-[0_4px_20px_rgba(0,255,0,0.3)] hover:shadow-[0_6px_30px_rgba(0,255,0,0.5)] border-[3px] border-[#00ff00]",
+        destructive: "bg-gradient-to-b from-[#aa00aa] via-[#880088] to-[#660066] text-white focus-visible:ring-[#ff00ff] border-2 border-[#ff00ff]",
+        blue: "bg-gradient-to-b from-[#0088cc] via-[#006699] to-[#004466] text-white focus-visible:ring-[#00ffff] border-2 border-[#00ffff]",
+        purple: "bg-gradient-to-b from-[#9900aa] via-[#770088] to-[#550066] text-white focus-visible:ring-[#dd00ff] border-2 border-[#dd00ff]",
+        warning: "bg-gradient-to-b from-[#cc3333] via-[#aa1111] to-[#880000] text-white focus-visible:ring-[#ff4d4d] border-2 border-[#ff4d4d]",
+        outline: "bg-transparent text-white focus-visible:ring-[#00ff41] border-2 border-[#00ff41]",
+        ghost: "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white focus-visible:ring-[#00ff41] border-2 border-[#00ff41]",
+        link: "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white shadow-none hover:shadow-[0_0_15px_currentColor] focus-visible:ring-[#00ff41] border-2 border-[#00ff41]"
       },
       size: {
         default: "h-12 px-6 py-3 text-sm",

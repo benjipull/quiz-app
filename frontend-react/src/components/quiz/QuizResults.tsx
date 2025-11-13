@@ -89,6 +89,21 @@ const getPerformanceData = (percentage: number) => {
   }
 };
 
+// Extracted Knowledge Point Icon SVG for reuse
+const KnowledgePointIcon = ({ className }: { className: string }) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+    >
+      <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
+      <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
+      <circle cx="12" cy="9" r="2" fill="#fff" />
+    </svg>
+);
+
+
 export default function QuizResults({ results, onPlayAgain, onClose }: QuizResultsProps) {
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
@@ -117,7 +132,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [animatedScore, setAnimatedScore] = useState(0);
   const [animatedKnowledge, setAnimatedKnowledge] = useState(0);
   const [animatedTotalXP, setAnimatedTotalXP] = useState(totalKnowledge - knowledgeGained);
-  // Removed showPointsCenter state, replaced with showXPOverlay for the floating animation
   const [showXPOverlay, setShowXPOverlay] = useState(true); 
   const [showFlyingTokens, setShowFlyingTokens] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
@@ -135,11 +149,11 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   );
 
   useEffect(() => {
-    // FIX: Scroll to top when the component mounts
+    // Scroll to top when the component mounts
     if (typeof window !== "undefined") {
         window.scrollTo({
             top: 0,
-            behavior: 'smooth' // Smooth scrolling for better user experience
+            behavior: 'smooth'
         });
     }
     
@@ -151,7 +165,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     updateSize();
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
-  }, []); // Empty dependency array ensures this runs once on mount
+  }, []);
 
   // Animated score counter
   useEffect(() => {
@@ -184,7 +198,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           setTimeout(() => {
             startTokenAnimation();
             
-            // Hide the entire XP overlay after the tokens have flown away (approx 1.8s)
+            // Hide the entire XP overlay after the tokens have flown away
             setTimeout(() => {
                 setShowXPOverlay(false);
             }, 1800);
@@ -359,11 +373,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   }
 
   return (
-    // MODIFIED: Changed h-screen to min-h-screen and added flex-col to enable vertical growth
-    <div className="min-h-screen w-full z-50 flex flex-col items-center p-2 sm:p-4 font-sans bg-gradient-to-br from-[#100221] via-[#4f187a] to-[#380d67] overflow-y-auto">
+    <div className="h-screen w-full z-50 flex flex-col items-center p-2 sm:p-4 font-sans bg-gradient-to-br from-[#100221] via-[#4f187a] to-[#380d67] overflow-hidden">
       
       {/* Header with Stats (The XP target) */}
-      <div className="w-full max-w-lg mb-3 animate-fade-in-down sticky top-0 z-20">
+      <div className="w-full max-w-lg flex-shrink-0 animate-fade-in-down">
         <div className="flex items-center justify-between p-2 sm:p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 backdrop-blur-sm">
           {/* Stat Item: Coins */}
           <div className="flex items-center gap-1 sm:gap-1.5">
@@ -390,16 +403,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
            {/* Stat Item - XP - TARGET FOR TOKENS */}
            <div ref={headerXPRef} className="flex items-center gap-1 sm:gap-1.5 relative">
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center transition-all duration-300">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="h-4 w-4 text-amber-500"
-              >
-                <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
-                <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
-                <circle cx="12" cy="9" r="2" fill="#fff" />
-              </svg>
+              <KnowledgePointIcon className="h-4 w-4 text-amber-500" />
             </div>
             <div>
               <div className="text-sm sm:text-base font-bold text-yellow-400 tabular-nums">{animatedTotalXP}</div>
@@ -482,9 +486,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 </div>
               </div>
               <Button
-                onClick={() => setShowLevelUp(false)}
-                className="bg-white text-purple-600 hover:bg-purple-50 font-black px-6 py-2 text-md"
-              >
+              variant="default"
+                onClick={() => setShowLevelUp(false)} >
                 AWESOME!
               </Button>
             </div>
@@ -492,11 +495,9 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </div>
       )}
 
-      {/* Main Results Card Container (THE COMPLETION PAGE) */}
-      {/* MODIFIED: Added flex-1 (flex-grow) and min-h-0 to ensure it takes up remaining space and handles its own content scrolling */}
-      <div className="relative z-10 w-full max-w-lg mx-auto pb-6 sm:pb-0 flex-1 min-h-0">
-        {/* MODIFIED: Added h-full and flex flex-col to make the Card fill its parent's height and allow its content to scroll if needed */}
-        <Card className="relative overflow-hidden bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in h-full flex flex-col">
+      {/* Main Results Card Container - Takes remaining space */}
+      <div className="relative z-10 w-full max-w-lg mx-auto flex-1 flex flex-col min-h-0 mt-3">
+        <Card className="relative overflow-hidden bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in flex-1 flex flex-col">
           
           {/* Close Button */}
           <Link
@@ -508,7 +509,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             <X className="h-5 w-5 text-white" />
           </Link>
           
-          {/* Content Wrapper - MODIFIED: Added flex-1 and overflow-y-auto to allow scrolling inside the card if content is too long */}
+          {/* Content Wrapper - Scrollable */}
           <div className="relative z-10 p-4 sm:p-6 space-y-4 sm:space-y-5 flex-1 overflow-y-auto">
             
             {/* Header */}
@@ -522,7 +523,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               </h1>
             </div>
 
-            {/* Results Content (Now always visible) */}
+            {/* Results Content */}
             <div className="space-y-3 sm:space-y-4 animate-fade-in pt-8">
               {/* Results Grid */}
               <div className="grid grid-cols-2 gap-2 sm:gap-3">
@@ -644,8 +645,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               </Card>
 
               {/* Next Quiz Button */}
-              {/* NOTE: This button is inside the scrollable content of the card, 
-                 which is fine for this design as it will be at the bottom of the card content. */}
               <Button
                 onClick={handleNextQuiz}
                 disabled={playButtonLoading}
@@ -659,23 +658,20 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </Card>
       </div>
 
-      {/* XP EARNED OVERLAY (Minimalist, Transparent, Transient) */}
+      {/* XP EARNED OVERLAY */}
       {showXPOverlay && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
             <div 
                 ref={earnedPointsRef} 
                 className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
             >
-                {/* Yellow Trophy Icon */}
                 <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-yellow-500/50 animate-pulse-glow">
-                  <Trophy className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
+                  <KnowledgePointIcon className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
-                  {/* Yellow XP Value - REMOVED "+" AND ADDED AURA CLASS */}
                   <div className="xp-text-aura text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
                     {animatedKnowledge}
                   </div>
-                  {/* Yellow XP EARNED Text */}
                   <div className="text-yellow-400/80 font-bold text-sm sm:text-base mt-1 sm:mt-2">
                     XP EARNED
                   </div>
@@ -684,7 +680,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </div>
       )}
 
-      {/* Flying Tokens - Enhanced animation (Must be rendered on top) */}
+      {/* Flying Tokens */}
       {showFlyingTokens && tokens.map((token) => (
         <div
           key={token.id}
@@ -778,15 +774,14 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           animation: number-grow 0.8s ease-out forwards;
         }
         
-        /* New CSS for Text Aura */
         .xp-text-aura {
           text-shadow: 
-            0 0 10px rgba(255, 193, 7, 0.9), /* Bright inner glow */
-            0 0 20px rgba(255, 165, 0, 0.7), /* Medium outer glow */
-            0 0 30px rgba(255, 140, 0, 0.5); /* Farthest shadow */
+            0 0 10px rgba(255, 193, 7, 0.9),
+            0 0 20px rgba(255, 165, 0, 0.7),
+            0 0 30px rgba(255, 140, 0, 0.5);
         }
 
-        /* Enhanced Flying Token Animation - Straight path to knowledge points */
+        /* Flying Token Animation */
         .token {
           position: fixed;
           width: 20px;
@@ -865,7 +860,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             transform: translate(-50%, -50%) scale(0.1) rotate(1080deg);
           }
         }
-        
         
         .animate-fade-in-down { animation: fade-in-down 0.6s ease-out; }
         .animate-scale-in { animation: scale-in 0.5s ease-out; }

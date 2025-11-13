@@ -343,7 +343,7 @@ export default function Home() {
               Register
             </Button>
             <Button
-              variant="secondary"
+              variant="outline"
               size="sm"
               onClick={() => dismiss(toastId)}
             >
@@ -465,21 +465,37 @@ export default function Home() {
           </Card>
         )}
 
-        {/* User Avatar Section */}
-        <div className="flex flex-col items-center space-y-2 py-3">
-          <div className="relative">
+        <div className="flex flex-col items-center py-6">
+          {/* Wrapper with moon.jpg background */}
+          <div
+            className="relative w-[180px] h-[180px] md:w-52 md:h-52 rounded-full flex items-center justify-center"
+            style={{
+              backgroundImage: `url('/image.png')`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+            }}
+          >
             <Link to="/profile" className="no-underline">
-              <Avatar className="w-24 h-24 md:w-32 md:h-32 border-4 border-white/10">
+              <Avatar className="w-[145px] h-[145px] md:w-44 md:h-44">
                 <AvatarImage src={avatarImage} alt={alias} />
-                <AvatarFallback className="bg-transparent border-none text-white text-2xl md:text-3xl font-bold">
+                <AvatarFallback className="bg-transparent border-none text-white text-3xl md:text-4xl font-bold">
                   {alias.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             </Link>
-            <div className="absolute bottom-0 right-0 w-5 h-5 md:w-6 md:h-6 bg-success rounded-full border-2 border-background"></div>
+
+            {/* Presence indicator dot - positioned on shoulder area */}
+            <div className="absolute bottom-[52px] right-[20px] md:bottom-16 md:right-7 w-6 h-6 md:w-7 md:h-7 bg-green-500 rounded-full 
+            border-4 border-green-800 shadow-lg"></div>
+
+            {/* Alias at bottom edge of avatar circle */}
+            <h2 className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 text-white font-extrabold text-xl md:text-2xl whitespace-nowrap truncate max-w-[160px] md:max-w-[200px] text-center">
+              {alias}
+            </h2>
           </div>
-          <h2 className="text-lg md:text-xl font-bold text-white">{alias}</h2>
         </div>
+
 
         {/* Play Button */}
         <div className="pb-3 relative">
