@@ -423,7 +423,7 @@ export default function Home() {
 
   // Improved background style with better positioning
   const backgroundStyle = {
-    backgroundImage: `url('/homebg.jpg')`,
+    backgroundImage: `url('/homebg1.jpg')`,
     backgroundSize: 'cover',
     backgroundPosition: 'center center',
     backgroundRepeat: 'no-repeat',
