@@ -219,12 +219,21 @@ const Profile = () => {
       setUserType(newType);
 
       if (newType === "Registered" && isRegistration) {
+        // Successful Guest registration
         toast({
           title: "Registration Complete",
           description: "Welcome! Your account is now fully registered.",
         });
-        setTimeout(() => navigate("/"), 1500);
+        setTimeout(() => navigate("/"), 1500); // Redirect to /
+      } else if (newType !== "Guest" && !isRegistration) {
+        // Successful Registered/Admin update
+        toast({
+          title: "Success",
+          description: "Profile updated successfully! Redirecting to home.",
+        });
+        setTimeout(() => navigate("/"), 1500); // Redirect to /
       } else {
+        // Other updates 
         toast({
           title: "Success",
           description: "Profile updated successfully!",
@@ -309,22 +318,22 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] p-4 flex items-center justify-center">
-      <Card className="w-full max-w-lg bg-card/90 backdrop-blur-sm border-border/50 shadow-xl relative">
+      <Card className="w-full max-w-lg bg-card/90 backdrop-blur-sm border-border/50 shadow-2xl relative">
         <Link 
           to={"/"}
-          className="absolute top-3 right-3 z-20 h-8 w-8 bg-red-600 hover:bg-red-700 rounded-full transition-colors flex items-center justify-center shadow-lg"
+          className="absolute top-3 right-3 z-20 h-9 w-9 bg-red-600 hover:bg-red-700 rounded-full transition-colors flex items-center justify-center shadow-lg transform hover:scale-105"
           aria-label="Close Profile and go to Categories"
         >
           <X className="h-5 w-5 text-white" />
         </Link>
 
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-foreground">
-            <User className="w-5 h-5" />
+          <CardTitle className="flex items-center space-x-3 text-foreground text-2xl font-bold border-b border-border/30 pb-3">
+            <User className="w-6 h-6 text-primary" />
             <span>
               {isGuest ? "Complete Registration" : "My Profile"}
               {isGuest && (
-                <span className="text-sm font-normal text-amber-500">
+                <span className="text-base font-normal text-amber-500 ml-2">
                   {" "}
                   (Guest)
                 </span>
@@ -332,7 +341,7 @@ const Profile = () => {
             </span>
           </CardTitle>
           {isGuest && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground pt-2">
               Please fill out the fields below to secure and register your account.
             </p>
           )}
@@ -340,19 +349,19 @@ const Profile = () => {
 
         <CardContent>
           <div className="flex justify-center mb-6">
-            <Avatar className="w-20 h-20 border-4 border-primary shadow-xl">
+            <Avatar className="w-24 h-24 border-4 border-primary shadow-xl ring-4 ring-primary/20">
               <AvatarImage 
                 src={avatar || avatars[0]} 
                 alt="Current Avatar" 
                 className="object-cover"
               />
-              <AvatarFallback className="bg-muted text-muted-foreground text-xl">
+              <AvatarFallback className="bg-muted text-muted-foreground text-2xl">
                 {alias.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
           </div>
 
-          <form className="space-y-4" onSubmit={handleSaveClick}>
+          <form className="space-y-6" onSubmit={handleSaveClick}>
             <div className="space-y-2">
               <Label htmlFor="alias">Username</Label>
               <Input
@@ -376,11 +385,13 @@ const Profile = () => {
                   isGuest ? "Enter your email for registration" : "Your registered email"
                 }
                 disabled={!isGuest}
-                className={`${!isGuest ? "cursor-not-allowed bg-muted" : ""}`}
+                className={`${!isGuest ? "cursor-not-allowed bg-muted/50 border-border/70" : ""}`}
               />
-              <p className="text-xs text-muted-foreground">
-                Email is required to complete registration.
-              </p>
+              {isGuest && (
+                <p className="text-xs text-muted-foreground">
+                  Email is required to complete registration.
+                </p>
+              )}
             </div>
             
             {isGuest && (
@@ -400,7 +411,7 @@ const Profile = () => {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                      className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted/50 transition-colors"
                       aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -423,7 +434,7 @@ const Profile = () => {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                      className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted/50 transition-colors"
                       aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -452,23 +463,28 @@ const Profile = () => {
               <Label>Your Interests</Label>
               
               {/* Display selected interests as tags */}
-              {selectedInterestNames.length > 0 && (
-                <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-lg border border-border/50 min-h-[60px]">
+              {selectedInterestNames.length > 0 ? (
+                <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-lg border border-border/50 min-h-[60px] max-h-32 overflow-y-auto">
                   {selectedInterestNames.map((name, index) => (
                     <span
                       key={index}
-                      className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-200 border border-purple-500/30"
+                      className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-purple-600/30 text-purple-200 border border-purple-600/50 shadow-sm"
                     >
                       {name}
                     </span>
                   ))}
                 </div>
+              ) : (
+                <div className="p-3 bg-muted/30 rounded-lg border border-border/50 min-h-[60px] flex items-center justify-center text-sm text-muted-foreground italic">
+                  No interests selected. Click the button to choose some!
+                </div>
               )}
               
-              {/* Blue button to open modal */}
+              {/* Button to open modal */}
               <Button
                 type="button"
-                variant="blue"
+                variant="blue" 
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={handleOpenInterestModal}
                 disabled={savingInterests}
               >
@@ -487,13 +503,13 @@ const Profile = () => {
             {!isGuest && (
               <div className="space-y-2">
                 <Label>Select Avatar</Label>
-                <div className="grid grid-cols-4 gap-2 p-3 border border-border rounded-lg bg-card">
+                <div className="grid grid-cols-5 gap-3 p-3 border border-border rounded-lg bg-card/70">
                   {avatars.map((avatarImg, index) => (
                     <Avatar
                       key={index}
-                      className={`w-16 h-16 cursor-pointer border-2 transition-all ${
+                      className={`w-14 h-14 cursor-pointer border-2 transition-all duration-200 ${
                         avatar === avatarImg
-                          ? "border-primary ring-2 ring-primary/30 shadow-lg scale-110"
+                          ? "border-primary ring-2 ring-primary/50 shadow-xl scale-110"
                           : "border-transparent hover:border-primary/50 hover:scale-105"
                       }`}
                       onClick={() => handleAvatarSelection(avatarImg, index)}
@@ -514,7 +530,7 @@ const Profile = () => {
             <Button
               type="submit"
               disabled={updating || savingInterests}
-              className={`w-full ${isGuest ? "bg-amber-500 hover:bg-amber-600" : "bg-primary hover:bg-primary/80"}`}
+              className={`w-full h-10 transition-colors ${isGuest ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-primary hover:bg-primary/90"}`}
             >
               {updating ? (
                 <div className="flex items-center space-x-2">
@@ -536,10 +552,10 @@ const Profile = () => {
 
       {/* Interest Selection Modal */}
       <Dialog open={isInterestModalOpen} onOpenChange={setIsInterestModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[100vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card/95 backdrop-blur-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Heart className="w-5 h-5" />
+            <DialogTitle className="flex items-center space-x-2 text-xl font-bold">
+              <Heart className="w-5 h-5 text-primary" />
               <span>Select Your Interests</span>
             </DialogTitle>
             <DialogDescription>
@@ -547,7 +563,7 @@ const Profile = () => {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="py-4">
+          <div className="py-4 border-y border-border/50">
             {user._id && (
               <InterestSelector
                 userId={user._id}
@@ -557,11 +573,11 @@ const Profile = () => {
             )}
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4 border-t">
+          <div className="flex justify-end space-x-2 pt-4">
             <Button
               variant="outline"
               onClick={() => setIsInterestModalOpen(false)}
-              className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+              className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
               disabled={savingInterests}
             >
               Cancel
@@ -569,6 +585,7 @@ const Profile = () => {
             <Button 
               onClick={handleSaveInterests}
               disabled={savingInterests}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               {savingInterests ? (
                 <div className="flex items-center space-x-2">
