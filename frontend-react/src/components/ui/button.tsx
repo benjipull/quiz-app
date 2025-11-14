@@ -5,23 +5,63 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-// ✅ Preload the click sound
-const clickSound = typeof Audio !== "undefined" ? new Audio("/clicksound.m4a") : null;
-if (clickSound) clickSound.volume = 0.5;
+/* ------------------------------------------------------------------
+    ULTRA FAST AUDIO ENGINE (0ms latency)
+------------------------------------------------------------------ */
+
+let audioCtx: AudioContext | null = null;
+let clickBuffer: AudioBuffer | null = null;
+
+// Preload & decode the click sound once
+async function loadClickSound() {
+  try {
+    if (!audioCtx) audioCtx = new window.AudioContext();
+
+    const res = await fetch("/clicksound.m4a");
+    const arrayBuffer = await res.arrayBuffer();
+    clickBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  } catch (err) {
+    console.warn("Failed loading click sound:", err);
+  }
+}
+
+// Preload immediately
+loadClickSound();
+
+// Play instantly (no delay)
+function playClick() {
+  if (!audioCtx || !clickBuffer) return;
+
+  const src = audioCtx.createBufferSource();
+  src.buffer = clickBuffer;
+  src.connect(audioCtx.destination);
+  src.start(0);
+}
+
+/* ------------------------------------------------------------------
+    BUTTON STYLING
+------------------------------------------------------------------ */
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-bold transition-all duration-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 font-poppins shadow-sm hover:shadow-md hover:scale-105 active:scale-95",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-bold transition-all duration-150 active:scale-95 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none",
   {
     variants: {
       variant: {
-        default: "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white shadow-[0_4px_20px_rgba(0,255,0,0.3)] hover:shadow-[0_6px_30px_rgba(0,255,0,0.5)] border-[3px] border-[#00ff00]",
-        destructive: "bg-gradient-to-b from-[#aa00aa] via-[#880088] to-[#660066] text-white focus-visible:ring-[#ff00ff] border-2 border-[#ff00ff]",
-        blue: "bg-gradient-to-b from-[#0088cc] via-[#006699] to-[#004466] text-white focus-visible:ring-[#00ffff] border-2 border-[#00ffff]",
-        purple: "bg-gradient-to-b from-[#9900aa] via-[#770088] to-[#550066] text-white focus-visible:ring-[#dd00ff] border-2 border-[#dd00ff]",
-        warning: "bg-gradient-to-b from-[#cc3333] via-[#aa1111] to-[#880000] text-white focus-visible:ring-[#ff4d4d] border-2 border-[#ff4d4d]",
-        outline: "bg-transparent text-white focus-visible:ring-[#00ff41] border-2 border-[#00ff41]",
-        ghost: "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white focus-visible:ring-[#00ff41] border-2 border-[#00ff41]",
-        link: "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white shadow-none hover:shadow-[0_0_15px_currentColor] focus-visible:ring-[#00ff41] border-2 border-[#00ff41]"
+        default:
+          "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white border-[3px] border-[#00ff00] shadow-[0_4px_20px_rgba(0,255,0,0.3)] hover:shadow-[0_6px_30px_rgba(0,255,0,0.5)]",
+        destructive:
+          "bg-gradient-to-b from-[#aa00aa] via-[#880088] to-[#660066] text-white border-2 border-[#ff00ff]",
+        blue:
+          "bg-gradient-to-b from-[#0088cc] via-[#006699] to-[#004466] text-white border-2 border-[#00ffff]",
+        purple:
+          "bg-gradient-to-b from-[#9900aa] via-[#770088] to-[#550066] text-white border-2 border-[#dd00ff]",
+        warning:
+          "bg-gradient-to-b from-[#cc3333] via-[#aa1111] to-[#880000] text-white border-2 border-[#ff4d4d]",
+        outline: "bg-transparent text-white border-2 border-[#00ff41]",
+        ghost:
+          "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white border-2 border-[#00ff41]",
+        link:
+          "bg-transparent text-white border-2 border-[#00ff41] shadow-none",
       },
       size: {
         default: "h-12 px-6 py-3 text-sm",
@@ -38,6 +78,9 @@ const buttonVariants = cva(
   }
 );
 
+/* ------------------------------------------------------------------
+    BUTTON COMPONENT
+------------------------------------------------------------------ */
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
@@ -50,30 +93,20 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const Comp = asChild ? Slot : "button";
 
     const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-      try {
-        // ✅ Play click sound
-        if (clickSound) {
-          clickSound.currentTime = 0;
-          clickSound.play().catch(() => {});
-        }
+      // ⚡ Instant sound
+      playClick();
 
-        // ✅ Short vibration (30ms)
-        if (navigator.vibrate) {
-          navigator.vibrate(30);
-        }
-      } catch (error) {
-        console.warn("Button feedback error:", error);
-      }
+      // ⚡ Instant vibration
+      if (navigator.vibrate) navigator.vibrate(25);
 
-      // ✅ Trigger any user-provided onClick
       onClick?.(e);
     };
 
     return (
       <Comp
         ref={ref}
+        className={cn(buttonVariants({ variant, size }), className)}
         onClick={handleClick}
-        className={cn(buttonVariants({ variant, size, className }))}
         {...props}
       />
     );
