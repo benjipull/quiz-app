@@ -464,48 +464,45 @@ export default function Home() {
             </Button>
           </Card>
         )}
+            {/* User Avatar and Alias */}
+    <div className="flex flex-col items-center py-6">
+      <div
+        className="relative w-[210px] h-[210px] md:w-[260px] md:h-[260px] rounded-full flex items-center justify-center"
+        style={{
+          backgroundImage: `url('/image.png')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      >
+        <Link to="/profile" className="no-underline relative z-10">
+          <Avatar className="w-[165px] h-[165px] md:w-[200px] md:h-[200px] overflow-visible relative">
+            <AvatarImage
+              src={avatarImage}
+              alt={alias}
+              className="object-contain scale-[1.12] relative z-10"
+            />
+            <AvatarFallback className="bg-transparent border-none text-white text-3xl md:text-4xl font-bold">
+              {alias.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </Link>
 
-        <div className="flex flex-col items-center py-6"> 
-        {/* Moon background (bigger size like your reference) */}
-        <div
-          className="relative w-[210px] h-[210px] md:w-[260px] md:h-[260px] rounded-full flex items-center justify-center"
+        {/* Username / Alias */}
+        <h2
+          className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-white font-extrabold
+            text-2xl md:text-4xl whitespace-nowrap max-w-[180px] md:max-w-[230px] text-center"
           style={{
-            backgroundImage: `url('/image.png')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
+            textShadow: '0 0 8px rgba(255,255,255,0.7), 0 0 12px rgba(255,255,255,0.4)',
           }}
         >
-          <Link to="/profile" className="no-underline">
-            {/* Bigger avatar so hair is NOT cut off */}
-            <Avatar className="w-[165px] h-[165px] md:w-[200px] md:h-[200px] overflow-visible">
-              <AvatarImage
-                src={avatarImage}
-                alt={alias}
-                className="object-contain scale-[1.12]" // lifts hair out of clipping
-              />
-              <AvatarFallback className="bg-transparent border-none text-white text-3xl md:text-4xl font-bold">
-                {alias.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-          </Link>
-
-          {/* Presence indicator - repositioned for larger avatar */}
-          <div className="absolute bottom-[60px] right-[28px] md:bottom-[72px] md:right-[34px] 
-            w-6 h-6 md:w-7 md:h-7 bg-green-500 rounded-full 
-            border-4 border-green-800 shadow-lg"></div>
-
-          {/* Username */}
-          <h2 className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 
-            text-white font-extrabold text-xl md:text-2xl whitespace-nowrap truncate 
-            max-w-[180px] md:max-w-[230px] text-center">
-            {alias}
-          </h2>
-        </div>
-        </div>
-
-
-
+          {alias
+            .split(/[\s-_]+/) // split by space, dash, or underscore
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ')}
+        </h2>
+      </div>
+    </div>
         {/* Play Button */}
         <div className="pb-3 relative">
           <Button
