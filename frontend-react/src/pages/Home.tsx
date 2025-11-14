@@ -465,36 +465,45 @@ export default function Home() {
           </Card>
         )}
 
-        <div className="flex flex-col items-center py-6">
-          {/* Wrapper with moon.jpg background */}
-          <div
-            className="relative w-[180px] h-[180px] md:w-52 md:h-52 rounded-full flex items-center justify-center"
-            style={{
-              backgroundImage: `url('/image.png')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-            }}
-          >
-            <Link to="/profile" className="no-underline">
-              <Avatar className="w-[145px] h-[145px] md:w-44 md:h-44">
-                <AvatarImage src={avatarImage} alt={alias} />
-                <AvatarFallback className="bg-transparent border-none text-white text-3xl md:text-4xl font-bold">
-                  {alias.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            </Link>
+        <div className="flex flex-col items-center py-6"> 
+  {/* Moon background (bigger size like your reference) */}
+  <div
+    className="relative w-[210px] h-[210px] md:w-[260px] md:h-[260px] rounded-full flex items-center justify-center"
+    style={{
+      backgroundImage: `url('/image.png')`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+    }}
+  >
+    <Link to="/profile" className="no-underline">
+      {/* Bigger avatar so hair is NOT cut off */}
+      <Avatar className="w-[165px] h-[165px] md:w-[200px] md:h-[200px] overflow-visible">
+        <AvatarImage
+          src={avatarImage}
+          alt={alias}
+          className="object-contain scale-[1.12]" // lifts hair out of clipping
+        />
+        <AvatarFallback className="bg-transparent border-none text-white text-3xl md:text-4xl font-bold">
+          {alias.charAt(0).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+    </Link>
 
-            {/* Presence indicator dot - positioned on shoulder area */}
-            <div className="absolute bottom-[52px] right-[20px] md:bottom-16 md:right-7 w-6 h-6 md:w-7 md:h-7 bg-green-500 rounded-full 
-            border-4 border-green-800 shadow-lg"></div>
+    {/* Presence indicator - repositioned for larger avatar */}
+    <div className="absolute bottom-[60px] right-[28px] md:bottom-[72px] md:right-[34px] 
+      w-6 h-6 md:w-7 md:h-7 bg-green-500 rounded-full 
+      border-4 border-green-800 shadow-lg"></div>
 
-            {/* Alias at bottom edge of avatar circle */}
-            <h2 className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 text-white font-extrabold text-xl md:text-2xl whitespace-nowrap truncate max-w-[160px] md:max-w-[200px] text-center">
-              {alias}
-            </h2>
-          </div>
-        </div>
+    {/* Username */}
+    <h2 className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 
+      text-white font-extrabold text-xl md:text-2xl whitespace-nowrap truncate 
+      max-w-[180px] md:max-w-[230px] text-center">
+      {alias}
+    </h2>
+  </div>
+</div>
+
 
 
         {/* Play Button */}
