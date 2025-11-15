@@ -5,7 +5,10 @@ const authenticateToken = require("../middleware/auth");
 
 const router = express.Router();
 
-// Helper function to calculate the start date for aggregation
+/**
+ * Helper function to calculate the start date for the leaderboard aggregation,
+ * based on the requested period ('day', 'week', 'month', 'year').
+ */
 const getStartDate = (period) => {
     const now = new Date();
     let startDate = new Date(now);
@@ -15,11 +18,13 @@ const getStartDate = (period) => {
 
     switch (period) {
         case 'day':
+            // startDate is already set to the start of today
             break;
         case 'week':
             // Using Monday (1) as the start of the week
             const dayOfWeek = now.getDay(); // 0 is Sunday, 1 is Monday...
-            const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Days to subtract to get Monday
+            // Calculate days to subtract to get to Monday (or the day before if today is Sunday)
+            const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; 
             startDate.setDate(now.getDate() - diff);
             startDate.setHours(0, 0, 0, 0);
             break;
@@ -34,7 +39,7 @@ const getStartDate = (period) => {
             startDate.setHours(0, 0, 0, 0);
             break;
         default:
-            return null;
+            return null; // Invalid period
     }
     return startDate;
 };
@@ -50,7 +55,16 @@ router.get("/", authenticateToken, async (req, res) => {
     }
 
     try {
+        // --- Aggregation Pipeline ---
         const pipeline = [
+            // 1. Filter ledger entries by the start date of the period
+            {
+                $match: {
+                    // Only include entries after the start date
+                    timestamp: { $gte: startDate } 
+                }
+            },
+            // 2. Group by userId and sum the points
             {
                 $group: {
                     _id: "$userId",
@@ -81,14 +95,15 @@ router.get("/", authenticateToken, async (req, res) => {
                     preserveNullAndEmptyArrays: false // Only include users found
                 }
             },
-            // 7. Project the final required structure
+            // 7. Project the final required structure, including avatarUrl
             {
                 $project: {
                     _id: 0,
                     userId: "$_id",
                     totalPoints: 1,
-                    username: "$userDetails.alias", // Use the alias field for the display name
-                    level: "$userDetails.level"
+                    username: "$userDetails.alias", 
+                    level: "$userDetails.level",
+                    avatarUrl: "$userDetails.avatarUrl" 
                 }
             }
         ];
