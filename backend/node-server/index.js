@@ -66,6 +66,8 @@ app.use("/api/getImageUrl", require("./routes/getImageUrl"));
 //Sources
 app.use("/api/DBpedia", require("./routes/DBpedia")); 
 
+app.use("/api/leaderboard", require("./routes/leaderboard"));
+
 // Admin APIs
 app.use("/api/admin/categories", require("./routes/admin/getAllCategories"));
 app.use("/api/admin/categories", require("./routes/admin/getCategoryQuestions"));
