@@ -20,7 +20,7 @@ import Confetti from "react-confetti";
 const KNOWLEDGE_GAIN_SOUND_SRC = "/knowledge-point.mp3"; 
 const LEVEL_UP_SOUND_SRC = "/player-level-up.mp3";
 
-const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 interface QuizResultsProps {
   results: {

@@ -1,15 +1,22 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Clock } from "lucide-react"; 
-// Assuming the following files are correct relative paths in your project
+import { Clock } from "lucide-react";
+import { apiClient } from "@/utils/apiClient";
+
+// Avatar imports
 import avatar1 from '../assets/images/avatars/1.png';
 import avatar2 from '../assets/images/avatars/2.png';
 import avatar3 from '../assets/images/avatars/3.png';
 import avatar4 from '../assets/images/avatars/4.png';
 import avatar5 from '../assets/images/avatars/5.png';
 
-// --- ADDED BASE_URL ---
 const BASE_URL = import.meta.env.VITE_BASE_URL;
-// ----------------------
+
+// Get all avatars into an array
+const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
+  eager: true,
+  import: "default",
+});
+const avatars: string[] = Object.values(avatarImages) as string[];
 
 // Define the expected structure of a single player item from the API
 interface LeaderboardPlayer {
@@ -17,6 +24,7 @@ interface LeaderboardPlayer {
   username: string;
   totalPoints: number;
   level: number;
+  avatarUrl?: string;
 }
 
 // Map for period display names and API values
@@ -32,9 +40,8 @@ const Leaderboard = () => {
   const [currentPeriod, setCurrentPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardPlayer[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // NOTE: You must replace this with the actual authenticated user's ID
-  const currentUserId = "5f8d07..."; // Placeholder for the logged-in user's ID
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [userAvatar, setUserAvatar] = useState<number>(1);
 
   const avatarMap = useMemo(() => ({
     1: avatar1,
@@ -44,12 +51,26 @@ const Leaderboard = () => {
     5: avatar5, 
   }), []);
 
-  // --- API FETCH LOGIC ---
+  // Get current user ID and avatar from localStorage
+  useEffect(() => {
+    const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setCurrentUserId(parsedUser._id || "");
+        setUserAvatar(parsedUser.avatar || 1);
+      } catch (e) {
+        console.error("Failed to parse user data:", e);
+      }
+    }
+  }, []);
+
+  // Fetch leaderboard data
   useEffect(() => {
     const fetchLeaderboard = async () => {
       setLoading(true);
       
-      const token = localStorage.getItem('userToken'); 
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       if (!token) {
         console.error("Authentication token not found.");
         setLoading(false);
@@ -59,19 +80,23 @@ const Leaderboard = () => {
       const apiUrl = `${BASE_URL}/api/leaderboard?period=${currentPeriod}`;
 
       try {
-        const response = await fetch(apiUrl, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+        const response = await apiClient(apiUrl, {
+          method: "GET",
         });
+
+        if (!response) {
+          setLoading(false);
+          return;
+        }
         
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`HTTP error! status: ${response.status}`, errorText);
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
-        setLeaderboardData(data.leaderboard);
+        setLeaderboardData(data.leaderboard || []);
 
       } catch (error) {
         console.error("Error fetching leaderboard data:", error);
@@ -84,11 +109,22 @@ const Leaderboard = () => {
     fetchLeaderboard();
   }, [currentPeriod]); 
 
-  // Helper to determine the avatar source (simple circular assignment)
-  const getAvatarSource = (index: number) => {
-    const avatarKeys = Object.keys(avatarMap);
-    const key = (index % avatarKeys.length) + 1;
-    return avatarMap[key as keyof typeof avatarMap];
+  // Helper to get the user's actual avatar from their avatar number
+  const getPlayerAvatar = (player: LeaderboardPlayer, isCurrentUser: boolean) => {
+    // If it's the current user, use their actual avatar from state
+    if (isCurrentUser && userAvatar) {
+      const avatarIndex = userAvatar - 1;
+      return avatars[avatarIndex] || avatars[0];
+    }
+    
+    // For other players, try to use avatarUrl from backend if available
+    // Otherwise fall back to avatar number pattern
+    if (player.avatarUrl) {
+      return player.avatarUrl;
+    }
+    
+    // Fallback: use a default avatar based on ranking (for demo purposes)
+    return avatarMap[(((leaderboardData.indexOf(player) + 1) % 5) + 1) as keyof typeof avatarMap];
   };
 
   return (
@@ -105,7 +141,6 @@ const Leaderboard = () => {
         bg-fixed
       "
     >
-
       {/* Top spacing */}
       <div className="pt-5 lg:pt-10"></div>
 
@@ -129,7 +164,7 @@ const Leaderboard = () => {
       </div>
 
       {/* Title + Timer */}
-      <div className="text-center "> 
+      <div className="text-center"> 
         <h1
           className="text-5xl font-bold text-purple-200 drop-shadow-lg"
           style={{ fontFamily: "Georgia, serif" }}
@@ -158,98 +193,105 @@ const Leaderboard = () => {
       {/* Leaderboard List */}
       <div className="w-full max-w-2xl rounded-xl bg-purple-900/55 shadow-md overflow-hidden -mt-8">
         {loading ? (
-            <div className="p-8 text-center text-purple-200">Loading Leaderboard...</div>
+          <div className="p-8 text-center text-purple-200">
+            <div className="flex items-center justify-center space-x-2">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-200"></div>
+              <span>Loading Leaderboard...</span>
+            </div>
+          </div>
         ) : leaderboardData.length === 0 ? (
-            <div className="p-8 text-center text-purple-200">No players found for this period.</div>
+          <div className="p-8 text-center text-purple-200">
+            No players found for this period.
+          </div>
         ) : (
-            leaderboardData.map((player, index) => {
-              const rank = index + 1;
-              const isCurrentUser = player.userId === currentUserId; // Highlight the logged-in player
-              
-              return (
-                <div
-                  key={player.userId}
-                  className={`
-                    flex items-center gap-4 px-4 py-3 transition-all duration-500
-                    ${isCurrentUser ? "bg-green-300/50 scale-[1.02]" : "bg-transparent"}
-                    ${index < leaderboardData.length - 1 ? "border-b border-purple-400" : ""}
-                  `}
-                >
-                  {/* Rank */}
-                  <div className="text-xl font-bold text-purple-200 w-10 text-center"> 
-                    {rank}
-                  </div>
+          leaderboardData.map((player, index) => {
+            const rank = index + 1;
+            const isCurrentUser = player.userId === currentUserId; 
+            
+            return (
+              <div
+                key={player.userId}
+                className={`
+                  flex items-center gap-4 px-4 py-3 transition-all duration-500
+                  ${isCurrentUser ? "bg-green-300/50 scale-[1.02]" : "bg-transparent"}
+                  ${index < leaderboardData.length - 1 ? "border-b border-purple-400" : ""}
+                `}
+              >
+                {/* Rank */}
+                <div className="text-xl font-bold text-purple-200 w-10 text-center"> 
+                  {rank}
+                </div>
 
-                  {/* Avatar */}
-                  <div className="relative flex-shrink-0"> 
-                    <img
-                      src={getAvatarSource(rank)} // Use dynamic avatar helper
-                      alt={`${player.username}'s avatar`}
-                      className="
-                        w-10 h-10 rounded-full object-cover 
-                        border border-gray-300/50 
-                      "
+                {/* Avatar */}
+                <div className="relative flex-shrink-0"> 
+                  <img
+                    src={getPlayerAvatar(player, isCurrentUser)}
+                    alt={`${player.username}'s avatar`}
+                    className="
+                      w-10 h-10 rounded-full object-cover 
+                      border border-gray-300/50 
+                    "
+                  />
+
+                  {/* Optional Badge (e.g., for Top 3) */}
+                  {(rank <= 3) && (
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full border-2 border-purple-900 flex items-center justify-center" />
+                  )}
+                </div>
+
+                {/* Name + Level */}
+                <div className="flex-1 flex flex-col justify-center"> 
+                  <div className="text-lg font-semibold text-purple-100">
+                    {player.username}
+                  </div>
+                  {player.level && (
+                    <div className="text-sm text-purple-300/70 -mt-0.5">
+                      Level: {player.level}
+                    </div>
+                  )}
+                </div>
+
+                {/* Score + Star */}
+                <div className="flex items-center gap-1"> 
+                  <span className="text-xl font-bold text-purple-100"> 
+                    {player.totalPoints}
+                  </span>
+
+                  {/* Star SVG (Wisdom Points Icon) */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 100 100"
+                    className="w-8 h-8"
+                  >
+                    <defs>
+                      <filter id="star-background-glow" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
+                        <feMerge>
+                          <feMergeNode in="blur" />
+                          <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                      </filter>
+                    </defs>
+
+                    {/* Background circle */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="30"
+                      fill="#e84c3d"
+                      filter="url(#star-background-glow)"
                     />
 
-                    {/* Optional Badge (e.g., for Top 3) */}
-                    {(rank <= 3) && (
-                       <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full border-2 border-purple-900 flex items-center justify-center" />
-                    )}
-                  </div>
-
-                  {/* Name + Level */}
-                  <div className="flex-1 flex flex-col justify-center"> 
-                    <div className="text-lg font-semibold text-purple-100">
-                      {player.username}
-                    </div>
-                    {player.level && (
-                      <div className="text-sm text-purple-300/70 -mt-0.5">
-                        Level: {player.level}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Score + Star */}
-                  <div className="flex items-center gap-1"> 
-                    <span className="text-xl font-bold text-purple-100"> 
-                      {player.totalPoints}
-                    </span>
-
-                    {/* Star SVG (Wisdom Points Icon) */}
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 100 100"
-                      className="w-8 h-8"
-                    >
-                      <defs>
-                        <filter id="star-background-glow" x="-50%" y="-50%" width="200%" height="200%">
-                          <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
-                          <feMerge>
-                            <feMergeNode in="blur" />
-                            <feMergeNode in="SourceGraphic" />
-                          </feMerge>
-                        </filter>
-                      </defs>
-
-                      {/* Background circle */}
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="30"
-                        fill="#e84c3d"
-                        filter="url(#star-background-glow)"
-                      />
-
-                      {/* Star */}
-                      <path
-                        fill="#f9a825"
-                        d="M50 28 L55.75 44.25 L74 46.35 L59.25 58.25 L61.7 73 L50 65.25 L38.3 73 L40.75 58.25 L26 46.35 L44.25 44.25 Z"
-                      />
-                    </svg>
-                  </div>
+                    {/* Star */}
+                    <path
+                      fill="#f9a825"
+                      d="M50 28 L55.75 44.25 L74 46.35 L59.25 58.25 L61.7 73 L50 65.25 L38.3 73 L40.75 58.25 L26 46.35 L44.25 44.25 Z"
+                    />
+                  </svg>
                 </div>
-              );
-            })
+              </div>
+            );
+          })
         )}
       </div>
     </div>
