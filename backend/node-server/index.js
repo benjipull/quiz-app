@@ -40,12 +40,21 @@ app.use("/api/getUserDetails", require("./routes/getUserDetails"));
 app.use("/api/updateUserDetails", require("./routes/updateUserDetails"));
 app.use("/api/users", require("./routes/users"));
 app.use("/api/interests", require("./routes/interestRoutes")); 
-app.use("/api/categories", require("./routes/categories")); 
-app.use("/api/my-categories", require("./routes/getUserCategories")); // Added in a previous step
-app.use("/api/startQuiz", require("./routes/startQuiz"));
-app.use("/api/nextQuestion", require("./routes/nextQuestion"));
-app.use("/api/answerQuestion", require("./routes/answerQuestion"));
-app.use("/api/recordCompletion", require("./routes/recordCompletion"));
+
+//Quiz
+app.use("/api/startQuiz", require("./routes/startQuiz")); 
+app.use("/api/getGetegoryToPlay", require("./routes/getGetegoryToPlay")); 
+
+//Categories
+app.use("/api/categories", require("./routes/createCategory"));
+app.use("/api/categories", require("./routes/getCategories"));
+app.use("/api/getUserCategories", require("./routes/getUserCategories"));
+app.use("/api/categories", require("./routes/recordCompletion")); 
+app.use("/api/categories", require("./routes/rateCategory")); 
+
+//Questions
+app.use("/api/nextQuestion", require("./routes/nextQuestion")); 
+app.use("/api/answerQuestion", require("./routes/answerQuestion")); 
 app.use("/api/updatePopularity", require("./routes/updatePopularity")); 
 app.use("/api/reportQuestion", require("./routes/reportQuestion")); 
 
@@ -57,7 +66,6 @@ app.use("/api/getImageUrl", require("./routes/getImageUrl"));
 //Sources
 app.use("/api/DBpedia", require("./routes/DBpedia")); 
 
-// Leaderboard <-- NEW ROUTE
 app.use("/api/leaderboard", require("./routes/leaderboard"));
 
 // Admin APIs
@@ -79,8 +87,10 @@ app.get("*", (req, res) => {
 // Protected Route (Requires Authentication)
 const authenticateToken = require("./middleware/auth");
 app.get("/api/users/protected", authenticateToken, (req, res) => {
-    res.json({ message: "Protected route accessed successfully." });
+    res.json({ message: "Protected route accessed", user: req.user });
 });
 
-
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+// Start Server
+app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+});
