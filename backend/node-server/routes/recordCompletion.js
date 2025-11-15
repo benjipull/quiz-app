@@ -2,7 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const Category = require("../models/categoryModel");
 const User = require("../models/user");
-const WisdomPointsLedger = require("../models/WisdomPointsLedger"); // <-- ADD THIS IMPORT
+const WisdomPointsLedger = require("../models/WisdomPointsLedger"); // <-- KEEP THIS IMPORT
 const authenticateToken = require("../middleware/auth");
 
 const router = express.Router();
