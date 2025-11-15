@@ -15,12 +15,11 @@ const getStartDate = (period) => {
 
     switch (period) {
         case 'day':
-            // Already set to the start of the current day
             break;
         case 'week':
-            // Set to the most recent Sunday (0) or Monday (1). Using Monday (1) standard here.
+            // Using Monday (1) as the start of the week
             const dayOfWeek = now.getDay(); // 0 is Sunday, 1 is Monday...
-            const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Correct for Monday start
+            const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Days to subtract to get Monday
             startDate.setDate(now.getDate() - diff);
             startDate.setHours(0, 0, 0, 0);
             break;
@@ -35,7 +34,7 @@ const getStartDate = (period) => {
             startDate.setHours(0, 0, 0, 0);
             break;
         default:
-            return null; // Invalid period
+            return null;
     }
     return startDate;
 };
@@ -52,13 +51,6 @@ router.get("/", authenticateToken, async (req, res) => {
 
     try {
         const pipeline = [
-            // 1. Filter by the calculated time period
-            {
-                $match: {
-                    timestamp: { $gte: startDate }
-                }
-            },
-            // 2. Group by user ID and sum the points
             {
                 $group: {
                     _id: "$userId",
@@ -76,7 +68,7 @@ router.get("/", authenticateToken, async (req, res) => {
             // 5. Join with the users collection to get player details
             {
                 $lookup: {
-                    from: "users", // Assuming your User model/collection name is 'users'
+                    from: "users", // Assumes your User model/collection name is 'users'
                     localField: "_id",
                     foreignField: "_id",
                     as: "userDetails"
@@ -97,7 +89,6 @@ router.get("/", authenticateToken, async (req, res) => {
                     totalPoints: 1,
                     username: "$userDetails.alias", // Use the alias field for the display name
                     level: "$userDetails.level"
-                    // Add other user fields like profile image URL if available
                 }
             }
         ];
