@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Clock } from "lucide-react";
 import { apiClient } from "@/utils/apiClient";
 
@@ -42,6 +42,16 @@ const Leaderboard = () => {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [userAvatar, setUserAvatar] = useState<number>(1);
+  
+  // STATE: To track the user's previous rank for animation
+  const [previousLeaderboardData, setPreviousLeaderboardData] = useState<LeaderboardPlayer[]>([]);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [animatingUserId, setAnimatingUserId] = useState<string | null>(null);
+  const [translateY, setTranslateY] = useState(0);
+  
+  // REF: For auto-scrolling to the current user's position
+  const currentUserRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const avatarMap = useMemo(() => ({
     1: avatar1,
@@ -78,6 +88,11 @@ const Leaderboard = () => {
       }
       
       const apiUrl = `${BASE_URL}/api/leaderboard?period=${currentPeriod}`;
+      
+      // Save the current data as "previous" before fetching new data
+      if (leaderboardData.length > 0) {
+        setPreviousLeaderboardData(leaderboardData);
+      }
 
       try {
         const response = await apiClient(apiUrl, {
@@ -108,6 +123,97 @@ const Leaderboard = () => {
 
     fetchLeaderboard();
   }, [currentPeriod]); 
+  
+  // Animate rank change when data loads
+  useEffect(() => {
+    if (loading || previousLeaderboardData.length === 0 || leaderboardData.length === 0 || !currentUserId) {
+      // If no previous data or still loading, just scroll to user
+      if (!loading && leaderboardData.length > 0 && currentUserRef.current) {
+        setTimeout(() => {
+          currentUserRef.current?.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+        }, 300);
+      }
+      return;
+    }
+
+    const previousIndex = previousLeaderboardData.findIndex(p => p.userId === currentUserId);
+    const currentIndex = leaderboardData.findIndex(p => p.userId === currentUserId);
+
+    if (previousIndex === -1 || currentIndex === -1 || previousIndex === currentIndex) {
+      // No rank change or user not found - just scroll to position
+      setTimeout(() => {
+        currentUserRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 300);
+      return;
+    }
+
+    // Calculate the distance to move (in row heights)
+    const rankDifference = previousIndex - currentIndex;
+    const rowHeight = 60; // Approximate height of each row in pixels
+    const distance = rankDifference * rowHeight;
+
+    // Start animation
+    setIsAnimating(true);
+    setAnimatingUserId(currentUserId);
+    setTranslateY(-distance);
+
+    // Scroll to show the animation path
+    setTimeout(() => {
+      const middleRank = Math.floor((previousIndex + currentIndex) / 2);
+      const middleElement = containerRef.current?.children[middleRank] as HTMLElement;
+      if (middleElement) {
+        middleElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+
+    // Complete animation
+    const animationDuration = Math.abs(rankDifference) * 400; // 400ms per rank
+    setTimeout(() => {
+      setTranslateY(0);
+      setIsAnimating(false);
+      setAnimatingUserId(null);
+      
+      // Scroll to final position
+      setTimeout(() => {
+        currentUserRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 600);
+    }, animationDuration);
+
+  }, [leaderboardData, loading, currentUserId]);
+  
+  // Helper function: Calculates if the user moved up or down
+  const getRankChange = (player: LeaderboardPlayer, currentRank: number) => {
+    // Only calculate if there was previous data
+    if (previousLeaderboardData.length === 0) {
+        return 'new'; 
+    }
+    
+    // Find the player's previous rank
+    const previousIndex = previousLeaderboardData.findIndex(p => p.userId === player.userId);
+    
+    if (previousIndex === -1) {
+        return 'new'; // Player wasn't in the previous list
+    }
+    
+    const previousRank = previousIndex + 1;
+
+    if (currentRank < previousRank) {
+      return 'up';
+    } else if (currentRank > previousRank) {
+      return 'down';
+    } else {
+      return 'same';
+    }
+  };
 
   // Helper to get the user's actual avatar from their avatar number
   const getPlayerAvatar = (player: LeaderboardPlayer, isCurrentUser: boolean) => {
@@ -118,7 +224,6 @@ const Leaderboard = () => {
     }
     
     // For other players, try to use avatarUrl from backend if available
-    // Otherwise fall back to avatar number pattern
     if (player.avatarUrl) {
       return player.avatarUrl;
     }
@@ -141,6 +246,41 @@ const Leaderboard = () => {
         bg-fixed
       "
     >
+      {/* CSS Keyframes for Rank Change Animation */}
+      <style>{`
+        @keyframes glow-pulse {
+          0%, 100% { 
+            box-shadow: 0 0 20px rgba(76, 209, 55, 0.6);
+          }
+          50% { 
+            box-shadow: 0 0 40px rgba(76, 209, 55, 0.9);
+          }
+        }
+
+        @keyframes glow-pulse-down {
+          0%, 100% { 
+            box-shadow: 0 0 20px rgba(255, 82, 82, 0.6);
+          }
+          50% { 
+            box-shadow: 0 0 40px rgba(255, 82, 82, 0.9);
+          }
+        }
+
+        .animating-row {
+          position: relative;
+          z-index: 50;
+          transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glow-up {
+          animation: glow-pulse 0.8s ease-in-out infinite;
+        }
+
+        .glow-down {
+          animation: glow-pulse-down 0.8s ease-in-out infinite;
+        }
+      `}</style>
+        
       {/* Top spacing */}
       <div className="pt-5 lg:pt-10"></div>
 
@@ -191,7 +331,10 @@ const Leaderboard = () => {
       </div>
 
       {/* Leaderboard List */}
-      <div className="w-full max-w-2xl rounded-xl bg-purple-900/55 shadow-md overflow-hidden -mt-8">
+      <div 
+        ref={containerRef}
+        className="w-full max-w-2xl rounded-xl bg-purple-900/55 shadow-md overflow-hidden -mt-8"
+      >
         {loading ? (
           <div className="p-8 text-center text-purple-200">
             <div className="flex items-center justify-center space-x-2">
@@ -207,18 +350,39 @@ const Leaderboard = () => {
           leaderboardData.map((player, index) => {
             const rank = index + 1;
             const isCurrentUser = player.userId === currentUserId; 
+            const rankChange = isCurrentUser ? getRankChange(player, rank) : null;
+            const isAnimatingThis = isAnimating && animatingUserId === player.userId;
             
             return (
               <div
                 key={player.userId}
+                ref={isCurrentUser ? currentUserRef : null} // Attach ref for scrolling
                 className={`
-                  flex items-center gap-4 px-4 py-3 transition-all duration-500
-                  ${isCurrentUser ? "bg-green-300/50 scale-[1.02]" : "bg-transparent"}
+                  flex items-center gap-4 px-4 py-3 transition-all duration-300
+                  ${isCurrentUser ? "bg-green-300/50 rounded-lg" : "bg-transparent"}
                   ${index < leaderboardData.length - 1 ? "border-b border-purple-400" : ""}
+                  ${isAnimatingThis ? "animating-row" : ""}
+                  ${isAnimatingThis && rankChange === 'up' ? "glow-up" : ""}
+                  ${isAnimatingThis && rankChange === 'down' ? "glow-down" : ""}
                 `}
+                style={{
+                  transform: isAnimatingThis ? `translateY(${translateY}px)` : 'translateY(0)',
+                }}
               >
-                {/* Rank */}
-                <div className="text-xl font-bold text-purple-200 w-10 text-center"> 
+                {/* Rank + Indicator (REFINED STYLING) */}
+                <div className="text-xl font-bold text-purple-200 w-10 text-center flex items-center justify-center gap-0.5"> 
+                  
+                  {/* Rank Change Indicator (Up/Down Arrow) */}
+                  {isCurrentUser && !isAnimating && rankChange === 'down' && (
+                      // Red triangle for moving down
+                      <span className="text-red-400 text-base font-extrabold -mt-1">▼</span> 
+                  )}
+                  {isCurrentUser && !isAnimating && rankChange === 'up' && (
+                      // Green triangle for moving up
+                      <span className="text-green-400 text-base font-extrabold -mt-1">▲</span>
+                  )}
+                  
+                  {/* Rank Number */}
                   {rank}
                 </div>
 
@@ -270,7 +434,7 @@ const Leaderboard = () => {
                           <feMergeNode in="blur" />
                           <feMergeNode in="SourceGraphic" />
                         </feMerge>
-                      </filter>
+                        </filter>
                     </defs>
 
                     {/* Background circle */}
