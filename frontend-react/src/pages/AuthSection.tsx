@@ -326,7 +326,8 @@ const AuthSection = () => {
             <Button
                 type="button"
                 onClick={handleGuestLogin}
-                className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white border-0 shadow-lg shadow-blue-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-blue-500/40"
+                variant="blue"
+                className="w-full h-14 text-lg font-semibold text-white"
                 disabled={isLoading}
             >
                 <div className="flex items-center justify-center gap-3">
@@ -350,8 +351,7 @@ const AuthSection = () => {
                     setShowAuthOptions(false);
                     setAuthMode('signup');
                 }}
-                className="w-full h-12 font-semibold bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white border-0 shadow-md transition-all duration-300 hover:scale-105"
-                disabled={isLoading}
+                className="w-full h-12 font-semibold"
             >
                 <div className="flex items-center justify-center gap-2">
                     <Trophy className="h-5 w-5" />
@@ -367,7 +367,7 @@ const AuthSection = () => {
                         setShowAuthOptions(false);
                         setAuthMode('login');
                     }}
-                    className="text-blue-400 hover:text-blue-300 font-medium transition-colors underline-offset-4 hover:underline"
+                    className="text-purple-400 hover:text-purple-300 font-medium transition-colors underline-offset-4 hover:underline"
                 >
                     Sign In
                 </button>

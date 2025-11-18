@@ -84,7 +84,7 @@ const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmTe
       <p className="text-sm text-muted-foreground">{description}</p>
       <div className="flex justify-end gap-3">
         <Button variant="outline" onClick={onCancel}>{cancelText}</Button>
-        <Button variant="destructive" onClick={onConfirm}>{confirmText}</Button>
+        <Button variant="warning" className="text-white" onClick={onConfirm}>{confirmText}</Button>
       </div>
     </Card>
   </div>
@@ -211,7 +211,7 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
             )}
 
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" className="text-red-500 border-red-600 hover:bg-red-600"
+              <Button variant="outline" className="text-red-500 border-red-600 hover:bg-red-600 hover:text-white"
                 onClick={onClose} disabled={isSubmitting}>Cancel</Button>
               <Button
                 variant="default"
@@ -1029,10 +1029,10 @@ export default function Quiz() {
           <div className="px-2 py-2 md:py-4 max-w-full mx-auto">
             <div className="flex items-center justify-between gap-2 mb-3">
               <Button
-                variant="ghost"
+                variant="purple"
                 size="sm"
                 onClick={handleBackNavigation}
-                className="flex items-center gap-1 hover:bg-purple-500/30 text-purple-100 text-sm md:text-base px-2 py-1 flex-shrink-0 min-w-0"
+                className="flex items-center gap-1 hover:bg-blue-800 text-purple-100 text-sm md:text-base px-2 py-1 flex-shrink-0 min-w-0"
               >
                 <ArrowLeft className="h-4 w-4 flex-shrink-0" />
                 <span className="hidden sm:inline truncate">Back</span>
@@ -1079,48 +1079,59 @@ export default function Quiz() {
         <div className="flex-1 overflow-y-auto px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-4xl">
           <div className="space-y-6">
             <div className="px-1 py-3 md:py-6 text-center">
-              <h2 className="text-xl md:text-2xl lg:text-4xl font-bold text-white leading-relaxed drop-shadow-lg">
+              <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-white leading-relaxed drop-shadow-lg">
                 {quizState.question?.question}
               </h2>
             </div>
 
             <div className="space-y-4">
-              {quizState.question?.answers.map((answer, index) => (
-                <Card
-                  key={index}
-                  className={`p-5 md:p-6 transition-all duration-300 ${getOptionStyle(answer)} relative overflow-hidden cursor-pointer`}
-                  onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
-                  style={{ 
-                    borderRadius: '1.5rem',
-                    ...getInitialOptionAuraStyle(answer) // Applied the aura/glow style here
-                  }}
-                >
-                  {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
-                    <div
-                      className={`absolute top-0 left-0 h-full animate-bar-fill rounded-l-3xl ${answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
-                          ? 'bg-green-500/30 border-r-4 border-green-400'
-                          : answer === selectedAnswer
-                            ? 'bg-red-500/30 border-r-4 border-red-400'
-                            : 'bg-purple-400/20'
-                        }`}
-                      style={{
-                        '--target-width': `${getAnswerPercentage(answer)}%`,
-                        animationDelay: `${index * 150}ms`,
-                        animationDuration: '0.8s'
-                      } as React.CSSProperties}
-                    />
-                  )}
+      {quizState.question?.answers.map((answer, index) => {
+        // Calculate font size based on answer length
+        const getFontSize = (text: string) => {
+          const length = text.length;
+          if (length > 60) return 'text-xs md:text-base';
+          if (length > 45) return 'text-sm md:text-lg';
+          if (length > 30) return 'text-sm md:text-xl';
+          return 'text-base md:text-xl';
+        };
 
-                  <div className="flex items-center gap-3 relative z-10">
-                    <div className="flex-1 min-w-0 flex items-center justify-between">
-                      <span className={`text-base md:text-xl leading-snug break-words w-full font-semibold text-left text-white`}>
-                        {answer}
-                      </span>
-                    </div>
-                  </div>
-                </Card>
-              ))}
+        return (
+          <Card
+            key={index}
+            className={`p-5 md:p-6 transition-all duration-300 ${getOptionStyle(answer)} relative overflow-hidden cursor-pointer`}
+            onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
+            style={{ 
+              borderRadius: '1.5rem',
+              ...getInitialOptionAuraStyle(answer)
+            }}
+          >
+            {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
+              <div
+                className={`absolute top-0 left-0 h-full animate-bar-fill rounded-l-3xl ${answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
+                    ? 'bg-green-500/30 border-r-4 border-green-400'
+                    : answer === selectedAnswer
+                      ? 'bg-red-500/30 border-r-4 border-red-400'
+                      : 'bg-purple-400/20'
+                  }`}
+                style={{
+                  '--target-width': `${getAnswerPercentage(answer)}%`,
+                  animationDelay: `${index * 150}ms`,
+                  animationDuration: '0.8s'
+                } as React.CSSProperties}
+              />
+            )}
+
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="flex-1 min-w-0 flex items-center justify-between">
+              <span className={`${getFontSize(answer)} leading-tight break-words w-full font-semibold text-left text-white`}>
+                {answer}
+              </span>
             </div>
+          </div>
+        </Card>
+      );
+    })}
+  </div>
 
             {timeUp && (
               <div ref={explanationRef}>
@@ -1153,14 +1164,8 @@ export default function Quiz() {
             )}
             {showExplanation && !timeUp && answerResponse && (
               <div ref={explanationRef}>
-                <Card className="p-6 md:p-8  animate-slide-up border-2 border-purple-400 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
+                <Card className="p-4 md:p-6  animate-slide-up border-2 border-purple-400 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
                   <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <Lightbulb className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-yellow-400 flex-shrink-0" />
-                      <span className="font-semibold text-purple-100 text-base md:text-lg lg:text-xl">
-                        {answerResponse.isCorrect ? "Correct!" : "Incorrect!"}
-                      </span>
-                    </div>
                     <p className="text-sm md:text-base text-white leading-relaxed">
                       {answerResponse.explanation}
                     </p>
@@ -1218,11 +1223,9 @@ export default function Quiz() {
                   </Card>
 
                   <Button
-                    size="lg"
-                    className="w-full h-14 md:h-16 text-base md:text-lg text-white font-bold border-0"
+                    className="w-full h-14 md:h-16 text-base md:text-lg text-white font-bold"
                     onClick={handleNextQuestion}
                     disabled={isCompletingQuiz}
-                    style={{ borderRadius: '1rem' }}
                   >
                     {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
                   </Button>

@@ -2,6 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const Category = require("../models/categoryModel");
 const User = require("../models/user");
+const WisdomPointsLedger = require("../models/WisdomPointsLedger"); // <-- KEEP THIS IMPORT
 const authenticateToken = require("../middleware/auth");
 
 const router = express.Router();
@@ -39,6 +40,19 @@ router.post("/:categoryId/completion", authenticateToken, async (req, res) => {
 
         // ✅ Calculate knowledge gained (exponential reward)
         const knowledgePointsEarned = Math.floor(Math.pow(correctAnswers, 1.2) * 5);
+
+        // --- NEW LEDGER ENTRY LOGIC START ---
+        if (knowledgePointsEarned > 0) {
+            const newLedgerEntry = new WisdomPointsLedger({
+                userId: userId, // User ID from auth middleware
+                points: knowledgePointsEarned,
+                source: 'quiz-completion'
+                // timestamp defaults to Date.now()
+            });
+            await newLedgerEntry.save();
+            console.log(`✨ Recorded ${knowledgePointsEarned} wisdom points for user ${userId}`);
+        }
+        // --- NEW LEDGER ENTRY LOGIC END ---
 
         // ✅ Track previous level
         const previousLevel = user.level;

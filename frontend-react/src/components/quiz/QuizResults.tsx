@@ -20,7 +20,7 @@ import Confetti from "react-confetti";
 const KNOWLEDGE_GAIN_SOUND_SRC = "/knowledge-point.mp3"; 
 const LEVEL_UP_SOUND_SRC = "/player-level-up.mp3";
 
-const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 interface QuizResultsProps {
   results: {
@@ -53,10 +53,10 @@ const getPerformanceData = (percentage: number) => {
     };
   } else if (score >= 90) {
     return {
-      message: "Nearly Perfect!",
+    message: "Outstanding Performance!",
       rank: "DIAMOND",
       icon: <Trophy className="h-8 w-8" />,
-      rankColor: "text-cyan-500",
+      rankColor: "text-blue-400",
     };
   } else if (score >= 80) {
     return {
@@ -89,6 +89,21 @@ const getPerformanceData = (percentage: number) => {
   }
 };
 
+// Extracted Knowledge Point Icon SVG for reuse
+const KnowledgePointIcon = ({ className }: { className: string }) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+    >
+      <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
+      <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
+      <circle cx="12" cy="9" r="2" fill="#fff" />
+    </svg>
+);
+
+
 export default function QuizResults({ results, onPlayAgain, onClose }: QuizResultsProps) {
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
@@ -117,7 +132,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [animatedScore, setAnimatedScore] = useState(0);
   const [animatedKnowledge, setAnimatedKnowledge] = useState(0);
   const [animatedTotalXP, setAnimatedTotalXP] = useState(totalKnowledge - knowledgeGained);
-  const [showPointsCenter, setShowPointsCenter] = useState(true);
+  const [showXPOverlay, setShowXPOverlay] = useState(true); 
   const [showFlyingTokens, setShowFlyingTokens] = useState(false);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [tokens, setTokens] = useState<Array<{id: number; delay: number}>>([]);
@@ -134,7 +149,16 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   );
 
   useEffect(() => {
+    // Scroll to top when the component mounts
+    if (typeof window !== "undefined") {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    }
+    
     setMounted(true);
+    // Setup for dynamic window size tracking, essential for the Confetti component
     const updateSize = () => {
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
     };
@@ -172,8 +196,13 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           clearInterval(interval);
           
           setTimeout(() => {
-            setShowPointsCenter(false);
             startTokenAnimation();
+            
+            // Hide the entire XP overlay after the tokens have flown away
+            setTimeout(() => {
+                setShowXPOverlay(false);
+            }, 1800);
+
           }, 800);
         }
         setAnimatedKnowledge(count);
@@ -344,10 +373,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center p-2 sm:p-4 font-sans bg-gradient-to-br from-[#100221] via-[#4f187a] to-[#380d67] overflow-y-auto">
+    <div className="h-screen w-full z-50 flex flex-col items-center p-2 sm:p-4 font-sans bg-gradient-to-br from-[#100221] via-[#4f187a] to-[#380d67] overflow-hidden">
       
-      {/* Header with Stats */}
-      <div className="w-full max-w-lg mb-3 animate-fade-in-down">
+      {/* Header with Stats (The XP target) */}
+      <div className="w-full max-w-lg flex-shrink-0 animate-fade-in-down">
         <div className="flex items-center justify-between p-2 sm:p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 backdrop-blur-sm">
           {/* Stat Item: Coins */}
           <div className="flex items-center gap-1 sm:gap-1.5">
@@ -374,16 +403,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
            {/* Stat Item - XP - TARGET FOR TOKENS */}
            <div ref={headerXPRef} className="flex items-center gap-1 sm:gap-1.5 relative">
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center transition-all duration-300">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="h-4 w-4 text-amber-500"
-              >
-                <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
-                <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
-                <circle cx="12" cy="9" r="2" fill="#fff" />
-              </svg>
+              <KnowledgePointIcon className="h-4 w-4 text-amber-500" />
             </div>
             <div>
               <div className="text-sm sm:text-base font-bold text-yellow-400 tabular-nums">{animatedTotalXP}</div>
@@ -446,17 +466,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         />
       )}
 
-      {/* Flying Tokens - Enhanced animation */}
-      {showFlyingTokens && tokens.map((token) => (
-        <div
-          key={token.id}
-          className="token"
-          style={{
-            '--token-delay': `${token.delay}ms`,
-          } as any}
-        />
-      ))}
-
       {/* Level Up Modal */}
       {showLevelUp && hasLeveledUp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
@@ -477,9 +486,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 </div>
               </div>
               <Button
-                onClick={() => setShowLevelUp(false)}
-                className="bg-white text-purple-600 hover:bg-purple-50 font-black px-6 py-2 text-md"
-              >
+              variant="default"
+                onClick={() => setShowLevelUp(false)} >
                 AWESOME!
               </Button>
             </div>
@@ -487,9 +495,9 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </div>
       )}
 
-      {/* Main Results Card Container */}
-      <div className="relative z-10 w-full max-w-lg mx-auto pb-6 sm:pb-0">
-        <Card className="relative overflow-hidden bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in">
+      {/* Main Results Card Container - Takes remaining space */}
+      <div className="relative z-10 w-full max-w-lg mx-auto flex-1 flex flex-col min-h-0 mt-3">
+        <Card className="relative overflow-hidden bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in flex-1 flex flex-col">
           
           {/* Close Button */}
           <Link
@@ -501,8 +509,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             <X className="h-5 w-5 text-white" />
           </Link>
           
-          {/* Content Wrapper */}
-          <div className="relative z-10 p-4 sm:p-6 space-y-4 sm:space-y-5">
+          {/* Content Wrapper - Scrollable */}
+          <div className="relative z-10 p-4 sm:p-6 space-y-4 sm:space-y-5 flex-1 overflow-y-auto">
             
             {/* Header */}
             <div className="text-center space-y-2 sm:space-y-3 animate-fade-in-up">
@@ -515,158 +523,175 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               </h1>
             </div>
 
-            {/* Center Content - Points Earned or Results */}
-            {showPointsCenter ? (
-              <div ref={earnedPointsRef} className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in">
+            {/* Results Content */}
+            <div className="space-y-3 sm:space-y-4 animate-fade-in pt-8">
+              {/* Results Grid */}
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                {/* Correct/Incorrect */}
+                <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4">
+                  <div className="text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-2">Result</div>
+                  <div className="space-y-2 sm:space-y-2">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
+                      <div>
+                        <div className="text-xl sm:text-2xl font-black text-emerald-400">{correctAnswers}</div>
+                        <div className="text-xs text-emerald-500/70">CORRECT</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
+                      <div>
+                        <div className="text-xl sm:text-2xl font-black text-red-400">{incorrectAnswers}</div>
+                        <div className="text-xs text-red-500/70">INCORRECT</div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Accuracy Circle */}
+                <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="relative inline-block mb-2">
+                      <svg className="w-14 h-14 sm:w-18 sm:h-18 transform -rotate-90">
+                        <circle
+                          cx="28"
+                          cy="28"
+                          r="24"
+                          stroke="currentColor"
+                          className="text-slate-700"
+                          strokeWidth="6"
+                          fill="none"
+                        />
+                        <circle
+                          cx="28"
+                          cy="28"
+                          r="24"
+                          stroke="url(#accuracyGradient)"
+                          strokeWidth="6"
+                          fill="none"
+                          strokeDasharray={`${2 * Math.PI * 24}`}
+                          strokeDashoffset={`${2 * Math.PI * 24 * (1 - animatedScore / 100)}`}
+                          strokeLinecap="round"
+                          className="transition-all duration-1000"
+                        />
+                        <defs>
+                          <linearGradient id="accuracyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#06b6d4" />
+                            <stop offset="100%" stopColor="#3b82f6" />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-lg sm:text-xl font-black text-slate-100">{animatedScore}%</span>
+                      </div>
+                    </div>
+                    <div className="text-xs font-bold text-slate-400 uppercase">Accuracy</div>
+                    <div className="text-xs text-slate-600 font-bold">{performanceData.rank}</div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Level Badge */}
+              <div className="flex items-center justify-center gap-3 sm:gap-4 p-2 bg-slate-800/40 border border-slate-700/50 rounded-xl">
+                <Crown className="h-5 w-5 sm:h-6 text-purple-400" />
+                <div className="flex flex-row gap-3 items-center">
+                  <div className="text-xs text-slate-500 uppercase">Level</div>
+                  <div className="text-xl sm:text-2xl font-black text-slate-200">{currentLevel}</div>
+                </div>
+                {hasLeveledUp && (
+                  <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs px-2 py-0.5 animate-pulse">
+                    UP!
+                  </Badge>
+                )}
+              </div>
+
+              {/* Rating */}
+              <Card className="bg-slate-800/40 border border-slate-700/50 p-2 sm:p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-xs font-bold text-slate-500 uppercase">
+                    Rate This Quiz
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        disabled={hasRated || isSubmittingRating}
+                        onClick={() => handleRatingSubmit(star)}
+                        onMouseEnter={() => !hasRated && setHoveredRating(star)}
+                        onMouseLeave={() => !hasRated && setHoveredRating(0)}
+                        className={`transition-all duration-200 transform ${
+                          hasRated || isSubmittingRating ? "cursor-default" : "cursor-pointer hover:scale-125"
+                        }`}
+                      >
+                        <StarIcon
+                          className={`h-4 w-4 transition-all ${
+                            star <= (hoveredRating || rating)
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-slate-600 hover:text-yellow-400/60"
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {ratingMessage && (
+                  <div className={`text-xs ${
+                    ratingMessage.includes("Thanks") ? "text-emerald-400" : "text-red-400"
+                  }`}>
+                    {ratingMessage}
+                  </div>
+                )}
+              </Card>
+
+              {/* Next Quiz Button */}
+              <Button
+                onClick={handleNextQuiz}
+                disabled={playButtonLoading}
+                size="lg"
+                className="w-full h-11 sm:h-12 text-sm sm:text-base font-black text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
+              >
+                {playButtonLoading ? "LOADING..." : "NEXT QUIZ"}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* XP EARNED OVERLAY */}
+      {showXPOverlay && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
+            <div 
+                ref={earnedPointsRef} 
+                className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
+            >
                 <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-yellow-500/50 animate-pulse-glow">
-                  <Trophy className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
+                  <KnowledgePointIcon className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
-                  <div className="text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
-                    +{animatedKnowledge}
+                  <div className="xp-text-aura text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
+                    {animatedKnowledge}
                   </div>
                   <div className="text-yellow-400/80 font-bold text-sm sm:text-base mt-1 sm:mt-2">
                     XP EARNED
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-3 sm:space-y-4 animate-fade-in">
-                {/* Results Grid */}
-                <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                  {/* Correct/Incorrect */}
-                  <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4">
-                    <div className="text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-2">Result</div>
-                    <div className="space-y-2 sm:space-y-2">
-                      <div className="flex items-center gap-1 sm:gap-2">
-                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
-                        <div>
-                          <div className="text-xl sm:text-2xl font-black text-emerald-400">{correctAnswers}</div>
-                          <div className="text-xs text-emerald-500/70">CORRECT</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 sm:gap-2">
-                        <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
-                        <div>
-                          <div className="text-xl sm:text-2xl font-black text-red-400">{incorrectAnswers}</div>
-                          <div className="text-xs text-red-500/70">INCORRECT</div>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
+            </div>
+        </div>
+      )}
 
-                  {/* Accuracy Circle */}
-                  <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="relative inline-block mb-2">
-                        <svg className="w-14 h-14 sm:w-18 sm:h-18 transform -rotate-90">
-                          <circle
-                            cx="28"
-                            cy="28"
-                            r="24"
-                            stroke="currentColor"
-                            className="text-slate-700"
-                            strokeWidth="6"
-                            fill="none"
-                          />
-                          <circle
-                            cx="28"
-                            cy="28"
-                            r="24"
-                            stroke="url(#accuracyGradient)"
-                            strokeWidth="6"
-                            fill="none"
-                            strokeDasharray={`${2 * Math.PI * 24}`}
-                            strokeDashoffset={`${2 * Math.PI * 24 * (1 - animatedScore / 100)}`}
-                            strokeLinecap="round"
-                            className="transition-all duration-1000"
-                          />
-                          <defs>
-                            <linearGradient id="accuracyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                              <stop offset="0%" stopColor="#06b6d4" />
-                              <stop offset="100%" stopColor="#3b82f6" />
-                            </linearGradient>
-                          </defs>
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-lg sm:text-xl font-black text-slate-100">{animatedScore}%</span>
-                        </div>
-                      </div>
-                      <div className="text-xs font-bold text-slate-400 uppercase">Accuracy</div>
-                      <div className="text-xs text-slate-600 font-bold">{performanceData.rank}</div>
-                    </div>
-                  </Card>
-                </div>
+      {/* Flying Tokens */}
+      {showFlyingTokens && tokens.map((token) => (
+        <div
+          key={token.id}
+          className="token"
+          style={{
+            '--token-delay': `${token.delay}ms`,
+          } as any}
+        />
+      ))}
 
-                {/* Level Badge */}
-                <div className="flex items-center justify-center gap-3 sm:gap-4 p-2 bg-slate-800/40 border border-slate-700/50 rounded-xl">
-                  <Crown className="h-5 w-5 sm:h-6 text-purple-400" />
-                  <div className="flex flex-row gap-3 items-center">
-                    <div className="text-xs text-slate-500 uppercase">Level</div>
-                    <div className="text-xl sm:text-2xl font-black text-slate-200">{currentLevel}</div>
-                  </div>
-                  {hasLeveledUp && (
-                    <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs px-2 py-0.5 animate-pulse">
-                      UP!
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Rating */}
-                <Card className="bg-slate-800/40 border border-slate-700/50 p-2 sm:p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="text-xs font-bold text-slate-500 uppercase">
-                      Rate This Quiz
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          disabled={hasRated || isSubmittingRating}
-                          onClick={() => handleRatingSubmit(star)}
-                          onMouseEnter={() => !hasRated && setHoveredRating(star)}
-                          onMouseLeave={() => !hasRated && setHoveredRating(0)}
-                          className={`transition-all duration-200 transform ${
-                            hasRated || isSubmittingRating ? "cursor-default" : "cursor-pointer hover:scale-125"
-                          }`}
-                        >
-                          <StarIcon
-                            className={`h-4 w-4 transition-all ${
-                              star <= (hoveredRating || rating)
-                                ? "fill-yellow-400 text-yellow-400"
-                                : "text-slate-600 hover:text-yellow-400/60"
-                            }`}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {ratingMessage && (
-                    <div className={`text-xs ${
-                      ratingMessage.includes("Thanks") ? "text-emerald-400" : "text-red-400"
-                    }`}>
-                      {ratingMessage}
-                    </div>
-                  )}
-                </Card>
-
-                {/* Next Quiz Button */}
-                <Button
-                  onClick={handleNextQuiz}
-                  disabled={playButtonLoading}
-                  size="lg"
-                  className="w-full h-11 sm:h-12 text-sm sm:text-base font-black text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
-                >
-                  {playButtonLoading ? "LOADING..." : "NEXT QUIZ"}
-                </Button>
-              </div>
-            )}
-          </div>
-        </Card>
-      </div>
-
-      {/* CSS Animations */}
+      {/* CSS Animations and Styles */}
       <style>{`
         @keyframes scale-in {
           0% { transform: scale(0.9); opacity: 0; }
@@ -749,7 +774,14 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           animation: number-grow 0.8s ease-out forwards;
         }
         
-        /* Enhanced Flying Token Animation - Straight path to knowledge points */
+        .xp-text-aura {
+          text-shadow: 
+            0 0 10px rgba(255, 193, 7, 0.9),
+            0 0 20px rgba(255, 165, 0, 0.7),
+            0 0 30px rgba(255, 140, 0, 0.5);
+        }
+
+        /* Flying Token Animation */
         .token {
           position: fixed;
           width: 20px;

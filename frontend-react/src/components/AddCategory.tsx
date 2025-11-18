@@ -2,12 +2,13 @@
 
 import React, { useState } from "react";
 import { Plus, X } from "lucide-react";
-import { Button } from "@/components/ui/button"; // ✅ Themed button
+import { Button } from "@/components/ui/button";
 
 interface AddCategoryProps {
   fetchCategories?: () => void;
   isGuest: boolean;
   onRegistrationRequired: () => void;
+  isEmbeddedInEmptyState?: boolean;
 }
 
 interface Notification {
@@ -19,13 +20,13 @@ const AddCategory: React.FC<AddCategoryProps> = ({
   fetchCategories = () => {},
   isGuest,
   onRegistrationRequired,
+  isEmbeddedInEmptyState = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [categoryName, setCategoryName] = useState("");
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState<Notification | null>(null);
 
-  // ✅ Base URL from .env
   const BASE_URL = import.meta.env.VITE_BASE_URL;
 
   const showNotification = (message: string, type: "success" | "error") => {
@@ -36,7 +37,6 @@ const AddCategory: React.FC<AddCategoryProps> = ({
   const handleCreateCategory = async () => {
     const token = localStorage.getItem("token");
 
-    // ✅ Prevent creation without a token
     if (!token) {
       setIsOpen(false);
       showNotification("You need to be logged in to create a category.", "error");
@@ -68,7 +68,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({
         setCategoryName("");
         fetchCategories();
         showNotification(
-          "Your category is being created. We’ll notify you once it’s done.",
+          "Your category is being created. We'll notify you once it's done.",
           "success"
         );
       } else {
@@ -85,7 +85,6 @@ const AddCategory: React.FC<AddCategoryProps> = ({
   const handleMainButtonClick = () => {
     const token = localStorage.getItem("token");
 
-    // ✅ Only allow modal if logged in
     if (!token) {
       onRegistrationRequired();
     } else {
@@ -93,30 +92,103 @@ const AddCategory: React.FC<AddCategoryProps> = ({
     }
   };
 
+  // Conditional Rendering for Empty State
+  if (isEmbeddedInEmptyState) {
+    return (
+      <>
+        <Button
+          onClick={handleMainButtonClick}
+          className="flex items-center gap-2 px-6 py-3 rounded-lg text-white text-base shadow-xl bg-purple-600 hover:bg-purple-700 transition-all duration-200"
+        >
+          <Plus className="h-5 w-5" />
+          <span>Create Your First Quiz</span>
+        </Button>
+        
+        {isOpen && (
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4"
+            onClick={() => setIsOpen(false)}
+          >
+            <div
+              className="relative bg-gradient-to-br from-zinc-900/95 via-zinc-800/90 to-black/90 border border-border/40
+              rounded-2xl p-6 w-full max-w-md shadow-[0_0_30px_-5px_rgba(0,150,255,0.5)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Button
+                onClick={() => setIsOpen(false)}
+                variant="destructive"
+                size="icon"
+                className="absolute top-4 right-4 rounded-full p-2 shadow-md"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+
+              <h2 className="text-xl font-bold text-white mb-6">Create New Quiz</h2>
+
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="Enter quiz name"
+                  value={categoryName}
+                  onChange={(e) => setCategoryName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreateCategory()}
+                  className="w-full px-4 py-3 rounded-lg bg-zinc-800/80 text-white border border-zinc-700
+                  placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+                />
+
+                <div className="flex space-x-3">
+                  <Button
+                    onClick={handleCreateCategory}
+                    disabled={loading || !categoryName.trim()}
+                    className="flex-1"
+                  >
+                    {loading ? "Creating..." : "Create"}
+                  </Button>
+
+                  <Button
+                    onClick={() => setIsOpen(false)}
+                    variant="outline"
+                    className="flex-1 border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {notification && (
+          <div
+            className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-xl font-medium shadow-lg transition-all duration-500 ${
+              notification.type === "success"
+                ? "bg-green-600/90 shadow-green-500/40"
+                : "bg-red-600/90 shadow-red-500/40"
+            } text-white backdrop-blur-md`}
+          >
+            {notification.message}
+          </div>
+        )}
+      </>
+    );
+  }
+
+  // Default Rendering - Simple button on background
   return (
-    <div className="w-full max-w-6xl mx-auto p-4 space-y-6">
-      {/* Main Card */}
-      <div
-        className="p-6 rounded-2xl border border-border/40 bg-gradient-to-br from-zinc-900/80 via-zinc-900/60 to-black/70 
-        backdrop-blur-md shadow-[0_0_25px_-5px_rgba(0,150,255,0.4)] flex items-center justify-between"
-      >
-        <div>
-          <h4 className="font-semibold text-lg text-white">Create Your Own</h4>
-          <p className="text-sm text-white/70">
-            Build a custom quiz and share it with others!
-          </p>
-        </div>
+    <div className="w-full max-w-6xl mx-auto p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-white/60">
+          Create your own quiz
+        </p>
 
         <Button
           onClick={handleMainButtonClick}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white shadow-lg"
         >
           <Plus className="h-4 w-4" />
-          <span>Create</span>
+          <span>Create Quiz</span>
         </Button>
       </div>
 
-      {/* Modal */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4"
@@ -127,7 +199,6 @@ const AddCategory: React.FC<AddCategoryProps> = ({
             rounded-2xl p-6 w-full max-w-md shadow-[0_0_30px_-5px_rgba(0,150,255,0.5)]"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close Button */}
             <Button
               onClick={() => setIsOpen(false)}
               variant="destructive"
@@ -172,7 +243,6 @@ const AddCategory: React.FC<AddCategoryProps> = ({
         </div>
       )}
 
-      {/* Notification */}
       {notification && (
         <div
           className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-xl font-medium shadow-lg transition-all duration-500 ${

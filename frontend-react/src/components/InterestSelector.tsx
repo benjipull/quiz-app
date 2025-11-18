@@ -1,3 +1,4 @@
+// InterestSelector.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -56,6 +57,12 @@ const InterestSelector: React.FC<InterestSelectorProps> = ({
     if (onSelectionChange) onSelectionChange(selectedInterests);
   }, [selectedInterests, onSelectionChange]);
 
+  // Truncate text to fit consistently
+  const truncateText = (text: string, maxLength: number = 20) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength - 3) + "...";
+  };
+
   if (loading) {
     return (
       <div className="p-4 text-center text-gray-400">
@@ -66,7 +73,7 @@ const InterestSelector: React.FC<InterestSelectorProps> = ({
 
   return (
     <div className="w-full flex flex-col items-center">
-      {/* Grid - 3 columns on all screens */}
+      {/* Grid - 3 columns on all screens with consistent sizing */}
       <div className="grid grid-cols-3 gap-2 w-full max-w-full">
         {interests.map((interest) => {
           const isSelected = selectedInterests.includes(interest._id);
@@ -75,19 +82,22 @@ const InterestSelector: React.FC<InterestSelectorProps> = ({
               key={interest._id}
               onClick={() => toggleInterest(interest._id)}
               className={`
-                px-1.5 py-2.5
+                px-2 py-3
                 flex items-center justify-center text-center text-xs font-medium leading-tight
                 rounded-xl border-2 transition-all duration-200
+                min-h-[60px] h-[60px]
                 ${
                   isSelected
                     ? "bg-gradient-to-b from-purple-500 to-fuchsia-600 text-white border-purple-300/60 shadow-[0_4px_20px_rgba(168,85,247,0.4)]"
                     : "bg-transparent text-purple-100 border-purple-500/40 hover:border-purple-400 hover:bg-purple-800/20"
                 }
               `}
+              title={interest.name} // Show full text on hover
             >
-              <span className="line-clamp-3 px-1">
-                {interest.name}
-              </span>
+             <span className="break-words text-center leading-snug px-1 overflow-hidden">
+            {interest.name}
+          </span>
+
             </button>
           );
         })}

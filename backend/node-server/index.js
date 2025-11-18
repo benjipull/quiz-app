@@ -66,6 +66,7 @@ app.use("/api/getImageUrl", require("./routes/getImageUrl"));
 //Sources
 app.use("/api/DBpedia", require("./routes/DBpedia")); 
 
+app.use("/api/leaderboard", require("./routes/leaderboard"));
 
 // Admin APIs
 app.use("/api/admin/categories", require("./routes/admin/getAllCategories"));
@@ -75,6 +76,8 @@ app.use("/api/admin/questions", require("./routes/admin/markQuestionAsDuplicate"
 app.use("/api/admin/questions", require("./routes/admin/unmarkDuplicateGroup"));
 app.use("/api/admin/questions", require("./routes/admin/updateQuestion"));
 app.use("/api/admin/reports", require("./routes/admin/adminReports"));
+app.use("/api/admin/questions", require("./routes/admin/getDifficultyStats"));
+
 
 // Default route (serves index.html for all other routes)
 app.get("*", (req, res) => {

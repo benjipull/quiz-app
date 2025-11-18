@@ -1,276 +1,465 @@
-import { Header } from "@/components/layout/Header";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Trophy, Crown, Star, Medal, Target, TrendingUp } from "lucide-react";
-import { cn } from "@/lib/utils";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { Clock } from "lucide-react";
+import { apiClient } from "@/utils/apiClient";
 
-const topPlayers = [
-  {
-    id: "1",
-    name: "Sarah Chen",
-    avatar: "https://picsum.photos/seed/sarah/200/200",
-    level: 15,
-    score: 9847,
-    accuracy: 94,
-    streak: 28,
-    position: 1
-  },
-  {
-    id: "2", 
-    name: "Mike Johnson",
-    avatar: "https://picsum.photos/seed/mike/200/200",
-    level: 14,
-    score: 9203,
-    accuracy: 91,
-    streak: 15,
-    position: 2
-  },
-  {
-    id: "3",
-    name: "Emma Wilson",
-    avatar: "https://picsum.photos/seed/emma/200/200", 
-    level: 13,
-    score: 8956,
-    accuracy: 89,
-    streak: 22,
-    position: 3
-  }
-];
+// Avatar imports
+import avatar1 from '../assets/images/avatars/1.png';
+import avatar2 from '../assets/images/avatars/2.png';
+import avatar3 from '../assets/images/avatars/3.png';
+import avatar4 from '../assets/images/avatars/4.png';
+import avatar5 from '../assets/images/avatars/5.png';
 
-const leaderboardData = [
-  {
-    id: "4",
-    name: "Alex Rodriguez",
-    avatar: "https://picsum.photos/seed/alex/200/200",
-    level: 12,
-    score: 8234,
-    accuracy: 87,
-    streak: 12,
-    position: 4
-  },
-  {
-    id: "5",
-    name: "Lisa Park",
-    avatar: "https://picsum.photos/seed/lisa/200/200",
-    level: 11,
-    score: 7891,
-    accuracy: 85,
-    streak: 8,
-    position: 5
-  },
-  {
-    id: "6",
-    name: "John Doe",
-    avatar: "https://picsum.photos/seed/john/200/200",
-    level: 8,
-    score: 6547,
-    accuracy: 82,
-    streak: 12,
-    position: 6,
-    isCurrentUser: true
-  },
-  {
-    id: "7",
-    name: "Maria Garcia",
-    avatar: "https://picsum.photos/seed/maria/200/200",
-    level: 10,
-    score: 7234,
-    accuracy: 88,
-    streak: 5,
-    position: 7
-  }
-];
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
-const categories = [
-  { name: "Global", active: true },
-  { name: "Science", active: false },
-  { name: "History", active: false },
-  { name: "Sports", active: false },
-  { name: "Tech", active: false }
-];
+// Get all avatars into an array
+const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
+  eager: true,
+  import: "default",
+});
+const avatars: string[] = Object.values(avatarImages) as string[];
 
-export default function Leaderboard() {
-  const getPositionIcon = (position: number) => {
-    switch (position) {
-      case 1: return <Crown className="h-5 w-5 text-yellow-500" />;
-      case 2: return <Medal className="h-5 w-5 text-gray-400" />;
-      case 3: return <Medal className="h-5 w-5 text-amber-600" />;
-      default: return <span className="text-lg font-bold text-muted-foreground">#{position}</span>;
+// Define the expected structure of a single player item from the API
+interface LeaderboardPlayer {
+  userId: string;
+  username: string;
+  totalPoints: number;
+  level: number;
+  avatarUrl?: string;
+}
+
+// Map for period display names and API values
+const PERIOD_MAP = {
+  day: "Daily",
+  week: "Weekly",
+  month: "Monthly",
+  year: "Yearly",
+};
+const PERIODS = Object.keys(PERIOD_MAP) as ('day' | 'week' | 'month' | 'year')[];
+
+const Leaderboard = () => {
+  const [currentPeriod, setCurrentPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardPlayer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [userAvatar, setUserAvatar] = useState<number>(1);
+  
+  // STATE: To track the user's previous rank for animation
+  const [previousLeaderboardData, setPreviousLeaderboardData] = useState<LeaderboardPlayer[]>([]);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [animatingUserId, setAnimatingUserId] = useState<string | null>(null);
+  const [translateY, setTranslateY] = useState(0);
+  
+  // REF: For auto-scrolling to the current user's position
+  const currentUserRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const avatarMap = useMemo(() => ({
+    1: avatar1,
+    2: avatar2,
+    3: avatar3,
+    4: avatar4,
+    5: avatar5, 
+  }), []);
+
+  // Get current user ID and avatar from localStorage
+  useEffect(() => {
+    const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setCurrentUserId(parsedUser._id || "");
+        setUserAvatar(parsedUser.avatar || 1);
+      } catch (e) {
+        console.error("Failed to parse user data:", e);
+      }
+    }
+  }, []);
+
+  // Fetch leaderboard data
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      setLoading(true);
+      
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      if (!token) {
+        console.error("Authentication token not found.");
+        setLoading(false);
+        return;
+      }
+      
+      const apiUrl = `${BASE_URL}/api/leaderboard?period=${currentPeriod}`;
+      
+      // Save the current data as "previous" before fetching new data
+      if (leaderboardData.length > 0) {
+        setPreviousLeaderboardData(leaderboardData);
+      }
+
+      try {
+        const response = await apiClient(apiUrl, {
+          method: "GET",
+        });
+
+        if (!response) {
+          setLoading(false);
+          return;
+        }
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`HTTP error! status: ${response.status}`, errorText);
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setLeaderboardData(data.leaderboard || []);
+
+      } catch (error) {
+        console.error("Error fetching leaderboard data:", error);
+        setLeaderboardData([]); 
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
+  }, [currentPeriod]); 
+  
+  // Animate rank change when data loads
+  useEffect(() => {
+    if (loading || previousLeaderboardData.length === 0 || leaderboardData.length === 0 || !currentUserId) {
+      // If no previous data or still loading, just scroll to user
+      if (!loading && leaderboardData.length > 0 && currentUserRef.current) {
+        setTimeout(() => {
+          currentUserRef.current?.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+        }, 300);
+      }
+      return;
+    }
+
+    const previousIndex = previousLeaderboardData.findIndex(p => p.userId === currentUserId);
+    const currentIndex = leaderboardData.findIndex(p => p.userId === currentUserId);
+
+    if (previousIndex === -1 || currentIndex === -1 || previousIndex === currentIndex) {
+      // No rank change or user not found - just scroll to position
+      setTimeout(() => {
+        currentUserRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 300);
+      return;
+    }
+
+    // Calculate the distance to move (in row heights)
+    const rankDifference = previousIndex - currentIndex;
+    const rowHeight = 60; // Approximate height of each row in pixels
+    const distance = rankDifference * rowHeight;
+
+    // Start animation
+    setIsAnimating(true);
+    setAnimatingUserId(currentUserId);
+    setTranslateY(-distance);
+
+    // Scroll to show the animation path
+    setTimeout(() => {
+      const middleRank = Math.floor((previousIndex + currentIndex) / 2);
+      const middleElement = containerRef.current?.children[middleRank] as HTMLElement;
+      if (middleElement) {
+        middleElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+
+    // Complete animation
+    const animationDuration = Math.abs(rankDifference) * 400; // 400ms per rank
+    setTimeout(() => {
+      setTranslateY(0);
+      setIsAnimating(false);
+      setAnimatingUserId(null);
+      
+      // Scroll to final position
+      setTimeout(() => {
+        currentUserRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 600);
+    }, animationDuration);
+
+  }, [leaderboardData, loading, currentUserId]);
+  
+  // Helper function: Calculates if the user moved up or down
+  const getRankChange = (player: LeaderboardPlayer, currentRank: number) => {
+    // Only calculate if there was previous data
+    if (previousLeaderboardData.length === 0) {
+        return 'new'; 
+    }
+    
+    // Find the player's previous rank
+    const previousIndex = previousLeaderboardData.findIndex(p => p.userId === player.userId);
+    
+    if (previousIndex === -1) {
+        return 'new'; // Player wasn't in the previous list
+    }
+    
+    const previousRank = previousIndex + 1;
+
+    if (currentRank < previousRank) {
+      return 'up';
+    } else if (currentRank > previousRank) {
+      return 'down';
+    } else {
+      return 'same';
     }
   };
 
-  const getPositionBg = (position: number) => {
-    switch (position) {
-      case 1: return "bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/30";
-      case 2: return "bg-gradient-to-r from-gray-400/20 to-slate-400/20 border-gray-400/30";
-      case 3: return "bg-gradient-to-r from-amber-600/20 to-orange-600/20 border-amber-600/30";
-      default: return "bg-card/60 border-border/50";
+  // Helper to get the user's actual avatar from their avatar number
+  const getPlayerAvatar = (player: LeaderboardPlayer, isCurrentUser: boolean) => {
+    // If it's the current user, use their actual avatar from state
+    if (isCurrentUser && userAvatar) {
+      const avatarIndex = userAvatar - 1;
+      return avatars[avatarIndex] || avatars[0];
     }
+    
+    // For other players, try to use avatarUrl from backend if available
+    if (player.avatarUrl) {
+      return player.avatarUrl;
+    }
+    
+    // Fallback: use a default avatar based on ranking (for demo purposes)
+    return avatarMap[(((leaderboardData.indexOf(player) + 1) % 5) + 1) as keyof typeof avatarMap];
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-quiz-background pb-20 lg:pb-4">
-      <Header title="Leaderboard" />
-      
-      <div className="px-4 lg:px-8 space-y-6 max-w-md lg:max-w-4xl xl:max-w-6xl mx-auto">
-        {/* Category Tabs */}
-        <div className="pt-4">
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {categories.map((category, index) => (
-              <Button
-                key={index}
-                variant={category.active ? "default" : "outline"}
-                size="sm"
-                className="shrink-0"
+    <div
+      className="
+        min-h-screen w-full 
+        flex flex-col items-center 
+        px-4 pb-10 
+        bg-[#100321]
+        bg-[url('/leaderboard.jpg')]
+        bg-no-repeat
+        bg-center
+        bg-cover
+        bg-fixed
+      "
+    >
+      {/* CSS Keyframes for Rank Change Animation */}
+      <style>{`
+        @keyframes glow-pulse {
+          0%, 100% { 
+            box-shadow: 0 0 20px rgba(76, 209, 55, 0.6);
+          }
+          50% { 
+            box-shadow: 0 0 40px rgba(76, 209, 55, 0.9);
+          }
+        }
+
+        @keyframes glow-pulse-down {
+          0%, 100% { 
+            box-shadow: 0 0 20px rgba(255, 82, 82, 0.6);
+          }
+          50% { 
+            box-shadow: 0 0 40px rgba(255, 82, 82, 0.9);
+          }
+        }
+
+        .animating-row {
+          position: relative;
+          z-index: 50;
+          transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glow-up {
+          animation: glow-pulse 0.8s ease-in-out infinite;
+        }
+
+        .glow-down {
+          animation: glow-pulse-down 0.8s ease-in-out infinite;
+        }
+      `}</style>
+        
+      {/* Top spacing */}
+      <div className="pt-5 lg:pt-10"></div>
+
+      {/* Period Selection Tabs */}
+      <div className="flex justify-center w-full max-w-lg mb-4 p-1 rounded-full bg-purple-900/55 shadow-xl">
+        {PERIODS.map((period) => (
+          <button
+            key={period}
+            onClick={() => setCurrentPeriod(period)}
+            className={`
+              flex-1 py-2 text-sm font-semibold rounded-full transition-colors duration-300
+              ${currentPeriod === period
+                ? "bg-purple-500 text-white shadow-lg"
+                : "text-purple-200 hover:bg-purple-700/50"
+              }
+            `}
+          >
+            {PERIOD_MAP[period]}
+          </button>
+        ))}
+      </div>
+
+      {/* Title + Timer */}
+      <div className="text-center"> 
+        <h1
+          className="text-5xl font-bold text-purple-200 drop-shadow-lg"
+          style={{ fontFamily: "Georgia, serif" }}
+        >
+          {PERIOD_MAP[currentPeriod]}
+        </h1>
+
+        {/* This timer is typically only shown for the Daily leaderboard to show reset time */}
+        {currentPeriod === 'day' && (
+          <div className="flex items-center justify-center gap-2 text-purple-200 mt-2">
+            <Clock className="w-5 h-5" />
+            <span className="text-lg">left 22 h 1 m</span> 
+          </div>
+        )}
+      </div>
+
+      {/* Trophy */}
+      <div className="-mt-16 flex justify-center">
+        <img
+          src="/trophy.png"
+          alt="Trophy"
+          className="w-72 h-72 md:w-96 md:h-96 object-contain drop-shadow-2xl"
+        />
+      </div>
+
+      {/* Leaderboard List */}
+      <div 
+        ref={containerRef}
+        className="w-full max-w-2xl rounded-xl bg-purple-900/55 shadow-md overflow-hidden -mt-8"
+      >
+        {loading ? (
+          <div className="p-8 text-center text-purple-200">
+            <div className="flex items-center justify-center space-x-2">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-200"></div>
+              <span>Loading Leaderboard...</span>
+            </div>
+          </div>
+        ) : leaderboardData.length === 0 ? (
+          <div className="p-8 text-center text-purple-200">
+            No players found for this period.
+          </div>
+        ) : (
+          leaderboardData.map((player, index) => {
+            const rank = index + 1;
+            const isCurrentUser = player.userId === currentUserId; 
+            const rankChange = isCurrentUser ? getRankChange(player, rank) : null;
+            const isAnimatingThis = isAnimating && animatingUserId === player.userId;
+            
+            return (
+              <div
+                key={player.userId}
+                ref={isCurrentUser ? currentUserRef : null} // Attach ref for scrolling
+                className={`
+                  flex items-center gap-4 px-4 py-3 transition-all duration-300
+                  ${isCurrentUser ? "bg-green-300/50 rounded-lg" : "bg-transparent"}
+                  ${index < leaderboardData.length - 1 ? "border-b border-purple-400" : ""}
+                  ${isAnimatingThis ? "animating-row" : ""}
+                  ${isAnimatingThis && rankChange === 'up' ? "glow-up" : ""}
+                  ${isAnimatingThis && rankChange === 'down' ? "glow-down" : ""}
+                `}
+                style={{
+                  transform: isAnimatingThis ? `translateY(${translateY}px)` : 'translateY(0)',
+                }}
               >
-                {category.name}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        {/* Top 3 Podium */}
-        <Card className="p-6 bg-gradient-to-r from-primary/10 via-accent/10 to-secondary/10 border-primary/20">
-          <div className="text-center mb-6">
-            <h2 className="text-lg font-bold text-foreground">Top Performers</h2>
-            <p className="text-sm text-muted-foreground">This week's champions</p>
-          </div>
-          
-          <div className="flex items-end justify-center gap-4">
-            {/* 2nd Place */}
-            <div className="text-center">
-              <div className="relative mb-3">
-                <Avatar className="w-12 h-12 border-2 border-gray-400">
-                  <AvatarImage src={topPlayers[1].avatar} />
-                  <AvatarFallback>MJ</AvatarFallback>
-                </Avatar>
-                <div className="absolute -top-2 -right-2 bg-gray-400 rounded-full p-1">
-                  <Medal className="h-3 w-3 text-white" />
+                {/* Rank + Indicator (REFINED STYLING) */}
+                <div className="text-xl font-bold text-purple-200 w-10 text-center flex items-center justify-center gap-0.5"> 
+                  
+                  {/* Rank Change Indicator (Up/Down Arrow) */}
+                  {isCurrentUser && !isAnimating && rankChange === 'down' && (
+                      // Red triangle for moving down
+                      <span className="text-red-400 text-base font-extrabold -mt-1">▼</span> 
+                  )}
+                  {isCurrentUser && !isAnimating && rankChange === 'up' && (
+                      // Green triangle for moving up
+                      <span className="text-green-400 text-base font-extrabold -mt-1">▲</span>
+                  )}
+                  
+                  {/* Rank Number */}
+                  {rank}
                 </div>
-              </div>
-              <div className="bg-gray-400/20 rounded-lg p-3 min-h-16">
-                <p className="font-semibold text-sm">{topPlayers[1].name}</p>
-                <p className="text-xs text-muted-foreground">{topPlayers[1].score.toLocaleString()}</p>
-              </div>
-            </div>
 
-            {/* 1st Place */}
-            <div className="text-center">
-              <div className="relative mb-3">
-                <Avatar className="w-16 h-16 border-2 border-yellow-500">
-                  <AvatarImage src={topPlayers[0].avatar} />
-                  <AvatarFallback>SC</AvatarFallback>
-                </Avatar>
-                <div className="absolute -top-2 -right-2 bg-yellow-500 rounded-full p-1">
-                  <Crown className="h-4 w-4 text-white" />
+                {/* Avatar */}
+                <div className="relative flex-shrink-0"> 
+                  <img
+                    src={getPlayerAvatar(player, isCurrentUser)}
+                    alt={`${player.username}'s avatar`}
+                    className="
+                      w-10 h-10 rounded-full object-cover 
+                      border border-gray-300/50 
+                    "
+                  />
+
+                  {/* Optional Badge (e.g., for Top 3) */}
+                  {(rank <= 3) && (
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full border-2 border-purple-900 flex items-center justify-center" />
+                  )}
                 </div>
-              </div>
-              <div className="bg-yellow-500/20 rounded-lg p-4 min-h-20">
-                <p className="font-bold text-sm">{topPlayers[0].name}</p>
-                <p className="text-xs text-muted-foreground">{topPlayers[0].score.toLocaleString()}</p>
-                <Badge variant="outline" className="border-yellow-500 text-yellow-600 mt-1">
-                  Champion
-                </Badge>
-              </div>
-            </div>
 
-            {/* 3rd Place */}
-            <div className="text-center">
-              <div className="relative mb-3">
-                <Avatar className="w-12 h-12 border-2 border-amber-600">
-                  <AvatarImage src={topPlayers[2].avatar} />
-                  <AvatarFallback>EW</AvatarFallback>
-                </Avatar>
-                <div className="absolute -top-2 -right-2 bg-amber-600 rounded-full p-1">
-                  <Medal className="h-3 w-3 text-white" />
-                </div>
-              </div>
-              <div className="bg-amber-600/20 rounded-lg p-3 min-h-16">
-                <p className="font-semibold text-sm">{topPlayers[2].name}</p>
-                <p className="text-xs text-muted-foreground">{topPlayers[2].score.toLocaleString()}</p>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Rankings List */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-bold text-foreground">Global Rankings</h3>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {leaderboardData.map((player) => (
-              <Card 
-                key={player.id} 
-                className={cn(
-                  "p-4 transition-all duration-300",
-                  getPositionBg(player.position),
-                  player.isCurrentUser ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "",
-                  "hover:shadow-lg hover:-translate-y-0.5"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8">
-                    {getPositionIcon(player.position)}
+                {/* Name + Level */}
+                <div className="flex-1 flex flex-col justify-center"> 
+                  <div className="text-lg font-semibold text-purple-100">
+                    {player.username}
                   </div>
-                  
-                  <Avatar className="w-10 h-10">
-                    <AvatarImage src={player.avatar} />
-                    <AvatarFallback>{player.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold text-foreground truncate">
-                        {player.name}
-                      </h4>
-                      {player.isCurrentUser && (
-                        <Badge variant="outline" className="text-xs border-primary text-primary">
-                          You
-                        </Badge>
-                      )}
+                  {player.level && (
+                    <div className="text-sm text-purple-300/70 -mt-0.5">
+                      Level: {player.level}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>Level {player.level}</span>
-                      <span>{player.accuracy}% accuracy</span>
-                      <div className="flex items-center gap-1">
-                        <TrendingUp className="h-3 w-3" />
-                        <span>{player.streak}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="text-right">
-                    <p className="font-bold text-foreground">{player.score.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">points</p>
-                  </div>
+                  )}
                 </div>
-              </Card>
-            ))}
-          </div>
-        </div>
 
-        {/* Your Rank Card */}
-        <Card className="p-4 bg-gradient-to-r from-primary/5 to-accent/5 border-primary/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-semibold text-foreground">Your Current Rank</h4>
-              <p className="text-sm text-muted-foreground">Keep playing to climb higher!</p>
-            </div>
-            <div className="text-right">
-              <div className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
-                <span className="text-2xl font-bold text-primary">#6</span>
+                {/* Score + Star */}
+                <div className="flex items-center gap-1"> 
+                  <span className="text-xl font-bold text-purple-100"> 
+                    {player.totalPoints}
+                  </span>
+
+                  {/* Star SVG (Wisdom Points Icon) */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 100 100"
+                    className="w-8 h-8"
+                  >
+                    <defs>
+                      <filter id="star-background-glow" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
+                        <feMerge>
+                          <feMergeNode in="blur" />
+                          <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                        </filter>
+                    </defs>
+
+                    {/* Background circle */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="30"
+                      fill="#e84c3d"
+                      filter="url(#star-background-glow)"
+                    />
+
+                    {/* Star */}
+                    <path
+                      fill="#f9a825"
+                      d="M50 28 L55.75 44.25 L74 46.35 L59.25 58.25 L61.7 73 L50 65.25 L38.3 73 L40.75 58.25 L26 46.35 L44.25 44.25 Z"
+                    />
+                  </svg>
+                </div>
               </div>
-              <Button variant="outline" size="sm" className="mt-2">
-                <Trophy className="h-4 w-4" />
-                View Stats
-              </Button>
-            </div>
-          </div>
-        </Card>
+            );
+          })
+        )}
       </div>
     </div>
   );
-}
+};
+
+export default Leaderboard;

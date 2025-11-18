@@ -1,46 +1,73 @@
+"use client";
+
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-// ✅ Preload the sound file
-const clickSound = new Audio("/clicksound.m4a");
-clickSound.volume = 0.5; 
+/* ------------------------------------------------------------------
+    ULTRA FAST AUDIO ENGINE (0ms latency)
+------------------------------------------------------------------ */
 
-// ✅ Button Variants with Bold Borders
+let audioCtx: AudioContext | null = null;
+let clickBuffer: AudioBuffer | null = null;
+
+// Preload & decode the click sound once
+async function loadClickSound() {
+  try {
+    if (!audioCtx) audioCtx = new window.AudioContext();
+
+    const res = await fetch("/clicksound.m4a");
+    const arrayBuffer = await res.arrayBuffer();
+    clickBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  } catch (err) {
+    console.warn("Failed loading click sound:", err);
+  }
+}
+
+// Preload immediately
+loadClickSound();
+
+// Play instantly (no delay)
+function playClick() {
+  if (!audioCtx || !clickBuffer) return;
+
+  const src = audioCtx.createBufferSource();
+  src.buffer = clickBuffer;
+  src.connect(audioCtx.destination);
+  src.start(0);
+}
+
+/* ------------------------------------------------------------------
+    BUTTON STYLING
+------------------------------------------------------------------ */
+
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold border-4 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-bold transition-all duration-150 active:scale-95 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none",
   {
     variants: {
       variant: {
         default:
-          "border-green-600 bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-lg hover:scale-105 active:scale-95",
+          "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white border-[3px] border-[#00ff00] shadow-[0_4px_20px_rgba(0,255,0,0.3)] hover:shadow-[0_6px_30px_rgba(0,255,0,0.5)]",
         destructive:
-          "border-red-700 bg-red-600 text-white hover:bg-red-700 active:scale-95",
-        outline:
-          "border-green-500 text-green-600 bg-transparent hover:bg-green-500 hover:text-white hover:shadow-md",
-        secondary:
-          "border-green-500 bg-gradient-to-r from-green-400 to-green-500 text-white hover:shadow-lg hover:scale-105 active:scale-95",
-        ghost:
-          "border-green-500 hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900/20",
-        link:
-          "border-transparent text-green-600 underline-offset-4 hover:underline",
-        quiz:
-          "border-green-600 bg-green-600 text-white hover:bg-green-700 hover:scale-105 active:scale-95",
-        success:
-          "border-green-600 bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-lg hover:scale-105 active:scale-95",
-        warning:
-          "border-yellow-500 bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:shadow-lg hover:scale-105 active:scale-95",
-        hero:
-          "border-green-600 bg-gradient-to-r from-green-400 via-green-500 to-green-600 text-white hover:shadow-2xl hover:shadow-green-500/25 hover:scale-110 active:scale-95 animate-pulse-glow",
+          "bg-gradient-to-b from-[#aa00aa] via-[#880088] to-[#660066] text-white border-2 border-[#ff00ff]",
         blue:
-          "border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 active:scale-95",
+          "bg-gradient-to-b from-[#0088cc] via-[#006699] to-[#004466] text-white border-2 border-[#00ffff]",
+        purple:
+          "bg-gradient-to-b from-[#9900aa] via-[#770088] to-[#550066] text-white border-2 border-[#dd00ff]",
+        warning:
+          "bg-gradient-to-b from-[#cc3333] via-[#aa1111] to-[#880000] text-white border-2 border-[#ff4d4d]",
+        outline: "bg-transparent text-white border-2 border-[#00ff41]",
+        ghost:
+          "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white border-2 border-[#00ff41]",
+        link:
+          "bg-transparent text-white border-2 border-[#00ff41] shadow-none",
       },
       size: {
-        default: "h-12 px-6 py-3",
-        sm: "h-9 rounded-lg px-4",
-        lg: "h-14 rounded-xl px-8 text-base",
-        xl: "h-16 rounded-2xl px-10 text-lg",
+        default: "h-12 px-6 py-3 text-sm",
+        sm: "h-9 px-4 text-sm",
+        lg: "h-14 px-8 text-base",
+        xl: "h-16 px-10 text-lg",
         icon: "h-12 w-12",
       },
     },
@@ -50,6 +77,10 @@ const buttonVariants = cva(
     },
   }
 );
+
+/* ------------------------------------------------------------------
+    BUTTON COMPONENT
+------------------------------------------------------------------ */
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
@@ -62,28 +93,20 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const Comp = asChild ? Slot : "button";
 
     const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-      try {
-        // ✅ Play click sound
-        clickSound.currentTime = 0;
-        clickSound.play().catch(() => {});
+      // ⚡ Instant sound
+      playClick();
 
-        // ✅ Short vibration (30ms)
-        if (navigator.vibrate) {
-          navigator.vibrate(30);
-        }
-      } catch (error) {
-        console.warn("Button feedback error:", error);
-      }
+      // ⚡ Instant vibration
+      if (navigator.vibrate) navigator.vibrate(25);
 
-      // ✅ Trigger any user-provided onClick
       onClick?.(e);
     };
 
     return (
       <Comp
         ref={ref}
+        className={cn(buttonVariants({ variant, size }), className)}
         onClick={handleClick}
-        className={cn(buttonVariants({ variant, size, className }))}
         {...props}
       />
     );
