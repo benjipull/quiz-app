@@ -214,7 +214,7 @@ export default function Categories() {
               Register
             </Button>
             <Button
-              variant="secondary"
+              variant="warning"
               size="sm"
               onClick={() => dismiss(toastId)}
             >
