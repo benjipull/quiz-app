@@ -24,8 +24,8 @@ export const BottomTabs = () => {
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-card/95 to-card/80 backdrop-blur-lg border-t border-border z-50 md:hidden">
       {/* ✅ justify-around makes spacing consistent */}
-      <div className="flex items-center justify-around h-20 px-4 max-w-full mx-auto">
-        {tabs.map((tab, index) => {
+<div className="flex items-center justify-around h-20 px-2 max-w-full mx-auto">
+          {tabs.map((tab, index) => {
           const isActive = location.pathname === tab.path;
           // The center tab is now at index 2 (Profile: 0, About Us: 1, Home: 2)
           const isCenter = index === 2; 
