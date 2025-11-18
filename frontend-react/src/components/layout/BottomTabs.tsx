@@ -1,6 +1,6 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom"; 
 // Imported new icons: Info (for About Us), BarChart3 (for Leaderboard)
-import { Home, Grid3X3, User, Info, BarChart3 } from "lucide-react"; 
+import { Home, Grid3X3, User, Info, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -8,28 +8,25 @@ const tabs = [
   // 1. Profile
   { icon: User, label: "Profile", path: "/profile" },
   // 2. About Us
-  { icon: Info, label: "About Us", path: "/about-us" }, 
+  { icon: Info, label: "About Us", path: "/about-us" },
   // 3. Home (This will be the centered tab, index 2)
-  { icon: Home, label: "Home", path: "/" }, 
+  { icon: Home, label: "Home", path: "/" },
   // 4. Leaderboard
-  { icon: BarChart3, label: "Leaderboard", path: "/leaderboard" }, 
-  // 5. All Quizzes (Updated label and path)
-  { icon: Grid3X3, label: "All Quizzes", path: "/all-quizzes" }, 
+  { icon: BarChart3, label: "Leaderboard", path: "/leaderboard" },
+  // 5. Quizzes (Updated label and path)
+  { icon: Grid3X3, label: "Quizzes", path: "/all-quizzes" },
 ];
 
 export const BottomTabs = () => {
   const location = useLocation();
-  const isMobile = useIsMobile(); // Kept this hook, though it's not strictly used in the return logic's rendering.
+  const isMobile = useIsMobile();
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-card/95 to-card/80 backdrop-blur-lg border-t border-border z-50 md:hidden">
-      {/* ✅ justify-around makes spacing consistent */}
-<div className="flex items-center justify-around h-20 px-2 max-w-full mx-auto">
-          {tabs.map((tab, index) => {
+      <div className="flex items-center justify-around h-20 px-2 max-w-full mx-auto">
+        {tabs.map((tab, index) => {
           const isActive = location.pathname === tab.path;
-          // The center tab is now at index 2 (Profile: 0, About Us: 1, Home: 2)
-          const isCenter = index === 2; 
-
+          const isCenter = index === 2;
           return (
             <NavLink
               key={tab.path}
@@ -58,7 +55,6 @@ export const BottomTabs = () => {
                   )}
                 />
               </div>
-
               <span
                 className={cn(
                   "text-xs font-medium transition-all duration-300",
