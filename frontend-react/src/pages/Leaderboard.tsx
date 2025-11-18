@@ -127,15 +127,7 @@ const Leaderboard = () => {
   // Animate rank change when data loads
   useEffect(() => {
     if (loading || previousLeaderboardData.length === 0 || leaderboardData.length === 0 || !currentUserId) {
-      // If no previous data or still loading, just scroll to user
-      if (!loading && leaderboardData.length > 0 && currentUserRef.current) {
-        setTimeout(() => {
-          currentUserRef.current?.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center' 
-          });
-        }, 300);
-      }
+      // Don't auto-scroll on initial load or period change
       return;
     }
 
@@ -143,13 +135,7 @@ const Leaderboard = () => {
     const currentIndex = leaderboardData.findIndex(p => p.userId === currentUserId);
 
     if (previousIndex === -1 || currentIndex === -1 || previousIndex === currentIndex) {
-      // No rank change or user not found - just scroll to position
-      setTimeout(() => {
-        currentUserRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center' 
-        });
-      }, 300);
+      // No rank change or user not found - don't scroll
       return;
     }
 
@@ -163,29 +149,12 @@ const Leaderboard = () => {
     setAnimatingUserId(currentUserId);
     setTranslateY(-distance);
 
-    // Scroll to show the animation path
-    setTimeout(() => {
-      const middleRank = Math.floor((previousIndex + currentIndex) / 2);
-      const middleElement = containerRef.current?.children[middleRank] as HTMLElement;
-      if (middleElement) {
-        middleElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 100);
-
     // Complete animation
     const animationDuration = Math.abs(rankDifference) * 400; // 400ms per rank
     setTimeout(() => {
       setTranslateY(0);
       setIsAnimating(false);
       setAnimatingUserId(null);
-      
-      // Scroll to final position
-      setTimeout(() => {
-        currentUserRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center' 
-        });
-      }, 600);
     }, animationDuration);
 
   }, [leaderboardData, loading, currentUserId]);
@@ -237,7 +206,7 @@ const Leaderboard = () => {
       className="
         min-h-screen w-full 
         flex flex-col items-center 
-        px-4 pb-10 
+        px-4 pb-24
         bg-[#100321]
         bg-[url('/leaderboard.jpg')]
         bg-no-repeat
