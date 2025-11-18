@@ -280,7 +280,6 @@ const Leaderboard = () => {
           animation: glow-pulse-down 0.8s ease-in-out infinite;
         }
       `}</style>
-        
       {/* Top spacing */}
       <div className="pt-5 lg:pt-10"></div>
 
