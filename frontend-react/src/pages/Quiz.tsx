@@ -942,9 +942,9 @@ export default function Quiz() {
       };
   }
 
+  // REVISED QuizBase: Removed min-h-screen and unnecessary flex-col
   const QuizBase = ({ children }: { children: React.ReactNode }) => (
-    <div className="flex flex-col min-h-screen relative overflow-hidden">
-      {/* Updated Background to darker, more vibrant space theme */}
+<div className="flex flex-col min-h-[100dvh] relative overflow-hidden"> 
       <div className="fixed inset-0 bg-gradient-to-br from-[#0c031c] via-[#1a0b2e] to-[#2d1b4e]" style={{ zIndex: 0 }} />
       <StarfieldBackground />
       {categoryImage && (
@@ -958,16 +958,18 @@ export default function Quiz() {
           }}
         />
       )}
-      {/* <div className="relative z-10 flex flex-col min-h-screen">
+      {/* Added relative z-10 wrapper around children */}
+      <div className="relative z-10 h-full"> 
         {children}
-      </div> */}
+      </div>
     </div>
   );
 
   if (error) {
     return (
       <QuizBase>
-        <div className="flex-1 flex items-center justify-center px-4">
+        {/* Added flex-1 to center content vertically within MobileLayout's container */}
+        <div className="min-h-[100dvh] flex-1 flex items-center justify-center px-4">
           <div className="text-center space-y-4 max-w-md">
             <h2 className="text-xl md:text-2xl font-bold text-red-400">Error</h2>
             <p className="text-sm md:text-base text-purple-200">{error}</p>
@@ -983,7 +985,8 @@ export default function Quiz() {
   if (loading || (!quizState.question && !quizState.completed)) {
     return (
       <QuizBase>
-        <div className="flex-1 flex items-center justify-center px-4">
+        {/* Added flex-1 to center content vertically within MobileLayout's container */}
+        <div className=" min-h-[100dvh] flex-1 flex items-center justify-center px-4">
           <div className="text-center space-y-4">
             <div className="animate-spin rounded-full h-8 w-8 md:h-12 md:w-12 border-b-2 border-purple-400 mx-auto"></div>
             <p className="text-sm md:text-base text-purple-200">
@@ -1008,13 +1011,13 @@ export default function Quiz() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen relative overflow-hidden">
+    <div className="fixed inset-0 flex flex-col overflow-hidden"> {/* Changed to fixed positioning */}
       {/* Updated Background to darker, more vibrant space theme */}
-      <div className="fixed inset-0 bg-gradient-to-br from-[#0c031c] via-[#1a0b2e] to-[#2d1b4e]" style={{ zIndex: 0 }} />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0c031c] via-[#1a0b2e] to-[#2d1b4e]" style={{ zIndex: 0 }} />
       <StarfieldBackground />
       {categoryImage && (
         <div 
-          className="fixed inset-0 opacity-5"
+          className="absolute inset-0 opacity-5"
           style={{
             backgroundImage: `url(${categoryImage})`,
             backgroundSize: 'cover',
@@ -1023,9 +1026,8 @@ export default function Quiz() {
           }}
         />
       )}
-
-      <div className="relative z-10 flex flex-col min-h-screen">
-        <div className="sticky top-0 z-30 bg-black/40 backdrop-blur-md border-b-2 border-purple-500/30">
+      <div className="relative z-10 flex-1 flex flex-col overflow-y-auto">
+      <div className="sticky top-0 z-30 bg-black/40 backdrop-blur-md border-b-2 border-purple-500/30">
           <div className="px-2 py-2 md:py-4 max-w-full mx-auto">
             <div className="flex items-center justify-between gap-2 mb-3">
               <Button
@@ -1076,7 +1078,7 @@ export default function Quiz() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-4xl">
+        <div className="flex-1 px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-4xl"> {/* Added flex-1 to ensure content area fills remaining height */}
           <div className="space-y-6">
             <div className="px-1 py-3 md:py-6 text-center">
               <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-white leading-relaxed drop-shadow-lg">
@@ -1098,7 +1100,7 @@ export default function Quiz() {
         return (
           <Card
             key={index}
-            className={`p-5 md:p-6 transition-all duration-300 ${getOptionStyle(answer)} relative overflow-hidden cursor-pointer`}
+            className={`p-6 md:p-8 transition-all duration-300 ${getOptionStyle(answer)} relative overflow-hidden cursor-pointer`}
             onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
             style={{ 
               borderRadius: '1.5rem',
@@ -1149,7 +1151,7 @@ export default function Quiz() {
                   </div>
                 </Card>
 
-               <div className="mt-6 pb-4">
+               <div className="mt-6">
                   <Button
                     variant="default"
                     size="lg"
@@ -1172,7 +1174,7 @@ export default function Quiz() {
                   </div>
                 </Card>
 
-                <div className="mt-6 space-y-4 animate-fade-in pb-4">
+                <div className="mt-6 space-y-4 animate-fade-in">
                   <Card className="p-4 md:p-6 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
                     <div className="space-y-4">
                       <p className="text-sm font-medium text-center text-white">Did you like this question?</p>

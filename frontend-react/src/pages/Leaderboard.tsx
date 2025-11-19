@@ -264,7 +264,7 @@ const Leaderboard = () => {
           shadow-md 
           overflow-hidden 
           -mt-6 sm:-mt-8
-          max-h-[60vh] sm:max-h-[70vh]
+          min-h-[100dvh]
           overflow-y-auto
           scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-purple-900
         "
