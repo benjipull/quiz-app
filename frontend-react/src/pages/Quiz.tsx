@@ -958,9 +958,9 @@ export default function Quiz() {
           }}
         />
       )}
-      <div className="relative z-10 flex flex-col min-h-screen">
+      {/* <div className="relative z-10 flex flex-col min-h-screen">
         {children}
-      </div>
+      </div> */}
     </div>
   );
 
