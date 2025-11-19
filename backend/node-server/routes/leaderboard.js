@@ -103,7 +103,7 @@ router.get("/", authenticateToken, async (req, res) => {
                     totalPoints: 1,
                     username: "$userDetails.alias", 
                     level: "$userDetails.level",
-                    avatar: "$userDetails.avatar" 
+                    avatar: { $ifNull: ["$userDetails.avatar", 1] }
                 }
             }
         ];
