@@ -164,8 +164,9 @@ const Leaderboard = () => {
     <div
       className="
         w-full 
+        min-h-screen
         flex flex-col items-center 
-        px-3 sm:px-4 pb-24
+        px-3 sm:px-4 pb-20
         bg-[#100321]
         bg-[url('/leaderboard.jpg')]
         bg-no-repeat bg-center bg-cover
@@ -264,7 +265,7 @@ const Leaderboard = () => {
           shadow-md 
           overflow-hidden 
           -mt-6 sm:-mt-8
-          min-h-[100dvh]
+          max-h-[calc(100dvh-280px)]
           overflow-y-auto
           scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-purple-900
         "
