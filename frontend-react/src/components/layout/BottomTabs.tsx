@@ -1,5 +1,4 @@
 import { NavLink, useLocation } from "react-router-dom"; 
-// Imported new icons: Info (for About Us), BarChart3 (for Leaderboard)
 import { Home, Grid3X3, User, Info, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -20,6 +19,11 @@ const tabs = [
 export const BottomTabs = () => {
   const location = useLocation();
   const isMobile = useIsMobile();
+
+  // Hide on quiz playing page (/quiz or /quiz/:categoryId)
+  const hideOnQuizPage = location.pathname.startsWith("/quiz");
+
+  if (hideOnQuizPage) return null; // ⛔ Do not display tabs
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-card/95 to-card/80 backdrop-blur-lg border-t border-border z-50 md:hidden">
@@ -48,19 +52,12 @@ export const BottomTabs = () => {
                     : "w-12 h-12 bg-muted/60 text-muted-foreground hover:bg-primary/20 hover:text-primary hover:scale-105"
                 )}
               >
-                <tab.icon
-                  className={cn(
-                    "transition-all duration-300",
-                    isCenter ? "h-6 w-6" : "h-5 w-5"
-                  )}
-                />
+                <tab.icon className={cn("transition-all duration-300", isCenter ? "h-6 w-6" : "h-5 w-5")} />
               </div>
               <span
                 className={cn(
                   "text-xs font-medium transition-all duration-300",
-                  isActive
-                    ? "text-primary font-semibold"
-                    : "text-muted-foreground",
+                  isActive ? "text-primary font-semibold" : "text-muted-foreground",
                   isCenter && isActive ? "font-bold" : ""
                 )}
               >
@@ -73,3 +70,4 @@ export const BottomTabs = () => {
     </div>
   );
 };
+

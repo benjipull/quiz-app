@@ -2,21 +2,14 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Clock } from "lucide-react";
 import { apiClient } from "@/utils/apiClient";
 
-// Avatar imports
-import avatar1 from '../assets/images/avatars/1.png';
-import avatar2 from '../assets/images/avatars/2.png';
-import avatar3 from '../assets/images/avatars/3.png';
-import avatar4 from '../assets/images/avatars/4.png';
-import avatar5 from '../assets/images/avatars/5.png';
-
-const BASE_URL = import.meta.env.VITE_BASE_URL;
-
-// Get all avatars into an array
+// 1. Avatar Imports (Needed for the current user's local fallback and general defaults)
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
   import: "default",
 });
 const avatars: string[] = Object.values(avatarImages) as string[];
+
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 // Define the expected structure of a single player item from the API
 interface LeaderboardPlayer {
@@ -24,7 +17,7 @@ interface LeaderboardPlayer {
   username: string;
   totalPoints: number;
   level: number;
-  avatarUrl?: string;
+  avatarUrl?: string; 
 }
 
 // Map for period display names and API values
@@ -41,7 +34,8 @@ const Leaderboard = () => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string>("");
-  const [userAvatar, setUserAvatar] = useState<number>(1);
+  // userAvatar stores the local image URL path (fallback for current user)
+  const [userAvatar, setUserAvatar] = useState<string | null>(null); 
   
   // STATE: To track the user's previous rank for animation
   const [previousLeaderboardData, setPreviousLeaderboardData] = useState<LeaderboardPlayer[]>([]);
@@ -54,22 +48,31 @@ const Leaderboard = () => {
   // containerRef now points to the scrollable list container
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const avatarMap = useMemo(() => ({
-    1: avatar1,
-    2: avatar2,
-    3: avatar3,
-    4: avatar4,
-    5: avatar5, 
-  }), []);
-
   // Get current user ID and avatar from localStorage
   useEffect(() => {
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+    const storedUserAvatarIndex = typeof window !== 'undefined' ? localStorage.getItem("userAvatarIndex") : null;
+
     if (storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
         setCurrentUserId(parsedUser._id || "");
-        setUserAvatar(parsedUser.avatar || 1);
+        
+        // Logic to retrieve the current user's local avatar image path
+        let avatarIndex = 0;
+        if (storedUserAvatarIndex !== null) {
+          // localStorage stores the index as a 0-based number
+          avatarIndex = parseInt(storedUserAvatarIndex);
+        } else if (parsedUser.avatar) {
+          // Fallback: If 'avatar' is a 1-based index (e.g., 1, 2, 3...)
+          avatarIndex = parsedUser.avatar - 1;
+        }
+
+        // Set the local path as the fallback userAvatar state
+        // Ensure index is within bounds of the avatars array
+        const initialAvatar = avatars[avatarIndex % avatars.length] || avatars[0] || null;
+        setUserAvatar(initialAvatar);
+
       } catch (e) {
         console.error("Failed to parse user data:", e);
       }
@@ -176,7 +179,6 @@ const Leaderboard = () => {
 
       if (isBelow || isAbove) {
         // Scroll the container to bring the user's row into view.
-        // Using 'smooth' behavior makes it a nice transition.
         userElement.scrollIntoView({ 
           behavior: 'smooth', 
           block: 'center' // Center the item in the view if possible
@@ -211,22 +213,6 @@ const Leaderboard = () => {
     }
   };
 
-  // Helper to get the user's actual avatar from their avatar number
-  const getPlayerAvatar = (player: LeaderboardPlayer, isCurrentUser: boolean) => {
-    // If it's the current user, use their actual avatar from state
-    if (isCurrentUser && userAvatar) {
-      const avatarIndex = userAvatar - 1;
-      return avatars[avatarIndex] || avatars[0];
-    }
-    
-    // For other players, try to use avatarUrl from backend if available
-    if (player.avatarUrl) {
-      return player.avatarUrl;
-    }
-    
-    // Fallback: use a default avatar based on ranking (for demo purposes)
-    return avatarMap[(((leaderboardData.indexOf(player) + 1) % 5) + 1) as keyof typeof avatarMap];
-  };
 
   return (
     <div
@@ -359,10 +345,28 @@ const Leaderboard = () => {
             const rankChange = isCurrentUser ? getRankChange(player, rank) : null;
             const isAnimatingThis = isAnimating && animatingUserId === player.userId;
             
+            // --- FINAL AVATAR RESOLUTION LOGIC ---
+            let avatarSrc: string;
+            
+            if (player.avatarUrl) {
+                // Priority 1: Use the URL provided by the backend (for everyone).
+                avatarSrc = player.avatarUrl;
+            } else if (isCurrentUser && userAvatar) {
+                // Priority 2: Use the current user's local state fallback (from localStorage/local files).
+                avatarSrc = userAvatar;
+            } else {
+                // Priority 3: Fallback for ALL other players (and current user if their local state failed).
+                // Use a deterministic rotation of local avatars based on their rank/index.
+                const defaultAvatarIndex = index % avatars.length;
+                // Use one of the local avatars, or the final public placeholder if the local array is somehow empty.
+                avatarSrc = avatars[defaultAvatarIndex] || "/default-avatar-placeholder.png"; 
+            }
+            // ------------------------------------
+
             return (
               <div
                 key={player.userId}
-                ref={isCurrentUser ? currentUserRef : null} // Attach ref for scrolling
+                ref={isCurrentUser ? currentUserRef : null} 
                 className={`
                   flex items-center gap-4 px-4 py-3 transition-all duration-300
                   ${isCurrentUser ? "bg-green-300/50 rounded-lg" : "bg-transparent"}
@@ -395,8 +399,16 @@ const Leaderboard = () => {
                 {/* Avatar */}
                 <div className="relative flex-shrink-0"> 
                   <img
-                    src={getPlayerAvatar(player, isCurrentUser)}
+                    src={avatarSrc}
                     alt={`${player.username}'s avatar`}
+                    // Add an onError handler to replace the image with the placeholder if the URL fails to load
+                    onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        // Only change if it's not already the placeholder to prevent infinite loop
+                        if (target.src !== "/default-avatar-placeholder.png") {
+                           target.src = "/default-avatar-placeholder.png";
+                        }
+                    }}
                     className="
                       w-10 h-10 rounded-full object-cover 
                       border border-gray-300/50 

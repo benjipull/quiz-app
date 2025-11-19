@@ -75,14 +75,14 @@ router.get("/", authenticateToken, async (req, res) => {
             {
                 $sort: { totalPoints: -1 }
             },
-            // 4. Limit to the top 50 players (adjust as needed)
+            // 4. Limit to the top 100 players (adjust as needed)
             {
-                $limit: 50 
+                $limit: 100 
             },
             // 5. Join with the users collection to get player details
             {
                 $lookup: {
-                    from: "users", // Assumes your User model/collection name is 'users'
+                    from: "users", 
                     localField: "_id",
                     foreignField: "_id",
                     as: "userDetails"
@@ -92,10 +92,10 @@ router.get("/", authenticateToken, async (req, res) => {
             {
                 $unwind: {
                     path: "$userDetails",
-                    preserveNullAndEmptyArrays: false // Only include users found
+                    preserveNullAndEmptyArrays: false 
                 }
             },
-            // 7. Project the final required structure, including avatarUrl
+            // 7. Project the final required structure
             {
                 $project: {
                     _id: 0,
@@ -103,7 +103,7 @@ router.get("/", authenticateToken, async (req, res) => {
                     totalPoints: 1,
                     username: "$userDetails.alias", 
                     level: "$userDetails.level",
-                    avatarUrl: "$userDetails.avatarUrl" 
+                    avatar: "$userDetails.avatar" 
                 }
             }
         ];
