@@ -17,7 +17,8 @@ interface LeaderboardPlayer {
   username: string;
   totalPoints: number;
   level: number;
-  avatarUrl?: string; 
+  // ✅ CORRECTION: Changed from avatarUrl?: string to avatar: number
+  avatar: number; 
 }
 
 // Map for period display names and API values
@@ -348,17 +349,18 @@ const Leaderboard = () => {
             // --- FINAL AVATAR RESOLUTION LOGIC ---
             let avatarSrc: string;
             
-            if (player.avatarUrl) {
-                // Priority 1: Use the URL provided by the backend (for everyone).
-                avatarSrc = player.avatarUrl;
+            // ✅ CORRECTION: Use the numeric 'avatar' ID returned from the backend (1-based index)
+            if (player.avatar && player.avatar > 0) {
+                const avatarIndex = (player.avatar - 1) % avatars.length;
+                // Priority 1: Use the avatar ID to look up the local asset.
+                avatarSrc = avatars[avatarIndex] || avatars[0] || "/default-avatar-placeholder.png"; 
             } else if (isCurrentUser && userAvatar) {
-                // Priority 2: Use the current user's local state fallback (from localStorage/local files).
+                // Priority 2: Use the current user's local state fallback (if their avatar ID failed).
                 avatarSrc = userAvatar;
             } else {
-                // Priority 3: Fallback for ALL other players (and current user if their local state failed).
+                // Priority 3: Fallback for all other players.
                 // Use a deterministic rotation of local avatars based on their rank/index.
                 const defaultAvatarIndex = index % avatars.length;
-                // Use one of the local avatars, or the final public placeholder if the local array is somehow empty.
                 avatarSrc = avatars[defaultAvatarIndex] || "/default-avatar-placeholder.png"; 
             }
             // ------------------------------------
