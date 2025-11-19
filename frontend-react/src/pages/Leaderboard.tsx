@@ -9,6 +9,10 @@ const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
 });
 const avatars: string[] = Object.values(avatarImages) as string[];
 
+// Debug: Check if avatars loaded
+console.log("🎭 Total avatars loaded:", avatars.length);
+console.log("🎭 Avatar paths:", avatars);
+
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 // Define the expected structure of a single player item from the API
@@ -17,7 +21,6 @@ interface LeaderboardPlayer {
   username: string;
   totalPoints: number;
   level: number;
-  // ✅ CORRECTION: Changed from avatarUrl?: string to avatar: number
   avatar: number; 
 }
 
@@ -59,6 +62,8 @@ const Leaderboard = () => {
         const parsedUser = JSON.parse(storedUser);
         setCurrentUserId(parsedUser._id || "");
         
+        console.log("👤 Current user data:", parsedUser);
+        
         // Logic to retrieve the current user's local avatar image path
         let avatarIndex = 0;
         if (storedUserAvatarIndex !== null) {
@@ -69,10 +74,14 @@ const Leaderboard = () => {
           avatarIndex = parsedUser.avatar - 1;
         }
 
+        console.log("👤 Current user avatar index:", avatarIndex);
+
         // Set the local path as the fallback userAvatar state
         // Ensure index is within bounds of the avatars array
         const initialAvatar = avatars[avatarIndex % avatars.length] || avatars[0] || null;
         setUserAvatar(initialAvatar);
+        
+        console.log("👤 Current user avatar path:", initialAvatar);
 
       } catch (e) {
         console.error("Failed to parse user data:", e);
@@ -93,6 +102,8 @@ const Leaderboard = () => {
       }
       
       const apiUrl = `${BASE_URL}/api/leaderboard?period=${currentPeriod}`;
+      
+      console.log("🔄 Fetching leaderboard for period:", currentPeriod);
       
       // Save the current data as "previous" before fetching new data
       if (leaderboardData.length > 0) {
@@ -116,6 +127,12 @@ const Leaderboard = () => {
         }
 
         const data = await response.json();
+        
+        console.log("📊 Leaderboard response:", data);
+        console.log("📊 Leaderboard players:", data.leaderboard);
+        console.log("📊 First player:", data.leaderboard?.[0]);
+        console.log("📊 First player avatar:", data.leaderboard?.[0]?.avatar);
+        
         setLeaderboardData(data.leaderboard || []);
 
       } catch (error) {
@@ -346,23 +363,31 @@ const Leaderboard = () => {
             const rankChange = isCurrentUser ? getRankChange(player, rank) : null;
             const isAnimatingThis = isAnimating && animatingUserId === player.userId;
             
-            // --- FINAL AVATAR RESOLUTION LOGIC ---
+            // --- IMPROVED AVATAR RESOLUTION LOGIC ---
             let avatarSrc: string;
             
-            // ✅ CORRECTION: Use the numeric 'avatar' ID returned from the backend (1-based index)
-            if (player.avatar && player.avatar > 0) {
+            console.log(`🎭 Processing player: ${player.username} (userId: ${player.userId})`);
+            console.log(`🎭 Player avatar value:`, player.avatar, `(type: ${typeof player.avatar})`);
+            console.log(`🎭 Is current user:`, isCurrentUser);
+            console.log(`🎭 Avatars array length:`, avatars.length);
+            
+            if (player.avatar && typeof player.avatar === 'number' && player.avatar > 0 && avatars.length > 0) {
+                // Convert 1-based avatar ID to 0-based array index
                 const avatarIndex = (player.avatar - 1) % avatars.length;
-                // Priority 1: Use the avatar ID to look up the local asset.
-                avatarSrc = avatars[avatarIndex] || avatars[0] || "/default-avatar-placeholder.png"; 
+                avatarSrc = avatars[avatarIndex];
+                console.log(`✅ ${player.username}: Using backend avatar ID ${player.avatar} → index ${avatarIndex} → ${avatarSrc}`);
             } else if (isCurrentUser && userAvatar) {
-                // Priority 2: Use the current user's local state fallback (if their avatar ID failed).
+                // Fallback to current user's stored avatar
                 avatarSrc = userAvatar;
+                console.log(`👤 ${player.username}: Using current user stored avatar → ${avatarSrc}`);
             } else {
-                // Priority 3: Fallback for all other players.
-                // Use a deterministic rotation of local avatars based on their rank/index.
-                const defaultAvatarIndex = index % avatars.length;
-                avatarSrc = avatars[defaultAvatarIndex] || "/default-avatar-placeholder.png"; 
+                // NO DEFAULT - Show broken image to debug
+                avatarSrc = "";
+                console.warn(`⚠️ ${player.username}: NO AVATAR FOUND! avatar=${player.avatar}, isCurrentUser=${isCurrentUser}, userAvatar=${userAvatar}`);
             }
+            
+            console.log(`🎯 Final avatar for ${player.username}:`, avatarSrc);
+            console.log("---");
             // ------------------------------------
 
             return (
@@ -381,16 +406,14 @@ const Leaderboard = () => {
                   transform: isAnimatingThis ? `translateY(${translateY}px)` : 'translateY(0)',
                 }}
               >
-                {/* Rank + Indicator (REFINED STYLING) */}
+                {/* Rank + Indicator */}
                 <div className="text-xl font-bold text-purple-200 w-10 text-center flex items-center justify-center gap-0.5"> 
                   
                   {/* Rank Change Indicator (Up/Down Arrow) */}
                   {isCurrentUser && !isAnimating && rankChange === 'down' && (
-                      // Red triangle for moving down
                       <span className="text-red-400 text-base font-extrabold -mt-1">▼</span> 
                   )}
                   {isCurrentUser && !isAnimating && rankChange === 'up' && (
-                      // Green triangle for moving up
                       <span className="text-green-400 text-base font-extrabold -mt-1">▲</span>
                   )}
                   
@@ -400,22 +423,26 @@ const Leaderboard = () => {
 
                 {/* Avatar */}
                 <div className="relative flex-shrink-0"> 
-                  <img
-                    src={avatarSrc}
-                    alt={`${player.username}'s avatar`}
-                    // Add an onError handler to replace the image with the placeholder if the URL fails to load
-                    onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        // Only change if it's not already the placeholder to prevent infinite loop
-                        if (target.src !== "/default-avatar-placeholder.png") {
-                           target.src = "/default-avatar-placeholder.png";
-                        }
-                    }}
-                    className="
-                      w-10 h-10 rounded-full object-cover 
-                      border border-gray-300/50 
-                    "
-                  />
+                  {avatarSrc ? (
+                    <img
+                      src={avatarSrc}
+                      alt={`${player.username}'s avatar`}
+                      onError={(e) => {
+                          console.error(`❌ Failed to load avatar for ${player.username}:`, avatarSrc);
+                          const target = e.target as HTMLImageElement;
+                          target.style.border = '2px solid red';
+                          target.alt = 'Failed to load';
+                      }}
+                      className="
+                        w-10 h-10 rounded-full object-cover 
+                        border border-gray-300/50 
+                      "
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-red-500 border-2 border-red-700 flex items-center justify-center text-white text-xs font-bold">
+                      ❌
+                    </div>
+                  )}
 
                   {/* Optional Badge (e.g., for Top 3) */}
                   {(rank <= 3) && (
