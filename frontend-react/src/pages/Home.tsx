@@ -466,48 +466,6 @@ export default function Home() {
           </Card>
         )}
 
-        {/* Leaderboard Button */}
-{/* <div className="pb-3 relative">
-  <Button
-    onClick={() => navigate("/leaderboard")}
-    disabled={loading}
-    className="w-full h-14 md:h-16 flex items-center justify-between px-6 relative overflow-hidden rounded-full shadow-lg bg-gradient-to-r from-purple-600 via-purple-700 to-purple-800 hover:from-purple-700 hover:via-purple-800 hover:to-purple-900 transition-all duration-300"
-  >
-    <div className="flex items-center space-x-3">
-      <Trophy className="w-6 h-6 md:w-7 md:h-7 text-yellow-400" />
-      <span className="text-xl md:text-2xl font-bold text-white">Leaderboard</span>
-    </div>
-    
-    <div className="relative">
-      <div className="bg-yellow-400/20 rounded-full w-12 h-12 md:w-14 md:h-14 flex items-center justify-center shadow-md animate-pulse">
-        <Trophy className="w-7 h-7 md:w-8 md:h-8 text-yellow-400" />
-      </div>
-    </div>
-  </Button>
-</div> */}
-
-{/* Compact Floating Badge Style */}
-<div className="fixed z-40 top-[120px] sm:top-[140px] md:top-[160px] lg:top-[180px] right-4 sm:right-8 md:right-12 lg:right-16 xl:right-24">
-  <Button
-    onClick={() => navigate("/leaderboard")}
-    className="h-14 w-14 rounded-full bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 
-               hover:from-yellow-500 hover:via-yellow-600 hover:to-yellow-700 
-               shadow-2xl hover:scale-110 transition-transform duration-300 
-               flex items-center justify-center group relative"
-  >
-    <Trophy className="w-7 h-7 text-purple-900 group-hover:animate-bounce" />
-
-    <span className="absolute inset-0 rounded-full bg-yellow-400 animate-ping opacity-25" />
-
-    <span className="absolute right-16 bg-purple-900 text-white px-3 py-1.5 rounded-lg 
-                     text-sm font-semibold whitespace-nowrap opacity-0 
-                     group-hover:opacity-100 transition-opacity duration-200 shadow-lg">
-      Leaderboard
-    </span>
-  </Button>
-</div>
-
-            {/* User Avatar and Alias */}
     {/* User Avatar and Alias */}
 <div className="flex flex-col items-center py-6">
   <div

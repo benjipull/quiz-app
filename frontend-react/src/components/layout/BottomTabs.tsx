@@ -1,12 +1,20 @@
-import { NavLink, useLocation } from "react-router-dom";
-import { Home, Grid3X3, User } from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom"; 
+// Imported new icons: Info (for About Us), BarChart3 (for Leaderboard)
+import { Home, Grid3X3, User, Info, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const tabs = [
+  // 1. Profile
   { icon: User, label: "Profile", path: "/profile" },
+  // 2. About Us
+  { icon: Info, label: "About Us", path: "/about-us" },
+  // 3. Home (This will be the centered tab, index 2)
   { icon: Home, label: "Home", path: "/" },
-  { icon: Grid3X3, label: "Quizzes", path: "/categories" },
+  // 4. Leaderboard
+  { icon: BarChart3, label: "Leaderboard", path: "/leaderboard" },
+  // 5. Quizzes (Updated label and path)
+  { icon: Grid3X3, label: "Quizzes", path: "/all-quizzes" },
 ];
 
 export const BottomTabs = () => {
@@ -15,12 +23,10 @@ export const BottomTabs = () => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-card/95 to-card/80 backdrop-blur-lg border-t border-border z-50 md:hidden">
-      {/* ✅ justify-around makes spacing consistent */}
-      <div className="flex items-center justify-around h-20 px-4 max-w-full mx-auto">
+      <div className="flex items-center justify-around h-20 px-2 max-w-full mx-auto">
         {tabs.map((tab, index) => {
           const isActive = location.pathname === tab.path;
-          const isCenter = index === 1;
-
+          const isCenter = index === 2;
           return (
             <NavLink
               key={tab.path}
@@ -49,7 +55,6 @@ export const BottomTabs = () => {
                   )}
                 />
               </div>
-
               <span
                 className={cn(
                   "text-xs font-medium transition-all duration-300",

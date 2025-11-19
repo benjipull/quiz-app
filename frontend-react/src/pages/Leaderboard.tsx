@@ -51,6 +51,7 @@ const Leaderboard = () => {
   
   // REF: For auto-scrolling to the current user's position
   const currentUserRef = useRef<HTMLDivElement>(null);
+  // containerRef now points to the scrollable list container
   const containerRef = useRef<HTMLDivElement>(null);
 
   const avatarMap = useMemo(() => ({
@@ -127,15 +128,7 @@ const Leaderboard = () => {
   // Animate rank change when data loads
   useEffect(() => {
     if (loading || previousLeaderboardData.length === 0 || leaderboardData.length === 0 || !currentUserId) {
-      // If no previous data or still loading, just scroll to user
-      if (!loading && leaderboardData.length > 0 && currentUserRef.current) {
-        setTimeout(() => {
-          currentUserRef.current?.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center' 
-          });
-        }, 300);
-      }
+      // Don't auto-scroll on initial load or period change
       return;
     }
 
@@ -143,13 +136,7 @@ const Leaderboard = () => {
     const currentIndex = leaderboardData.findIndex(p => p.userId === currentUserId);
 
     if (previousIndex === -1 || currentIndex === -1 || previousIndex === currentIndex) {
-      // No rank change or user not found - just scroll to position
-      setTimeout(() => {
-        currentUserRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center' 
-        });
-      }, 300);
+      // No rank change or user not found - don't scroll
       return;
     }
 
@@ -163,32 +150,41 @@ const Leaderboard = () => {
     setAnimatingUserId(currentUserId);
     setTranslateY(-distance);
 
-    // Scroll to show the animation path
-    setTimeout(() => {
-      const middleRank = Math.floor((previousIndex + currentIndex) / 2);
-      const middleElement = containerRef.current?.children[middleRank] as HTMLElement;
-      if (middleElement) {
-        middleElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 100);
-
     // Complete animation
     const animationDuration = Math.abs(rankDifference) * 400; // 400ms per rank
     setTimeout(() => {
       setTranslateY(0);
       setIsAnimating(false);
       setAnimatingUserId(null);
-      
-      // Scroll to final position
-      setTimeout(() => {
-        currentUserRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center' 
-        });
-      }, 600);
     }, animationDuration);
 
   }, [leaderboardData, loading, currentUserId]);
+  
+  // Auto-scroll to current user when data is loaded/updated
+  useEffect(() => {
+    // Only scroll if the container is available and the list is not animating a rank change.
+    if (!loading && !isAnimating && currentUserRef.current && containerRef.current) {
+      const userElement = currentUserRef.current;
+      const container = containerRef.current;
+
+      // Check if the user's row is outside the visible area of the container
+      const containerRect = container.getBoundingClientRect();
+      const userRect = userElement.getBoundingClientRect();
+
+      const isBelow = userRect.bottom > containerRect.bottom;
+      const isAbove = userRect.top < containerRect.top;
+
+      if (isBelow || isAbove) {
+        // Scroll the container to bring the user's row into view.
+        // Using 'smooth' behavior makes it a nice transition.
+        userElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' // Center the item in the view if possible
+        });
+      }
+    }
+  }, [leaderboardData, loading, isAnimating]); // Rerun when data changes and animation stops
+
   
   // Helper function: Calculates if the user moved up or down
   const getRankChange = (player: LeaderboardPlayer, currentRank: number) => {
@@ -235,9 +231,9 @@ const Leaderboard = () => {
   return (
     <div
       className="
-        min-h-screen w-full 
+        w-full 
         flex flex-col items-center 
-        px-4 pb-10 
+        px-4 pb-24
         bg-[#100321]
         bg-[url('/leaderboard.jpg')]
         bg-no-repeat
@@ -280,7 +276,7 @@ const Leaderboard = () => {
           animation: glow-pulse-down 0.8s ease-in-out infinite;
         }
       `}</style>
-        
+      
       {/* Top spacing */}
       <div className="pt-5 lg:pt-10"></div>
 
@@ -330,10 +326,20 @@ const Leaderboard = () => {
         />
       </div>
 
-      {/* Leaderboard List */}
+      {/* Leaderboard List (Internal Scroll Container) */}
       <div 
         ref={containerRef}
-        className="w-full max-w-2xl rounded-xl bg-purple-900/55 shadow-md overflow-hidden -mt-8"
+        className="
+          w-full max-w-2xl 
+          rounded-xl 
+          bg-purple-900/55 
+          shadow-md 
+          overflow-hidden 
+          -mt-8
+          max-h-[60vh] md:max-h-[70vh] 
+          overflow-y-auto 
+          scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-purple-900
+        "
       >
         {loading ? (
           <div className="p-8 text-center text-purple-200">
