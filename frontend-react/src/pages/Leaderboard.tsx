@@ -265,11 +265,14 @@ const Leaderboard = () => {
           shadow-md 
           overflow-hidden 
           -mt-6 sm:-mt-8
-          max-h-[calc(100dvh-280px)]
-          overflow-y-auto
           scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-purple-900
         "
+        style={{
+          maxHeight: leaderboardData.length > 10 ? '80vh' : 'auto',
+          overflowY: leaderboardData.length > 10 ? 'auto' : 'visible'
+        }}
       >
+        {/* ... content ... */}
         {loading ? (
           <div className="p-8 text-center text-purple-200">
             <div className="flex items-center justify-center space-x-2">
