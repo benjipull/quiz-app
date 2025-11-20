@@ -258,7 +258,7 @@ const Leaderboard = () => {
       {/* Scroll list */}
      <div
   ref={containerRef}
-  className="
+  className={`
     w-full max-w-2xl 
     rounded-xl 
     bg-purple-900/55 
@@ -266,11 +266,15 @@ const Leaderboard = () => {
     -mt-6 sm:-mt-8
     mb-28 md:mb-8
     scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-purple-900
-    pb-24
-  "
+    ${leaderboardData.length > 10 ? "pb-24" : "pb-0"}
+  `}
   style={{
-    height: "calc(100vh - 320px)",
-    overflowY: "auto"
+    height: leaderboardData.length > 10 
+      ? "calc(100vh - 320px)" 
+      : "auto",
+    overflowY: leaderboardData.length > 10 
+      ? "auto" 
+      : "visible"
   }}
 >
 
