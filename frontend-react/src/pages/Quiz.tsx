@@ -973,8 +973,8 @@ export default function Quiz() {
           <div className="text-center space-y-4 max-w-md">
             <h2 className="text-xl md:text-2xl font-bold text-red-400">Error</h2>
             <p className="text-sm md:text-base text-purple-200">{error}</p>
-            <Link to='/categories' className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl inline-block mt-4 border-0">
-              Back to Categories
+            <Link to='/all-quizzes' className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl inline-block mt-4 border-0">
+              Back to Quizzes
             </Link>
           </div>
         </div>
