@@ -256,23 +256,24 @@ const Leaderboard = () => {
       </div>
 
       {/* Scroll list */}
-      <div
-        ref={containerRef}
-        className="
-          w-full max-w-2xl 
-          rounded-xl 
-          bg-purple-900/55 
-          shadow-md 
-          overflow-hidden 
-          -mt-6 sm:-mt-8
-          scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-purple-900
-        "
-        style={{
-          maxHeight: leaderboardData.length > 10 ? '80vh' : 'auto',
-          overflowY: leaderboardData.length > 10 ? 'auto' : 'visible'
-        }}
-      >
-        {/* ... content ... */}
+     <div
+  ref={containerRef}
+  className="
+    w-full max-w-2xl 
+    rounded-xl 
+    bg-purple-900/55 
+    shadow-md 
+    -mt-6 sm:-mt-8
+    mb-28 md:mb-8
+    scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-purple-900
+    pb-24
+  "
+  style={{
+    height: "calc(100vh - 320px)",
+    overflowY: "auto"
+  }}
+>
+
         {loading ? (
           <div className="p-8 text-center text-purple-200">
             <div className="flex items-center justify-center space-x-2">
