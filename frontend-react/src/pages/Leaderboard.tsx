@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Clock } from "lucide-react";
 import { apiClient } from "@/utils/apiClient";
 
@@ -35,10 +35,9 @@ const Leaderboard = () => {
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [userAvatar, setUserAvatar] = useState<string | null>(null); 
 
+  // --- Removed Animation State ---
   const [previousLeaderboardData, setPreviousLeaderboardData] = useState<LeaderboardPlayer[]>([]);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [animatingUserId, setAnimatingUserId] = useState<string | null>(null);
-  const [translateY, setTranslateY] = useState(0);
+  // --- Removed Animation State ---
 
   const currentUserRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -77,6 +76,7 @@ const Leaderboard = () => {
 
       const apiUrl = `${BASE_URL}/api/leaderboard?period=${currentPeriod}`;
 
+      // Keep previous data to calculate rank change, but animation logic is removed
       if (leaderboardData.length > 0) {
         setPreviousLeaderboardData(leaderboardData);
       }
@@ -103,35 +103,12 @@ const Leaderboard = () => {
     fetchLeaderboard();
   }, [currentPeriod]);
 
-  // Rank-change animation
-  useEffect(() => {
-    if (loading || previousLeaderboardData.length === 0 || leaderboardData.length === 0 || !currentUserId) return;
-
-    const prevIndex = previousLeaderboardData.findIndex(p => p.userId === currentUserId);
-    const newIndex = leaderboardData.findIndex(p => p.userId === currentUserId);
-
-    if (prevIndex === -1 || newIndex === -1 || prevIndex === newIndex) return;
-
-    const diff = prevIndex - newIndex;
-    const rowHeight = 56; // slightly reduced for mobile friendliness
-    const distance = diff * rowHeight;
-
-    setIsAnimating(true);
-    setAnimatingUserId(currentUserId);
-    setTranslateY(-distance);
-
-    const animDuration = Math.abs(diff) * 350;
-    setTimeout(() => {
-      setTranslateY(0);
-      setIsAnimating(false);
-      setAnimatingUserId(null);
-    }, animDuration);
-
-  }, [leaderboardData, loading, currentUserId]);
+  // --- Removed Rank-change animation useEffect ---
 
   // Auto scroll
   useEffect(() => {
-    if (!loading && !isAnimating && currentUserRef.current && containerRef.current) {
+    // Simplified scroll logic: check on load and data change
+    if (!loading && currentUserRef.current && containerRef.current) {
       const userEl = currentUserRef.current;
       const container = containerRef.current;
 
@@ -141,11 +118,12 @@ const Leaderboard = () => {
       const below = userRect.bottom > containerRect.bottom;
       const above = userRect.top < containerRect.top;
 
+      // Smooth scroll if the current user is outside the container view
       if (below || above) {
         userEl.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }
-  }, [leaderboardData, loading, isAnimating]);
+  }, [leaderboardData, loading]);
 
 
   const getRankChange = (player: LeaderboardPlayer, currentRank: number) => {
@@ -197,19 +175,7 @@ const Leaderboard = () => {
         }
       `}</style>
 
-      <style>{`
-        @keyframes glow-pulse {
-          0%, 100% { box-shadow: 0 0 14px rgba(76, 209, 55, 0.6); }
-          50% { box-shadow: 0 0 26px rgba(76, 209, 55, 0.9); }
-        }
-        @keyframes glow-pulse-down {
-          0%, 100% { box-shadow: 0 0 14px rgba(255, 82, 82, 0.6); }
-          50% { box-shadow: 0 0 26px rgba(255, 82, 82, 0.9); }
-        }
-        .animating-row { transition: transform 0.35s; }
-        .glow-up { animation: glow-pulse 0.8s infinite; }
-        .glow-down { animation: glow-pulse-down 0.8s infinite; }
-      `}</style>
+      {/* --- Removed Animation Styles --- */}
 
       <div className="pt-6 sm:pt-10"></div>
 
@@ -292,7 +258,7 @@ const Leaderboard = () => {
             const rank = index + 1;
             const isCurrentUser = player.userId === currentUserId;
             const rankChange = isCurrentUser ? getRankChange(player, rank) : null;
-            const animating = isAnimating && animatingUserId === player.userId;
+            // --- Removed 'animating' variable ---
 
             let avatarSrc = "";
             if (player.avatar && typeof player.avatar === "number" && player.avatar > 0) {
@@ -309,18 +275,17 @@ const Leaderboard = () => {
                   flex items-center gap-4 px-4 py-3 transition-all
                   ${isCurrentUser ? "bg-green-300/40 rounded-lg" : ""}
                   ${index < leaderboardData.length - 1 ? "border-b border-purple-400/40" : ""}
-                  ${animating ? "animating-row" : ""}
-                  ${animating && rankChange === "up" ? "glow-up" : ""}
-                  ${animating && rankChange === "down" ? "glow-down" : ""}
+                  /* --- Removed animation classes: animating-row, glow-up, glow-down --- */
                 `}
-                style={{ transform: animating ? `translateY(${translateY}px)` : "none" }}
+                // --- Removed inline animation style: style={{ transform: animating ? ... }} ---
               >
                 {/* Rank */}
                 <div className="text-lg sm:text-xl font-bold text-purple-200 w-8 sm:w-10 text-center flex items-center justify-center">
-                  {isCurrentUser && !isAnimating && rankChange === "down" && (
+                  {/* Rank change indicator remains, but only when not animating (which is always now) */}
+                  {isCurrentUser && rankChange === "down" && (
                     <span className="text-red-400 text-sm font-extrabold">▼</span>
                   )}
-                  {isCurrentUser && !isAnimating && rankChange === "up" && (
+                  {isCurrentUser && rankChange === "up" && (
                     <span className="text-green-400 text-sm font-extrabold">▲</span>
                   )}
                   {rank}
