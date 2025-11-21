@@ -215,20 +215,20 @@ const Leaderboard = () => {
       {/* Scroll list */}
       <div
         ref={containerRef}
-        className="
+        className={`
           w-full max-w-2xl 
-          flex-1
-          min-h-0
           rounded-xl 
           bg-purple-900/55 
           shadow-md 
           -mt-4 sm:-mt-6
           mb-20
-          pb-4
-          overflow-y-auto
           scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-purple-900
-        "
-        style={{ touchAction: 'pan-y' }}
+          ${leaderboardData.length > 5 ? 'flex-1 min-h-0' : ''}
+        `}
+        style={{ 
+          touchAction: 'pan-y',
+          ...(leaderboardData.length > 5 ? { overflowY: 'auto' } : { overflowY: 'visible' })
+        }}
       >
         {loading ? (
           <div className="p-8 text-center text-purple-200">
