@@ -135,7 +135,7 @@ const Leaderboard = () => {
     <div
       className="
         w-full 
-        h-screen
+        h-[100dvh]
         flex flex-col items-center 
         px-3 sm:px-4
         bg-[#100321]
@@ -218,15 +218,17 @@ const Leaderboard = () => {
         className="
           w-full max-w-2xl 
           flex-1
+          min-h-0
           rounded-xl 
           bg-purple-900/55 
           shadow-md 
           -mt-4 sm:-mt-6
-          mb-4
+          mb-20
           pb-4
           overflow-y-auto
           scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-purple-900
         "
+        style={{ touchAction: 'pan-y' }}
       >
         {loading ? (
           <div className="p-8 text-center text-purple-200">
