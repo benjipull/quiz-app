@@ -38,6 +38,7 @@ const Leaderboard = () => {
   const [previousLeaderboardData, setPreviousLeaderboardData] = useState<LeaderboardPlayer[]>([]);
 
   const currentUserRef = useRef<HTMLDivElement>(null);
+  // NOTE: containerRef is now mostly redundant for scrolling but kept for potential future use or other logic
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Get current user ID + avatar
@@ -100,22 +101,13 @@ const Leaderboard = () => {
     fetchLeaderboard();
   }, [currentPeriod]);
 
-  // Auto scroll to current user
+  // Auto scroll to current user (Removed logic related to container height/rects)
   useEffect(() => {
-    if (!loading && currentUserRef.current && containerRef.current) {
-      const userEl = currentUserRef.current;
-      const container = containerRef.current;
-
-      const containerRect = container.getBoundingClientRect();
-      const userRect = userEl.getBoundingClientRect();
-
-      const below = userRect.bottom > containerRect.bottom;
-      const above = userRect.top < containerRect.top;
-
-      if (below || above) {
-        userEl.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
+    if (!loading && currentUserRef.current) {
+      // With page-level scrolling, we just need to scroll the element into view
+      currentUserRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+    // Dependency on leaderboardData is kept to ensure this runs after data loads
   }, [leaderboardData, loading]);
 
 
@@ -132,16 +124,17 @@ const Leaderboard = () => {
   };
 
   return (
+    // 1. Remove h-[100dvh] and overflow-hidden to allow the main page to grow and scroll.
+    // 2. Add overflow-y-auto to allow scrolling on the main page.
     <div
       className="
         w-full 
-        h-[100dvh]
         flex flex-col items-center 
         px-3 sm:px-4
         bg-[#100321]
         bg-[url('/leaderboard.jpg')]
         bg-no-repeat bg-center bg-cover
-        overflow-hidden
+        overflow-y-auto min-h-[100dvh] // Add min-h and auto-scroll
       "
     >
       {/* Improved responsiveness CSS */}
@@ -215,6 +208,8 @@ const Leaderboard = () => {
       {/* Scroll list */}
       <div
         ref={containerRef}
+        // 3. Remove flex-1 min-h-0 (which forces the height) and all internal scrolling classes/styles.
+        // The container will now naturally grow to fit its content.
         className={`
           w-full max-w-2xl 
           rounded-xl 
@@ -222,12 +217,11 @@ const Leaderboard = () => {
           shadow-md 
           -mt-4 sm:-mt-6
           mb-20
-          scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-purple-900
-          ${leaderboardData.length > 5 ? 'flex-1 min-h-0' : ''}
         `}
         style={{ 
-          touchAction: 'pan-y',
-          ...(leaderboardData.length > 5 ? { overflowY: 'auto' } : { overflowY: 'visible' })
+          // Remove touchAction and overflowY styles
+          touchAction: 'unset', // or remove style prop entirely if not needed
+          overflowY: 'unset' 
         }}
       >
         {loading ? (
@@ -243,7 +237,7 @@ const Leaderboard = () => {
           leaderboardData.map((player, index) => {
             const rank = index + 1;
             const isCurrentUser = player.userId === currentUserId;
-            const rankChange = isCurrentUser ? getRankChange(player, rank) : null;
+            // Removed unused rankChange calculation for the rendering part as it's not displayed
 
             let avatarSrc = "";
             if (player.avatar && typeof player.avatar === "number" && player.avatar > 0) {
