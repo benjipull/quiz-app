@@ -5,56 +5,140 @@ const Category = require("../models/categoryModel");
 const connectDB = require("../config/db");
 
 const OLLAMA_URL = process.env.OLLAMA_URL;
-const CURRENT_VALIDATION_VERSION = 0.06;
+const CURRENT_VALIDATION_VERSION = 0.07; // ⬅️ bump version so questions get revalidated
 
-async function validateQuestion(question) {
-  const prompt = `
+if (!OLLAMA_URL) {
+  console.error("❌ Missing OLLAMA_URL in .env");
+  process.exit(1);
+}
+
+// ----- Low-level helper -----
+async function callOllama(prompt) {
+  const res = await axios.post(OLLAMA_URL, {
+    model: "llama3",
+    prompt,
+    options: {
+      temperature: 0.0,
+      top_p: 0.85,
+      top_k: 40,
+      num_ctx: 2048,
+      num_predict: 400,
+      repeat_penalty: 1.1,
+    },
+    stream: false,
+  });
+  return (res.data?.response || "").trim();
+}
+
+function extractJson(text) {
+  if (!text) return null;
+
+  let clean = text
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .replace(/^Here.*?:/i, "")
+    .trim();
+
+  const match = clean.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+
+  try {
+    return JSON.parse(match[0]);
+  } catch {
+    return null;
+  }
+}
+
+async function runPrompt(prompt, label, questionId) {
+  try {
+    let raw = await callOllama(prompt);
+    let parsed = extractJson(raw);
+
+    if (!parsed) {
+      console.warn(`⚠️ [${label}] Invalid JSON, retrying for question ${questionId}...`);
+      await new Promise((r) => setTimeout(r, 800));
+      raw = await callOllama(prompt);
+      parsed = extractJson(raw);
+    }
+
+    if (!parsed) {
+      console.error(`❌ [${label}] Still invalid JSON for question ${questionId}. Raw snippet:`, raw.slice(0, 300));
+      return null;
+    }
+
+    return parsed;
+  } catch (err) {
+    console.error(`❌ [${label}] Error for question ${questionId}:`, err.message);
+    return null;
+  }
+}
+
+// ----- Prompt builders -----
+
+function buildDomainPrompt(question) {
+  return `
+Classify the trivia question domain.
+
+Domains with *one authoritative official answer* (TRUE):
+- professional certifications (e.g., CCSP, CISSP),
+- exams with fixed durations or score thresholds,
+- biology facts (e.g., number of bones in the human body),
+- geography facts (e.g., capital cities),
+- historical dates/events,
+- scientific constants or definitions,
+- standardized specs (e.g., official units, ISO standards),
+- legal definitions.
+
+If the answer is standardized worldwide or by an official body → TRUE.
+
+Return ONLY strict JSON (no extra text):
+
+{
+  "has_authoritative_answer": true|false,
+  "domain": "<short domain>"
+}
+
+Question: ${question.text}
+Correct Answer: ${question.correct_answer}
+`.trim();
+}
+
+function buildPrimaryPrompt(question, authoritative) {
+  return `
 You are a *formal trivia question validator*.
 
-Your task is to determine if a trivia question’s "correct answer" and "explanation" are **factual, self-consistent, and unambiguous**.
+Your task is to determine if a trivia question’s "correct answer" and "explanation" are factual, self-consistent, and appropriately specific.
 
----
+IMPORTANT:
+- Authoritative Domain = ${authoritative}
+- If Authoritative Domain is true (e.g., certifications, standardized facts), then the question is expected to have ONE official correct answer defined by some authority.
+- In authoritative domains, words like "typical", "usually", "generally" or "commonly" usually refer to that official standard and do NOT automatically make the question ambiguous.
 
-## 1️⃣ FACT CHECK
-- Evaluate whether the provided "correct answer" (A_correct) matches real-world knowledge.
-- If it is factually false, mark **Incorrect**.
+Rules:
 
-Example:
-Q: What is the average number of lives a cat has?
-A_correct: 3
-Explanation: "Cats have nine lives..."
-→ Verdict: Incorrect — explanation and factual knowledge contradict the given correct answer.
+1) FACT CHECK
+- Evaluate whether the provided "correct answer" matches real-world knowledge.
+- If it is factually false, mark final_verdict = "Incorrect".
 
----
+2) INTERNAL CONSISTENCY
+- If the explanation disagrees with the answer → "Incorrect".
+- If the explanation does not clearly justify the correct answer → "Ambiguous".
+- If the explanation supports the answer → continue.
 
-## 2️⃣ INTERNAL CONSISTENCY
-Compare the explanation and the correct answer:
-- If the explanation **disagrees** with the answer → "Incorrect"
-- If the explanation **does not clearly justify** the correct answer → "Ambiguous"
-- If the explanation **directly supports** the correct answer → continue
+3) MULTIPLE VALID ANSWERS
+- If Authoritative Domain = true:
+  - Only treat as "Ambiguous" if there are genuinely multiple officially recognized correct answers.
+- If Authoritative Domain = false:
+  - If the question naturally allows several different correct answers (e.g. "a reason", "a popular X", "a city known for..."), you may mark "Ambiguous".
 
----
+4) FINAL DECISION
+- Factual answer wrong → "Incorrect".
+- Explanation contradicts answer → "Incorrect".
+- Multiple plausible answers (non-authoritative domain) → "Ambiguous".
+- Explanation vague/partial but not clearly wrong → "Ambiguous".
+- Everything factually correct and well supported → "Correct".
 
-## 3️⃣ MULTIPLE VALID ANSWERS
-- If the question allows for more than one possible valid answer, mark **Ambiguous**
-(e.g., contains words like “a”, “one of”, “commonly”, “typically”, etc.)
-
----
-
-## 4️⃣ FINAL DECISION RULES
-| Case | Verdict | Description |
-|------|----------|--------------|
-| Factual answer wrong | Incorrect | The “correct answer” is not factually true |
-| Explanation contradicts answer | Incorrect | Internal mismatch |
-| Multiple plausible answers | Ambiguous | More than one possible correct answer |
-| Explanation vague or partial | Ambiguous | Not well-justified |
-| Everything aligns factually and logically | Correct | ✅ Only one clear, factual answer |
-
----
-
-Return ONLY valid JSON that starts with { and ends with } — no markdown, no explanations.
-
-No markdown, no prose, no code fences.
+Return ONLY valid JSON, no markdown, no prose:
 
 {
   "is_correct_answer_valid": true|false,
@@ -70,84 +154,160 @@ Answers: ${question.answers.map(a => a.text).join(", ")}
 Correct Answer: ${question.correct_answer}
 Explanation: ${question.explanation || "N/A"}
 `.trim();
+}
 
-  async function queryOllama() {
-    const res = await axios.post(OLLAMA_URL, {
-      model: "llama3",
-      prompt,
-      options: {
-        temperature: 0.0,
-        top_p: 0.85,
-        top_k: 30,
-        num_ctx: 2048,
-        num_predict: 400,
-        repeat_penalty: 1.15,
-      },
-      stream: false,
-    });
-    return res.data?.response || "";
-  }
+function buildCriticPrompt(question, authoritative) {
+  return `
+Act as a *strict but factual* adversarial critic of a trivia question.
 
-  function extractJson(text) {
-    if (!text) return null;
+Your job is to try to find issues with the given correct answer, but you MUST obey these constraints:
 
-    // Remove common wrappers
-    let clean = text
-      .replace(/```json/gi, "")
-      .replace(/```/g, "")
-      .replace(/^Here.*?:/i, "")
-      .trim();
+- DO NOT invent alternative answers.
+- Only list alternative_answers if they are official, factual, and widely recognized as valid answers to this specific question.
+- If you are uncertain about an alternative, DO NOT include it.
+- If Authoritative Domain = true, alternative official answers should be extremely rare.
 
-    // Find the first {...} JSON block
-    const match = clean.match(/\{[\s\S]*\}/);
-    if (!match) return null;
+Return ONLY strict JSON:
 
-    try {
-      return JSON.parse(match[0]);
-    } catch (err) {
-      return null;
-    }
-  }
+{
+  "has_issue": true|false,
+  "issue_type": "Incorrect" | "Ambiguous" | "None",
+  "reasons": "<describe the strongest issues you find, or 'None'>",
+  "alternative_answers": ["<alt1>", "<alt2>"]
+}
 
+Authoritative Domain: ${authoritative}
+
+Question: ${question.text}
+Correct Answer: ${question.correct_answer}
+Explanation: ${question.explanation || "N/A"}
+`.trim();
+}
+
+function buildIndependentPrompt(question, authoritative) {
+  return `
+You are performing a factual check of a trivia question.
+
+IMPORTANT:
+- Ignore the explanation completely. Do NOT rely on it for facts.
+- Consider only the question text and the provided correct answer.
+- If Authoritative Domain = true, expect a single official correct answer.
+- DO NOT hallucinate ranges or alternative answers unless they are truly official, widely accepted factual alternatives.
+
+Return ONLY strict JSON:
+
+{
+  "is_factually_correct": true|false,
+  "alternative_correct_answers": ["<alt1>", "<alt2>"],
+  "reasons": "<short factual justification>",
+  "verdict": "Correct" | "Incorrect" | "Ambiguous"
+}
+
+Authoritative Domain: ${authoritative}
+
+Question: ${question.text}
+Correct Answer: ${question.correct_answer}
+`.trim();
+}
+
+// ----- Multi-pass validator (domain-aware, lenient) -----
+async function validateQuestion(question) {
   try {
-    let raw = (await queryOllama()).trim();
-    let parsed = extractJson(raw);
+    // 1) Domain classification
+    const domainPrompt = buildDomainPrompt(question);
+    const domain = await runPrompt(domainPrompt, "DOMAIN", question._id);
+    const authoritative = domain?.has_authoritative_answer === true;
 
-    // 🔁 One retry if invalid JSON
-    if (!parsed) {
-      console.warn("⚠️ Retrying due to invalid JSON for:", question._id);
-      await new Promise(r => setTimeout(r, 1000));
-      raw = (await queryOllama()).trim();
-      parsed = extractJson(raw);
+    // 2) Primary evaluation
+    const primaryPrompt = buildPrimaryPrompt(question, authoritative);
+    const primary = await runPrompt(primaryPrompt, "PRIMARY", question._id);
+    if (!primary) {
+      throw new Error("Primary validation failed");
     }
 
-    if (!parsed) {
-      console.error("❌ Still invalid JSON after retry. Raw snippet:", raw.slice(0, 400));
-      throw new Error("Invalid response format");
+    // 3) Critic
+    const criticPrompt = buildCriticPrompt(question, authoritative);
+    const critic = await runPrompt(criticPrompt, "CRITIC", question._id);
+
+    // 4) Independent fact check
+    const independentPrompt = buildIndependentPrompt(question, authoritative);
+    const independent = await runPrompt(independentPrompt, "INDEPENDENT", question._id);
+
+    // ----- Aggregate results -----
+    let finalVerdict = primary.final_verdict || "Ambiguous";
+    let isCorrectAnswerValid = !!primary.is_correct_answer_valid;
+    let explanationConsistent = !!primary.explanation_consistent;
+
+    const otherAnswers = new Set();
+    if (Array.isArray(primary.other_answers_possible)) {
+      primary.other_answers_possible.forEach((a) => otherAnswers.add(a));
     }
 
-    // ✅ Structural validation
-    const requiredFields = [
-      "is_correct_answer_valid",
-      "correct_answer_reasoning",
-      "explanation_consistent",
-      "explanation_reasoning",
-      "final_verdict",
-    ];
-    for (const field of requiredFields) {
-      if (parsed[field] === undefined || parsed[field] === null) {
-        throw new Error(`Missing field: ${field}`);
+    // Merge critic
+    if (critic) {
+      if (Array.isArray(critic.alternative_answers)) {
+        critic.alternative_answers.forEach((a) => otherAnswers.add(a));
+      }
+
+      if (critic.has_issue && critic.issue_type && critic.issue_type !== "None") {
+        if (critic.issue_type === "Incorrect") {
+          finalVerdict = "Incorrect";
+          isCorrectAnswerValid = false;
+        } else if (critic.issue_type === "Ambiguous" && finalVerdict === "Correct") {
+          // lenient mode: allow Ambiguous (we do NOT treat as Incorrect here)
+          finalVerdict = "Ambiguous";
+        }
       }
     }
 
-    return parsed;
+    // Merge independent fact check
+    if (independent) {
+      if (!independent.is_factually_correct) {
+        finalVerdict = "Incorrect";
+        isCorrectAnswerValid = false;
+      } else {
+        const hasAlt =
+          Array.isArray(independent.alternative_correct_answers) &&
+          independent.alternative_correct_answers.length > 0;
+
+        // Only downgrade to Ambiguous for non-authoritative domains
+        if (hasAlt && !authoritative && finalVerdict === "Correct") {
+          finalVerdict = "Ambiguous";
+          independent.alternative_correct_answers.forEach((a) => otherAnswers.add(a));
+        }
+      }
+    }
+
+    const mergedCorrectReasoning = [
+      primary.correct_answer_reasoning,
+      critic?.reasons ? `Critic: ${critic.reasons}` : "",
+      independent?.reasons ? `Independent: ${independent.reasons}` : "",
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    const mergedExplanationReasoning =
+      primary.explanation_reasoning || "Based on primary evaluation.";
+
+    return {
+      is_correct_answer_valid: isCorrectAnswerValid,
+      correct_answer_reasoning: mergedCorrectReasoning,
+      explanation_consistent: explanationConsistent,
+      explanation_reasoning: mergedExplanationReasoning,
+      other_answers_possible: Array.from(otherAnswers),
+      final_verdict: finalVerdict,
+    };
   } catch (err) {
     console.error("❌ Validation failed for question:", question._id, err.message);
     return null;
   }
 }
 
+module.exports = {
+  validateQuestion,
+};
 
+// ----- Bulk category validation -----
 async function validateAllCategories() {
   try {
     await connectDB();
@@ -155,7 +315,7 @@ async function validateAllCategories() {
 
     // Fetch all categories so we can know which ones were skipped
     const allCategories = await Category.find({}, { name: 1 });
-    const allCategoryNames = allCategories.map(c => c.name);
+    const allCategoryNames = allCategories.map((c) => c.name);
 
     const categories = await Category.aggregate([
       {
@@ -167,43 +327,35 @@ async function validateAllCategories() {
               as: "q",
               cond: {
                 $and: [
-                  // ✅ Keep only NOT disabled
+                  // Keep only NOT disabled
                   { $ne: ["$$q.disabled", true] },
-                  // ✅ validation missing, null, or older than current version
+                  // validation missing, null, or older than current version
                   {
                     $or: [
-                      // No validation object at all
                       { $eq: ["$$q.validation", null] },
-                      // validationVersion field missing or null
                       { $eq: ["$$q.validation.validationVersion", null] },
-                      // validationVersion strictly less than current version
-                      { $lt: ["$$q.validation.validationVersion", CURRENT_VALIDATION_VERSION] }
-                    ]
-                  }
-
-                ]
-              }
-            }
-          }
-        }
+                      { $lt: ["$$q.validation.validationVersion", CURRENT_VALIDATION_VERSION] },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
       },
-      // ✅ remove categories with no matching questions
       {
         $match: {
-          "questions.0": { $exists: true }
-        }
-      }
+          "questions.0": { $exists: true },
+        },
+      },
     ]);
 
-
-
-    // Derive skipped category names
-    const processedNames = categories.map(c => c.name);
-    const skippedNames = allCategoryNames.filter(name => !processedNames.includes(name));
+    const processedNames = categories.map((c) => c.name);
+    const skippedNames = allCategoryNames.filter((name) => !processedNames.includes(name));
 
     if (skippedNames.length > 0) {
       console.log(`⚪ Skipped categories (all questions validated):`);
-      skippedNames.forEach(name => console.log("   •", name));
+      skippedNames.forEach((name) => console.log("   •", name));
     }
 
     if (categories.length === 0) {
@@ -221,9 +373,12 @@ async function validateAllCategories() {
         const parsed = await validateQuestion(question);
         if (!parsed) continue;
 
+        // LENIENT MODE:
+        // ❌ Incorrect → disable
+        // ⚠️ Ambiguous → keep
+        // ❗ But if explanation is inconsistent → disable
         const shouldDisable =
           parsed.final_verdict === "Incorrect" ||
-          parsed.final_verdict === "Ambiguous" ||
           parsed.explanation_consistent === false;
 
         await Category.updateOne(
@@ -237,16 +392,37 @@ async function validateAllCategories() {
                 explanation_reasoning: parsed.explanation_reasoning,
                 other_answers_possible: parsed.other_answers_possible,
                 final_verdict: parsed.final_verdict,
-                validationVersion: CURRENT_VALIDATION_VERSION
+                validationVersion: CURRENT_VALIDATION_VERSION,
               },
-              "questions.$.disabled": shouldDisable
-            }
+              "questions.$.disabled": shouldDisable,
+            },
           }
         );
 
         console.log(
           `   ✅ Question ${question._id} updated | Verdict: ${parsed.final_verdict} | Disabled: ${shouldDisable}`
         );
+
+        // 🔥 Log detailed info only if disabled
+        if (shouldDisable) {
+          console.log("\n❌ DISABLED QUESTION DETAILS ❌");
+          console.log("------------------------------------------------------");
+          console.log(`🆔 Question ID: ${question._id}`);
+          console.log(`📌 Text: ${question.text}`);
+          console.log("📝 Answers:");
+          question.answers.forEach((a, i) => {
+            console.log(`   ${i + 1}. ${a.text}`);
+          });
+          console.log(`✔ Correct Answer: ${question.correct_answer}`);
+          console.log(`💬 Explanation: ${question.explanation || "(none)"}`);
+          console.log("\n🔍 VALIDATION DETAILS:");
+          console.log(`- Final Verdict: ${parsed.final_verdict}`);
+          console.log(`- is_correct_answer_valid: ${parsed.is_correct_answer_valid}`);
+          console.log(`- explanation_consistent: ${parsed.explanation_consistent}`);
+          console.log(`- Reasoning: ${parsed.correct_answer_reasoning}`);
+          console.log("------------------------------------------------------\n");
+        }
+
       }
     }
 
@@ -258,5 +434,5 @@ async function validateAllCategories() {
   }
 }
 
-// Run
+// Run as script
 validateAllCategories();

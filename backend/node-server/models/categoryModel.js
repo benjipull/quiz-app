@@ -85,6 +85,13 @@ const CategorySchema = new mongoose.Schema({
 
     // a higher-level "group" (for quick filtering)
     groups: [{ type: String, index: true }],
+
+    // 🏷️ Category interests (same as user)
+    interests: {
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Interest" }],
+    default: [],
+    },
+
 });
 
 module.exports = mongoose.model("Category", CategorySchema);
