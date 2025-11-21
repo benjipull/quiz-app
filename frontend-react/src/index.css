@@ -89,5 +89,6 @@
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     @apply transition-[var(--transition-smooth)];
+    min-height: 100vh;
   }
 }

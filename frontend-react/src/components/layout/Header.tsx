@@ -1,12 +1,11 @@
 import { Button } from "@/components/ui/button";
 import {
-  Bell,
-  Search,
   Menu,
   ArrowLeft,
   Home,
   Grid3X3,
-  Trophy,
+  Info,
+  BarChart3,
   User,
   ShoppingBag
 } from "lucide-react";
@@ -16,10 +15,11 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 const navTabs = [
   { icon: Home, label: "Home", path: "/" },
-  { icon: Grid3X3, label: "Quizzes", path: "/categories" },
   { icon: User, label: "Profile", path: "/profile" },
-  { icon: ShoppingBag, label: "Store", path: "/store" },
-  { icon: Menu, label: "Menu", path: "/menu" },
+  { icon: BarChart3, label: "Leaderboard", path: "/leaderboard" },
+  { icon: Grid3X3, label: "All Quizzes", path: "/all-quizzes" },
+  { icon: Info, label: "About Us", path: "/about-us" },
+
 ];
 
 interface HeaderProps {
@@ -27,8 +27,8 @@ interface HeaderProps {
   imageSrc?: string;
   logoAsTitle?: boolean;
   showMenu?: boolean;
-  showSearch?: boolean;
-  showNotifications?: boolean;
+  showSearch?: boolean; // Kept but logic is removed below
+  showNotifications?: boolean; // Kept but logic is removed below
   showBack?: boolean;
   onBack?: () => void;
 }
@@ -38,8 +38,9 @@ export const Header = ({
   imageSrc,
   logoAsTitle = false,
   showMenu = false,
-  showSearch = false,
-  showNotifications = true,
+  // The props remain but the rendering logic is gone
+  showSearch = false, 
+  showNotifications = true, 
   showBack = false,
   onBack,
 }: HeaderProps) => {
@@ -79,7 +80,7 @@ export const Header = ({
         <div className="flex items-center gap-2">
           {/* Desktop Navigation Tabs */}
           {!isMobile && (
-            <div className="flex items-center gap-1 mr-4">
+            <div className="flex items-center gap-1"> {/* Removed mr-4 class */}
               {navTabs.map((tab) => {
                 const isActive = location.pathname === tab.path;
                 return (
@@ -100,6 +101,7 @@ export const Header = ({
               })}
             </div>
           )}
+        
         </div>
       </div>
     </header>
