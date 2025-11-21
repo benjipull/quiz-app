@@ -223,6 +223,7 @@ const Leaderboard = () => {
           shadow-md 
           -mt-4 sm:-mt-6
           mb-4
+          pb-4
           overflow-y-auto
           scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-purple-900
         "
@@ -261,12 +262,6 @@ const Leaderboard = () => {
               >
                 {/* Rank */}
                 <div className="text-lg sm:text-xl font-bold text-purple-200 w-8 sm:w-10 text-center flex items-center justify-center">
-                  {isCurrentUser && rankChange === "down" && (
-                    <span className="text-red-400 text-sm font-extrabold">▼</span>
-                  )}
-                  {isCurrentUser && rankChange === "up" && (
-                    <span className="text-green-400 text-sm font-extrabold">▲</span>
-                  )}
                   {rank}
                 </div>
 
