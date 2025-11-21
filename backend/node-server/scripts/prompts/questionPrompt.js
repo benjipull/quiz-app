@@ -19,6 +19,12 @@ Output STRICT JSON only (no prose, no markdown)
 - You must deeply understand the category’s full meaning, not just individual words.
 - Use the category as a thematic context for the question, not as a literal keyword.
 
+=== FORBIDDEN QUESTION TYPES ===
+- Do NOT generate questions involving statistics, surveys, percentages, proportions, or population-based claims.
+- Do NOT generate questions whose correct answer is a number (counts, totals, measurements, years, quantities, ages, rankings).
+- Do NOT use subjective descriptors such as "typical", "common", "usually", "generally", or anything implying trends without a verifiable factual anchor.
+- Do NOT produce questions whose correctness relies on general habits or behavioral tendencies of people, populations, or nations.
+
 === CONTEXTUAL FRAMING RULES ===
 - Every question must be fully meaningful on its own, without assuming unstated context.
 - If the question uses generic phrasing such as "Which of the following", "Who among these", or "What of the following",
