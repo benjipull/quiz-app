@@ -4,6 +4,11 @@ const Category = require("../models/categoryModel");
 const User = require("../models/user");
 const authenticateToken = require("../middleware/auth");
 const { userQuestions } = require("../index"); // Import shared store
+const WisdomPointsLedger = require("../models/WisdomPointsLedger"); // Import Ledger
+
+// --- COIN CONSTANT ---
+const QUIZ_COST = 100; // Define the quiz cost
+// ---------------------
 
 const difficultyNames = {
     1: "Basic",
@@ -34,9 +39,9 @@ router.post("/", authenticateToken, async (req, res) => {
         return res.status(400).json({ message: "Missing required fields: categoryId, numQuestions." });
     }
 
-        const userId = req.user.id;
+    const userId = req.user.id;
 
-        console.log("✅ Extracted User ID:", userId);
+    console.log("✅ Extracted User ID:", userId);
     try {
         const category = await Category.findById(categoryId).lean();
         if (!category) {
@@ -48,6 +53,33 @@ router.post("/", authenticateToken, async (req, res) => {
             return res.status(404).json({ message: "❌ User not found" });
         }
 
+        // ----------------------------------------------------------------
+        // 💰 1. COIN CHECK AND DEDUCTION
+        // ----------------------------------------------------------------
+        if (user.coins < QUIZ_COST) {
+            console.log(`❌ User ${userId} blocked: Insufficient coins (${user.coins} < ${QUIZ_COST})`);
+            return res.status(402).json({ 
+                message: `Insufficient coins. This quiz costs ${QUIZ_COST} coins.`,
+                requiredCoins: QUIZ_COST,
+                userCoins: user.coins
+            });
+        }
+
+        // Deduct coins and save
+        user.coins -= QUIZ_COST;
+        await user.save();
+        
+        console.log(`💸 Deducted ${QUIZ_COST} coins from user ${userId}. Remaining: ${user.coins}`);
+        
+        // Record the coin deduction in the Ledger
+        const ledgerEntry = new WisdomPointsLedger({
+            userId: userId,
+            points: -QUIZ_COST, // Negative value for deduction
+            source: 'quiz-cost' 
+        });
+        await ledgerEntry.save();
+        // ----------------------------------------------------------------
+        
         const userLevel = user.level || 1;
 
         // 🎚 Sliding difficulty window
@@ -75,12 +107,27 @@ router.post("/", authenticateToken, async (req, res) => {
             .slice(0, numQuestions);
 
         if (selectedQuestions.length < 10) {
+            // ----------------------------------------------------------------
+            // 💰 2. COIN REFUND IF QUIZ FAILS TO START
+            // ----------------------------------------------------------------
+            user.coins += QUIZ_COST; // Refund the coins
+            await user.save();
+            
+            // Record the refund in the Ledger
+            const refundEntry = new WisdomPointsLedger({
+                userId: userId,
+                points: QUIZ_COST, // Positive value for refund
+                source: 'quiz-refund' 
+            });
+            await refundEntry.save();
+            
             console.error(
-                `Cannot start Quiz, only ${selectedQuestions.length} questions found in difficulty window. Populating category: ${category._id} (${category.name})`
+                `Cannot start Quiz, only ${selectedQuestions.length} questions found in difficulty window. Coins have been refunded.`
             );
+            // ----------------------------------------------------------------
 
             return res.status(404).json({
-                message: "Not enough available questions in this difficulty range (minimum 10 required). Please try again in a few minutes."
+                message: "Not enough available questions in this difficulty range (minimum 10 required). Coins have been refunded."
             });
         }
 
@@ -103,9 +150,10 @@ router.post("/", authenticateToken, async (req, res) => {
         console.log(`Loaded ${selectedQuestions.length} questions for user ${userToken}`);
 
         res.json({
-            message: "Questions preloaded.",
+            message: "Questions preloaded. Quiz cost deducted.",
             total: selectedQuestions.length,
-            difficultyRange: [minDifficulty, maxDifficulty] // for debugging
+            difficultyRange: [minDifficulty, maxDifficulty], // for debugging
+            userCoins: user.coins // Return the new coin balance
         });
 
     } catch (error) {
