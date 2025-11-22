@@ -160,46 +160,72 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
 
   return (
     <>
-      <Card className="bg-gradient-to-br from-yellow-500/20 via-orange-500/20 to-amber-600/20 border-yellow-500/30 backdrop-blur-sm p-4 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="bg-yellow-500/20 rounded-full p-3">
-              <Gift className="w-6 h-6 text-yellow-400" />
-            </div>
-            <div>
-              <h3 className="text-white font-bold text-lg">Daily Reward</h3>
-              <p className="text-white/70 text-sm">
-                {canClaim ? "Ready to claim!" : "Come back later"}
-              </p>
-            </div>
-          </div>
+ <Card
+  className="
+    w-full 
+    max-w-3xl
+    rounded-[30px]
+    bg-[#3a0077]
+    bg-gradient-to-br from-[#4d008d] to-[#25004d]
+    border-[3px] border-[#b535ff]
+    shadow-[0_0_2px_rgba(181,53,255,0.55)]
+    p-4 sm:p-5
+  "
+>
+  <div className="flex items-center justify-between gap-2 sm:gap-4">
 
-          <Button
-            onClick={handleClaimClick}
-            disabled={!canClaim || isClaiming}
-            className={`
-              px-6 py-6 rounded-full font-bold text-lg
-              ${canClaim 
-                ? 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white shadow-lg animate-pulse' 
-                : 'bg-gray-600 text-gray-300 cursor-not-allowed'
-              }
-            `}
-          >
-            {canClaim ? (
-              <div className="flex items-center space-x-2">
-                <Sparkles className="w-5 h-5" />
-                <span>Claim 500</span>
-                <Coins className="w-5 h-5" />
-              </div>
-            ) : (
-              <div className="flex items-center space-x-2">
-                <Clock className="w-5 h-5" />
-                <span>{formatTimeRemaining(timeRemaining)}</span>
-              </div>
-            )}
-          </Button>
-        </div>
-      </Card>
+    {/* LEFT SECTION */}
+    <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+      
+      {/* Gift Icon Box */}
+      <div
+        className="
+          w-12 h-12 sm:w-14 sm:h-14
+          rounded-2xl
+          flex items-center justify-center
+          bg-gradient-to-br from-[#a020f0] to-[#6a0dad]
+          border-[3px] border-[#ff4dff]
+          shadow-[0_0_25px_rgba(255,77,255,0.65)]
+          flex-shrink-0
+        "
+      >
+        <Gift className="w-6 h-6 sm:w-8 sm:h-8 text-[#ffe14d]" />
+      </div>
+
+      {/* Text */}
+      <div className="leading-tight">
+        <h3 className="text-white font-bold text-xl sm:text-2xl">
+          Daily
+        </h3>
+        <h3 className="text-white font-bold text-xl sm:text-2xl -mt-1">
+          Reward
+        </h3>
+      </div>
+    </div>
+
+    {/* RIGHT SIDE — TIMER PILL */}
+    <div
+      className="
+        flex items-center gap-1.5 sm:gap-2
+        px-3 py-2 sm:px-6 sm:py-3
+        rounded-full
+        bg-[#501b9b]
+        border-[3px] border-[#ff78ff]
+        shadow-[0_0_25px_rgba(255,115,255,0.5)]
+        flex-shrink-0
+      "
+    >
+      <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" />
+      <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap">
+        {formatTimeRemaining(timeRemaining)}
+      </span>
+    </div>
+
+  </div>
+</Card>
+
+
+
 
       {/* Reward Modal Overlay */}
       {showRewardModal && (
