@@ -19,13 +19,12 @@ const WisdomPointsLedgerSchema = new mongoose.Schema({
         default: Date.now,
         index: true // Index for date range queries
     },
-    // Optional: Source of the points (e.g., 'quiz-completion')
-    source: {
-        type: String,
-        // Added 'daily-bonus' to the enum
-        enum: ['quiz-completion', 'admin-grant', 'daily-bonus'], 
-        default: 'quiz-completion'
-    }
+   source: {
+    type: String,
+    // ✅ FIX: Added 'quiz-cost' and 'quiz-refund' to allow transactions
+    enum: ['quiz-completion', 'admin-grant', 'daily-bonus', 'quiz-cost', 'quiz-refund'], 
+    default: 'quiz-completion'
+}
 });
 
 module.exports = mongoose.model("WisdomPointsLedger", WisdomPointsLedgerSchema);
