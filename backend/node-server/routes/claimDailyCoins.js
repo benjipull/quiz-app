@@ -1,15 +1,11 @@
 const express = require("express");
 const User = require("../models/user"); 
 const authenticateToken = require("../middleware/auth");
-// const WisdomPointsLedger = require("../models/WisdomPointsLedger"); // ❌ REMOVED: No coin logging
 
 const router = express.Router();
 const DAILY_BONUS_COINS = 500; // 500 coins to claim
 const DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
-// @route   POST /api/claimDailyCoins
-// @desc    Allows user to claim 500 coins every 24 hours
-// @access  Registered
 router.post("/", authenticateToken, async (req, res) => {
     const userId = req.user.id;
     try {
@@ -29,7 +25,7 @@ router.post("/", authenticateToken, async (req, res) => {
             // Return the time remaining for the frontend countdown
             return res.status(403).json({ 
                 message: "Daily coin bonus already claimed. Please wait.",
-                timeRemainingMs: timeRemainingMs
+                timeRemainingMs: timeRemainingMs // Key for frontend countdown
             });
         }
         
@@ -38,7 +34,7 @@ router.post("/", authenticateToken, async (req, res) => {
         user.lastDailyCoinClaim = now; // Update the last claim timestamp
         await user.save();
 
-        // ❌ Ledger entry logic for coins removed
+        // ❌ Ledger entry logic for coins removed (as seen in the provided snippet)
 
         res.status(200).json({
             message: `🎉 Successfully claimed ${DAILY_BONUS_COINS} coins!`,
@@ -48,7 +44,7 @@ router.post("/", authenticateToken, async (req, res) => {
 
     } catch (error) {
         console.error("❌ Daily coin claim error:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
+        res.status(500).json({ message: "⚠️ Server error.", error: error.message });
     }
 });
 
