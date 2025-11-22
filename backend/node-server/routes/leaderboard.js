@@ -7,82 +7,76 @@ const router = express.Router();
 
 /**
  * Helper function to calculate the start date for the leaderboard aggregation,
- * based on the requested period ('day', 'week', 'month', 'year', 'all-time').
+ * based on the requested period ('day', 'week', 'month', 'year').
  */
 const getStartDate = (period) => {
     const now = new Date();
     let startDate = new Date(now);
 
-    // Set time to the very start of the day for accurate comparison
     startDate.setHours(0, 0, 0, 0); 
 
     switch (period) {
         case 'day':
-            // startDate is already set to the start of today
             break;
         case 'week':
-            // Using Monday (1) as the start of the week
             const dayOfWeek = now.getDay(); // 0 is Sunday, 1 is Monday...
-            // Calculate days to subtract to get to Monday (or the day before if today is Sunday)
             const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; 
             startDate.setDate(now.getDate() - diff);
             startDate.setHours(0, 0, 0, 0);
             break;
         case 'month':
-            // Set to the 1st day of the current month
             startDate.setDate(1); 
             startDate.setHours(0, 0, 0, 0);
             break;
         case 'year':
-            // Set to January 1st of the current year
-            startDate.setMonth(0); // January
-            startDate.setDate(1);  // 1st
+            startDate.setMonth(0, 1);
             startDate.setHours(0, 0, 0, 0);
             break;
         default:
-            // For 'all-time' or an unrecognized period
-            startDate = new Date(0); // Epoch time
-            break;
+            return null;
     }
-
     return startDate;
 };
 
-// @route   GET /api/leaderboard/:period
-// @desc    Gets the leaderboard for a specific period
-// @access  Registered
-router.get("/:period", authenticateToken, async (req, res) => {
-    // Ensure the period is lowercased for case-insensitive matching
-    const period = req.params.period.toLowerCase();
+
+router.get("/", authenticateToken, async (req, res) => {
+    const period = req.query.period ? req.query.period.toLowerCase() : 'month'; 
+    const startDate = getStartDate(period);
+
+    if (!startDate) {
+        return res.status(400).json({ message: "Invalid or missing 'period' query parameter." });
+    }
 
     try {
-        const startDate = getStartDate(period);
-
+        // --- Aggregation Pipeline ---
         const pipeline = [
-            // 1. Filter entries to only include those after the start date
+            // 1. Filter ledger entries by the start date of the period
             {
                 $match: {
-                    timestamp: { $gte: startDate },
+                    timestamp: { $gte: startDate } 
                 }
             },
-            // 2. Group by userId and sum the Knowledge Points
+            // 2. 🔑 CRITICAL FIX: Filter out Coin entries ('daily-bonus')
+            {
+                $match: {
+                    source: { $ne: 'daily-bonus' } // Exclude any entry whose source is for coins
+                }
+            },
+            // 3. Group by userId and sum the Knowledge Points (XP)
             {
                 $group: {
                     _id: "$userId",
-                    totalPoints: { $sum: "$points" } // Summing only Knowledge Points
+                    totalPoints: { $sum: "$points" }
                 }
             },
-            // 3. Sort by totalPoints (Knowledge Points) in descending order
+            // 4. Sort and Limit
             {
-                $sort: {
-                    totalPoints: -1
-                }
+                $sort: { totalPoints: -1 }
             },
-            // 4. Limit to the top 100 players
             {
                 $limit: 100 
             },
-            // 5. Join with the users collection to get player details (alias, level, avatar)
+            // 5. Join with the users collection to get player details
             {
                 $lookup: {
                     from: "users", 
@@ -91,11 +85,11 @@ router.get("/:period", authenticateToken, async (req, res) => {
                     as: "userDetails"
                 }
             },
-            // 6. Deconstruct the userDetails array
+            // 6. Deconstruct the userDetails array (Keeping the fix from the previous step)
             {
                 $unwind: {
                     path: "$userDetails",
-                    preserveNullAndEmptyArrays: false 
+                    preserveNullAndEmptyArrays: true // Use 'true' to ensure a user still shows if their data lookup fails (e.g., if their entry was deleted)
                 }
             },
             // 7. Project the final required structure
@@ -103,10 +97,11 @@ router.get("/:period", authenticateToken, async (req, res) => {
                 $project: {
                     _id: 0,
                     userId: "$_id",
-                    totalPoints: 1, 
-                    username: "$userDetails.alias", 
-                    level: "$userDetails.level",
-                    avatar: "$userDetails.avatar" 
+                    totalPoints: 1,
+                    // Use $ifNull to safely handle cases where $lookup failed (userDetails is null)
+                    username: { $ifNull: ["$userDetails.alias", "Unknown User"] },
+                    level: { $ifNull: ["$userDetails.level", 0] },
+                    avatar: { $ifNull: ["$userDetails.avatar", 1] } 
                 }
             }
         ];
