@@ -7,6 +7,8 @@ const authenticateToken = require("../middleware/auth");
 
 const router = express.Router();
 
+// --- REWARD CALCULATION LOGIC ---
+
 /**
  * Calculates the coin reward based on correct answers and total questions.
  * Range: 10 - 150 coins.
@@ -16,7 +18,6 @@ const calculateCoinReward = (correctAnswers, questionsAttempted) => {
     if (correctAnswers <= 0 || questionsAttempted <= 0) return 0;
 
     // Normalize score to a 0-10 scale regardless of total questions (N)
-    // This allows the exponential curve to be based on percentage correct.
     const scoreScale = (correctAnswers / questionsAttempted) * 10; 
 
     // Exponential formula: (ScoreScale ^ 1.3) * Multiplier (7.6)
@@ -29,11 +30,18 @@ const calculateCoinReward = (correctAnswers, questionsAttempted) => {
     return coinsEarned;
 };
 
-const calculateKnowledgePoints = (correct, incorrect) => {
-    // Example: 10 points per correct answer, -5 per incorrect.
-    return (correct * 10) - (incorrect * 5); 
+/**
+ * Calculates Knowledge Points (XP) using an exponential formula based ONLY on
+ * correct answers to reward mastery and avoid negative scores.
+ */
+const calculateKnowledgePoints = (correct) => {
+    // Formula: floor(correctAnswers ^ 1.2 * 5)
+    if (correct <= 0) return 0;
+    return Math.floor(Math.pow(correct, 1.2) * 5); 
 };
 
+
+// --- ROUTE HANDLER ---
 
 router.post("/:categoryId/completion", authenticateToken, async (req, res) => {
     try {
@@ -44,8 +52,12 @@ router.post("/:categoryId/completion", authenticateToken, async (req, res) => {
         console.log("✅ Received categoryId:", categoryId);
         console.log("✅ Extracted User ID:", userId);
 
+        // --- VALIDATION ---
         if (!mongoose.Types.ObjectId.isValid(categoryId)) {
-            return res.status(400).json({ message: "Invalid category ID format." });
+            return res.status(400).json({ message: "❌ Invalid category ID format." });
+        }
+        if (questionsAttempted == null || correctAnswers == null || incorrectAnswers == null) {
+            return res.status(400).json({ message: "⚠️ All fields are required." });
         }
         if (questionsAttempted <= 0) {
             return res.status(400).json({ message: "Questions attempted must be greater than zero." });
@@ -55,31 +67,36 @@ router.post("/:categoryId/completion", authenticateToken, async (req, res) => {
         const category = await Category.findById(categoryId);
 
         if (!user) {
-            return res.status(404).json({ message: "User not found." });
+            return res.status(404).json({ message: "❌ User not found." });
         }
         if (!category) {
-            return res.status(404).json({ message: "Category not found." });
+            return res.status(404).json({ message: "❌ Category not found." });
         }
 
 
-        // Calculate reward and XP
-        // IMPORTANT CHANGE: Pass questionsAttempted to enable dynamic calculation
+        // --- REWARD CALCULATION ---
         const coinsEarned = calculateCoinReward(correctAnswers, questionsAttempted);
-        const knowledgePointsEarned = calculateKnowledgePoints(correctAnswers, incorrectAnswers);
+        
+        // Use the corrected, positive-only logic
+        const knowledgePointsEarned = calculateKnowledgePoints(correctAnswers); 
+        
         const previousLevel = user.level;
         const percentageCorrect = (correctAnswers / questionsAttempted) * 100;
 
-        // Apply reward and XP to user
+        // --- APPLY REWARDS ---
         user.knowledgePoints += knowledgePointsEarned;
         user.coins += coinsEarned;
         
-        // 🧠 RECORDING KNOWLEDGE POINTS ONLY
-        const rewardLedger = new WisdomPointsLedger({
-            userId: userId,
-            points: knowledgePointsEarned, // This is the Knowledge Points (XP)
-            source: 'quiz-completion' 
-        });
-        await rewardLedger.save(); 
+        // 🧠 RECORDING KNOWLEDGE POINTS TO LEDGER
+        if (knowledgePointsEarned > 0) {
+            const rewardLedger = new WisdomPointsLedger({
+                userId: userId,
+                points: knowledgePointsEarned, // Knowledge Points (XP)
+                source: 'quiz-completion' 
+            });
+            await rewardLedger.save(); 
+            console.log(`✨ Recorded ${knowledgePointsEarned} wisdom points for user ${userId}`);
+        }
 
         user.level = user.calculateLevel();
         await user.save();
