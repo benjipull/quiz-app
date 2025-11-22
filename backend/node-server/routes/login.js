@@ -2,7 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
-const WisdomPointsLedger = require("../models/WisdomPointsLedger"); // 🚨 NEW: Import Ledger
+// The WisdomPointsLedger import is now removed
 
 const router = express.Router();
 const INITIAL_BONUS_AMOUNT = 2000; // Define the one-time bonus amount
@@ -28,6 +28,7 @@ router.post("/", async (req, res) => {
 
         // --------------------------------------------------------
         // 💰 ONE-TIME COIN GRANT LOGIC FOR EXISTING REGISTERED USERS
+        // Ledger tracking for this coin transaction is REMOVED.
         // --------------------------------------------------------
         if (
             user.userType === "Registered" &&
@@ -36,14 +37,8 @@ router.post("/", async (req, res) => {
             user.coins += INITIAL_BONUS_AMOUNT;
             user.initialLoginBonusClaimed = true; // Prevents future claims
 
-            // Record the grant in the Ledger
-            const grantEntry = new WisdomPointsLedger({
-                userId: user._id,
-                points: INITIAL_BONUS_AMOUNT,
-                source: 'initial-grant' 
-            });
-            await grantEntry.save();
-            
+            // Ledger logic for initial-grant coin entry removed
+
             console.log(`🎉 Granted ${INITIAL_BONUS_AMOUNT} coins to existing user ${user.alias} on login.`);
         }
         // --------------------------------------------------------

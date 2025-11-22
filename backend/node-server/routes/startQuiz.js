@@ -4,7 +4,7 @@ const Category = require("../models/categoryModel");
 const User = require("../models/user");
 const authenticateToken = require("../middleware/auth");
 const { userQuestions } = require("../index"); // Import shared store
-const WisdomPointsLedger = require("../models/WisdomPointsLedger"); // 🚨 NEW: Import Ledger
+// The WisdomPointsLedger import is now removed
 
 const QUIZ_COST = 100; // Define the quiz cost (100 coins)
 
@@ -52,21 +52,15 @@ router.post("/", authenticateToken, async (req, res) => {
         }
         
         // ----------------------------------------------------------------
-        // 💰 1. QUIZ COST DEDUCTION (Pay-to-Play)
-        // Deduct coins first (allows negative balance/debt to start)
+        // 💰 1. QUIZ COST DEDUCTION
+        // Ledger tracking for this coin transaction is REMOVED.
         // ----------------------------------------------------------------
         user.coins -= QUIZ_COST; 
         await user.save();
         
         console.log(`💸 Deducted ${QUIZ_COST} coins to start quiz for user ${userId}. New Balance: ${user.coins}`);
         
-        // Record the deduction in the Ledger
-        const ledgerEntry = new WisdomPointsLedger({
-            userId: userId,
-            points: -QUIZ_COST, // Negative value for deduction
-            source: 'quiz-cost' 
-        });
-        await ledgerEntry.save();
+        // Ledger logic for quiz-cost deduction removed
         // ----------------------------------------------------------------
         
         const userLevel = user.level || 1;
@@ -98,17 +92,12 @@ router.post("/", authenticateToken, async (req, res) => {
         if (selectedQuestions.length < 10) {
             // ----------------------------------------------------------------
             // 💰 2. COIN REFUND IF QUIZ FAILS TO START (Not enough questions)
+            // Ledger tracking for this coin transaction is REMOVED.
             // ----------------------------------------------------------------
             user.coins += QUIZ_COST; // Refund the coins
             await user.save();
             
-            // Record the refund in the Ledger
-            const refundEntry = new WisdomPointsLedger({
-                userId: userId,
-                points: QUIZ_COST, // Positive value for refund
-                source: 'quiz-refund' 
-            });
-            await refundEntry.save();
+            // Ledger logic for quiz-refund grant removed
             
             console.error(
                 `Cannot start Quiz, only ${selectedQuestions.length} questions found in difficulty window. Coins have been refunded.`
