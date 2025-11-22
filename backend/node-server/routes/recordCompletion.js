@@ -2,16 +2,30 @@ const express = require("express");
 const mongoose = require("mongoose");
 const Category = require("../models/categoryModel");
 const User = require("../models/user");
-const WisdomPointsLedger = require("../models/WisdomPointsLedger"); // ✅ Only Ledger use remains
+const WisdomPointsLedger = require("../models/WisdomPointsLedger"); 
 const authenticateToken = require("../middleware/auth");
 
 const router = express.Router();
 
-// ... (calculateCoinReward and calculateKnowledgePoints helpers)
-const calculateCoinReward = (correctAnswers) => {
-    if (correctAnswers <= 0) return 0;
-    const rawReward = Math.floor(Math.pow(correctAnswers, 1.3) * 3); 
+/**
+ * Calculates the coin reward based on correct answers and total questions.
+ * Range: 10 - 150 coins.
+ * Uses a dynamic exponential formula based on percentage correct to allow scaling with quiz length.
+ */
+const calculateCoinReward = (correctAnswers, questionsAttempted) => {
+    if (correctAnswers <= 0 || questionsAttempted <= 0) return 0;
+
+    // Normalize score to a 0-10 scale regardless of total questions (N)
+    // This allows the exponential curve to be based on percentage correct.
+    const scoreScale = (correctAnswers / questionsAttempted) * 10; 
+
+    // Exponential formula: (ScoreScale ^ 1.3) * Multiplier (7.6)
+    // Multiplier of 7.6 ensures 100% correct (ScoreScale=10) hits the max cap of 150.
+    const rawReward = Math.floor(Math.pow(scoreScale, 1.3) * 7.6);
+    
+    // Ensure reward is within 10 to 150 range
     const coinsEarned = Math.min(150, Math.max(10, rawReward));
+
     return coinsEarned;
 };
 
@@ -27,15 +41,30 @@ router.post("/:categoryId/completion", authenticateToken, async (req, res) => {
         const { questionsAttempted, correctAnswers, incorrectAnswers } = req.body;
         const userId = req.user.id;
 
-        // ... (validation logic)
+        console.log("✅ Received categoryId:", categoryId);
+        console.log("✅ Extracted User ID:", userId);
+
+        if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+            return res.status(400).json({ message: "Invalid category ID format." });
+        }
+        if (questionsAttempted <= 0) {
+            return res.status(400).json({ message: "Questions attempted must be greater than zero." });
+        }
 
         const user = await User.findById(userId);
         const category = await Category.findById(categoryId);
 
-        // ... (not found logic)
+        if (!user) {
+            return res.status(404).json({ message: "User not found." });
+        }
+        if (!category) {
+            return res.status(404).json({ message: "Category not found." });
+        }
+
 
         // Calculate reward and XP
-        const coinsEarned = calculateCoinReward(correctAnswers);
+        // IMPORTANT CHANGE: Pass questionsAttempted to enable dynamic calculation
+        const coinsEarned = calculateCoinReward(correctAnswers, questionsAttempted);
         const knowledgePointsEarned = calculateKnowledgePoints(correctAnswers, incorrectAnswers);
         const previousLevel = user.level;
         const percentageCorrect = (correctAnswers / questionsAttempted) * 100;
@@ -55,8 +84,18 @@ router.post("/:categoryId/completion", authenticateToken, async (req, res) => {
         user.level = user.calculateLevel();
         await user.save();
 
-        // ... (Save completion record and build response)
+        // ✅ Save completion record under category
+        const newCompletion = {
+            user: userId,
+            questionsAttempted,
+            correctAnswers,
+            incorrectAnswers
+        };
+        category.completions.push(newCompletion);
+        await category.save();
 
+
+        // ✅ Build response
         res.status(201).json({
             message: "✅ Completion recorded successfully!",
             results: {
