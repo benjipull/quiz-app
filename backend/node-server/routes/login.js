@@ -2,10 +2,9 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
-// The WisdomPointsLedger import is now removed
 
 const router = express.Router();
-const INITIAL_BONUS_AMOUNT = 2000; // Define the one-time bonus amount
+const INITIAL_BONUS_AMOUNT = 2000; 
 
 // @route   POST /api/users/login
 // @desc    Authenticate user & get token
