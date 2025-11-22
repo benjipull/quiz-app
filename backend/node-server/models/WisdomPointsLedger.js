@@ -22,7 +22,8 @@ const WisdomPointsLedgerSchema = new mongoose.Schema({
     // Optional: Source of the points (e.g., 'quiz-completion')
     source: {
         type: String,
-        enum: ['quiz-completion', 'admin-grant', 'daily-bonus'], // Example sources
+        // Added 'daily-bonus' to the enum
+        enum: ['quiz-completion', 'admin-grant', 'daily-bonus'], 
         default: 'quiz-completion'
     }
 });

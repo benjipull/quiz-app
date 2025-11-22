@@ -28,6 +28,8 @@ router.post("/", async (req, res) => {
 
         // Create new user
         const newUser = new User({ alias, email, password, age });
+        newUser.coins += 1000;
+
         await newUser.save();
 
         res.status(201).json({ message: "User registered successfully" });

@@ -5,6 +5,8 @@ const User = require("../models/user");
 const authenticateToken = require("../middleware/auth");
 const { userQuestions } = require("../index"); // Import shared store
 
+const QUIZ_COST = 100; // Define the quiz cost
+
 const difficultyNames = {
     1: "Basic",
     2: "Easy",
@@ -48,6 +50,16 @@ router.post("/", authenticateToken, async (req, res) => {
             return res.status(404).json({ message: "❌ User not found" });
         }
 
+        // --- COIN DEDUCTION LOGIC START ---
+        if (user.coins < QUIZ_COST) {
+            return res.status(403).json({ message: `❌ Insufficient coins to start the quiz. Cost: ${QUIZ_COST} coins.` });
+        }
+        
+        user.coins -= QUIZ_COST; // Deduct the quiz cost
+        await user.save(); // Save the deduction before proceeding
+        console.log(`-💰 Deducted ${QUIZ_COST} coins from user ${userId} for quiz.`);
+        // --- COIN DEDUCTION LOGIC END ---
+
         const userLevel = user.level || 1;
 
         // 🎚 Sliding difficulty window
@@ -75,12 +87,15 @@ router.post("/", authenticateToken, async (req, res) => {
             .slice(0, numQuestions);
 
         if (selectedQuestions.length < 10) {
+            // If quiz fails to start, refund the coins
+            user.coins += QUIZ_COST;
+            await user.save();
             console.error(
-                `Cannot start Quiz, only ${selectedQuestions.length} questions found in difficulty window. Populating category: ${category._id} (${category.name})`
+                `Cannot start Quiz, only ${selectedQuestions.length} questions found in difficulty window. Coins refunded.`
             );
 
             return res.status(404).json({
-                message: "Not enough available questions in this difficulty range (minimum 10 required). Please try again in a few minutes."
+                message: "Not enough available questions in this difficulty range (minimum 10 required). Coins have been refunded."
             });
         }
 
@@ -105,7 +120,7 @@ router.post("/", authenticateToken, async (req, res) => {
         res.json({
             message: "Questions preloaded.",
             total: selectedQuestions.length,
-            difficultyRange: [minDifficulty, maxDifficulty] // for debugging
+            difficultyRange: [minDifficulty, maxDifficulty] 
         });
 
     } catch (error) {
