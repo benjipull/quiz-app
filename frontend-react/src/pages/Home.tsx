@@ -30,6 +30,7 @@ import AddCategory from "@/components/AddCategory";
 import { useToast } from "@/hooks/use-toast";
 
 import { apiClient } from "@/utils/apiClient";
+import DailyCoinClaim from "@/components/DailyCoinClaim";
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
@@ -465,7 +466,13 @@ export default function Home() {
             </Button>
           </Card>
         )}
-
+{/* Daily Coin Claim */}
+<DailyCoinClaim 
+  userToken={userToken}
+  onCoinsEarned={(amount) => {
+    console.log(`Earned ${amount} coins!`);
+  }}
+/>
     {/* User Avatar and Alias */}
 <div className="flex flex-col items-center py-6">
   <div
