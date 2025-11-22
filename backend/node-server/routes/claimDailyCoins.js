@@ -1,7 +1,7 @@
 const express = require("express");
 const User = require("../models/user"); 
 const authenticateToken = require("../middleware/auth");
-const WisdomPointsLedger = require("../models/WisdomPointsLedger"); 
+// The WisdomPointsLedger import is now removed
 
 const router = express.Router();
 const DAILY_BONUS_COINS = 500; // 500 coins to claim
@@ -38,13 +38,7 @@ router.post("/", authenticateToken, async (req, res) => {
         user.lastDailyCoinClaim = now; // Update the last claim timestamp
         await user.save();
 
-        // Record the claim in the WisdomPointsLedger with source: 'daily-bonus'
-        const newLedgerEntry = new WisdomPointsLedger({
-            userId: userId,
-            points: DAILY_BONUS_COINS,
-            source: 'daily-bonus' 
-        });
-        await newLedgerEntry.save();
+        // Ledger logic for daily-bonus coin claim removed
 
         res.status(200).json({
             message: `🎉 Successfully claimed ${DAILY_BONUS_COINS} coins!`,
@@ -54,7 +48,7 @@ router.post("/", authenticateToken, async (req, res) => {
 
     } catch (error) {
         console.error("❌ Daily coin claim error:", error);
-        res.status(500).json({ message: "⚠️ Server error claiming daily bonus.", error: error.message });
+        res.status(500).json({ message: "Server error", error: error.message });
     }
 });
 
