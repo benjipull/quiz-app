@@ -54,22 +54,14 @@ router.post("/", authenticateToken, async (req, res) => {
         }
 
         // ----------------------------------------------------------------
-        // 💰 1. COIN CHECK AND DEDUCTION
+        // 💰 1. COIN DEDUCTION (UNCONDITIONAL: ALLOWS NEGATIVE BALANCE)
         // ----------------------------------------------------------------
-        if (user.coins < QUIZ_COST) {
-            console.log(`❌ User ${userId} blocked: Insufficient coins (${user.coins} < ${QUIZ_COST})`);
-            return res.status(402).json({ 
-                message: `Insufficient coins. This quiz costs ${QUIZ_COST} coins.`,
-                requiredCoins: QUIZ_COST,
-                userCoins: user.coins
-            });
-        }
-
+        
         // Deduct coins and save
         user.coins -= QUIZ_COST;
         await user.save();
         
-        console.log(`💸 Deducted ${QUIZ_COST} coins from user ${userId}. Remaining: ${user.coins}`);
+        console.log(`💸 Deducted ${QUIZ_COST} coins from user ${userId}. New Balance: ${user.coins}`);
         
         // Record the coin deduction in the Ledger
         const ledgerEntry = new WisdomPointsLedger({
@@ -108,7 +100,7 @@ router.post("/", authenticateToken, async (req, res) => {
 
         if (selectedQuestions.length < 10) {
             // ----------------------------------------------------------------
-            // 💰 2. COIN REFUND IF QUIZ FAILS TO START
+            // 💰 2. COIN REFUND IF QUIZ FAILS TO START (STILL NECESSARY)
             // ----------------------------------------------------------------
             user.coins += QUIZ_COST; // Refund the coins
             await user.save();
