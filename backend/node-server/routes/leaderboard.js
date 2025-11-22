@@ -7,7 +7,7 @@ const router = express.Router();
 
 /**
  * Helper function to calculate the start date for the leaderboard aggregation,
- * based on the requested period ('day', 'week', 'month', 'year').
+ * based on the requested period ('day', 'week', 'month', 'year', 'all-time').
  */
 const getStartDate = (period) => {
     const now = new Date();
@@ -35,51 +35,54 @@ const getStartDate = (period) => {
             break;
         case 'year':
             // Set to January 1st of the current year
-            startDate.setMonth(0, 1);
+            startDate.setMonth(0); // January
+            startDate.setDate(1);  // 1st
             startDate.setHours(0, 0, 0, 0);
             break;
         default:
-            return null; // Invalid period
+            // For 'all-time' or an unrecognized period
+            startDate = new Date(0); // Epoch time
+            break;
     }
+
     return startDate;
 };
 
-
-router.get("/", authenticateToken, async (req, res) => {
-    // period can be 'day', 'week', 'month', 'year'
-    const period = req.query.period ? req.query.period.toLowerCase() : 'month'; 
-    const startDate = getStartDate(period);
-
-    if (!startDate) {
-        return res.status(400).json({ message: "Invalid or missing 'period' query parameter. Must be 'day', 'week', 'month', or 'year'." });
-    }
+// @route   GET /api/leaderboard/:period
+// @desc    Gets the leaderboard for a specific period
+// @access  Registered
+router.get("/:period", authenticateToken, async (req, res) => {
+    // Ensure the period is lowercased for case-insensitive matching
+    const period = req.params.period.toLowerCase();
 
     try {
-        // --- Aggregation Pipeline ---
+        const startDate = getStartDate(period);
+
         const pipeline = [
-            // 1. Filter ledger entries by the start date of the period
+            // 1. Filter entries to only include those after the start date
             {
                 $match: {
-                    // Only include entries after the start date
-                    timestamp: { $gte: startDate } 
+                    timestamp: { $gte: startDate },
                 }
             },
-            // 2. Group by userId and sum the points
+            // 2. Group by userId and sum the Knowledge Points
             {
                 $group: {
                     _id: "$userId",
-                    totalPoints: { $sum: "$points" }
+                    totalPoints: { $sum: "$points" } // Summing only Knowledge Points
                 }
             },
-            // 3. Sort by total points (descending)
+            // 3. Sort by totalPoints (Knowledge Points) in descending order
             {
-                $sort: { totalPoints: -1 }
+                $sort: {
+                    totalPoints: -1
+                }
             },
-            // 4. Limit to the top 100 players (adjust as needed)
+            // 4. Limit to the top 100 players
             {
                 $limit: 100 
             },
-            // 5. Join with the users collection to get player details
+            // 5. Join with the users collection to get player details (alias, level, avatar)
             {
                 $lookup: {
                     from: "users", 
@@ -100,7 +103,7 @@ router.get("/", authenticateToken, async (req, res) => {
                 $project: {
                     _id: 0,
                     userId: "$_id",
-                    totalPoints: 1,
+                    totalPoints: 1, 
                     username: "$userDetails.alias", 
                     level: "$userDetails.level",
                     avatar: "$userDetails.avatar" 
