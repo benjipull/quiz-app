@@ -32,6 +32,8 @@ const UserSchema = new mongoose.Schema({
 
   // 💰 Coin Tracking
   lastDailyCoinClaim: { type: Date, default: null }, // Track last claim time
+  // 💰 NEW: One-time login bonus flag
+  initialLoginBonusClaimed: { type: Boolean, required: true, default: false }, // <-- ADDED
 
   // 👥 User type
   userType: {

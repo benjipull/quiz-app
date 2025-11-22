@@ -14,13 +14,19 @@ const router = express.Router();
 const calculateCoinReward = (correctAnswers) => {
     if (correctAnswers <= 0) return 0;
 
-    // Exponential formula for coin reward
-    const rawReward = Math.floor(Math.pow(correctAnswers, 1.3) * 3);
+    // 🏆 FIX: Increased the multiplier from '3' to '8' for profitability.
+    const rawReward = Math.floor(Math.pow(correctAnswers, 1.3) * 8); 
     
     // Ensure reward is within 10 to 150 range
     const coinsEarned = Math.min(150, Math.max(10, rawReward));
 
     return coinsEarned;
+};
+
+// Assuming you have this helper function for XP/Knowledge Points
+const calculateKnowledgePoints = (correct, incorrect) => {
+    // Example: 10 points per correct answer, -5 per incorrect.
+    return (correct * 10) - (incorrect * 5); 
 };
 
 
@@ -34,56 +40,40 @@ router.post("/:categoryId/completion", authenticateToken, async (req, res) => {
         console.log("✅ Extracted User ID:", userId);
 
         if (!mongoose.Types.ObjectId.isValid(categoryId)) {
-            return res.status(400).json({ message: "❌ Invalid category ID format." });
+            return res.status(400).json({ message: "Invalid category ID format." });
         }
 
-        if (questionsAttempted == null || correctAnswers == null || incorrectAnswers == null) {
-            return res.status(400).json({ message: "⚠️ All fields are required." });
-        }
-
-        const category = await Category.findById(categoryId);
-        if (!category) {
-            return res.status(404).json({ message: "❌ Category not found" });
-        }
-
-        // ✅ Find user
         const user = await User.findById(userId);
+        const category = await Category.findById(categoryId);
+
         if (!user) {
-            return res.status(404).json({ message: "❌ User not found" });
+            return res.status(404).json({ message: "User not found." });
+        }
+        if (!category) {
+            return res.status(404).json({ message: "Category not found." });
         }
 
-        // ✅ Calculate percentage
+        // Calculate reward and XP
+        const coinsEarned = calculateCoinReward(correctAnswers);
+        const knowledgePointsEarned = calculateKnowledgePoints(correctAnswers, incorrectAnswers);
+        const previousLevel = user.level;
         const percentageCorrect = (correctAnswers / questionsAttempted) * 100;
 
-        // ✅ Calculate knowledge gained (exponential reward)
-        const knowledgePointsEarned = Math.floor(Math.pow(correctAnswers, 1.2) * 5);
-        
-        // --- NEW: Calculate Coin Reward ---
-        const coinsEarned = calculateCoinReward(correctAnswers);
-        // ---------------------------------
-
-        // --- NEW LEDGER ENTRY LOGIC START (Wisdom Points) ---
-        if (knowledgePointsEarned > 0) {
-            const newLedgerEntry = new WisdomPointsLedger({
-                userId: userId, // User ID from auth middleware
-                points: knowledgePointsEarned,
-                source: 'quiz-completion'
-                // timestamp defaults to Date.now()
-            });
-            await newLedgerEntry.save();
-            console.log(`✨ Recorded ${knowledgePointsEarned} wisdom points for user ${userId}`);
-        }
-        // --- NEW LEDGER ENTRY LOGIC END ---
-
-        // ✅ Track previous level
-        const previousLevel = user.level;
-
-        // ✅ Update user’s points & level
+        // Apply reward and XP to user
         user.knowledgePoints += knowledgePointsEarned;
-        // --- NEW: Update user's coins ---
+        // --- ONLY ADD REWARD: Deduction happened in startQuiz.js ---
         user.coins += coinsEarned;
         console.log(`💰 Awarded ${coinsEarned} coins for user ${userId}`);
-        // --------------------------------
+        // -----------------------------------------------------------
+        
+        // Record the reward in the Ledger
+        const rewardLedger = new WisdomPointsLedger({
+            userId: userId,
+            points: coinsEarned,
+            source: 'quiz-completion' 
+        });
+        await rewardLedger.save();
+
         user.level = user.calculateLevel();
         await user.save();
 
@@ -105,10 +95,10 @@ router.post("/:categoryId/completion", authenticateToken, async (req, res) => {
                 incorrectAnswers,
                 percentageCorrect: Math.round(percentageCorrect), // integer only
                 knowledgeGained: knowledgePointsEarned,
-                // --- NEW: COIN RESULTS ---
+                // --- COIN RESULTS ---
                 coinsEarned: coinsEarned,
                 totalCoins: user.coins,
-                // -------------------------
+                // --------------------
                 totalKnowledge: user.knowledgePoints,
                 previousLevel,
                 currentLevel: user.level

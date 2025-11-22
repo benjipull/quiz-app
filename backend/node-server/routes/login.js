@@ -2,8 +2,10 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
+const WisdomPointsLedger = require("../models/WisdomPointsLedger"); // 🚨 NEW: Import Ledger
 
 const router = express.Router();
+const INITIAL_BONUS_AMOUNT = 2000; // Define the one-time bonus amount
 
 // @route   POST /api/users/login
 // @desc    Authenticate user & get token
@@ -24,7 +26,29 @@ router.post("/", async (req, res) => {
             return res.status(400).json({ message: "Invalid credentials" });
         }
 
-        console.log("User Object on Login:", user);
+        // --------------------------------------------------------
+        // 💰 ONE-TIME COIN GRANT LOGIC FOR EXISTING REGISTERED USERS
+        // --------------------------------------------------------
+        if (
+            user.userType === "Registered" &&
+            !user.initialLoginBonusClaimed
+        ) {
+            user.coins += INITIAL_BONUS_AMOUNT;
+            user.initialLoginBonusClaimed = true; // Prevents future claims
+
+            // Record the grant in the Ledger
+            const grantEntry = new WisdomPointsLedger({
+                userId: user._id,
+                points: INITIAL_BONUS_AMOUNT,
+                source: 'initial-grant' 
+            });
+            await grantEntry.save();
+            
+            console.log(`🎉 Granted ${INITIAL_BONUS_AMOUNT} coins to existing user ${user.alias} on login.`);
+        }
+        // --------------------------------------------------------
+
+        console.log("User Object on Login:", user); 
 
         // Generate JWT Token
         const token = jwt.sign(
@@ -40,7 +64,7 @@ router.post("/", async (req, res) => {
         console.log("Generated Token:", token); // ✅ Log token for debugging
 
         user.lastlogin_at = Date.now();
-        await user.save();
+        await user.save(); // Save the user with the updated coins/flag and lastlogin_at
 
         // Exclude password field from response
         const { password: _, ...userWithoutPassword } = user.toObject();

@@ -4,11 +4,9 @@ const Category = require("../models/categoryModel");
 const User = require("../models/user");
 const authenticateToken = require("../middleware/auth");
 const { userQuestions } = require("../index"); // Import shared store
-const WisdomPointsLedger = require("../models/WisdomPointsLedger"); // Import Ledger
+const WisdomPointsLedger = require("../models/WisdomPointsLedger"); // 🚨 NEW: Import Ledger
 
-// --- COIN CONSTANT ---
-const QUIZ_COST = 100; // Define the quiz cost
-// ---------------------
+const QUIZ_COST = 100; // Define the quiz cost (100 coins)
 
 const difficultyNames = {
     1: "Basic",
@@ -52,18 +50,17 @@ router.post("/", authenticateToken, async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: "❌ User not found" });
         }
-
-        // ----------------------------------------------------------------
-        // 💰 1. COIN DEDUCTION (UNCONDITIONAL: ALLOWS NEGATIVE BALANCE)
-        // ----------------------------------------------------------------
         
-        // Deduct coins and save
-        user.coins -= QUIZ_COST;
+        // ----------------------------------------------------------------
+        // 💰 1. QUIZ COST DEDUCTION (Pay-to-Play)
+        // Deduct coins first (allows negative balance/debt to start)
+        // ----------------------------------------------------------------
+        user.coins -= QUIZ_COST; 
         await user.save();
         
-        console.log(`💸 Deducted ${QUIZ_COST} coins from user ${userId}. New Balance: ${user.coins}`);
+        console.log(`💸 Deducted ${QUIZ_COST} coins to start quiz for user ${userId}. New Balance: ${user.coins}`);
         
-        // Record the coin deduction in the Ledger
+        // Record the deduction in the Ledger
         const ledgerEntry = new WisdomPointsLedger({
             userId: userId,
             points: -QUIZ_COST, // Negative value for deduction
@@ -100,7 +97,7 @@ router.post("/", authenticateToken, async (req, res) => {
 
         if (selectedQuestions.length < 10) {
             // ----------------------------------------------------------------
-            // 💰 2. COIN REFUND IF QUIZ FAILS TO START (STILL NECESSARY)
+            // 💰 2. COIN REFUND IF QUIZ FAILS TO START (Not enough questions)
             // ----------------------------------------------------------------
             user.coins += QUIZ_COST; // Refund the coins
             await user.save();
@@ -144,7 +141,7 @@ router.post("/", authenticateToken, async (req, res) => {
         res.json({
             message: "Questions preloaded. Quiz cost deducted.",
             total: selectedQuestions.length,
-            difficultyRange: [minDifficulty, maxDifficulty], // for debugging
+            difficultyRange: [minDifficulty, maxDifficulty],
             userCoins: user.coins // Return the new coin balance
         });
 
