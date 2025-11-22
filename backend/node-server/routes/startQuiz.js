@@ -4,7 +4,6 @@ const Category = require("../models/categoryModel");
 const User = require("../models/user");
 const authenticateToken = require("../middleware/auth");
 const { userQuestions } = require("../index"); // Import shared store
-// The WisdomPointsLedger import is now removed
 
 const QUIZ_COST = 100; // Define the quiz cost (100 coins)
 

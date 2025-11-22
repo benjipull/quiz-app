@@ -1,7 +1,7 @@
 const express = require("express");
 const User = require("../models/user"); 
 const authenticateToken = require("../middleware/auth");
-// The WisdomPointsLedger import is now removed
+// const WisdomPointsLedger = require("../models/WisdomPointsLedger"); // ❌ REMOVED: No coin logging
 
 const router = express.Router();
 const DAILY_BONUS_COINS = 500; // 500 coins to claim
@@ -38,7 +38,7 @@ router.post("/", authenticateToken, async (req, res) => {
         user.lastDailyCoinClaim = now; // Update the last claim timestamp
         await user.save();
 
-        // Ledger logic for daily-bonus coin claim removed
+        // ❌ Ledger entry logic for coins removed
 
         res.status(200).json({
             message: `🎉 Successfully claimed ${DAILY_BONUS_COINS} coins!`,
