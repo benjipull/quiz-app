@@ -28,14 +28,15 @@ router.post("/", async (req, res) => {
 
         // Create new user
         const newUser = new User({ alias, email, password, age });
-        newUser.coins += 1000;
+        // 💰 FIX: Grant 1000 extra coins (1000 default from model + 1000 bonus = 3000 total)
+        newUser.coins += 1000; 
 
         await newUser.save();
 
         res.status(201).json({ message: "User registered successfully" });
     } catch (error) {
         console.error("⚠️ Server Error:", error.message);
-        res.status(500).json({ message: "Server error", error: error.message });
+        res.status(500).json({ message: "Server error" });
     }
 });
 

@@ -18,11 +18,14 @@ router.post("/", async (req, res) => {
 
         // Create new user
         const newUser = new User({ alias, email, password, age, userType });
+        
+        newUser.coins = 1000; 
+        
         await newUser.save();
 
         // Generate JWT Token
         const token = jwt.sign(
-            { id: newUser._id.toString(), alias: newUser.alias },
+            { id: newUser._id.toString(), alias: newUser.alias, userType: newUser.userType }, // Ensure userType is in the token
             process.env.JWT_SECRET,
             { expiresIn: "30d" }
         );
