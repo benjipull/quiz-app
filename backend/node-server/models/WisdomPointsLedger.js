@@ -8,7 +8,7 @@ const WisdomPointsLedgerSchema = new mongoose.Schema({
         required: true,
         index: true // Index for efficient lookups
     },
-    // The amount of wisdom/knowledge points earned (KP/XP)
+    // The amount of wisdom/knowledge points earned
     points: {
         type: Number,
         required: true
@@ -19,11 +19,10 @@ const WisdomPointsLedgerSchema = new mongoose.Schema({
         default: Date.now,
         index: true // Index for date range queries
     },
-    // Optional: Source of the Knowledge Points (Coin sources removed)
+    // Optional: Source of the points (e.g., 'quiz-completion')
     source: {
         type: String,
-        // Only include sources that grant or deduct Knowledge Points (KP/XP)
-        enum: ['quiz-completion', 'admin-grant'], 
+        enum: ['quiz-completion', 'admin-grant', 'daily-bonus'], // Example sources
         default: 'quiz-completion'
     }
 });
