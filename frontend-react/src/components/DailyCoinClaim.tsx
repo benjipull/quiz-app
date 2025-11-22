@@ -185,10 +185,9 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
     w-full 
     max-w-8xl
     rounded-[30px]
-    bg-[#3a0077]
-    bg-gradient-to-br from-[#4d008d] to-[#25004d]
-    border-[3px] border-[#b535ff]
-    shadow-[0_0_2px_rgba(181,53,255,0.55)]
+    bg-transparent
+    border-[3px] border-[#d946ef]
+    shadow-[0_0_35px_rgba(217,70,239,0.4)]
     p-4 sm:p-5
   "
 >
