@@ -5,6 +5,7 @@ import { Coins, Clock, Sparkles, Gift, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/utils/apiClient";
 
+// Ensure BASE_URL is defined in your environment variables
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 interface DailyCoinClaimProps {
@@ -29,8 +30,11 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
     // Check every second for countdown
     const interval = setInterval(() => {
       setTimeRemaining((prev) => {
+        // If remaining time is less than 1 second (1000ms), switch to canClaim
         if (prev <= 1000) {
-          setCanClaim(true);
+          if (!canClaim) {
+            setCanClaim(true);
+          }
           return 0;
         }
         return prev - 1000;
@@ -38,10 +42,11 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [userToken]);
+  }, [userToken, canClaim]); // Include canClaim in dependencies to prevent unnecessary state updates
 
   const checkClaimStatus = async () => {
     try {
+      // NOTE: Assuming apiClient handles authorization using userToken internally
       const response = await apiClient(`${BASE_URL}/api/getUserDetails`, {
         method: "GET",
       });
@@ -70,12 +75,18 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
       }
     } catch (error) {
       console.error("Error checking claim status:", error);
+      // Fallback: If status check fails, allow claiming to avoid soft-lock
+      if (timeRemaining <= 0) {
+        setCanClaim(true);
+      }
     }
   };
 
   const handleClaimClick = () => {
-    if (!canClaim || isClaiming) return;
-    setShowRewardModal(true);
+    // Only show modal if the user is allowed to claim
+    if (canClaim && !isClaiming) {
+      setShowRewardModal(true);
+    }
   };
 
   const handleConfirmClaim = async () => {
@@ -94,42 +105,49 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
       const data = await response.json();
 
       if (response.ok) {
-        setClaimedAmount(data.coinsEarned || 500);
+        const coinsEarned = data.coinsEarned || 500;
+        setClaimedAmount(coinsEarned);
         
         // Show coin animation
         setShowAnimation(true);
 
-        // Hide modal after animation
+        // Hide modal after animation and reset state
         setTimeout(() => {
           setShowRewardModal(false);
           setShowAnimation(false);
+          
+          // Reset cooldown states
+          setCanClaim(false);
+          setTimeRemaining(24 * 60 * 60 * 1000);
+          setIsClaiming(false); // Ensure claiming state is reset after delay
         }, 3000);
 
-        // Update state
-        setCanClaim(false);
-        setTimeRemaining(24 * 60 * 60 * 1000);
-
-        // Notify parent
+        // Notify parent immediately
         if (onCoinsEarned) {
-          onCoinsEarned(data.coinsEarned || 500);
+          onCoinsEarned(coinsEarned);
         }
 
         toast({
           title: "🎉 Daily Reward Claimed!",
-          description: `You earned ${data.coinsEarned || 500} coins!`,
+          description: `You earned ${coinsEarned} coins!`,
         });
       } else {
-        // Handle cooldown response
+        // Handle cooldown or other errors from server
         if (data.timeRemainingMs) {
           setTimeRemaining(data.timeRemainingMs);
           setCanClaim(false);
+        } else {
+          // If server error, re-check status
+          checkClaimStatus(); 
         }
+
         toast({
           title: "Already Claimed",
           description: data.message || "Please wait for the cooldown.",
           variant: "destructive",
         });
         setShowRewardModal(false);
+        setIsClaiming(false);
       }
     } catch (error) {
       console.error("Error claiming coins:", error);
@@ -139,15 +157,17 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
         variant: "destructive",
       });
       setShowRewardModal(false);
-    } finally {
       setIsClaiming(false);
-    }
+    } 
   };
 
   const formatTimeRemaining = (ms: number) => {
-    const hours = Math.floor(ms / (1000 * 60 * 60));
-    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+    if (ms <= 0) return "Ready!";
+
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
 
     if (hours > 0) {
       return `${hours}h ${minutes}m`;
@@ -160,10 +180,10 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
 
   return (
     <>
- <Card
+  <Card
   className="
     w-full 
-    max-w-3xl
+    max-w-8xl
     rounded-[30px]
     bg-[#3a0077]
     bg-gradient-to-br from-[#4d008d] to-[#25004d]
@@ -193,7 +213,7 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
       </div>
 
       {/* Text */}
-      <div className="leading-tight">
+      <div className="leading-tight min-w-0">
         <h3 className="text-white font-bold text-xl sm:text-2xl">
           Daily
         </h3>
@@ -203,27 +223,40 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
       </div>
     </div>
 
-    {/* RIGHT SIDE — TIMER PILL */}
+    {/* RIGHT SIDE — TIMER / CLAIM BUTTON */}
     <div
-      className="
+      className={`
         flex items-center gap-1.5 sm:gap-2
         px-3 py-2 sm:px-6 sm:py-3
         rounded-full
-        bg-[#501b9b]
-        border-[3px] border-[#ff78ff]
-        shadow-[0_0_25px_rgba(255,115,255,0.5)]
-        flex-shrink-0
-      "
+        min-w-0   /* <-- IMPORTANT FIX */
+        ${
+          canClaim 
+            ? "bg-yellow-500/10 border-[3px] border-yellow-400 shadow-[0_0_25px_rgba(255,255,0,0.5)] cursor-pointer hover:bg-yellow-500/20 transition-colors"
+            : "bg-[#501b9b] border-[3px] border-[#ff78ff] shadow-[0_0_25px_rgba(255,115,255,0.5)]"
+        }
+      `}
+      onClick={handleClaimClick}
     >
-      <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" />
-      <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap">
-        {formatTimeRemaining(timeRemaining)}
-      </span>
+      {canClaim ? (
+        <>
+          <Sparkles className={`w-5 h-5 sm:w-6 sm:h-6 ${isClaiming ? "text-gray-400" : "text-yellow-400"}`} />
+          <span className={`font-bold text-sm sm:text-lg whitespace-nowrap ${isClaiming ? "text-gray-400" : "text-yellow-400"}`}>
+            {isClaiming ? 'Claiming...' : 'Claim Now'}
+          </span>
+        </>
+      ) : (
+        <>
+          <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" />
+          <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap">
+            {formatTimeRemaining(timeRemaining)}
+          </span>
+        </>
+      )}
     </div>
 
   </div>
 </Card>
-
 
 
 
@@ -330,6 +363,7 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
         </div>
       )}
 
+      {/* CSS Styles for Animations */}
       <style>{`
         @keyframes float-coin-modal {
           0% {
