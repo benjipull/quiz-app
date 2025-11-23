@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Coins, Clock, Sparkles, Gift, Star } from "lucide-react";
+import { Coins, Clock, Sparkles, Star, CircleDollarSign } from "lucide-react"; // Removed Gift
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/utils/apiClient";
 
 // Ensure BASE_URL is defined in your environment variables
 const BASE_URL = import.meta.env.VITE_BASE_URL;
+const DEFAULT_BONUS = 500; // Fallback value
 
 interface DailyCoinClaimProps {
   userToken: string;
@@ -19,12 +20,34 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
   const [showRewardModal, setShowRewardModal] = useState<boolean>(false);
   const [showAnimation, setShowAnimation] = useState<boolean>(false);
-  const [claimedAmount, setClaimedAmount] = useState<number>(500);
+  const [dailyBonusAmount, setDailyBonusAmount] = useState<number>(DEFAULT_BONUS); // Dynamic coin amount
   const { toast } = useToast();
+  
+  // New function to fetch the daily bonus amount
+ const fetchDailyBonusAmount = useCallback(async () => {
+    try {
+        const response = await apiClient(`${BASE_URL}/api/claimDailyCoins/amount`, {
+            method: "GET",
+        });
+
+        if (response && response.ok) {
+            const data = await response.json();
+            if (data.dailyBonusAmount) {
+                setDailyBonusAmount(data.dailyBonusAmount);
+            }
+        }
+    } catch (error) {
+        console.error("Error fetching daily bonus amount:", error);
+    }
+}, []);
+
 
   // Check claim status on mount and set up interval
   useEffect(() => {
     if (!userToken) return;
+    
+    // 👇 Fetch the bonus amount
+    fetchDailyBonusAmount(); 
     checkClaimStatus();
     
     // Check every second for countdown
@@ -42,7 +65,7 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [userToken, canClaim]); // Include canClaim in dependencies to prevent unnecessary state updates
+  }, [userToken, canClaim, fetchDailyBonusAmount]); // Added fetchDailyBonusAmount dependency
 
   const checkClaimStatus = async () => {
     try {
@@ -105,8 +128,8 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
       const data = await response.json();
 
       if (response.ok) {
-        const coinsEarned = data.coinsEarned || 500;
-        setClaimedAmount(coinsEarned);
+        const coinsEarned = data.coinsEarned || dailyBonusAmount;
+        // Use the actual earned amount from the server, falling back to the fetched amount
         
         // Show coin animation
         setShowAnimation(true);
@@ -196,20 +219,42 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
     {/* LEFT SECTION */}
     <div className="flex items-center gap-2 sm:gap-4 min-w-0">
       
-      {/* Gift Icon Box */}
-      <div
-        className="
-          w-12 h-12 sm:w-14 sm:h-14
-          rounded-2xl
-          flex items-center justify-center
-          bg-gradient-to-br from-[#a020f0] to-[#6a0dad]
-          border-[3px] border-[#ff4dff]
-          shadow-[0_0_25px_rgba(255,77,255,0.65)]
-          flex-shrink-0
-        "
-      >
-        <Gift className="w-6 h-6 sm:w-8 sm:h-8 text-[#ffe14d]" />
-      </div>
+      {/* 👇 COINS Icon Box with dynamic amount */}
+     <div
+  className="
+    w-12 h-12 sm:w-14 sm:h-14
+    rounded-2xl
+    flex items-center justify-center
+    bg-gradient-to-br from-[#a020f0] to-[#6a0dad]
+    border-[3px] border-[#ff4dff]
+    shadow-[0_0_25px_rgba(255,77,255,0.65)]
+    flex-shrink-0
+    relative
+  "
+>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 28 28"
+    className="w-8 h-8 sm:w-10 sm:h-10"
+  >
+    <circle cx="10" cy="11" r="7" fill="#f59e0b" />
+    <circle cx="10" cy="11" r="6" fill="#fbbf24" />
+    <circle cx="10" cy="11" r="3.5" fill="#f59e0b" opacity="0.4" />
+    <circle cx="17" cy="16" r="8" fill="#f59e0b" />
+    <circle cx="17" cy="16" r="7" fill="#fbbf24" />
+    <circle cx="17" cy="16" r="4.2" fill="#f59e0b" opacity="0.4" />
+  </svg>
+
+  <span className="
+    absolute bottom-[-8px] right-[-8px] 
+    bg-green-500 rounded-full 
+    px-2 text-xs font-bold text-white 
+    shadow-md border border-white
+  ">
+    +{dailyBonusAmount}
+  </span>
+</div>
+
 
       {/* Text */}
       <div className="leading-tight min-w-0">
@@ -325,7 +370,8 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
               {/* Points Display */}
               <div className="text-center mb-8 relative z-10">
                 <p className="text-white text-2xl font-semibold mb-1">Coins</p>
-                <p className="text-yellow-400 text-5xl font-black">x{claimedAmount}</p>
+                {/* 👇 Use dynamic amount */}
+                <p className="text-yellow-400 text-5xl font-black">x{dailyBonusAmount}</p>
               </div>
 
               {/* Buttons */}
@@ -362,7 +408,7 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
         </div>
       )}
 
-      {/* CSS Styles for Animations */}
+      {/* CSS Styles for Animations - Unchanged */}
       <style>{`
         @keyframes float-coin-modal {
           0% {

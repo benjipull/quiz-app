@@ -262,6 +262,7 @@ export default function Quiz() {
   const location = useLocation();
   const explanationRef = useRef<HTMLDivElement>(null);
   const timerInSecondsRef = useRef<NodeJS.Timeout | null>(null);
+  // FIX: hasStartedRef is the key to prevent double execution in React Strict Mode
   const hasStartedRef = useRef(false);
   
   const nextQuestionRef = useRef<Question | null>(null);
@@ -399,9 +400,12 @@ export default function Quiz() {
   };
 
   useEffect(() => {
-    if (categoryId && userToken && !hasStartedRef.current) {
-      hasStartedRef.current = true;
-      startQuiz(categoryId);
+    if (categoryId && userToken) {
+      // FIX IMPLEMENTED HERE: Check and set the ref value immediately
+      if (!hasStartedRef.current) {
+        hasStartedRef.current = true;
+        startQuiz(categoryId);
+      }
     } else if (!userToken) {
       console.log("You must be logged in to play.");
       navigate("/categories");
@@ -531,6 +535,9 @@ export default function Quiz() {
       });
 
       if (!startResponse.ok) {
+        // If the start fails, we must allow a retry, so we reset the ref.
+        // This is only safe because the server side also handles refunding the coins.
+        hasStartedRef.current = false;
         throw new Error("Error starting quiz session.");
       } else {
         const startData = await startResponse.json();
@@ -814,6 +821,7 @@ export default function Quiz() {
   };
 
   const handlePlayAgain = () => {
+    // Reset hasStartedRef to allow quiz to start again
     hasStartedRef.current = false;
     if (categoryId) {
       startQuiz(categoryId);
