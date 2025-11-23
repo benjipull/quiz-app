@@ -1,6 +1,13 @@
+/**
+ * @fileoverview GameStatsHeader component for displaying user statistics,
+ * fetching data from a base URL configured via environment variables.
+ */
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
+
+// Retrieve the base URL from environment variables as specified by the user
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 interface UserStats {
   coins: number;
@@ -20,57 +27,113 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
 }) => {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // State for animating XP changes
   const [animatedXP, setAnimatedXP] = useState(0);
+  // Ref to hold the current XP value for animation starting point
   const xpRef = useRef<number>(0);
 
+  // Effect to fetch user stats
   useEffect(() => {
+    // Guard against fetching if still loading or userToken is missing
     if (isParentLoading || !userToken) return;
 
     const fetchStats = async () => {
-      try {
-        const res = await fetch(
-          "https://quiz-app-node-606998948537.europe-west4.run.app/api/getUserDetails",
-          {
+      // Basic implementation of exponential backoff for retries
+      const maxRetries = 3;
+      let attempt = 0;
+      let success = false;
+      
+      while (attempt < maxRetries && !success) {
+        attempt++;
+        try {
+          // Add timestamp to prevent aggressive caching
+          const timestamp = Date.now();
+          // Use the dynamically defined BASE_URL
+          const url = `${BASE_URL}/api/getUserDetails?_t=${timestamp}`;
+          
+          const res = await fetch(url, {
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${userToken}`,
             },
+            // Ensure no-store for fresh data
+            cache: 'no-store',
+          });
+
+          if (!res.ok) {
+            // Throw error to trigger the catch block and retry logic
+            throw new Error(`Error ${res.status}`);
           }
-        );
-        if (!res.ok) throw new Error(`Error ${res.status}`);
-        const data = await res.json();
-        setStats({
-          coins: data.coins ?? 0,
-          xp: data.knowledgePoints ?? 0,
-          gem1: data.wisdomGems ?? 0,
-          gem2: data.enlightenmentCrystals ?? 0,
-        });
-      } catch (err: any) {
-        console.error("Error fetching stats:", err);
-        setError("Failed to load stats");
+          
+          const data = await res.json();
+          setStats({
+            coins: data.coins ?? 0,
+            xp: data.knowledgePoints ?? 0,
+            gem1: data.wisdomGems ?? 0,
+            gem2: data.enlightenmentCrystals ?? 0,
+          });
+          setError(null); // Clear any previous errors
+          success = true; // Mark as successful
+          
+        } catch (err) {
+          console.error(`Attempt ${attempt}: Error fetching stats:`, err);
+          
+          if (attempt === maxRetries) {
+            setError("Failed to load user statistics.");
+          } else {
+            // Exponential backoff: wait 2^attempt seconds before retrying
+            const delay = Math.pow(2, attempt) * 1000;
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
       }
     };
+    
     fetchStats();
   }, [userToken, isParentLoading]);
 
+  // Effect for smooth XP animation
   useEffect(() => {
     if (stats?.xp != null) {
       const start = xpRef.current;
       const end = stats.xp;
       const duration = 800;
       const startTime = performance.now();
+      
       const animate = (time: number) => {
         const progress = Math.min((time - startTime) / duration, 1);
+        // Animate the value smoothly
         setAnimatedXP(Math.floor(start + (end - start) * progress));
-        if (progress < 1) requestAnimationFrame(animate);
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          xpRef.current = end; // Update ref with final value
+        }
       };
+      
       requestAnimationFrame(animate);
-      xpRef.current = end;
     }
   }, [stats?.xp]);
 
-  if (isParentLoading || !userToken || !stats) return null;
-  if (error) return <div className="text-red-500 text-center">{error}</div>;
+  // Render logic for loading and errors
+  if (isParentLoading || !userToken) {
+    return (
+      <div className="w-full px-4 mb-3 mt-2">
+        <div className="flex items-center justify-between w-full max-w-lg mx-auto p-4 bg-slate-800/60 rounded-xl border-2 border-slate-600 backdrop-blur-sm">
+          <div className="h-6 w-1/4 bg-slate-700 rounded animate-pulse"></div>
+          <div className="h-6 w-1/4 bg-slate-700 rounded animate-pulse"></div>
+          <div className="h-6 w-1/4 bg-slate-700 rounded animate-pulse"></div>
+          <div className="h-6 w-1/4 bg-slate-700 rounded animate-pulse"></div>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!stats) return null; 
+
+  if (error) return <div className="text-red-400 text-center font-semibold p-4 bg-red-900/50 border border-red-700 rounded-lg max-w-md mx-auto my-4">{error}</div>;
+
 
   // Increased icon size — smaller bg
   const statItems = [
