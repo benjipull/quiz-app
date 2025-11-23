@@ -35,11 +35,10 @@ const Leaderboard = () => {
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [userAvatar, setUserAvatar] = useState<string | null>(null); 
 
-  // --- Removed Animation State ---
   const [previousLeaderboardData, setPreviousLeaderboardData] = useState<LeaderboardPlayer[]>([]);
-  // --- Removed Animation State ---
 
   const currentUserRef = useRef<HTMLDivElement>(null);
+  // NOTE: containerRef is now mostly redundant for scrolling but kept for potential future use or other logic
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Get current user ID + avatar
@@ -76,7 +75,6 @@ const Leaderboard = () => {
 
       const apiUrl = `${BASE_URL}/api/leaderboard?period=${currentPeriod}`;
 
-      // Keep previous data to calculate rank change, but animation logic is removed
       if (leaderboardData.length > 0) {
         setPreviousLeaderboardData(leaderboardData);
       }
@@ -103,26 +101,13 @@ const Leaderboard = () => {
     fetchLeaderboard();
   }, [currentPeriod]);
 
-  // --- Removed Rank-change animation useEffect ---
-
-  // Auto scroll
+  // Auto scroll to current user (Removed logic related to container height/rects)
   useEffect(() => {
-    // Simplified scroll logic: check on load and data change
-    if (!loading && currentUserRef.current && containerRef.current) {
-      const userEl = currentUserRef.current;
-      const container = containerRef.current;
-
-      const containerRect = container.getBoundingClientRect();
-      const userRect = userEl.getBoundingClientRect();
-
-      const below = userRect.bottom > containerRect.bottom;
-      const above = userRect.top < containerRect.top;
-
-      // Smooth scroll if the current user is outside the container view
-      if (below || above) {
-        userEl.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
+    if (!loading && currentUserRef.current) {
+      // With page-level scrolling, we just need to scroll the element into view
+      currentUserRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+    // Dependency on leaderboardData is kept to ensure this runs after data loads
   }, [leaderboardData, loading]);
 
 
@@ -139,18 +124,19 @@ const Leaderboard = () => {
   };
 
   return (
+    // 1. Remove h-[100dvh] and overflow-hidden to allow the main page to grow and scroll.
+    // 2. Add overflow-y-auto to allow scrolling on the main page.
     <div
       className="
         w-full 
-        min-h-screen
         flex flex-col items-center 
-        px-3 sm:px-4 pb-20
+        px-3 sm:px-4
         bg-[#100321]
         bg-[url('/leaderboard.jpg')]
         bg-no-repeat bg-center bg-cover
+        overflow-y-auto min-h-[100dvh] // Add min-h and auto-scroll
       "
     >
-
       {/* Improved responsiveness CSS */}
       <style>{`
         @media (max-width: 420px) {
@@ -175,12 +161,10 @@ const Leaderboard = () => {
         }
       `}</style>
 
-      {/* --- Removed Animation Styles --- */}
-
-      <div className="pt-6 sm:pt-10"></div>
+      <div className="pt-4 sm:pt-6 flex-shrink-0"></div>
 
       {/* Period selection */}
-      <div className="flex justify-center w-full max-w-lg mb-4 p-1 rounded-full bg-purple-900/55 shadow-xl overflow-hidden">
+      <div className="flex justify-center w-full max-w-lg mb-3 p-1 rounded-full bg-purple-900/55 shadow-xl overflow-hidden flex-shrink-0">
         {PERIODS.map((period) => (
           <button
             key={period}
@@ -199,51 +183,47 @@ const Leaderboard = () => {
       </div>
 
       {/* Title */}
-      <div className="text-center"> 
-        <h1 className="text-4xl sm:text-5xl font-bold text-purple-200 drop-shadow-lg font-serif">
+      <div className="text-center flex-shrink-0"> 
+        <h1 className="text-3xl sm:text-4xl font-bold text-purple-200 drop-shadow-lg font-serif">
           {PERIOD_MAP[currentPeriod]}
         </h1>
 
         {currentPeriod === 'day' && (
-          <div className="flex items-center justify-center gap-2 text-purple-200 mt-2">
-            <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span className="text-sm sm:text-lg">left 22 h 1 m</span> 
+          <div className="flex items-center justify-center gap-2 text-purple-200 mt-1">
+            <Clock className="w-4 h-4" />
+            <span className="text-sm">left 22 h 1 m</span> 
           </div>
         )}
       </div>
 
       {/* Trophy */}
-      <div className="-mt-10 sm:-mt-16 flex justify-center">
+      <div className="-mt-8 sm:-mt-12 flex justify-center flex-shrink-0">
         <img
           src="/trophy.png"
           alt="Trophy"
-          className="w-52 h-52 sm:w-72 sm:h-72 object-contain drop-shadow-2xl"
+          className="w-40 h-40 sm:w-56 sm:h-56 object-contain drop-shadow-2xl"
         />
       </div>
 
       {/* Scroll list */}
-     <div
-  ref={containerRef}
-  className={`
-    w-full max-w-2xl 
-    rounded-xl 
-    bg-purple-900/55 
-    shadow-md 
-    -mt-6 sm:-mt-8
-    mb-28 md:mb-8
-    scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-purple-900
-    ${leaderboardData.length > 10 ? "pb-24" : "pb-0"}
-  `}
-  style={{
-    height: leaderboardData.length > 10 
-      ? "calc(100vh - 320px)" 
-      : "auto",
-    overflowY: leaderboardData.length > 10 
-      ? "auto" 
-      : "visible"
-  }}
->
-
+      <div
+        ref={containerRef}
+        // 3. Remove flex-1 min-h-0 (which forces the height) and all internal scrolling classes/styles.
+        // The container will now naturally grow to fit its content.
+        className={`
+          w-full max-w-2xl 
+          rounded-xl 
+          bg-purple-900/55 
+          shadow-md 
+          -mt-4 sm:-mt-6
+          mb-20
+        `}
+        style={{ 
+          // Remove touchAction and overflowY styles
+          touchAction: 'unset', // or remove style prop entirely if not needed
+          overflowY: 'unset' 
+        }}
+      >
         {loading ? (
           <div className="p-8 text-center text-purple-200">
             <div className="flex items-center justify-center space-x-2">
@@ -257,8 +237,7 @@ const Leaderboard = () => {
           leaderboardData.map((player, index) => {
             const rank = index + 1;
             const isCurrentUser = player.userId === currentUserId;
-            const rankChange = isCurrentUser ? getRankChange(player, rank) : null;
-            // --- Removed 'animating' variable ---
+            // Removed unused rankChange calculation for the rendering part as it's not displayed
 
             let avatarSrc = "";
             if (player.avatar && typeof player.avatar === "number" && player.avatar > 0) {
@@ -275,19 +254,10 @@ const Leaderboard = () => {
                   flex items-center gap-4 px-4 py-3 transition-all
                   ${isCurrentUser ? "bg-green-300/40 rounded-lg" : ""}
                   ${index < leaderboardData.length - 1 ? "border-b border-purple-400/40" : ""}
-                  /* --- Removed animation classes: animating-row, glow-up, glow-down --- */
                 `}
-                // --- Removed inline animation style: style={{ transform: animating ? ... }} ---
               >
                 {/* Rank */}
                 <div className="text-lg sm:text-xl font-bold text-purple-200 w-8 sm:w-10 text-center flex items-center justify-center">
-                  {/* Rank change indicator remains, but only when not animating (which is always now) */}
-                  {isCurrentUser && rankChange === "down" && (
-                    <span className="text-red-400 text-sm font-extrabold">▼</span>
-                  )}
-                  {isCurrentUser && rankChange === "up" && (
-                    <span className="text-green-400 text-sm font-extrabold">▲</span>
-                  )}
                   {rank}
                 </div>
 
