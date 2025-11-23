@@ -72,12 +72,17 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
   if (isParentLoading || !userToken || !stats) return null;
   if (error) return <div className="text-red-500 text-center">{error}</div>;
 
+  // Increased icon size — smaller bg
   const statItems = [
     {
       value: stats.coins ?? 0,
       color: "cyan",
       icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-[14px] w-[14px] sm:h-5 sm:w-5">
+        <svg
+          viewBox="0 0 24 24"
+          className="h-[22px] w-[22px] sm:h-7 sm:w-7"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <circle cx="8" cy="9" r="5" fill="#f59e0b" />
           <circle cx="8" cy="9" r="4" fill="#fbbf24" />
           <circle cx="8" cy="9" r="2.5" fill="#f59e0b" opacity="0.4" />
@@ -101,7 +106,12 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
       value: animatedXP,
       color: "yellow",
       icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-[14px] w-[14px] sm:h-5 sm:w-5 text-amber-500">
+        <svg
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-[22px] w-[22px] sm:h-7 sm:w-7 text-amber-500"
+        >
           <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
           <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
           <circle cx="12" cy="9" r="2" fill="#fff" />
@@ -112,8 +122,16 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
       value: stats.gem1 ?? 0,
       color: "cyan",
       icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[14px] w-[14px] sm:h-5 sm:w-5 text-cyan-400">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-[22px] w-[22px] sm:h-7 sm:w-7 text-cyan-400"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
           <path d="m6 3 6 6 6-6" />
           <path d="m2 9 10 12 10-12" />
@@ -124,7 +142,12 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
       value: stats.gem2 ?? 0,
       color: "purple",
       icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-[14px] w-[14px] sm:h-5 sm:w-5 text-purple-500">
+        <svg
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          className="h-[22px] w-[22px] sm:h-7 sm:w-7 text-purple-500"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
           <path d="m6 3 6 6 6-6" fill="#fff" fillOpacity="0.3" />
           <path d="m2 9 10 12 10-12" fill="#fff" fillOpacity="0.2" />
@@ -138,19 +161,30 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
       <div
         className="
           flex items-center justify-between 
-          w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-4xl 
-          p-1.5 sm:p-2 md:p-3 
-          bg-slate-800/60 rounded-xl border border-slate-700/50 backdrop-blur-sm mx-auto
+          w-full max-w-lg sm:max-w-2xl md:max-w-3xl lg:max-w-4xl 
+          p-2 sm:p-3 md:p-4 
+          bg-slate-800/60 rounded-xl border-2 border-slate-600 backdrop-blur-sm mx-auto
         "
       >
         {statItems.map((item, i) => (
-          <div key={i} className="flex items-center gap-[2px] sm:gap-1.5 justify-center flex-1 min-w-0">
+          <div
+            key={i}
+            className="flex items-center gap-1 sm:gap-2 justify-center flex-1 min-w-0"
+          >
+            {/* Smaller bg, bigger icon */}
             <div
-              className={`w-[22px] h-[22px] sm:w-7 sm:h-7 rounded-md bg-${item.color}-500/20 border border-${item.color}-500/30 flex items-center justify-center`}
+              className={`
+                w-8 h-8 sm:w-10 sm:h-10
+                rounded-lg 
+                bg-${item.color}-500/30 
+                border border-${item.color}-500/50 
+                flex items-center justify-center
+              `}
             >
               {item.icon}
             </div>
-            <div className="text-[13px] sm:text-sm font-bold text-slate-200 tabular-nums truncate">
+
+            <div className="text-base sm:text-xl font-bold text-slate-200 tabular-nums truncate">
               {item.value}
             </div>
           </div>
