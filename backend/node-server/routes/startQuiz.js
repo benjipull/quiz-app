@@ -23,7 +23,7 @@ const difficultyNames = {
 router.post("/", authenticateToken, async (req, res) => {
     const { categoryId, numQuestions } = req.body;
 
-    const noQuestions = 5;
+    const noQuestions = 10;
     
     const authHeader = req.headers["authorization"];
     const userToken = authHeader && authHeader.startsWith("Bearer ")
