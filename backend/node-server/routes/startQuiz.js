@@ -21,6 +21,8 @@ const difficultyNames = {
 router.post("/", authenticateToken, async (req, res) => {
     const { categoryId, numQuestions } = req.body;
 
+    numQuestions = 5;
+    
     const authHeader = req.headers["authorization"];
     const userToken = authHeader && authHeader.startsWith("Bearer ")
         ? authHeader.split(" ")[1]
@@ -50,13 +52,13 @@ router.post("/", authenticateToken, async (req, res) => {
 
         const userLevel = user.level || 1;
 
-        // 🎚 Sliding difficulty window
+        // Sliding difficulty window
         let minDifficulty = Math.max(1, userLevel - 1);
         let maxDifficulty = Math.min(10, userLevel + 1);
 
         console.log(`User level: ${userLevel}, selecting difficulties ${minDifficulty}-${maxDifficulty}`);
 
-        // ✅ Filter enabled questions by difficulty window
+        // Filter enabled questions by difficulty window
         const filtered = category.questions.filter(q =>
             !q.disabled &&
             q.difficulty_level >= minDifficulty &&
