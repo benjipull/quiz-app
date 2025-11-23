@@ -5,6 +5,8 @@ const User = require("../models/user");
 const authenticateToken = require("../middleware/auth");
 const { userQuestions } = require("../index"); // Import shared store
 
+const QUIZ_COST = 100; // Define the quiz cost (100 coins)
+
 const difficultyNames = {
     1: "Basic",
     2: "Easy",
@@ -36,9 +38,9 @@ router.post("/", authenticateToken, async (req, res) => {
         return res.status(400).json({ message: "Missing required fields: categoryId, numQuestions." });
     }
 
-        const userId = req.user.id;
+    const userId = req.user.id;
 
-        console.log("✅ Extracted User ID:", userId);
+    console.log("✅ Extracted User ID:", userId);
     try {
         const category = await Category.findById(categoryId).lean();
         if (!category) {
@@ -49,7 +51,19 @@ router.post("/", authenticateToken, async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: "❌ User not found" });
         }
-
+        
+        // ----------------------------------------------------------------
+        // 💰 1. QUIZ COST DEDUCTION
+        // Ledger tracking for this coin transaction is REMOVED.
+        // ----------------------------------------------------------------
+        user.coins -= QUIZ_COST; 
+        await user.save();
+        
+        console.log(`💸 Deducted ${QUIZ_COST} coins to start quiz for user ${userId}. New Balance: ${user.coins}`);
+        
+        // Ledger logic for quiz-cost deduction removed
+        // ----------------------------------------------------------------
+        
         const userLevel = user.level || 1;
 
         // Sliding difficulty window
@@ -77,12 +91,22 @@ router.post("/", authenticateToken, async (req, res) => {
             .slice(0, numQuestions);
 
         if (selectedQuestions.length < 10) {
+            // ----------------------------------------------------------------
+            // 💰 2. COIN REFUND IF QUIZ FAILS TO START (Not enough questions)
+            // Ledger tracking for this coin transaction is REMOVED.
+            // ----------------------------------------------------------------
+            user.coins += QUIZ_COST; // Refund the coins
+            await user.save();
+            
+            // Ledger logic for quiz-refund grant removed
+            
             console.error(
-                `Cannot start Quiz, only ${selectedQuestions.length} questions found in difficulty window. Populating category: ${category._id} (${category.name})`
+                `Cannot start Quiz, only ${selectedQuestions.length} questions found in difficulty window. Coins have been refunded.`
             );
+            // ----------------------------------------------------------------
 
             return res.status(404).json({
-                message: "Not enough available questions in this difficulty range (minimum 10 required). Please try again in a few minutes."
+                message: "Not enough available questions in this difficulty range (minimum 10 required). Coins have been refunded."
             });
         }
 
@@ -105,9 +129,10 @@ router.post("/", authenticateToken, async (req, res) => {
         console.log(`Loaded ${selectedQuestions.length} questions for user ${userToken}`);
 
         res.json({
-            message: "Questions preloaded.",
+            message: "Questions preloaded. Quiz cost deducted.",
             total: selectedQuestions.length,
-            difficultyRange: [minDifficulty, maxDifficulty] // for debugging
+            difficultyRange: [minDifficulty, maxDifficulty],
+            userCoins: user.coins // Return the new coin balance
         });
 
     } catch (error) {

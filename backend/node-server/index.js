@@ -67,6 +67,7 @@ app.use("/api/getImageUrl", require("./routes/getImageUrl"));
 app.use("/api/DBpedia", require("./routes/DBpedia")); 
 
 app.use("/api/leaderboard", require("./routes/leaderboard"));
+app.use("/api/claimDailyCoins", require("./routes/claimDailyCoins"))
 
 // Admin APIs
 app.use("/api/admin/categories", require("./routes/admin/getAllCategories"));
