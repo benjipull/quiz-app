@@ -55,7 +55,7 @@ export const CategoryCard = ({
         {/* Hover Play Button */}
         <div className="hidden lg:flex absolute inset-0 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
           <Button
-            variant="secondary"
+            variant="purple"
             size="lg"
             className="rounded-full px-6 py-2 bg-primary/90 hover:bg-primary text-white shadow-lg shadow-primary/30 backdrop-blur-sm"
             onClick={(e) => {
