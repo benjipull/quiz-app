@@ -203,106 +203,100 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
 
   return (
     <>
-  <Card
+ <Card
   className="
     w-full 
     max-w-8xl
     rounded-[30px]
     bg-transparent
-    border-[3px] border-[#d946ef]
-    shadow-[0_0_35px_rgba(217,70,239,0.4)]
-    p-4 sm:p-5
+    border-none
+    p-2 sm:p-4
   "
 >
   <div className="flex items-center justify-between gap-2 sm:gap-4">
 
     {/* LEFT SECTION */}
-    <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+    <div className="flex items-center gap-2 sm:gap-4 min-w-0"> {/* Tighter gap on small screens */}
       
-      {/* 👇 COINS Icon Box with dynamic amount */}
-     <div
-  className="
-    w-12 h-12 sm:w-14 sm:h-14
-    rounded-2xl
-    flex items-center justify-center
-    bg-gradient-to-br from-[#a020f0] to-[#6a0dad]
-    border-[3px] border-[#ff4dff]
-    shadow-[0_0_25px_rgba(255,77,255,0.65)]
-    flex-shrink-0
-    relative
-  "
->
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 28 28"
-    className="w-8 h-8 sm:w-10 sm:h-10"
-  >
-    <circle cx="10" cy="11" r="7" fill="#f59e0b" />
-    <circle cx="10" cy="11" r="6" fill="#fbbf24" />
-    <circle cx="10" cy="11" r="3.5" fill="#f59e0b" opacity="0.4" />
-    <circle cx="17" cy="16" r="8" fill="#f59e0b" />
-    <circle cx="17" cy="16" r="7" fill="#fbbf24" />
-    <circle cx="17" cy="16" r="4.2" fill="#f59e0b" opacity="0.4" />
-  </svg>
+      {/* 👇 COINS Icon Box and Amount Label (Re-structured to match image) */}
+      <div className="flex flex-col items-start flex-shrink-0 -space-y-1"> 
+          
+          {/* Coin Icon - Sizing optimized for small screens */}
+          <div
+            className="w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center flex-shrink-0" // Adjusted w/h for small screens
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 28 28"
+              className="w-full h-full"
+            >
+              {/* Gold Coin SVG */}
+              <circle cx="10" cy="11" r="7" fill="#d97706" />
+              <circle cx="10" cy="11" r="6" fill="#fcd34d" />
+              <circle cx="10" cy="11" r="3.5" fill="#d97706" opacity="0.4" />
+              <circle cx="17" cy="16" r="8" fill="#d97706" />
+              <circle cx="17" cy="16" r="7" fill="#fcd34d" />
+              <circle cx="17" cy="16" r="4.2" fill="#d97706" opacity="0.4" />
+            </svg>
+          </div>
 
-  <span className="
-    absolute bottom-[-8px] right-[-8px] 
-    bg-green-500 rounded-full 
-    px-2 text-xs font-bold text-white 
-    shadow-md border border-white
-  ">
-    +{dailyBonusAmount}
-  </span>
-</div>
+          {/* Amount Label - Positioned below and slightly to the left */}
+          <span className="
+            bg-emerald-500 rounded-full 
+            px-2 sm:px-3 py-0.5 text-xs sm:text-sm font-bold text-white 
+            shadow-lg
+            whitespace-nowrap
+            -translate-y-1 sm:translate-y-0.5
+            -translate-x-1 sm:-translate-x-1
+          ">
+            +{dailyBonusAmount}
+          </span>
+      </div>
 
 
-      {/* Text */}
+      {/* Text: Daily Reward (Combined and no wrap) */}
       <div className="leading-tight min-w-0">
-        <h3 className="text-white font-bold text-xl sm:text-2xl">
-          Daily
+        <h3 className="text-white font-bold text-lg sm:text-2xl whitespace-nowrap"> {/* Adjusted text size for small screens */}
+          Daily Reward
         </h3>
-        <h3 className="text-white font-bold text-xl sm:text-2xl -mt-1">
-          Reward
-        </h3>
+        {/* Removed second h3 tag */}
       </div>
     </div>
 
     {/* RIGHT SIDE — TIMER / CLAIM BUTTON */}
-    <div
-      className={`
-        flex items-center gap-1.5 sm:gap-2
-        px-3 py-2 sm:px-6 sm:py-3
-        rounded-full
-        min-w-0   /* <-- IMPORTANT FIX */
-        ${
-          canClaim 
-            ? "bg-yellow-500/10 border-[3px] border-yellow-400 shadow-[0_0_25px_rgba(255,255,0,0.5)] cursor-pointer hover:bg-yellow-500/20 transition-colors"
-            : "bg-[#501b9b] border-[3px] border-[#ff78ff] shadow-[0_0_25px_rgba(255,115,255,0.5)]"
-        }
-      `}
-      onClick={handleClaimClick}
-    >
-      {canClaim ? (
-        <>
-          <Sparkles className={`w-5 h-5 sm:w-6 sm:h-6 ${isClaiming ? "text-gray-400" : "text-yellow-400"}`} />
-          <span className={`font-bold text-sm sm:text-lg whitespace-nowrap ${isClaiming ? "text-gray-400" : "text-yellow-400"}`}>
-            {isClaiming ? 'Claiming...' : 'Claim Now'}
-          </span>
-        </>
-      ) : (
-        <>
-          <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" />
-          <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap">
-            {formatTimeRemaining(timeRemaining)}
-          </span>
-        </>
-      )}
-    </div>
+   <div
+  className={`
+    flex items-center gap-1 sm:gap-2
+    px-3 py-1.5 sm:px-6 sm:py-3
+    rounded-full
+    min-w-0
+    ${
+      canClaim 
+        ? "bg-yellow-500/10 border-[3px] border-yellow-400 shadow-[0_0_25px_rgba(255,255,0,0.5)] cursor-pointer hover:bg-yellow-500/20 transition-colors"
+        : "bg-[#501b9b] shadow-[0_0_15px_rgba(240,171,240,0.4),_0_4px_15px_rgba(0,0,0,0.5)] border border-purple-800/50" // ⭐ ADDED GLOW SHADOW (f0abf0 is the clock color)
+    }
+  `}
+  onClick={handleClaimClick}
+>
+  {canClaim ? (
+    <>
+      <Sparkles className={`w-4 h-4 sm:w-6 sm:h-6 ${isClaiming ? "text-gray-400" : "text-yellow-400"}`} /> {/* Adjusted icon size */}
+      <span className={`font-bold text-sm sm:text-lg whitespace-nowrap ${isClaiming ? "text-gray-400" : "text-yellow-400"}`}>
+        {isClaiming ? 'Claiming...' : 'Claim Now'}
+      </span>
+    </>
+  ) : (
+    <>
+      <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" /> {/* Adjusted icon size */}
+      <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap"> {/* Adjusted font size */}
+        {formatTimeRemaining(timeRemaining)}
+      </span>
+    </>
+  )}
+</div>
 
   </div>
 </Card>
-
-
 
       {/* Reward Modal Overlay */}
       {showRewardModal && (
