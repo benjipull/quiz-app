@@ -90,7 +90,7 @@ router.post("/", authenticateToken, async (req, res) => {
             })
             .slice(0, noQuestions);
 
-        if (selectedQuestions.length < 10) {
+        if (selectedQuestions.length < noQuestions) {
             // ----------------------------------------------------------------
             // 💰 2. COIN REFUND IF QUIZ FAILS TO START (Not enough questions)
             // Ledger tracking for this coin transaction is REMOVED.
@@ -106,7 +106,7 @@ router.post("/", authenticateToken, async (req, res) => {
             // ----------------------------------------------------------------
 
             return res.status(404).json({
-                message: "Not enough available questions in this difficulty range (minimum 10 required). Coins have been refunded."
+                message: "Not enough available questions in this difficulty range (minimum 5 required). Coins have been refunded."
             });
         }
 
