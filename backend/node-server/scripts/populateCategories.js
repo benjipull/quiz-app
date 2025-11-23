@@ -209,7 +209,7 @@ async function addQuestionsToCategory(category, questions) {
       timesAnsweredCorrectly: 0,
       timesAnsweredIncorrectly: 0,
       hash,
-      version: 1.06
+      version: 1.07
     });
 
     added++;

@@ -23,6 +23,8 @@ const difficultyNames = {
 router.post("/", authenticateToken, async (req, res) => {
     const { categoryId, numQuestions } = req.body;
 
+    const noQuestions = 10;
+    
     const authHeader = req.headers["authorization"];
     const userToken = authHeader && authHeader.startsWith("Bearer ")
         ? authHeader.split(" ")[1]
@@ -32,8 +34,8 @@ router.post("/", authenticateToken, async (req, res) => {
         return res.status(401).json({ message: "Missing or invalid Authorization header." });
     }
 
-    if (!categoryId || !numQuestions) {
-        return res.status(400).json({ message: "Missing required fields: categoryId, numQuestions." });
+    if (!categoryId || !noQuestions) {
+        return res.status(400).json({ message: "Missing required fields: categoryId, noQuestions." });
     }
 
     const userId = req.user.id;
@@ -64,13 +66,13 @@ router.post("/", authenticateToken, async (req, res) => {
         
         const userLevel = user.level || 1;
 
-        // 🎚 Sliding difficulty window
+        // Sliding difficulty window
         let minDifficulty = Math.max(1, userLevel - 1);
         let maxDifficulty = Math.min(10, userLevel + 1);
 
         console.log(`User level: ${userLevel}, selecting difficulties ${minDifficulty}-${maxDifficulty}`);
 
-        // ✅ Filter enabled questions by difficulty window
+        // Filter enabled questions by difficulty window
         const filtered = category.questions.filter(q =>
             !q.disabled &&
             q.difficulty_level >= minDifficulty &&
@@ -86,9 +88,9 @@ router.post("/", authenticateToken, async (req, res) => {
                 // 🟡 Second priority: higher popularity ranks higher
                 return b.popularity - a.popularity;
             })
-            .slice(0, numQuestions);
+            .slice(0, noQuestions);
 
-        if (selectedQuestions.length < 10) {
+        if (selectedQuestions.length < noQuestions) {
             // ----------------------------------------------------------------
             // 💰 2. COIN REFUND IF QUIZ FAILS TO START (Not enough questions)
             // Ledger tracking for this coin transaction is REMOVED.
@@ -104,7 +106,7 @@ router.post("/", authenticateToken, async (req, res) => {
             // ----------------------------------------------------------------
 
             return res.status(404).json({
-                message: "Not enough available questions in this difficulty range (minimum 10 required). Coins have been refunded."
+                message: "Not enough available questions in this difficulty range (minimum 5 required). Coins have been refunded."
             });
         }
 
