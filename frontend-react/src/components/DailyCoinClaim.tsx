@@ -216,14 +216,13 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
   <div className="flex items-center justify-between gap-2 sm:gap-4">
 
     {/* LEFT SECTION */}
-    <div className="flex items-center gap-2 sm:gap-4 min-w-0"> {/* Tighter gap on small screens */}
+    <div className="flex items-center gap-2 sm:gap-4 min-w-0">
       
-      {/* 👇 COINS Icon Box and Amount Label (Re-structured to match image) */}
       <div className="flex flex-col items-start flex-shrink-0 -space-y-1"> 
           
           {/* Coin Icon - Sizing optimized for small screens */}
           <div
-            className="w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center flex-shrink-0" // Adjusted w/h for small screens
+            className="w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center flex-shrink-0"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -240,7 +239,6 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
             </svg>
           </div>
 
-          {/* Amount Label - Positioned below and slightly to the left */}
           <span className="
             bg-emerald-500 rounded-full 
             px-2 sm:px-3 py-0.5 text-xs sm:text-sm font-bold text-white 
@@ -254,12 +252,10 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
       </div>
 
 
-      {/* Text: Daily Reward (Combined and no wrap) */}
       <div className="leading-tight min-w-0">
-        <h3 className="text-white font-bold text-lg sm:text-2xl whitespace-nowrap"> {/* Adjusted text size for small screens */}
+        <h3 className="text-white font-bold text-lg sm:text-2xl whitespace-nowrap">
           Daily Reward
         </h3>
-        {/* Removed second h3 tag */}
       </div>
     </div>
 
@@ -280,15 +276,15 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
 >
   {canClaim ? (
     <>
-      <Sparkles className={`w-4 h-4 sm:w-6 sm:h-6 ${isClaiming ? "text-gray-400" : "text-yellow-400"}`} /> {/* Adjusted icon size */}
+      <Sparkles className={`w-4 h-4 sm:w-6 sm:h-6 ${isClaiming ? "text-gray-400" : "text-yellow-400"}`} /> 
       <span className={`font-bold text-sm sm:text-lg whitespace-nowrap ${isClaiming ? "text-gray-400" : "text-yellow-400"}`}>
         {isClaiming ? 'Claiming...' : 'Claim Now'}
       </span>
     </>
   ) : (
     <>
-      <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" /> {/* Adjusted icon size */}
-      <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap"> {/* Adjusted font size */}
+      <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" /> 
+      <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap"> 
         {formatTimeRemaining(timeRemaining)}
       </span>
     </>
