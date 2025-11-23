@@ -3,8 +3,14 @@ const User = require("../models/user");
 const authenticateToken = require("../middleware/auth");
 
 const router = express.Router();
-const DAILY_BONUS_COINS = 500; // 500 coins to claim
+// 👇 EXPORTED FOR FRONTEND USE
+const DAILY_BONUS_COINS = 500; // 500 coins to claim 
 const DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+// Endpoint to get the daily bonus amount (New endpoint for frontend)
+router.get("/amount", (req, res) => {
+    res.status(200).json({ dailyBonusAmount: DAILY_BONUS_COINS });
+});
 
 router.post("/", authenticateToken, async (req, res) => {
     const userId = req.user.id;
@@ -34,7 +40,6 @@ router.post("/", authenticateToken, async (req, res) => {
         user.lastDailyCoinClaim = now; // Update the last claim timestamp
         await user.save();
 
-        // ❌ Ledger entry logic for coins removed (as seen in the provided snippet)
 
         res.status(200).json({
             message: `🎉 Successfully claimed ${DAILY_BONUS_COINS} coins!`,
