@@ -343,7 +343,6 @@ const Leaderboard = () => {
                     {player.totalPoints}
                   </span>
 
-                  {/* Knowledge Points Icon (REPLACED STAR/CIRCLE) */}
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 sm:h-6 sm:w-6 text-amber-500">
                     <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
                     <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
@@ -356,7 +355,6 @@ const Leaderboard = () => {
         )}
       </div>
 
-      {/* Bottom safe area for mobile */}
       <div className="h-4 flex-shrink-0"></div>
     </div>
   );

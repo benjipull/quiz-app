@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ThumbsUp, ThumbsDown, Flag, Lightbulb, X } from "lucide-react";
+import { ArrowLeft, ThumbsUp, ThumbsDown, Flag, X } from "lucide-react";
 import QuizResults from "@/components/quiz/QuizResults";
 import {
   trackQuizStart,
@@ -11,7 +11,6 @@ import {
   trackQuizComplete,
 } from "@/utils/analytics";
 
-// Starfield background component with fewer stars
 const StarfieldBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -26,15 +25,15 @@ const StarfieldBackground = () => {
     canvas.height = window.innerHeight;
 
     const stars: Array<{ x: number; y: number; size: number; speed: number; opacity: number }> = [];
-    const numStars = 50; // Reduced from 150 to 50
+    const numStars = 50;
 
     for (let i = 0; i < numStars; i++) {
       stars.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
         size: Math.random() * 2 + 0.5,
-        speed: Math.random() * 0.3 + 0.05, // Slower speed
-        opacity: Math.random() * 0.4 + 0.3 // Lower opacity
+        speed: Math.random() * 0.3 + 0.05,
+        opacity: Math.random() * 0.4 + 0.3
       });
     }
 
@@ -102,30 +101,12 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
   const [otherText, setOtherText] = useState('');
 
   const reportOptions = [
-    {
-      value: "incorrect_answer",
-      label: "Incorrect Answer",
-    },
-    {
-      value: "multiple_correct_answers",
-      label: "Multiple Correct Answers",
-    },
-    {
-      value: "ambiguous_wording",
-      label: "Ambiguous or Poorly Worded Question",
-    },
-    {
-      value: "duplicate_question",
-      label: "Duplicate Question",
-    },
-    {
-      value: "offensive_content",
-      label: "Offensive or Inappropriate Content",
-    },
-    {
-      value: "other",
-      label: "Other (please describe)",
-    },
+    { value: "incorrect_answer", label: "Incorrect Answer" },
+    { value: "multiple_correct_answers", label: "Multiple Correct Answers" },
+    { value: "ambiguous_wording", label: "Ambiguous or Poorly Worded Question" },
+    { value: "duplicate_question", label: "Duplicate Question" },
+    { value: "offensive_content", label: "Offensive or Inappropriate Content" },
+    { value: "other", label: "Other (please describe)" },
   ];
 
   const handleSubmit = () => {
@@ -316,12 +297,12 @@ export default function Quiz() {
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
+  const [totalQuestions, setTotalQuestions] = useState(10);
 
   const userToken = localStorage.getItem("token");
   const storedUser = localStorage.getItem("user");
   const userId = storedUser ? JSON.parse(storedUser)._id : null;
 
-  const totalQuestions = 10;
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
 
   const startSound = new Audio("/intro-sound.mp3");
@@ -347,7 +328,7 @@ export default function Quiz() {
     setReportSuccess(false);
 
     try {
-      const payload: { questionId: string; reason: string; otherText: string } = {
+      const payload = {
         questionId: quizState.question._id,
         reason: reason,
         otherText: otherText,
@@ -365,11 +346,11 @@ export default function Quiz() {
       if (response.ok) {
         setReportSuccess(true);
       } else {
-        console.error("⚠️ Failed to submit report.");
+        console.error("Failed to submit report.");
         setReportSuccess(false);
       }
     } catch (err) {
-      console.error("⚠️ Error submitting report:", err);
+      console.error("Error submitting report:", err);
       setReportSuccess(false);
     } finally {
       setIsReporting(false);
@@ -422,7 +403,7 @@ export default function Quiz() {
       hasStartedRef.current = true;
       startQuiz(categoryId);
     } else if (!userToken) {
-      console.log("⚠️ You must be logged in to play.");
+      console.log("You must be logged in to play.");
       navigate("/categories");
     }
   }, [categoryId, userToken, navigate]);
@@ -457,24 +438,19 @@ export default function Quiz() {
     };
   }, [quizState.question, quizState.isAnswerSelected, timeUp]);
 
-  // --- MODIFIED SCROLL EFFECT ---
   useEffect(() => {
     if (showExplanation && explanationRef.current) {
-      // Small delay to ensure the explanation content is rendered
       setTimeout(() => {
         if (explanationRef.current) {
-          // Changed to always scroll when explanation appears for a smoother experience
-          // without the complexity of checking the viewport fold.
           explanationRef.current.scrollIntoView({
-            behavior: 'smooth', // Ensure smooth scrolling
+            behavior: 'smooth',
             block: 'start',
             inline: 'nearest'
           });
         }
-      }, 300); // 300ms delay after state update for element render
+      }, 300);
     }
   }, [showExplanation]);
-  // ------------------------------
 
   useEffect(() => {
     setSelectedAnswer(null);
@@ -501,7 +477,7 @@ export default function Quiz() {
 
   const startQuiz = async (categoryId: string) => {
     if (!userToken) {
-      console.log("⚠️ You must be logged in to play.");
+      console.log("You must be logged in to play.");
       return;
     }
 
@@ -522,6 +498,7 @@ export default function Quiz() {
       userAnswers: [],
     });
     setCategoryImage(undefined);
+    setTotalQuestions(10);
     nextQuestionRef.current = null;
 
     try {
@@ -554,8 +531,15 @@ export default function Quiz() {
       });
 
       if (!startResponse.ok) {
-        throw new Error("⚠️ Error starting quiz session.");
+        throw new Error("Error starting quiz session.");
       } else {
+        const startData = await startResponse.json();
+        
+        if (startData.total) {
+          setTotalQuestions(startData.total);
+          console.log(`Quiz started with ${startData.total} questions`);
+        }
+        
         trackQuizStart(categoryId, userId);
         await fetchNextQuestion();
       }
@@ -663,14 +647,6 @@ export default function Quiz() {
           setShowBars(true);
         }, 300);
 
-        // --- MODIFIED DELAY ---
-        // Give the user 1.2 seconds to see the "Time's Up!" and correct answer.
-        setTimeout(() => {
-          // No separate explanation needed for time up, as the info is in the 'timeUp' block.
-          // This call is redundant here, but keeping the structure simple.
-        }, 1200); 
-        // ----------------------
-
         if (!isLastQuestion) {
           preloadNextQuestion();
         }
@@ -729,7 +705,7 @@ export default function Quiz() {
         }));
       }
       else {
-        console.error("⚠️ Failed to complete quiz");
+        console.error("Failed to complete quiz");
         setError("Failed to complete quiz. Please try again.");
       }
     } catch (error) {
@@ -812,12 +788,9 @@ export default function Quiz() {
           setShowBars(true);
         }, 300);
 
-        // --- MODIFIED DELAY ---
-        // Give the user 1.2 seconds to see the answer feedback and bars.
         setTimeout(() => {
           setShowExplanation(true);
         }, 1200);
-        // ----------------------
 
         if (!isLastQuestion) {
           preloadNextQuestion();
@@ -868,10 +841,10 @@ export default function Quiz() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("⚠️ Failed to update popularity:", errorData.message || errorData);
+        console.error("Failed to update popularity:", errorData.message || errorData);
       }
     } catch (err) {
-      console.error("⚠️ Error updating popularity:", err);
+      console.error("Error updating popularity:", err);
     }
   };
 
@@ -886,11 +859,9 @@ export default function Quiz() {
     }
 
     if (selectedAnswer === null) {
-      // Default/Hover Style (The "Aura" effect is applied via Card styles below)
       return `${baseStyle} ${baseColor} ${hoverStyle}`;
     }
 
-    // Answer Selected Style
     const correctAnswer = answerResponse?.correctAnswer || quizState.question?.correct_answer;
 
     if (answer === correctAnswer) {
@@ -901,7 +872,6 @@ export default function Quiz() {
       return `${baseStyle} ${selectedStyle} border-red-400 bg-gradient-to-r from-red-600/30 to-red-500/30 text-red-100 shadow-xl shadow-red-500/40`;
     }
 
-    // Non-selected/Incorrect option after selection
     return `${baseStyle} ${selectedStyle} border-purple-500/40 bg-purple-900/30`;
   };
 
@@ -928,23 +898,19 @@ export default function Quiz() {
     return answerStat ? answerStat.percentage : 0;
   };
   
-  // New function to apply the aura look to options before selection
   const getInitialOptionAuraStyle = (answer: string) => {
       if (selectedAnswer !== null || timeUp) return {};
 
-      // This creates the deep, vibrant purple/pink glow effect
       return {
           background: 'linear-gradient(90deg, rgba(30, 0, 60, 0.8), rgba(40, 0, 80, 0.8))',
-          border: '2px solid rgba(147, 51, 234, 0.6)', // purple-500/60
-          boxShadow: '0 0 15px rgba(192, 38, 211, 0.5), inset 0 0 8px rgba(232, 121, 249, 0.4)', // Pink/Purple glow
-          // Add a subtle hover effect via style for a smoother transition
+          border: '2px solid rgba(147, 51, 234, 0.6)',
+          boxShadow: '0 0 15px rgba(192, 38, 211, 0.5), inset 0 0 8px rgba(232, 121, 249, 0.4)',
           transition: 'transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease',
       };
   }
 
-  // REVISED QuizBase: Removed min-h-screen and unnecessary flex-col
   const QuizBase = ({ children }: { children: React.ReactNode }) => (
-<div className="flex flex-col min-h-[100dvh] relative overflow-hidden"> 
+    <div className="flex flex-col min-h-[100dvh] relative overflow-hidden"> 
       <div className="fixed inset-0 bg-gradient-to-br from-[#0c031c] via-[#1a0b2e] to-[#2d1b4e]" style={{ zIndex: 0 }} />
       <StarfieldBackground />
       {categoryImage && (
@@ -958,7 +924,6 @@ export default function Quiz() {
           }}
         />
       )}
-      {/* Added relative z-10 wrapper around children */}
       <div className="relative z-10 h-full"> 
         {children}
       </div>
@@ -968,7 +933,6 @@ export default function Quiz() {
   if (error) {
     return (
       <QuizBase>
-        {/* Added flex-1 to center content vertically within MobileLayout's container */}
         <div className="min-h-[100dvh] flex-1 flex items-center justify-center px-4">
           <div className="text-center space-y-4 max-w-md">
             <h2 className="text-xl md:text-2xl font-bold text-red-400">Error</h2>
@@ -985,7 +949,6 @@ export default function Quiz() {
   if (loading || (!quizState.question && !quizState.completed)) {
     return (
       <QuizBase>
-        {/* Added flex-1 to center content vertically within MobileLayout's container */}
         <div className=" min-h-[100dvh] flex-1 flex items-center justify-center px-4">
           <div className="text-center space-y-4">
             <div className="animate-spin rounded-full h-8 w-8 md:h-12 md:w-12 border-b-2 border-purple-400 mx-auto"></div>
@@ -1011,8 +974,7 @@ export default function Quiz() {
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden"> {/* Changed to fixed positioning */}
-      {/* Updated Background to darker, more vibrant space theme */}
+    <div className="fixed inset-0 flex flex-col overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-[#0c031c] via-[#1a0b2e] to-[#2d1b4e]" style={{ zIndex: 0 }} />
       <StarfieldBackground />
       {categoryImage && (
@@ -1027,7 +989,7 @@ export default function Quiz() {
         />
       )}
       <div className="relative z-10 flex-1 flex flex-col overflow-y-auto">
-      <div className="sticky top-0 z-30 bg-black/40 backdrop-blur-md border-b-2 border-purple-500/30">
+        <div className="sticky top-0 z-30 bg-black/40 backdrop-blur-md border-b-2 border-purple-500/30">
           <div className="px-2 py-2 md:py-4 max-w-full mx-auto">
             <div className="flex items-center justify-between gap-2 mb-3">
               <Button
@@ -1078,7 +1040,7 @@ export default function Quiz() {
           </div>
         </div>
 
-        <div className="flex-1 px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-4xl"> {/* Added flex-1 to ensure content area fills remaining height */}
+        <div className="flex-1 px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-4xl">
           <div className="space-y-6">
             <div className="px-1 py-3 md:py-6 text-center">
               <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-white leading-relaxed drop-shadow-lg">
@@ -1087,53 +1049,52 @@ export default function Quiz() {
             </div>
 
             <div className="space-y-4">
-      {quizState.question?.answers.map((answer, index) => {
-        // Calculate font size based on answer length
-        const getFontSize = (text: string) => {
-          const length = text.length;
-          if (length > 60) return 'text-xs md:text-base';
-          if (length > 45) return 'text-sm md:text-lg';
-          if (length > 30) return 'text-sm md:text-xl';
-          return 'text-base md:text-xl';
-        };
+              {quizState.question?.answers.map((answer, index) => {
+                const getFontSize = (text: string) => {
+                  const length = text.length;
+                  if (length > 60) return 'text-xs md:text-base';
+                  if (length > 45) return 'text-sm md:text-lg';
+                  if (length > 30) return 'text-sm md:text-xl';
+                  return 'text-base md:text-xl';
+                };
 
-        return (
-          <Card
-            key={index}
-            className={`p-6 md:p-8 transition-all duration-300 ${getOptionStyle(answer)} relative overflow-hidden cursor-pointer`}
-            onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
-            style={{ 
-              borderRadius: '1.5rem',
-              ...getInitialOptionAuraStyle(answer)
-            }}
-          >
-            {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
-              <div
-                className={`absolute top-0 left-0 h-full animate-bar-fill rounded-l-3xl ${answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
-                    ? 'bg-green-500/30 border-r-4 border-green-400'
-                    : answer === selectedAnswer
-                      ? 'bg-red-500/30 border-r-4 border-red-400'
-                      : 'bg-purple-400/20'
-                  }`}
-                style={{
-                  '--target-width': `${getAnswerPercentage(answer)}%`,
-                  animationDelay: `${index * 150}ms`,
-                  animationDuration: '0.8s'
-                } as React.CSSProperties}
-              />
-            )}
+                return (
+                  <Card
+                    key={index}
+                    className={`p-6 md:p-8 transition-all duration-300 ${getOptionStyle(answer)} relative overflow-hidden cursor-pointer`}
+                    onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
+                    style={{ 
+                      borderRadius: '1.5rem',
+                      ...getInitialOptionAuraStyle(answer)
+                    }}
+                  >
+                    {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
+                      <div
+                        className={`absolute top-0 left-0 h-full animate-bar-fill rounded-l-3xl ${answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
+                            ? 'bg-green-500/30 border-r-4 border-green-400'
+                            : answer === selectedAnswer
+                              ? 'bg-red-500/30 border-r-4 border-red-400'
+                              : 'bg-purple-400/20'
+                          }`}
+                        style={{
+                          '--target-width': `${getAnswerPercentage(answer)}%`,
+                          animationDelay: `${index * 150}ms`,
+                          animationDuration: '0.8s'
+                        } as React.CSSProperties}
+                      />
+                    )}
 
-          <div className="flex items-center gap-3 relative z-10">
-            <div className="flex-1 min-w-0 flex items-center justify-between">
-              <span className={`${getFontSize(answer)} leading-tight break-words w-full font-semibold text-left text-white`}>
-                {answer}
-              </span>
+                    <div className="flex items-center gap-3 relative z-10">
+                      <div className="flex-1 min-w-0 flex items-center justify-between">
+                        <span className={`${getFontSize(answer)} leading-tight break-words w-full font-semibold text-left text-white`}>
+                          {answer}
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
-          </div>
-        </Card>
-      );
-    })}
-  </div>
 
             {timeUp && (
               <div ref={explanationRef}>
@@ -1151,7 +1112,7 @@ export default function Quiz() {
                   </div>
                 </Card>
 
-               <div className="mt-6">
+                <div className="mt-6">
                   <Button
                     variant="default"
                     size="lg"
@@ -1164,6 +1125,7 @@ export default function Quiz() {
                 </div>
               </div>
             )}
+
             {showExplanation && !timeUp && answerResponse && (
               <div ref={explanationRef}>
                 <Card className="p-4 md:p-6  animate-slide-up border-2 border-purple-400 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
@@ -1216,7 +1178,8 @@ export default function Quiz() {
                           variant="outline"
                           size="sm"
                           onClick={() => setShowReportDialog(true)}
-                          className="text-sm flex-1 max-w-[120px] h-10 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"             >
+                          className="text-sm flex-1 max-w-[120px] h-10 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
+                        >
                           <Flag className="h-4 w-4 md:h-5 md:w-5" />
                           <span className="ml-1 sm:ml-2">Report</span>
                         </Button>
