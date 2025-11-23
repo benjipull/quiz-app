@@ -23,7 +23,7 @@ const difficultyNames = {
 router.post("/", authenticateToken, async (req, res) => {
     const { categoryId, numQuestions } = req.body;
 
-    numQuestions = 5;
+    const noQuestions = 5;
     
     const authHeader = req.headers["authorization"];
     const userToken = authHeader && authHeader.startsWith("Bearer ")
@@ -34,8 +34,8 @@ router.post("/", authenticateToken, async (req, res) => {
         return res.status(401).json({ message: "Missing or invalid Authorization header." });
     }
 
-    if (!categoryId || !numQuestions) {
-        return res.status(400).json({ message: "Missing required fields: categoryId, numQuestions." });
+    if (!categoryId || !noQuestions) {
+        return res.status(400).json({ message: "Missing required fields: categoryId, noQuestions." });
     }
 
     const userId = req.user.id;
@@ -88,7 +88,7 @@ router.post("/", authenticateToken, async (req, res) => {
                 // 🟡 Second priority: higher popularity ranks higher
                 return b.popularity - a.popularity;
             })
-            .slice(0, numQuestions);
+            .slice(0, noQuestions);
 
         if (selectedQuestions.length < 10) {
             // ----------------------------------------------------------------
