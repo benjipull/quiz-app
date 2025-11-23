@@ -216,13 +216,13 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
   <div className="flex items-center justify-between gap-2 sm:gap-4">
 
     {/* LEFT SECTION */}
-    <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
       
-      <div className="flex flex-col items-start flex-shrink-0 -space-y-1"> 
+      <div className="relative flex-shrink-0"> 
           
           {/* Coin Icon - Sizing optimized for small screens */}
           <div
-            className="w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center flex-shrink-0"
+            className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -240,19 +240,19 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
           </div>
 
           <span className="
+            absolute bottom-[-18px] left-2
             bg-emerald-500 rounded-full 
-            px-2 sm:px-3 py-0.5 text-xs sm:text-sm font-bold text-white 
+            border-2 border-white/80
+            px-2.5 sm:px-3 py-0.5 text-xs sm:text-sm font-bold text-white 
             shadow-lg
             whitespace-nowrap
-            -translate-y-1 sm:translate-y-0.5
-            -translate-x-1 sm:-translate-x-1
           ">
             +{dailyBonusAmount}
           </span>
       </div>
 
 
-      <div className="leading-tight min-w-0">
+      <div className="leading-tight min-w-0 -ml-1">
         <h3 className="text-white font-bold text-lg sm:text-2xl whitespace-nowrap">
           Daily Reward
         </h3>
