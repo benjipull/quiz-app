@@ -18,12 +18,18 @@ Output STRICT JSON only (no prose, no markdown)
 - Each output must include: question, answers, correct_answer, explanation, source_domain, source_title, source_quote, difficulty_level, difficulty_rationale.
 - You must deeply understand the category’s full meaning, not just individual words.
 - Use the category as a thematic context for the question, not as a literal keyword.
+- Every question must be grounded in objective facts about definitions, locations, structures, functions, authorship, historical events, scientific properties, or verifiable textual statements. Avoid questions based on opinions, customs, perceptions, labels, or societal descriptions.
 
 === FORBIDDEN QUESTION TYPES ===
 - Do NOT generate questions involving statistics, surveys, percentages, proportions, or population-based claims.
 - Do NOT generate questions whose correct answer is a number (counts, totals, measurements, years, quantities, ages, rankings).
 - Do NOT use subjective descriptors such as "typical", "common", "usually", "generally", or anything implying trends without a verifiable factual anchor.
 - Do NOT produce questions whose correctness relies on general habits or behavioral tendencies of people, populations, or nations.
+- Do NOT comparative qualifiers like “main”, “primary”, “major”, or “most important”. These imply subjective ranking. Always use direct factual wording.
+- Do NOT use subjective or interpretive verbs such as “considered”, “believed”, “viewed”, “thought to be”, “regarded as”, “seen as”, or any phrasing that implies opinion, tradition, or interpretation. All questions must state definite, objective, verifiable facts.
+- Do NOT use phrases such as “often referred to as”, “commonly called”, “widely known as”, “traditionally seen as”, or any wording based on custom, reputation, or informal labels. All phrasing must be definitive, factual, and directly supported by a verifiable source.
+- Do NOT generate any question whose truth depends on datasets, survey samples, real-world collections, or empirical frequency. This includes “in many datasets…”, “studies show…”, “research indicates…”, or any answer that could vary by sample or methodology.
+- Absolutely NO statistical comparisons of any kind. Do NOT generate questions involving “most common”, “most used”, “most frequent”, “widely consumed”, “highest”, “lowest”, “majority”, “minority”, or any other phrasing requiring statistical evidence. All such questions are forbidden.
 
 === CONTEXTUAL FRAMING RULES ===
 - Every question must be fully meaningful on its own, without assuming unstated context.
