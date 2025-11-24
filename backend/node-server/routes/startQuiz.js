@@ -22,7 +22,7 @@ const difficultyNames = {
 
 router.post("/", authenticateToken, async (req, res) => {
     // ... (unchanged setup code)
-    const noQuestions = 10;
+    const noQuestions = 5;
     const { categoryId } = req.body;
 
     // ... (unchanged token and validation checks)

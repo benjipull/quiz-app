@@ -37,6 +37,8 @@ function extractJson(text) {
     .replace(/```json/gi, "")
     .replace(/```/g, "")
     .replace(/^Here.*?:/i, "")
+    // ❗ remove JS-style comments
+    .replace(/\/\/.*$/gm, "")
     .trim();
 
   const match = clean.match(/\{[\s\S]*\}/);
@@ -49,20 +51,14 @@ function extractJson(text) {
   }
 }
 
+
 async function runPrompt(prompt, label, questionId) {
   try {
     let raw = await callOllama(prompt);
     let parsed = extractJson(raw);
 
     if (!parsed) {
-      console.warn(`⚠️ [${label}] Invalid JSON, retrying for question ${questionId}...`);
-      await new Promise((r) => setTimeout(r, 800));
-      raw = await callOllama(prompt);
-      parsed = extractJson(raw);
-    }
-
-    if (!parsed) {
-      console.error(`❌ [${label}] Still invalid JSON for question ${questionId}. Raw snippet:`, raw.slice(0, 300));
+      console.error(`❌ [${label}] Invalid JSON for question ${questionId}. Raw snippet:`, raw);
       return null;
     }
 

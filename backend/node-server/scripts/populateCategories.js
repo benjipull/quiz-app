@@ -5,8 +5,7 @@ const axios = require("axios");
 const Category = require("../models/categoryModel");
 
 const { buildQuestionPrompt } = require("./prompts/questionPrompt");
-//const { processSingleQuestion } = require("./validateDuplicateQuestions");
-
+//const { buildQuestionPrompt } = require("./prompts/questionPromptEasy"); //This is KAK!
 
 // ==== GLOBAL CONFIG ====
 const OLLAMA_URL = process.env.OLLAMA_URL;
