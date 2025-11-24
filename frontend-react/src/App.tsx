@@ -19,6 +19,7 @@ import Store from "./pages/Store";
 import Menu from "./pages/Menu";
 import NotFound from "./pages/NotFound";
 import About from "./pages/About";
+import Claim from "./components/dummy";
 
 const queryClient = new QueryClient();
 
@@ -75,6 +76,7 @@ const AppContent = () => {
                 <Route path="store" element={<Store />} />
                 <Route path="about-us" element={<About />} />
                 <Route path="menu" element={<Menu />} />
+                <Route path="claim" element={<Claim />} />
             </Route>
 
             {/* Catch-all route for any undefined paths */}

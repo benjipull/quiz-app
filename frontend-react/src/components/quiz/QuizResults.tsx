@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,8 @@ interface QuizResultsProps {
     completionData: {
       percentageCorrect: number;
       knowledgeGained: number;
+      coinsEarned: number; 
+      totalCoins: number;   
       totalKnowledge: number;
       previousLevel: number;
       currentLevel: number;
@@ -103,8 +105,26 @@ const KnowledgePointIcon = ({ className }: { className: string }) => (
     </svg>
 );
 
+// Extracted Coin Icon SVG for reuse
+const CoinIcon = ({ className }: { className: string }) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      className={className}
+    >
+      <circle cx="8" cy="9" r="5" fill="#f59e0b" />
+      <circle cx="8" cy="9" r="4" fill="#fbbf24" />
+      <circle cx="8" cy="9" r="2.5" fill="#f59e0b" opacity="0.4" />
+      <circle cx="14" cy="13" r="6" fill="#f59e0b" />
+      <circle cx="14" cy="13" r="5" fill="#fbbf24" />
+      <circle cx="14" cy="13" r="3" fill="#f59e0b" opacity="0.4" />
+      <text x="14" y="15.5" fontSize="6" fontWeight="bold" fill="#d97706" textAnchor="middle">$</text>
+    </svg>
+);
+
 
 export default function QuizResults({ results, onPlayAgain, onClose }: QuizResultsProps) {
+  const navigate = useNavigate();
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const {
@@ -119,6 +139,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const {
     percentageCorrect,
     knowledgeGained,
+    coinsEarned,
+    totalCoins,   
     totalKnowledge,
     previousLevel,
     currentLevel,
@@ -130,15 +152,27 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
   const [mounted, setMounted] = useState(false);
   const [animatedScore, setAnimatedScore] = useState(0);
+  
+  // XP STATE
   const [animatedKnowledge, setAnimatedKnowledge] = useState(0);
   const [animatedTotalXP, setAnimatedTotalXP] = useState(totalKnowledge - knowledgeGained);
   const [showXPOverlay, setShowXPOverlay] = useState(true); 
   const [showFlyingTokens, setShowFlyingTokens] = useState(false);
-  const [showLevelUp, setShowLevelUp] = useState(false);
   const [tokens, setTokens] = useState<Array<{id: number; delay: number}>>([]);
   
+  // COIN STATE
+  const [showCoinOverlay, setShowCoinOverlay] = useState(false); 
+  const [animatedCoins, setAnimatedCoins] = useState(0);
+  const [animatedTotalCoins, setAnimatedTotalCoins] = useState(totalCoins - coinsEarned);
+  const [showFlyingCoins, setShowFlyingCoins] = useState(false);
+  const [coinTokens, setCoinTokens] = useState<Array<{id: number; delay: number}>>([]);
+
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  
   const earnedPointsRef = useRef<HTMLDivElement>(null);
+  const earnedCoinsRef = useRef<HTMLDivElement>(null); 
   const headerXPRef = useRef<HTMLDivElement>(null);
+  const headerCoinRef = useRef<HTMLDivElement>(null); 
 
   const [knowledgeGainAudio] = useState(
     typeof Audio !== "undefined" ? new Audio(KNOWLEDGE_GAIN_SOUND_SRC) : null
@@ -174,6 +208,14 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         setAnimatedScore(prev => {
           if (prev >= percentage) {
             clearInterval(interval);
+            
+            // Start the XP reward animation sequence immediately after score is done
+            if (knowledgeGained > 0) {
+                startXPAnimation();
+            } else {
+                // If no XP, jump directly to coin animation
+                startCoinAnimation(); 
+            }
             return percentage;
           }
           return prev + Math.ceil((percentage - prev) / 10);
@@ -183,10 +225,15 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     }, 300);
 
     return () => clearTimeout(scoreTimer);
-  }, [percentage]);
+  }, [percentage, knowledgeGained]); 
 
-  // Points earned animation
-  useEffect(() => {
+  
+  // ----------------------------------------------------
+  // REWARD ANIMATION SEQUENCE FUNCTIONS
+  // ----------------------------------------------------
+
+  const startXPAnimation = () => {
+    // Points earned animation
     const earnedTimer = setTimeout(() => {
       let count = 0;
       const interval = setInterval(() => {
@@ -196,13 +243,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           clearInterval(interval);
           
           setTimeout(() => {
-            startTokenAnimation();
-            
-            // Hide the entire XP overlay after the tokens have flown away
-            setTimeout(() => {
-                setShowXPOverlay(false);
-            }, 1800);
-
+            startXPTokenAnimation();
           }, 800);
         }
         setAnimatedKnowledge(count);
@@ -211,18 +252,16 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     }, 500);
 
     return () => clearTimeout(earnedTimer);
-  }, [knowledgeGained]);
+  }
 
-  // Token flying animation
-  const startTokenAnimation = () => {
+  // XP Token flying animation
+  const startXPTokenAnimation = () => {
     const earnedRect = earnedPointsRef.current?.getBoundingClientRect();
     const headerRect = headerXPRef.current?.getBoundingClientRect();
 
     if (!earnedRect || !headerRect) {
       setAnimatedTotalXP(totalKnowledge);
-      if (hasLeveledUp) {
-        setTimeout(() => setShowLevelUp(true), 300);
-      }
+      startCoinAnimation();
       return;
     }
 
@@ -253,17 +292,12 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         currentXP = totalKnowledge;
         clearInterval(xpTimer);
         
-        setTimeout(() => setShowFlyingTokens(false), 200);
+        setTimeout(() => {
+            setShowFlyingTokens(false);
+            setShowXPOverlay(false);
+            startCoinAnimation();
+        }, 200); 
 
-        if (hasLeveledUp) {
-          setTimeout(() => {
-            setShowLevelUp(true);
-            if (levelUpAudio) {
-              levelUpAudio.volume = 0.5;
-              levelUpAudio.play().catch(e => console.log("Level Up Audio failed:", e));
-            }
-          }, 300);
-        }
       }
 
       setAnimatedTotalXP(Math.min(currentXP, totalKnowledge));
@@ -275,12 +309,116 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       }
     }, 150);
 
-    document.documentElement.style.setProperty('--token-start-x', `${startX}px`);
-    document.documentElement.style.setProperty('--token-start-y', `${startY}px`);
-    document.documentElement.style.setProperty('--token-end-x', `${endX}px`);
-    document.documentElement.style.setProperty('--token-end-y', `${endY}px`);
+    document.documentElement.style.setProperty('--xp-token-start-x', `${startX}px`);
+    document.documentElement.style.setProperty('--xp-token-start-y', `${startY}px`);
+    document.documentElement.style.setProperty('--xp-token-end-x', `${endX}px`);
+    document.documentElement.style.setProperty('--xp-token-end-y', `${endY}px`);
   };
 
+  const startCoinAnimation = () => {
+    if (coinsEarned <= 0) {
+        finishRewardSequence();
+        return;
+    }
+    
+    setShowCoinOverlay(true); 
+
+    const earnedTimer = setTimeout(() => {
+        let count = 0;
+        const interval = setInterval(() => {
+            count += Math.ceil(coinsEarned / 15);
+            if (count >= coinsEarned) {
+                count = coinsEarned;
+                clearInterval(interval);
+                
+                setTimeout(() => {
+                    startCoinTokenAnimation();
+                }, 800);
+            }
+            setAnimatedCoins(count);
+        }, 60);
+        return () => clearInterval(interval);
+    }, 300);
+
+    return () => clearTimeout(earnedTimer);
+  };
+
+  const startCoinTokenAnimation = () => {
+    const earnedRect = earnedCoinsRef.current?.getBoundingClientRect();
+    const headerRect = headerCoinRef.current?.getBoundingClientRect();
+
+    if (!earnedRect || !headerRect) {
+      setAnimatedTotalCoins(totalCoins);
+      finishRewardSequence();
+      return;
+    }
+
+    const startX = earnedRect.left + earnedRect.width / 2;
+    const startY = earnedRect.top + earnedRect.height / 2;
+    const endX = headerRect.left + headerRect.width / 2;
+    const endY = headerRect.top + headerRect.height / 2;
+    
+    const tokenCount = Math.min(15, Math.max(8, coinsEarned / 8));
+    const newTokens = Array.from({ length: Math.floor(tokenCount) }, (_, i) => ({
+      id: i,
+      delay: i * 80,
+    }));
+
+    setCoinTokens(newTokens);
+    setShowFlyingCoins(true);
+
+    const startCoins = totalCoins - coinsEarned;
+    let currentCoins = startCoins;
+    const per = Math.max(1, Math.round(coinsEarned / tokenCount));
+    let tokenIndex = 0;
+    
+    const coinTimer = setInterval(() => {
+      if (tokenIndex < tokenCount) {
+        currentCoins += per;
+        tokenIndex++;
+      } else {
+        currentCoins = totalCoins;
+        clearInterval(coinTimer);
+        
+        setTimeout(() => {
+            setShowFlyingCoins(false);
+            setShowCoinOverlay(false);
+            finishRewardSequence();
+        }, 200); 
+
+      }
+
+      setAnimatedTotalCoins(Math.min(currentCoins, totalCoins));
+      
+      if (knowledgeGainAudio) {
+        const audioClone = knowledgeGainAudio.cloneNode(true) as HTMLAudioElement;
+        audioClone.volume = 0.2;
+        audioClone.play().catch(e => console.log("Audio play failed:", e));
+      }
+    }, 150);
+
+    document.documentElement.style.setProperty('--coin-token-start-x', `${startX}px`);
+    document.documentElement.style.setProperty('--coin-token-start-y', `${startY}px`);
+    document.documentElement.style.setProperty('--coin-token-end-x', `${endX}px`);
+    document.documentElement.style.setProperty('--coin-token-end-y', `${endY}px`);
+  };
+
+  const finishRewardSequence = () => {
+      if (hasLeveledUp) {
+        setTimeout(() => {
+          setShowLevelUp(true);
+          if (levelUpAudio) {
+            levelUpAudio.volume = 0.5;
+            levelUpAudio.play().catch(e => console.log("Level Up Audio failed:", e));
+          }
+        }, 300);
+      }
+  };
+  
+  // ----------------------------------------------------
+  // END REWARD ANIMATION SEQUENCE FUNCTIONS
+  // ----------------------------------------------------
+  
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [hasRated, setHasRated] = useState<boolean>(false);
@@ -313,7 +451,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       const data = await response.json();
 
       if (data.categoryId) {
-        window.location.href = `/quiz/${data.categoryId}`;
+        // ✅ FIXED: Use navigate instead of window.location.href
+        navigate(`/quiz/${data.categoryId}`, { replace: true });
       } else {
         throw new Error("No category ID returned from server");
       }
@@ -368,6 +507,28 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
   const performanceData = useMemo(() => getPerformanceData(percentage), [percentage]);
   
+  // 🔥 Update localStorage with new coin/XP values when component mounts
+  useEffect(() => {
+    if (totalCoins && totalKnowledge) {
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser);
+          const updatedUser = {
+            ...user,
+            coins: totalCoins,
+            knowledgePoints: totalKnowledge,
+            level: currentLevel,
+          };
+          localStorage.setItem("user", JSON.stringify(updatedUser));
+          console.log('💾 Updated localStorage with new coins:', totalCoins);
+        } catch (e) {
+          console.error("Failed to update user in localStorage:", e);
+        }
+      }
+    }
+  }, [totalCoins, totalKnowledge, currentLevel]);
+  
   if (!mounted) {
     return null;
   }
@@ -375,32 +536,20 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   return (
     <div className="h-screen w-full z-50 flex flex-col items-center p-2 sm:p-4 font-sans bg-gradient-to-br from-[#100221] via-[#4f187a] to-[#380d67] overflow-hidden">
       
-      {/* Header with Stats (The XP target) */}
+      {/* Header with Stats */}
       <div className="w-full max-w-lg flex-shrink-0 animate-fade-in-down">
         <div className="flex items-center justify-between p-2 sm:p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 backdrop-blur-sm">
           {/* Stat Item: Coins */}
-          <div className="flex items-center gap-1 sm:gap-1.5">
+          <div ref={headerCoinRef} className="flex items-center gap-1 sm:gap-1.5 relative">
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                className="h-5 w-5"
-              >
-                <circle cx="8" cy="9" r="5" fill="#f59e0b" />
-                <circle cx="8" cy="9" r="4" fill="#fbbf24" />
-                <circle cx="8" cy="9" r="2.5" fill="#f59e0b" opacity="0.4" />
-                <circle cx="14" cy="13" r="6" fill="#f59e0b" />
-                <circle cx="14" cy="13" r="5" fill="#fbbf24" />
-                <circle cx="14" cy="13" r="3" fill="#f59e0b" opacity="0.4" />
-                <text x="14" y="15.5" fontSize="6" fontWeight="bold" fill="#d97706" textAnchor="middle">$</text>
-              </svg>
+              <CoinIcon className="h-5 w-5" />
             </div>
             <div>
-              <div className="text-sm sm:text-base font-bold text-slate-200">0</div>
+              <div className="text-sm sm:text-base font-bold text-slate-200 tabular-nums">{animatedTotalCoins}</div>
             </div>
           </div>
 
-           {/* Stat Item - XP - TARGET FOR TOKENS */}
+           {/* Stat Item - XP */}
            <div ref={headerXPRef} className="flex items-center gap-1 sm:gap-1.5 relative">
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center transition-all duration-300">
               <KnowledgePointIcon className="h-4 w-4 text-amber-500" />
@@ -495,7 +644,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </div>
       )}
 
-      {/* Main Results Card Container - Takes remaining space */}
+      {/* Main Results Card Container */}
       <div className="relative z-10 w-full max-w-lg mx-auto flex-1 flex flex-col min-h-0 mt-3">
         <Card className="relative overflow-hidden bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in flex-1 flex flex-col">
           
@@ -658,7 +807,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </Card>
       </div>
 
-      {/* XP EARNED OVERLAY */}
+      {/* XP EARNED OVERLAY (Reference style) */}
       {showXPOverlay && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
             <div 
@@ -679,20 +828,61 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             </div>
         </div>
       )}
+      
+      {/* COIN EARNED OVERLAY (MODIFIED to match XP style) */}
+      {showCoinOverlay && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
+            <div 
+                ref={earnedCoinsRef} 
+                className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
+            >
+                {/* ICON CONTAINER: Changed to use gold gradient and the existing yellow glow animation */}
+                <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 shadow-lg shadow-amber-500/50 animate-pulse-glow">
+                  {/* Icon size remains the same, but the inner CoinIcon SVG is already gold/yellow */}
+                  <CoinIcon className="h-7 w-7 sm:h-8 sm:w-8" />
+                </div>
+                <div>
+                  {/* COIN COUNT: Changed gradient to gold/yellow and uses the modified coin-text-aura */}
+                  <div className="coin-text-aura text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
+                    {animatedCoins}
+                  </div>
+                  {/* SUBTITLE: Changed color to amber-400 */}
+                  <div className="text-amber-400/80 font-bold text-sm sm:text-base mt-1 sm:mt-2">
+                    COINS EARNED
+                  </div>
+                </div>
+            </div>
+        </div>
+      )}
 
-      {/* Flying Tokens */}
+      {/* Flying XP Tokens */}
       {showFlyingTokens && tokens.map((token) => (
         <div
           key={token.id}
-          className="token"
+          className="xp-token"
           style={{
-            '--token-delay': `${token.delay}ms`,
+            '--xp-token-delay': `${token.delay}ms`,
           } as any}
         />
+      ))}
+      
+      {/* Flying Coin Tokens */}
+      {showFlyingCoins && coinTokens.map((token) => (
+        <div
+          key={token.id}
+          className="coin-token"
+          style={{
+            '--coin-token-delay': `${token.delay}ms`,
+          } as any}
+        >
+          {/* Embed the Coin Icon inside the flying div */}
+          <CoinIcon className="h-full w-full p-[2px] transition-all duration-700" />
+        </div>
       ))}
 
       {/* CSS Animations and Styles */}
       <style>{`
+        /* ... existing keyframes ... */
         @keyframes scale-in {
           0% { transform: scale(0.9); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
@@ -741,6 +931,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           100% { transform: scale(1.2); opacity: 1; }
         }
         
+        /* Gold/Yellow Pulse Glow (Reused for both XP and Coins) */
         @keyframes pulse-glow {
           0%, 100% { 
             box-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
@@ -752,6 +943,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           }
         }
         
+        /* Removed pulse-glow-cyan keyframes, using pulse-glow instead */
+
         @keyframes number-grow {
           0% { 
             transform: scale(0.5);
@@ -774,15 +967,24 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           animation: number-grow 0.8s ease-out forwards;
         }
         
+        /* XP Text Aura (Yellow/Orange Glow) */
         .xp-text-aura {
           text-shadow: 
             0 0 10px rgba(255, 193, 7, 0.9),
             0 0 20px rgba(255, 165, 0, 0.7),
             0 0 30px rgba(255, 140, 0, 0.5);
         }
+        
+        /* Coin Text Aura (MODIFIED to match XP's Gold/Yellow Glow) */
+        .coin-text-aura { 
+          text-shadow: 
+            0 0 10px rgba(255, 193, 7, 0.9), /* Yellow */
+            0 0 20px rgba(255, 165, 0, 0.7), /* Orange */
+            0 0 30px rgba(255, 140, 0, 0.5); /* Dark Orange */
+        }
 
-        /* Flying Token Animation */
-        .token {
+        /* Flying Token Animation - XP Tokens */
+        .xp-token { 
           position: fixed;
           width: 20px;
           height: 20px;
@@ -795,69 +997,118 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           z-index: 60;
           opacity: 0;
           pointer-events: none;
-          animation: fly-token-direct 1200ms cubic-bezier(0.25, 0.46, 0.45, 0.94) var(--token-delay, 0ms) forwards;
+          animation: fly-token-xp 1200ms cubic-bezier(0.25, 0.46, 0.45, 0.94) var(--xp-token-delay, 0ms) forwards; 
         }
         
-        .token::before {
-          content: '';
-          position: absolute;
-          inset: 2px;
-          border-radius: 50%;
-          background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8), transparent 60%);
-          opacity: 0.6;
-        }
-        
-        .token::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          border-radius: 50%;
-          background: inherit;
-          filter: blur(8px);
-          opacity: 0.5;
-          z-index: -1;
-        }
-        
-       @keyframes fly-token-direct {
+       @keyframes fly-token-xp { 
           0% {
             opacity: 0;
-            left: var(--token-start-x, 50vw);
-            top: var(--token-start-y, 50vh);
+            left: var(--xp-token-start-x, 50vw);
+            top: var(--xp-token-start-y, 50vh);
             transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
           }
           
           10% {
             opacity: 1;
-            left: var(--token-start-x, 50vw);
-            top: var(--token-start-y, 50vh);
+            left: var(--xp-token-start-x, 50vw);
+            top: var(--xp-token-start-y, 50vh);
             transform: translate(-50%, -50%) scale(1.2) rotate(180deg);
           }
           
           15% {
-            left: var(--token-start-x, 50vw);
-            top: var(--token-start-y, 50vh);
+            left: var(--xp-token-start-x, 50vw);
+            top: var(--xp-token-start-y, 50vh);
             transform: translate(-50%, -50%) scale(1) rotate(180deg);
           }
           
           85% {
             opacity: 1;
-            left: var(--token-end-x, 50vw);
-            top: var(--token-end-y, 50vh);
+            left: var(--xp-token-end-x, 50vw);
+            top: var(--xp-token-end-y, 50vh);
             transform: translate(-50%, -50%) scale(0.8) rotate(900deg);
           }
           
           95% {
             opacity: 0.8;
-            left: var(--token-end-x, 50vw);
-            top: var(--token-end-y, 50vh);
+            left: var(--xp-token-end-x, 50vw);
+            top: var(--xp-token-end-y, 50vh);
             transform: translate(-50%, -50%) scale(1.3) rotate(1080deg);
           }
           
           100% {
             opacity: 0;
-            left: var(--token-end-x, 50vw);
-            top: var(--token-end-y, 50vh);
+            left: var(--xp-token-end-x, 50vw);
+            top: var(--xp-token-end-y, 50vh);
             transform: translate(-50%, -50%) scale(0.1) rotate(1080deg);
+          }
+        }
+        
+        /* Flying Token Animation - Coin Tokens */
+        .coin-token { 
+          position: fixed;
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          
+          /* Gold/Yellow background for consistency */
+          background-color: #FCD34D; 
+          border: 1px solid #D97706; 
+          box-shadow: 
+            0 0 0 3px rgba(251, 191, 36, 0.2),
+            0 0 10px rgba(251, 191, 36, 0.4),
+            0 5px 15px rgba(0, 0, 0, 0.3);
+            
+          z-index: 60;
+          opacity: 0;
+          pointer-events: none;
+          
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          
+          animation: fly-token-coin 1200ms cubic-bezier(0.25, 0.46, 0.45, 0.94) var(--coin-token-delay, 0ms) forwards; 
+        }
+        
+        @keyframes fly-token-coin { 
+          0% {
+            opacity: 0;
+            left: var(--coin-token-start-x, 50vw);
+            top: var(--coin-token-start-y, 50vh);
+            transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
+          }
+          
+          10% {
+            opacity: 1;
+            left: var(--coin-token-start-x, 50vw);
+            top: var(--coin-token-start-y, 50vh);
+            transform: translate(-50%, -50%) scale(1.2) rotate(-180deg);
+          }
+          
+          15% {
+            left: var(--coin-token-start-x, 50vw);
+            top: var(--coin-token-start-y, 50vh);
+            transform: translate(-50%, -50%) scale(1) rotate(-180deg);
+          }
+          
+          85% {
+            opacity: 1;
+            left: var(--coin-token-end-x, 50vw);
+            top: var(--coin-token-end-y, 50vh);
+            transform: translate(-50%, -50%) scale(0.8) rotate(-900deg);
+          }
+          
+          95% {
+            opacity: 0.8;
+            left: var(--coin-token-end-x, 50vw);
+            top: var(--coin-token-end-y, 50vh);
+            transform: translate(-50%, -50%) scale(1.3) rotate(-1080deg);
+          }
+          
+          100% {
+            opacity: 0;
+            left: var(--coin-token-end-x, 50vw);
+            top: var(--coin-token-end-y, 50vh);
+            transform: translate(-50%, -50%) scale(0.1) rotate(-1080deg);
           }
         }
         

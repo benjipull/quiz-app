@@ -12,7 +12,8 @@ const UserSchema = new mongoose.Schema({
   knowledgePoints: { type: Number, required: true, default: 0 },
   wisdomGems: { type: Number, required: true, default: 0 },
   enlightenmentCrystals: { type: Number, required: true, default: 0 },
-  coins: { type: Number, required: true, default: 0 },
+  // Default coins for a new player is 1000
+  coins: { type: Number, required: true, default: 1000 },
   level: { type: Number, required: true, default: 1 },
 
   // 🏷️ New: Player interests
@@ -28,6 +29,11 @@ const UserSchema = new mongoose.Schema({
   created_at: { type: Date, default: Date.now },
   lastupdated_at: { type: Date, default: Date.now, required: true },
   lastlogin_at: { type: Date },
+
+  // 💰 Coin Tracking
+  lastDailyCoinClaim: { type: Date, default: null }, // Track last claim time
+  // 💰 NEW: One-time login bonus flag
+  initialLoginBonusClaimed: { type: Boolean, required: true, default: false }, // <-- ADDED
 
   // 👥 User type
   userType: {

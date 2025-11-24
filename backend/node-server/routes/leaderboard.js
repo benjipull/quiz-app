@@ -13,45 +13,38 @@ const getStartDate = (period) => {
     const now = new Date();
     let startDate = new Date(now);
 
-    // Set time to the very start of the day for accurate comparison
     startDate.setHours(0, 0, 0, 0); 
 
     switch (period) {
         case 'day':
-            // startDate is already set to the start of today
             break;
         case 'week':
-            // Using Monday (1) as the start of the week
             const dayOfWeek = now.getDay(); // 0 is Sunday, 1 is Monday...
-            // Calculate days to subtract to get to Monday (or the day before if today is Sunday)
             const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; 
             startDate.setDate(now.getDate() - diff);
             startDate.setHours(0, 0, 0, 0);
             break;
         case 'month':
-            // Set to the 1st day of the current month
             startDate.setDate(1); 
             startDate.setHours(0, 0, 0, 0);
             break;
         case 'year':
-            // Set to January 1st of the current year
             startDate.setMonth(0, 1);
             startDate.setHours(0, 0, 0, 0);
             break;
         default:
-            return null; // Invalid period
+            return null;
     }
     return startDate;
 };
 
 
 router.get("/", authenticateToken, async (req, res) => {
-    // period can be 'day', 'week', 'month', 'year'
     const period = req.query.period ? req.query.period.toLowerCase() : 'month'; 
     const startDate = getStartDate(period);
 
     if (!startDate) {
-        return res.status(400).json({ message: "Invalid or missing 'period' query parameter. Must be 'day', 'week', 'month', or 'year'." });
+        return res.status(400).json({ message: "Invalid or missing 'period' query parameter." });
     }
 
     try {
@@ -60,22 +53,26 @@ router.get("/", authenticateToken, async (req, res) => {
             // 1. Filter ledger entries by the start date of the period
             {
                 $match: {
-                    // Only include entries after the start date
                     timestamp: { $gte: startDate } 
                 }
             },
-            // 2. Group by userId and sum the points
+            // 2. 🔑 CRITICAL FIX: Filter out Coin entries ('daily-bonus')
+            {
+                $match: {
+                    source: { $ne: 'daily-bonus' } // Exclude any entry whose source is for coins
+                }
+            },
+            // 3. Group by userId and sum the Knowledge Points (XP)
             {
                 $group: {
                     _id: "$userId",
                     totalPoints: { $sum: "$points" }
                 }
             },
-            // 3. Sort by total points (descending)
+            // 4. Sort and Limit
             {
                 $sort: { totalPoints: -1 }
             },
-            // 4. Limit to the top 100 players (adjust as needed)
             {
                 $limit: 100 
             },
@@ -88,11 +85,11 @@ router.get("/", authenticateToken, async (req, res) => {
                     as: "userDetails"
                 }
             },
-            // 6. Deconstruct the userDetails array
+            // 6. Deconstruct the userDetails array (Keeping the fix from the previous step)
             {
                 $unwind: {
                     path: "$userDetails",
-                    preserveNullAndEmptyArrays: false 
+                    preserveNullAndEmptyArrays: true // Use 'true' to ensure a user still shows if their data lookup fails (e.g., if their entry was deleted)
                 }
             },
             // 7. Project the final required structure
@@ -101,9 +98,10 @@ router.get("/", authenticateToken, async (req, res) => {
                     _id: 0,
                     userId: "$_id",
                     totalPoints: 1,
-                    username: "$userDetails.alias", 
-                    level: "$userDetails.level",
-                    avatar: "$userDetails.avatar" 
+                    // Use $ifNull to safely handle cases where $lookup failed (userDetails is null)
+                    username: { $ifNull: ["$userDetails.alias", "Unknown User"] },
+                    level: { $ifNull: ["$userDetails.level", 0] },
+                    avatar: { $ifNull: ["$userDetails.avatar", 1] } 
                 }
             }
         ];
