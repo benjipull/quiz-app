@@ -262,6 +262,7 @@ export default function Quiz() {
   const location = useLocation();
   const explanationRef = useRef<HTMLDivElement>(null);
   const timerInSecondsRef = useRef<NodeJS.Timeout | null>(null);
+  // FIX: hasStartedRef is the key to prevent double execution in React Strict Mode
   const hasStartedRef = useRef(false);
   
   const nextQuestionRef = useRef<Question | null>(null);
@@ -399,14 +400,38 @@ export default function Quiz() {
   };
 
   useEffect(() => {
-    if (categoryId && userToken && !hasStartedRef.current) {
-      hasStartedRef.current = true;
-      startQuiz(categoryId);
-    } else if (!userToken) {
-      console.log("You must be logged in to play.");
-      navigate("/categories");
+  let isSubscribed = true;
+  let isMounted = true;
+  
+  const initQuiz = async () => {
+    // Triple protection against double calls
+    if (!isSubscribed || !isMounted) return;
+    if (hasStartedRef.current) return;
+    if (!categoryId || !userToken) {
+      if (!userToken) {
+        console.log("You must be logged in to play.");
+        navigate("/categories");
+      }
+      return;
     }
-  }, [categoryId, userToken, navigate]);
+    
+    // Set the ref IMMEDIATELY before any async operations
+    hasStartedRef.current = true;
+    
+    // Check one more time after setting the ref
+    if (isSubscribed && isMounted) {
+      await startQuiz(categoryId);
+    }
+  };
+  
+  initQuiz();
+  
+  // Cleanup function
+  return () => {
+    isSubscribed = false;
+    isMounted = false;
+  };
+}, [categoryId, userToken]); 
 
   useEffect(() => {
     if (timerInSecondsRef.current) {
@@ -476,80 +501,99 @@ export default function Quiz() {
   }, [quizState.currentQuestionIndex]);
 
   const startQuiz = async (categoryId: string) => {
-    if (!userToken) {
-      console.log("You must be logged in to play.");
-      return;
-    }
+  if (!userToken) {
+    console.log("You must be logged in to play.");
+    return;
+  }
 
-    setLoading(true);
-    setError(null);
-    setIsCompletingQuiz(false);
+  // FRONTEND CHECK: If already loading or started, don't proceed
+  if (loading || quizState.started) {
+    console.log("Quiz already starting or in progress");
+    return;
+  }
 
-    setQuizState({
-      started: true,
-      completed: false,
-      selectedCategory: null,
-      question: null,
-      currentQuestionIndex: 0,
-      correctAnswers: 0,
-      incorrectAnswers: 0,
-      results: null,
-      isAnswerSelected: false,
-      userAnswers: [],
+  setLoading(true);
+  setError(null);
+  setIsCompletingQuiz(false);
+
+  setQuizState({
+    started: true, // Set this IMMEDIATELY
+    completed: false,
+    selectedCategory: null,
+    question: null,
+    currentQuestionIndex: 0,
+    correctAnswers: 0,
+    incorrectAnswers: 0,
+    results: null,
+    isAnswerSelected: false,
+    userAnswers: [],
+  });
+  setCategoryImage(undefined);
+  setTotalQuestions(10);
+  nextQuestionRef.current = null;
+
+  try {
+    const categoryResponse = await fetch(`${BASE_URL}/api/categories`, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${userToken}`,
+      },
     });
-    setCategoryImage(undefined);
-    setTotalQuestions(10);
-    nextQuestionRef.current = null;
-
-    try {
-      const categoryResponse = await fetch(`${BASE_URL}/api/categories`, {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${userToken}`,
-        },
-      });
-      if (categoryResponse.ok) {
-        const categories = await categoryResponse.json();
-        const category = categories.find((cat: any) => cat._id === categoryId);
-        if (category) {
-          setCategoryTitle(category.name);
-          setCategoryImage(category.imageUrl || category.image);
-          setQuizState(prev => ({
-            ...prev,
-            selectedCategory: { id: categoryId, name: category.name }
-          }));
-        }
+    if (categoryResponse.ok) {
+      const categories = await categoryResponse.json();
+      const category = categories.find((cat: any) => cat._id === categoryId);
+      if (category) {
+        setCategoryTitle(category.name);
+        setCategoryImage(category.imageUrl || category.image);
+        setQuizState(prev => ({
+          ...prev,
+          selectedCategory: { id: categoryId, name: category.name }
+        }));
       }
-
-      const startResponse = await fetch(`${BASE_URL}/api/startQuiz`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({ categoryId, numQuestions: 10, userToken }),
-      });
-
-      if (!startResponse.ok) {
-        throw new Error("Error starting quiz session.");
-      } else {
-        const startData = await startResponse.json();
-        
-        if (startData.total) {
-          setTotalQuestions(startData.total);
-          console.log(`Quiz started with ${startData.total} questions`);
-        }
-        
-        trackQuizStart(categoryId, userId);
-        await fetchNextQuestion();
-      }
-
-    } catch (error: any) {
-      setError(error.message);
-      setLoading(false);
     }
-  };
 
+    const startResponse = await fetch(`${BASE_URL}/api/startQuiz`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${userToken}`,
+      },
+      body: JSON.stringify({ categoryId, numQuestions: 10, userToken }),
+    });
+
+    if (!startResponse.ok) {
+      // If the start fails, we must allow a retry, so we reset the ref.
+      // This is only safe because the server side also handles refunding the coins.
+      hasStartedRef.current = false;
+      
+      const errorData = await startResponse.json();
+      
+      // If it's a "quiz already starting" error, don't show error
+      if (startResponse.status === 400 || startResponse.status === 429) {
+        console.log("Quiz already in progress or starting");
+        setLoading(false);
+        return;
+      }
+      
+      throw new Error(errorData.message || "Error starting quiz session.");
+    } else {
+      const startData = await startResponse.json();
+      
+      if (startData.total) {
+        setTotalQuestions(startData.total);
+        console.log(`Quiz started with ${startData.total} questions`);
+      }
+      
+      trackQuizStart(categoryId, userId);
+      await fetchNextQuestion();
+    }
+
+  } catch (error: any) {
+    setError(error.message);
+    setLoading(false);
+    hasStartedRef.current = false; // Reset on error
+  }
+};
   const fetchNextQuestion = async () => {
     if (!userToken || quizState.completed || isCompletingQuiz) return;
 
@@ -814,6 +858,7 @@ export default function Quiz() {
   };
 
   const handlePlayAgain = () => {
+    // Reset hasStartedRef to allow quiz to start again
     hasStartedRef.current = false;
     if (categoryId) {
       startQuiz(categoryId);

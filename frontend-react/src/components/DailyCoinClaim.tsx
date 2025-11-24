@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Coins, Clock, Sparkles, Gift, Star } from "lucide-react";
+import { Coins, Clock, Sparkles, Star, CircleDollarSign } from "lucide-react"; // Removed Gift
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/utils/apiClient";
 
 // Ensure BASE_URL is defined in your environment variables
 const BASE_URL = import.meta.env.VITE_BASE_URL;
+const DEFAULT_BONUS = 500; // Fallback value
 
 interface DailyCoinClaimProps {
   userToken: string;
@@ -19,12 +20,34 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
   const [showRewardModal, setShowRewardModal] = useState<boolean>(false);
   const [showAnimation, setShowAnimation] = useState<boolean>(false);
-  const [claimedAmount, setClaimedAmount] = useState<number>(500);
+  const [dailyBonusAmount, setDailyBonusAmount] = useState<number>(DEFAULT_BONUS); // Dynamic coin amount
   const { toast } = useToast();
+  
+  // New function to fetch the daily bonus amount
+ const fetchDailyBonusAmount = useCallback(async () => {
+    try {
+        const response = await apiClient(`${BASE_URL}/api/claimDailyCoins/amount`, {
+            method: "GET",
+        });
+
+        if (response && response.ok) {
+            const data = await response.json();
+            if (data.dailyBonusAmount) {
+                setDailyBonusAmount(data.dailyBonusAmount);
+            }
+        }
+    } catch (error) {
+        console.error("Error fetching daily bonus amount:", error);
+    }
+}, []);
+
 
   // Check claim status on mount and set up interval
   useEffect(() => {
     if (!userToken) return;
+    
+    // 👇 Fetch the bonus amount
+    fetchDailyBonusAmount(); 
     checkClaimStatus();
     
     // Check every second for countdown
@@ -42,7 +65,7 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [userToken, canClaim]); // Include canClaim in dependencies to prevent unnecessary state updates
+  }, [userToken, canClaim, fetchDailyBonusAmount]); // Added fetchDailyBonusAmount dependency
 
   const checkClaimStatus = async () => {
     try {
@@ -105,8 +128,8 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
       const data = await response.json();
 
       if (response.ok) {
-        const coinsEarned = data.coinsEarned || 500;
-        setClaimedAmount(coinsEarned);
+        const coinsEarned = data.coinsEarned || dailyBonusAmount;
+        // Use the actual earned amount from the server, falling back to the fetched amount
         
         // Show coin animation
         setShowAnimation(true);
@@ -180,84 +203,96 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
 
   return (
     <>
-  <Card
+ <Card
   className="
     w-full 
     max-w-8xl
     rounded-[30px]
     bg-transparent
-    border-[3px] border-[#d946ef]
-    shadow-[0_0_35px_rgba(217,70,239,0.4)]
-    p-4 sm:p-5
+    border-none
+    p-2 sm:p-4
   "
 >
   <div className="flex items-center justify-between gap-2 sm:gap-4">
 
     {/* LEFT SECTION */}
-    <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
       
-      {/* Gift Icon Box */}
-      <div
-        className="
-          w-12 h-12 sm:w-14 sm:h-14
-          rounded-2xl
-          flex items-center justify-center
-          bg-gradient-to-br from-[#a020f0] to-[#6a0dad]
-          border-[3px] border-[#ff4dff]
-          shadow-[0_0_25px_rgba(255,77,255,0.65)]
-          flex-shrink-0
-        "
-      >
-        <Gift className="w-6 h-6 sm:w-8 sm:h-8 text-[#ffe14d]" />
+      <div className="relative flex-shrink-0"> 
+          
+          {/* Coin Icon - Sizing optimized for small screens */}
+          <div
+            className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 28 28"
+              className="w-full h-full"
+            >
+              {/* Gold Coin SVG */}
+              <circle cx="10" cy="11" r="7" fill="#d97706" />
+              <circle cx="10" cy="11" r="6" fill="#fcd34d" />
+              <circle cx="10" cy="11" r="3.5" fill="#d97706" opacity="0.4" />
+              <circle cx="17" cy="16" r="8" fill="#d97706" />
+              <circle cx="17" cy="16" r="7" fill="#fcd34d" />
+              <circle cx="17" cy="16" r="4.2" fill="#d97706" opacity="0.4" />
+            </svg>
+          </div>
+
+          <span className="
+            absolute bottom-[-18px] left-2
+            bg-emerald-500 rounded-full 
+            border-2 border-white/80
+            px-2.5 sm:px-3 py-0.5 text-xs sm:text-sm font-bold text-white 
+            shadow-lg
+            whitespace-nowrap
+          ">
+            +{dailyBonusAmount}
+          </span>
       </div>
 
-      {/* Text */}
-      <div className="leading-tight min-w-0">
-        <h3 className="text-white font-bold text-xl sm:text-2xl">
-          Daily
-        </h3>
-        <h3 className="text-white font-bold text-xl sm:text-2xl -mt-1">
-          Reward
+
+      <div className="leading-tight min-w-0 -ml-1">
+        <h3 className="text-white font-bold text-lg sm:text-2xl whitespace-nowrap">
+          Daily Reward
         </h3>
       </div>
     </div>
 
     {/* RIGHT SIDE — TIMER / CLAIM BUTTON */}
-    <div
-      className={`
-        flex items-center gap-1.5 sm:gap-2
-        px-3 py-2 sm:px-6 sm:py-3
-        rounded-full
-        min-w-0   /* <-- IMPORTANT FIX */
-        ${
-          canClaim 
-            ? "bg-yellow-500/10 border-[3px] border-yellow-400 shadow-[0_0_25px_rgba(255,255,0,0.5)] cursor-pointer hover:bg-yellow-500/20 transition-colors"
-            : "bg-[#501b9b] border-[3px] border-[#ff78ff] shadow-[0_0_25px_rgba(255,115,255,0.5)]"
-        }
-      `}
-      onClick={handleClaimClick}
-    >
-      {canClaim ? (
-        <>
-          <Sparkles className={`w-5 h-5 sm:w-6 sm:h-6 ${isClaiming ? "text-gray-400" : "text-yellow-400"}`} />
-          <span className={`font-bold text-sm sm:text-lg whitespace-nowrap ${isClaiming ? "text-gray-400" : "text-yellow-400"}`}>
-            {isClaiming ? 'Claiming...' : 'Claim Now'}
-          </span>
-        </>
-      ) : (
-        <>
-          <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" />
-          <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap">
-            {formatTimeRemaining(timeRemaining)}
-          </span>
-        </>
-      )}
-    </div>
+   <div
+  className={`
+    flex items-center gap-1 sm:gap-2
+    px-3 py-1.5 sm:px-6 sm:py-3
+    rounded-full
+    min-w-0
+    ${
+      canClaim 
+        ? "bg-yellow-500/10 border-[3px] border-yellow-400 shadow-[0_0_25px_rgba(255,255,0,0.5)] cursor-pointer hover:bg-yellow-500/20 transition-colors"
+        : "bg-[#501b9b] shadow-[0_0_15px_rgba(240,171,240,0.4),_0_4px_15px_rgba(0,0,0,0.5)] border border-purple-800/50" // ⭐ ADDED GLOW SHADOW (f0abf0 is the clock color)
+    }
+  `}
+  onClick={handleClaimClick}
+>
+  {canClaim ? (
+    <>
+      <Sparkles className={`w-4 h-4 sm:w-6 sm:h-6 ${isClaiming ? "text-gray-400" : "text-yellow-400"}`} /> 
+      <span className={`font-bold text-sm sm:text-lg whitespace-nowrap ${isClaiming ? "text-gray-400" : "text-yellow-400"}`}>
+        {isClaiming ? 'Claiming...' : 'Claim Now'}
+      </span>
+    </>
+  ) : (
+    <>
+      <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" /> 
+      <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap"> 
+        {formatTimeRemaining(timeRemaining)}
+      </span>
+    </>
+  )}
+</div>
 
   </div>
 </Card>
-
-
 
       {/* Reward Modal Overlay */}
       {showRewardModal && (
@@ -325,7 +360,8 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
               {/* Points Display */}
               <div className="text-center mb-8 relative z-10">
                 <p className="text-white text-2xl font-semibold mb-1">Coins</p>
-                <p className="text-yellow-400 text-5xl font-black">x{claimedAmount}</p>
+                {/* 👇 Use dynamic amount */}
+                <p className="text-yellow-400 text-5xl font-black">x{dailyBonusAmount}</p>
               </div>
 
               {/* Buttons */}
@@ -362,7 +398,7 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
         </div>
       )}
 
-      {/* CSS Styles for Animations */}
+      {/* CSS Styles for Animations - Unchanged */}
       <style>{`
         @keyframes float-coin-modal {
           0% {
