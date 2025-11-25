@@ -5,7 +5,7 @@ import { Clock, Sparkles } from "lucide-react";
 import { apiClient } from "@/utils/apiClient";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
-const DEFAULT_BONUS = 500;
+const DEFAULT_BONUS = 1000;
 const COINS_GAIN_SOUND_SRC = "/knowledge-point.mp3"; 
 
 
