@@ -648,7 +648,7 @@ export default function Home() {
     ) : (
       <>
         {/* LEFT SIDE */}
-        <div className="flex flex-col">
+        <div className="flex items-center gap-2">
           <span className="text-3xl md:text-4xl font-extrabold text-white leading-none">
             Play
           </span>
