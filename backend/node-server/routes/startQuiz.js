@@ -93,7 +93,6 @@ router.post("/", authenticateToken, async (req, res) => {
         if (selectedQuestions.length < noQuestions) {
             // ----------------------------------------------------------------
             // 💰 2. COIN REFUND IF QUIZ FAILS TO START (Not enough questions)
-            // Ledger tracking for this coin transaction is REMOVED.
             // ----------------------------------------------------------------
             user.coins += QUIZ_COST; // Refund the coins
             await user.save();

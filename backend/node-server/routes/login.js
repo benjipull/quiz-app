@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/user");
 
 const router = express.Router();
-const INITIAL_BONUS_AMOUNT = 2000; 
+// Removed: const INITIAL_BONUS_AMOUNT = 2000; 
 
 // @route   POST /api/users/login
 // @desc    Authenticate user & get token
@@ -26,20 +26,8 @@ router.post("/", async (req, res) => {
         }
 
         // --------------------------------------------------------
-        // 💰 ONE-TIME COIN GRANT LOGIC FOR EXISTING REGISTERED USERS
-        // Ledger tracking for this coin transaction is REMOVED.
-        // --------------------------------------------------------
-        if (
-            user.userType === "Registered" &&
-            !user.initialLoginBonusClaimed
-        ) {
-            user.coins += INITIAL_BONUS_AMOUNT;
-            user.initialLoginBonusClaimed = true; // Prevents future claims
-
-            // Ledger logic for initial-grant coin entry removed
-
-            console.log(`🎉 Granted ${INITIAL_BONUS_AMOUNT} coins to existing user ${user.alias} on login.`);
-        }
+        // Removed ONE-TIME COIN GRANT LOGIC (ensuring total coins 
+        // for a new registered user is capped at the 2000 from register.js).
         // --------------------------------------------------------
 
         console.log("User Object on Login:", user); 
@@ -58,7 +46,7 @@ router.post("/", async (req, res) => {
         console.log("Generated Token:", token); // ✅ Log token for debugging
 
         user.lastlogin_at = Date.now();
-        await user.save(); // Save the user with the updated coins/flag and lastlogin_at
+        await user.save(); // Save the user with updated lastlogin_at
 
         // Exclude password field from response
         const { password: _, ...userWithoutPassword } = user.toObject();
