@@ -21,7 +21,6 @@ import {
   Brain,
   AlertTriangle,
   Heart,
-  Trophy,
 } from "lucide-react";
 import logo from "../assets/images/QuizicleLogo.png";
 import SplashScreen from "../components/SplashScreen";
@@ -70,6 +69,7 @@ interface UserDetails {
   avatar: number;
   userType?: "Guest" | "Registered" | "Admin";
   interests?: string[];
+  coins?: number;
 }
 
 export default function Home() {
@@ -85,6 +85,7 @@ export default function Home() {
   const [userLevel, setUserLevel] = useState(1);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
+  const [currentCoins, setCurrentCoins] = useState(0);
   
   // Interest modal state
   const [isInterestModalOpen, setIsInterestModalOpen] = useState(false);
@@ -145,9 +146,13 @@ export default function Home() {
       trackHomeScreen(userProfile._id);
       fetchUserCategories();
       
+      // Set initial coins
+      if (userProfile.coins !== undefined) {
+        setCurrentCoins(userProfile.coins);
+      }
+      
       // Check if user has no interests selected - show modal if needed
       if (!userProfile.interests || userProfile.interests.length === 0) {
-        // Small delay to ensure smooth UI load
         setTimeout(() => {
           setIsInterestModalOpen(true);
           trackEvent("view_interests", {
@@ -169,6 +174,7 @@ export default function Home() {
           if (parsedUser.level) setUserLevel(parsedUser.level);
           setIsGuest(parsedUser.userType === 'Guest');
           setSelectedInterests(parsedUser.interests || []);
+          if (parsedUser.coins !== undefined) setCurrentCoins(parsedUser.coins);
         } catch (e) {
           console.error("Failed to parse local user data:", e);
         }
@@ -194,6 +200,7 @@ export default function Home() {
           if (parsedUser.level) setUserLevel(parsedUser.level);
           setIsGuest(parsedUser.userType === 'Guest');
           setSelectedInterests(parsedUser.interests || []);
+          if (parsedUser.coins !== undefined) setCurrentCoins(parsedUser.coins);
         }
         return;
       }
@@ -204,6 +211,7 @@ export default function Home() {
       setUserLevel(apiUser.level || 1);
       setIsGuest(apiUser.userType === 'Guest');
       setSelectedInterests(apiUser.interests || []);
+      if (apiUser.coins !== undefined) setCurrentCoins(apiUser.coins);
 
       const avatarIndex = apiUser.avatar ? apiUser.avatar - 1 : 0;
       const calculatedAvatar = avatars[avatarIndex] || null;
@@ -215,6 +223,7 @@ export default function Home() {
           level: apiUser.level || 1,
           userType: apiUser.userType || 'Registered',
           interests: apiUser.interests || [],
+          coins: apiUser.coins || 0,
         };
         localStorage.setItem("user", JSON.stringify(userToStore));
         if (calculatedAvatar) {
@@ -232,6 +241,7 @@ export default function Home() {
           if (parsedUser.level) setUserLevel(parsedUser.level);
           setIsGuest(parsedUser.userType === 'Guest');
           setSelectedInterests(parsedUser.interests || []);
+          if (parsedUser.coins !== undefined) setCurrentCoins(parsedUser.coins);
         } catch (e) {
           console.error("Failed to parse local user data on API error:", e);
         }
@@ -416,6 +426,30 @@ export default function Home() {
     }
   };
 
+  const handleCoinsEarned = (amount: number) => {
+    setCurrentCoins(prev => {
+      const newTotal = prev + amount;
+      
+      // Update localStorage
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser);
+          const updatedUser = { ...user, coins: newTotal };
+          localStorage.setItem("user", JSON.stringify(updatedUser));
+        } catch (e) {
+          console.error("Failed to update coins in localStorage:", e);
+        }
+      }
+      
+      return newTotal;
+    });
+  };
+
+  const handleCoinsUpdate = (coins: number) => {
+    setCurrentCoins(coins);
+  };
+
   if (showSplash) {
     return <SplashScreen dataLoaded={dataLoaded} />;
   }
@@ -423,7 +457,6 @@ export default function Home() {
   const alias = userProfile?.alias || "Guest";
   const avatarImage = userAvatar || undefined;
 
-  // Improved background style with better positioning
   const backgroundStyle = {
     backgroundImage: `url('/homebg1.jpg')`,
     backgroundSize: 'cover',
@@ -442,7 +475,11 @@ export default function Home() {
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
       <div className="mx-auto max-w-full space-y-4 px-4 pb-20 lg:px-8 lg:pb-8">
-        <GameStatsHeader userToken={userToken} isParentLoading={loading} />
+        <GameStatsHeader 
+          userToken={userToken} 
+          isParentLoading={loading}
+          onCoinsUpdate={handleCoinsUpdate}
+        />
 
         {/* Guest User Registration Panel */}
         {isGuest && (
@@ -466,84 +503,84 @@ export default function Home() {
             </Button>
           </Card>
         )}
-{/* Daily Coin Claim */}
-<DailyCoinClaim 
-  userToken={userToken}
-  onCoinsEarned={(amount) => {
-    console.log(`Earned ${amount} coins!`);
-  }}
-/>
-    {/* User Avatar and Alias */}
-<div className="flex flex-col items-center py-6">
-  <div
-    className="
-      relative 
-      rounded-full 
-      flex items-center justify-center
-      overflow-visible
-      mx-auto
-      w-[180px] h-[180px]    /* base size */
-      sm:w-[200px] sm:h-[200px]
-      md:w-[240px] md:h-[240px]
-      lg:w-[260px] lg:h-[260px]
-      xl:w-[280px] xl:h-[280px]
-    "
-    style={{
-      backgroundImage: `url('/image.png')`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      backgroundRepeat: "no-repeat",
-    }}
-  >
-    <Link to="/profile" className="no-underline relative z-10">
-      <Avatar
-        className="
-          rounded-full 
-          overflow-visible 
-          relative 
-          w-[130px] h-[130px]
-          sm:w-[150px] sm:h-[150px]
-          md:w-[180px] md:h-[180px]
-          lg:w-[200px] lg:h-[200px]
-          xl:w-[220px] xl:h-[220px]
-        "
-      >
-        <AvatarImage
-          src={avatarImage}
-          alt={alias}
-          className="object-contain scale-[1.12] relative z-10"
-        />
-        <AvatarFallback className="bg-transparent border-none text-white font-bold text-3xl md:text-4xl">
-          {alias.charAt(0).toUpperCase()}
-        </AvatarFallback>
-      </Avatar>
-    </Link>
 
-    {/* Username */}
-    <h2
-      className="
-        absolute 
-        left-1/2 -translate-x-1/2 
-        text-white font-extrabold text-center whitespace-nowrap
-        -bottom-6
-        text-xl
-        sm:text-2xl
-        md:text-3xl
-        lg:text-4xl
-        max-w-[220px] sm:max-w-[260px] md:max-w-[300px]
-      "
-      style={{
-        textShadow:
-          "0 0 8px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.4)",
-      }}
-    >
-      {alias
-        .split(/[\s-_]+/)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ")}
-    </h2>
-  </div>
-</div>
+        {/* Daily Coin Claim */}
+        <DailyCoinClaim 
+          userToken={userToken}
+          onCoinsEarned={handleCoinsEarned}
+        />
+
+        {/* User Avatar and Alias */}
+        <div className="flex flex-col items-center py-6">
+          <div
+            className="
+              relative 
+              rounded-full 
+              flex items-center justify-center
+              overflow-visible
+              mx-auto
+              w-[180px] h-[180px]
+              sm:w-[200px] sm:h-[200px]
+              md:w-[240px] md:h-[240px]
+              lg:w-[260px] lg:h-[260px]
+              xl:w-[280px] xl:h-[280px]
+            "
+            style={{
+              backgroundImage: `url('/image.png')`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            }}
+          >
+            <Link to="/profile" className="no-underline relative z-10">
+              <Avatar
+                className="
+                  rounded-full 
+                  overflow-visible 
+                  relative 
+                  w-[130px] h-[130px]
+                  sm:w-[150px] sm:h-[150px]
+                  md:w-[180px] md:h-[180px]
+                  lg:w-[200px] lg:h-[200px]
+                  xl:w-[220px] xl:h-[220px]
+                "
+              >
+                <AvatarImage
+                  src={avatarImage}
+                  alt={alias}
+                  className="object-contain scale-[1.12] relative z-10"
+                />
+                <AvatarFallback className="bg-transparent border-none text-white font-bold text-3xl md:text-4xl">
+                  {alias.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </Link>
+
+            {/* Username */}
+            <h2
+              className="
+                absolute 
+                left-1/2 -translate-x-1/2 
+                text-white font-extrabold text-center whitespace-nowrap
+                -bottom-6
+                text-xl
+                sm:text-2xl
+                md:text-3xl
+                lg:text-4xl
+                max-w-[220px] sm:max-w-[260px] md:max-w-[300px]
+              "
+              style={{
+                textShadow:
+                  "0 0 8px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.4)",
+              }}
+            >
+              {alias
+                .split(/[\s-_]+/)
+                .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                .join(" ")}
+            </h2>
+          </div>
+        </div>
 
         {/* Play Button */}
         <div className="pb-3 relative">
@@ -603,7 +640,6 @@ export default function Home() {
               ))}
             </div>
           ) : userCategories.length === 0 ? (
-            // Empty State with Better Centering
             <div className="flex justify-center items-center min-h-[200px]">
               <AddCategory
                 fetchCategories={fetchUserCategories}
@@ -613,7 +649,6 @@ export default function Home() {
               />
             </div>
           ) : (
-            // Display existing categories
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {userCategories.map((cat) => (
@@ -634,7 +669,6 @@ export default function Home() {
                 ))}
               </div>
               
-              {/* Add Category Button below existing categories */}
               <div className="mt-6">
                 <AddCategory
                   fetchCategories={fetchUserCategories}
