@@ -6,6 +6,8 @@ import { apiClient } from "@/utils/apiClient";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const DEFAULT_BONUS = 500;
+const COINS_GAIN_SOUND_SRC = "/knowledge-point.mp3"; 
+
 
 interface DailyCoinClaimProps {
 userToken: string;
@@ -25,6 +27,11 @@ const [dailyBonusAmount, setDailyBonusAmount] = useState<number>(DEFAULT_BONUS);
 // Overlay state + ref (we'll start the flying coins from this element)
 const [showDailyOverlay, setShowDailyOverlay] = useState(false);
 const earnedCoinsRef = useRef<HTMLDivElement>(null);
+
+// ADDITION: Initialize the Audio object
+const [coinGainAudio] = useState(
+    typeof Audio !== "undefined" ? new Audio(COINS_GAIN_SOUND_SRC) : null
+);
 
 const claimButtonRef = useRef<HTMLDivElement>(null);
 
@@ -189,6 +196,13 @@ let coinsAdded = 0;
 const coinsPerToken = Math.ceil(coinsEarned / tokenCount);
 
 const coinTimer = setInterval(() => {
+  // ADDITION: Play coin gain sound
+  if (coinGainAudio) {
+      const audioClone = coinGainAudio.cloneNode(true) as HTMLAudioElement;
+      audioClone.volume = 0.2; // Lower volume slightly for repeated ticks
+      audioClone.play().catch(e => console.log("Audio play failed:", e));
+  }
+    
   coinsAdded += coinsPerToken;
   if (coinsAdded >= coinsEarned) {
     coinsAdded = coinsEarned;

@@ -18,7 +18,7 @@ const navTabs = [
   { icon: User, label: "Profile", path: "/profile" },
   { icon: BarChart3, label: "Leaderboard", path: "/leaderboard" },
   { icon: Grid3X3, label: "All Quizzes", path: "/all-quizzes" },
-  { icon: Info, label: "Menu", path: "/menu" },
+  { icon: Info, label: "About Us", path: "/about-us" },
 
 ];
 
