@@ -20,23 +20,29 @@ interface GameStatsHeaderProps {
   userToken: string;
   isParentLoading: boolean;
   onCoinsUpdate?: (coins: number) => void;
+  // --- MODIFICATION: New prop to accept the coin state from the parent for animation ---
+  currentCoinsFromParent: number;
 }
 
 const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
   userToken,
   isParentLoading,
   onCoinsUpdate,
+  // --- MODIFICATION: Destructure the new prop ---
+  currentCoinsFromParent,
 }) => {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   // State for animating XP changes
   const [animatedXP, setAnimatedXP] = useState(0);
   // State for animating Coin changes
-  const [animatedCoins, setAnimatedCoins] = useState(0);
+  // --- MODIFICATION: Initialize with the parent's current coin value ---
+  const [animatedCoins, setAnimatedCoins] = useState(currentCoinsFromParent);
   // Ref to hold the current XP value for animation starting point
   const xpRef = useRef<number>(0);
   // Ref to hold the current Coins value for animation starting point
-  const coinsRef = useRef<number>(0);
+  // --- MODIFICATION: Initialize ref with the parent's current coin value ---
+  const coinsRef = useRef<number>(currentCoinsFromParent);
 
   // Effect to fetch user stats
   useEffect(() => {
@@ -72,8 +78,10 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
           }
           
           const data = await res.json();
+          const fetchedCoins = data.coins ?? 0;
+          
           setStats({
-            coins: data.coins ?? 0,
+            coins: fetchedCoins,
             xp: data.knowledgePoints ?? 0,
             gem1: data.wisdomGems ?? 0,
             gem2: data.enlightenmentCrystals ?? 0,
@@ -81,7 +89,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
           
           // Notify parent of coins update
           if (onCoinsUpdate && data.coins !== undefined) {
-            onCoinsUpdate(data.coins);
+            onCoinsUpdate(fetchedCoins);
           }
           
           setError(null); // Clear any previous errors
@@ -104,7 +112,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
     fetchStats();
   }, [userToken, isParentLoading, onCoinsUpdate]);
 
-  // Effect for smooth XP animation
+  // Effect for smooth XP animation (remains unchanged)
   useEffect(() => {
     if (stats?.xp != null) {
       const start = xpRef.current;
@@ -129,12 +137,16 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
   }, [stats?.xp]);
 
   // Effect for smooth Coins animation
+  // --- MODIFICATION: Driven by the parent's coin state (currentCoinsFromParent) ---
   useEffect(() => {
-    if (stats?.coins != null) {
+    if (currentCoinsFromParent != null) {
       const start = coinsRef.current;
-      const end = stats.coins;
+      const end = currentCoinsFromParent; // Use parent prop as the target
       const duration = 800;
       const startTime = performance.now();
+      
+      // Stop if value hasn't changed to avoid unnecessary animation loop
+      if (start === end) return;
       
       const animate = (time: number) => {
         const progress = Math.min((time - startTime) / duration, 1);
@@ -150,7 +162,8 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
       
       requestAnimationFrame(animate);
     }
-  }, [stats?.coins]);
+  // --- MODIFICATION: Dependency is now the parent's coin state ---
+  }, [currentCoinsFromParent]);
 
   // Render logic for loading and errors
   if (isParentLoading || !userToken) {
@@ -172,7 +185,8 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
 
   const statItems = [
     {
-      value: animatedCoins,
+      // --- MODIFICATION: Use the animated coins state, which is now driven by the parent prop ---
+      value: animatedCoins, 
       color: "cyan",
       dataCoinHeader: true, // Mark this as the coin header
       icon: (
