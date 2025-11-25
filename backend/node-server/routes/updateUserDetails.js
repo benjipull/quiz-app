@@ -51,7 +51,7 @@ router.post("/", authenticateToken, async (req, res) => {
         user.userType = "Registered";
         
         // 💰 FIX: Grant 1000 extra coins for completing registration from Guest status
-        user.coins += 1000;
+        user.coins += 2000;
         console.log(`🎉 Granted 1000 coins to user ${user.alias} for upgrading from Guest to Registered.`);
       }
       else if (password) {
