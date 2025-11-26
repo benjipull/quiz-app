@@ -426,44 +426,44 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [ratingMessage, setRatingMessage] = useState<string | null>(null);
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
 
-  const handleNextQuiz = async () => {
-    if (!userToken) {
-      console.error("User must be logged in to play the next quiz.");
-      setRatingMessage("You must be logged in to play the next quiz.");
-      return;
+ const handleNextQuiz = async () => {
+  if (!userToken) {
+    console.error("User must be logged in to play the next quiz.");
+    setRatingMessage("You must be logged in to play the next quiz.");
+    return;
+  }
+
+  setPlayButtonLoading(true);
+
+  try {
+    const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay?exclude=${categoryId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${userToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get category to play: ${response.status}`);
     }
 
-    setPlayButtonLoading(true);
+    const data = await response.json();
 
-    try {
-      const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay?exclude=${categoryId}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to get category to play: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data.categoryId) {
-        // ✅ FIXED: Use navigate instead of window.location.href
-        navigate(`/quiz/${data.categoryId}`, { replace: true });
-      } else {
-        throw new Error("No category ID returned from server");
-      }
-    } catch (error: any) {
-      console.error("Error getting category to play:", error);
-      setRatingMessage(`Error playing next quiz: ${error.message}`);
-    } finally {
-      setPlayButtonLoading(false);
+    if (data.categoryId) {
+      // ✅ FIXED: Navigate with replace to prevent going back to results
+      // This ensures the Home page visibility listener doesn't get triggered incorrectly
+      navigate(`/quiz/${data.categoryId}`, { replace: true });
+    } else {
+      throw new Error("No category ID returned from server");
     }
-  };
-
+  } catch (error: any) {
+    console.error("Error getting category to play:", error);
+    setRatingMessage(`Error playing next quiz: ${error.message}`);
+  } finally {
+    setPlayButtonLoading(false);
+  }
+};
   const handleRatingSubmit = async (value: number) => {
     if (!userToken) {
       setRatingMessage("You must be logged in to submit a rating.");
@@ -652,7 +652,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           <Link
             to={"/"}
             className="absolute top-3 right-3 z-20 h-8 w-8 bg-red-600 hover:bg-red-700 rounded-full transition-colors flex items-center justify-center shadow-lg"
-            onClick={onClose}
             aria-label="Close Results and go to Categories"
           >
             <X className="h-5 w-5 text-white" />
