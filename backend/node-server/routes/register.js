@@ -28,8 +28,7 @@ router.post("/", async (req, res) => {
 
         // Create new user
         const newUser = new User({ alias, email, password, age });
-        // 💰 FIX: Grant 1000 extra coins (1000 default from model + 1000 bonus = 3000 total)
-        newUser.coins += 1000; 
+        newUser.coins += 5000; 
 
         await newUser.save();
 

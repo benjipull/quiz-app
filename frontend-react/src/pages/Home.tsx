@@ -21,7 +21,8 @@ import {
   Brain,
   AlertTriangle,
   Heart,
-  Trophy,
+  CoinsIcon,
+  Coins,
 } from "lucide-react";
 import logo from "../assets/images/QuizicleLogo.png";
 import SplashScreen from "../components/SplashScreen";
@@ -39,6 +40,9 @@ const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
 const avatars: string[] = Object.values(avatarImages) as string[];
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
+
+// --- MODIFICATION: Define Quiz Cost on client side ---
+const QUIZ_COST = 100;
 
 interface Category {
   _id: string;
@@ -70,6 +74,7 @@ interface UserDetails {
   avatar: number;
   userType?: "Guest" | "Registered" | "Admin";
   interests?: string[];
+  coins?: number;
 }
 
 export default function Home() {
@@ -85,6 +90,7 @@ export default function Home() {
   const [userLevel, setUserLevel] = useState(1);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
+  const [currentCoins, setCurrentCoins] = useState(0);
   
   // Interest modal state
   const [isInterestModalOpen, setIsInterestModalOpen] = useState(false);
@@ -145,9 +151,13 @@ export default function Home() {
       trackHomeScreen(userProfile._id);
       fetchUserCategories();
       
+      // Set initial coins
+      if (userProfile.coins !== undefined) {
+        setCurrentCoins(userProfile.coins);
+      }
+      
       // Check if user has no interests selected - show modal if needed
       if (!userProfile.interests || userProfile.interests.length === 0) {
-        // Small delay to ensure smooth UI load
         setTimeout(() => {
           setIsInterestModalOpen(true);
           trackEvent("view_interests", {
@@ -169,6 +179,7 @@ export default function Home() {
           if (parsedUser.level) setUserLevel(parsedUser.level);
           setIsGuest(parsedUser.userType === 'Guest');
           setSelectedInterests(parsedUser.interests || []);
+          if (parsedUser.coins !== undefined) setCurrentCoins(parsedUser.coins);
         } catch (e) {
           console.error("Failed to parse local user data:", e);
         }
@@ -194,6 +205,7 @@ export default function Home() {
           if (parsedUser.level) setUserLevel(parsedUser.level);
           setIsGuest(parsedUser.userType === 'Guest');
           setSelectedInterests(parsedUser.interests || []);
+          if (parsedUser.coins !== undefined) setCurrentCoins(parsedUser.coins);
         }
         return;
       }
@@ -204,6 +216,7 @@ export default function Home() {
       setUserLevel(apiUser.level || 1);
       setIsGuest(apiUser.userType === 'Guest');
       setSelectedInterests(apiUser.interests || []);
+      if (apiUser.coins !== undefined) setCurrentCoins(apiUser.coins);
 
       const avatarIndex = apiUser.avatar ? apiUser.avatar - 1 : 0;
       const calculatedAvatar = avatars[avatarIndex] || null;
@@ -215,6 +228,7 @@ export default function Home() {
           level: apiUser.level || 1,
           userType: apiUser.userType || 'Registered',
           interests: apiUser.interests || [],
+          coins: apiUser.coins || 0,
         };
         localStorage.setItem("user", JSON.stringify(userToStore));
         if (calculatedAvatar) {
@@ -232,6 +246,7 @@ export default function Home() {
           if (parsedUser.level) setUserLevel(parsedUser.level);
           setIsGuest(parsedUser.userType === 'Guest');
           setSelectedInterests(parsedUser.interests || []);
+          if (parsedUser.coins !== undefined) setCurrentCoins(parsedUser.coins);
         } catch (e) {
           console.error("Failed to parse local user data on API error:", e);
         }
@@ -289,34 +304,72 @@ export default function Home() {
       console.log("⚠️ You must be logged in to play.");
       return;
     }
-
+    
+    // --- MODIFICATION: Optimistic Coin Deduction and Animation Start ---
+    // 1. Visually deduct the cost for the animation.
+    const optimisticCoins = currentCoins - QUIZ_COST;
+    setCurrentCoins(optimisticCoins);
+    
     setPlayButtonLoading(true);
 
     try {
+      // 2. The API call proceeds (which will confirm the deduction or refund)
       const response = await apiClient(`${BASE_URL}/api/getGetegoryToPlay`, {
         method: "GET",
       });
 
       if (!response) {
+        // If API fails completely, restore the coins and set loading to false
+        setCurrentCoins(prev => prev + QUIZ_COST); 
         setPlayButtonLoading(false);
+        toast({
+          title: "Network Error",
+          description: "Could not connect to the server. Coins refunded.",
+          variant: "destructive",
+        });
         return;
       }
 
       if (!response.ok) {
+        // If the server rejects the request (e.g., failed quiz start, not enough questions/coins)
+        // The server (startQuiz.js) handles the refund logic.
+        // We will rely on the next screen's GameStatsHeader or the next Home screen load
+        // to correct the balance if the optimistic update was wrong (i.e. if a refund happened).
+        
+        // For immediate feedback on failure (like not enough questions):
+        const errorData = await response.json().catch(() => ({ message: "Unknown error during quiz start." }));
+        
+        // Since the server refunds on failure, the optimistic update is *visually* correct 
+        // for the cost deduction. We only need to notify the user of the *reason* for failure.
+        toast({
+            title: "Quiz Start Failed",
+            description: errorData.message.includes("refunded") ? errorData.message : `Unable to start quiz: ${errorData.message}`,
+            variant: "destructive",
+        });
+        
+        // As we are not navigating away, we must revert the coin state to the server's *expected* state
+        // The best way is to trigger a manual refresh of user stats now.
+        await loadUserProfile(); // This will reset currentCoins to the true server value (refunded or not)
+        
         throw new Error(`Failed to get category to play: ${response.status}`);
       }
 
       const data: CategoryToPlayResponse = await response.json();
 
       if (data.categoryId) {
+        // Success. Navigate away. The next screen's GameStatsHeader will load the final balance.
         navigate(`/quiz/${data.categoryId}`);
       } else {
+        // Unexpected success response without ID, revert.
+        setCurrentCoins(prev => prev + QUIZ_COST); 
         throw new Error("No category ID returned from server");
       }
     } catch (error: any) {
       console.error("Error getting category to play:", error);
       if (userCategories.length > 0) {
-        navigate(`/quiz/${userCategories[0]._id}`);
+        // Fallback navigation
+        // Note: The coin state might still be slightly off here if `loadUserProfile` failed.
+        navigate(`/quiz/${userCategories[0]._id}`); 
       } else {
         console.log("❌ Unable to start quiz. Please try again later.");
       }
@@ -324,6 +377,7 @@ export default function Home() {
       setPlayButtonLoading(false);
     }
   };
+    // --- MODIFICATION: Optimistic Coin Deduction and Animation End ---
 
   const handleCreateCategoryAttempt = () => {
     if (isGuest) {
@@ -416,6 +470,31 @@ export default function Home() {
     }
   };
 
+  const handleCoinsEarned = (amount: number) => {
+    setCurrentCoins(prev => {
+      const newTotal = prev + amount;
+      
+      // Update localStorage
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser);
+          const updatedUser = { ...user, coins: newTotal };
+          localStorage.setItem("user", JSON.stringify(updatedUser));
+        } catch (e) {
+          console.error("Failed to update coins in localStorage:", e);
+        }
+      }
+      
+      return newTotal;
+    });
+  };
+
+  const handleCoinsUpdate = (coins: number) => {
+    // This function is called by GameStatsHeader after a successful fetch to update the parent state
+    setCurrentCoins(coins);
+  };
+
   if (showSplash) {
     return <SplashScreen dataLoaded={dataLoaded} />;
   }
@@ -423,7 +502,6 @@ export default function Home() {
   const alias = userProfile?.alias || "Guest";
   const avatarImage = userAvatar || undefined;
 
-  // Improved background style with better positioning
   const backgroundStyle = {
     backgroundImage: `url('/homebg1.jpg')`,
     backgroundSize: 'cover',
@@ -442,7 +520,13 @@ export default function Home() {
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
       <div className="mx-auto max-w-full space-y-4 px-4 pb-20 lg:px-8 lg:pb-8">
-        <GameStatsHeader userToken={userToken} isParentLoading={loading} />
+        <GameStatsHeader 
+          userToken={userToken} 
+          isParentLoading={loading}
+          onCoinsUpdate={handleCoinsUpdate}
+          // --- MODIFICATION: Pass currentCoins state to drive the animation ---
+          currentCoinsFromParent={currentCoins} 
+        />
 
         {/* Guest User Registration Panel */}
         {isGuest && (
@@ -466,109 +550,140 @@ export default function Home() {
             </Button>
           </Card>
         )}
-{/* Daily Coin Claim */}
-<DailyCoinClaim 
-  userToken={userToken}
-  onCoinsEarned={(amount) => {
-    console.log(`Earned ${amount} coins!`);
-  }}
-/>
-    {/* User Avatar and Alias */}
-<div className="flex flex-col items-center py-6">
-  <div
-    className="
-      relative 
-      rounded-full 
-      flex items-center justify-center
-      overflow-visible
-      mx-auto
-      w-[180px] h-[180px]    /* base size */
-      sm:w-[200px] sm:h-[200px]
-      md:w-[240px] md:h-[240px]
-      lg:w-[260px] lg:h-[260px]
-      xl:w-[280px] xl:h-[280px]
-    "
-    style={{
-      backgroundImage: `url('/image.png')`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      backgroundRepeat: "no-repeat",
-    }}
-  >
-    <Link to="/profile" className="no-underline relative z-10">
-      <Avatar
-        className="
-          rounded-full 
-          overflow-visible 
-          relative 
-          w-[130px] h-[130px]
-          sm:w-[150px] sm:h-[150px]
-          md:w-[180px] md:h-[180px]
-          lg:w-[200px] lg:h-[200px]
-          xl:w-[220px] xl:h-[220px]
-        "
-      >
-        <AvatarImage
-          src={avatarImage}
-          alt={alias}
-          className="object-contain scale-[1.12] relative z-10"
-        />
-        <AvatarFallback className="bg-transparent border-none text-white font-bold text-3xl md:text-4xl">
-          {alias.charAt(0).toUpperCase()}
-        </AvatarFallback>
-      </Avatar>
-    </Link>
 
-    {/* Username */}
-    <h2
-      className="
-        absolute 
-        left-1/2 -translate-x-1/2 
-        text-white font-extrabold text-center whitespace-nowrap
-        -bottom-6
-        text-xl
-        sm:text-2xl
-        md:text-3xl
-        lg:text-4xl
-        max-w-[220px] sm:max-w-[260px] md:max-w-[300px]
-      "
-      style={{
-        textShadow:
-          "0 0 8px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.4)",
-      }}
-    >
-      {alias
-        .split(/[\s-_]+/)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ")}
-    </h2>
-  </div>
-</div>
+        {/* Daily Coin Claim */}
+        <DailyCoinClaim 
+          userToken={userToken}
+          onCoinsEarned={handleCoinsEarned}
+        />
+
+        {/* User Avatar and Alias */}
+        <div className="flex flex-col items-center py-6">
+          <div
+            className="
+              relative 
+              rounded-full 
+              flex items-center justify-center
+              overflow-visible
+              mx-auto
+              w-[180px] h-[180px]
+              sm:w-[200px] sm:h-[200px]
+              md:w-[240px] md:h-[240px]
+              lg:w-[260px] lg:h-[260px]
+              xl:w-[280px] xl:h-[280px]
+            "
+            style={{
+              backgroundImage: `url('/image.png')`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            }}
+          >
+            <Link to="/profile" className="no-underline relative z-10">
+              <Avatar
+                className="
+                  rounded-full 
+                  overflow-visible 
+                  relative 
+                  w-[130px] h-[130px]
+                  sm:w-[150px] sm:h-[150px]
+                  md:w-[180px] md:h-[180px]
+                  lg:w-[200px] lg:h-[200px]
+                  xl:w-[220px] xl:h-[220px]
+                "
+              >
+                <AvatarImage
+                  src={avatarImage}
+                  alt={alias}
+                  className="object-contain scale-[1.12] relative z-10"
+                />
+                <AvatarFallback className="bg-transparent border-none text-white font-bold text-3xl md:text-4xl">
+                  {alias.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </Link>
+
+            {/* Username */}
+            <h2
+              className="
+                absolute 
+                left-1/2 -translate-x-1/2 
+                text-white font-extrabold text-center whitespace-nowrap
+                -bottom-6
+                text-xl
+                sm:text-2xl
+                md:text-3xl
+                lg:text-4xl
+                max-w-[220px] sm:max-w-[260px] md:max-w-[300px]
+              "
+              style={{
+                textShadow:
+                  "0 0 8px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.4)",
+              }}
+            >
+              {alias
+                .split(/[\s-_]+/)
+                .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                .join(" ")}
+            </h2>
+          </div>
+        </div>
 
         {/* Play Button */}
         <div className="pb-3 relative">
-          <Button
-            onClick={handleQuickQuiz}
-            disabled={loading || playButtonLoading}
-            className="w-full h-16 md:h-20 flex items-center justify-between px-6 relative overflow-hidden rounded-full shadow-lg"
+  <Button
+    onClick={handleQuickQuiz}
+    disabled={loading || playButtonLoading || currentCoins < QUIZ_COST}
+    className={`
+      w-full h-16 md:h-20 
+      flex items-center justify-between 
+      px-6 rounded-[50px]
+    `}
+  >
+    {playButtonLoading ? (
+      <div className="flex items-center text-xl md:text-2xl justify-center w-full">
+        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+        Starting Quiz...
+      </div>
+    ) : (
+      <>
+        {/* LEFT SIDE */}
+        <div className="flex items-center gap-2">
+          <span className="text-3xl md:text-4xl font-extrabold text-white leading-none">
+            Play
+          </span>
+          <span className="text-sm md:text-base font-semibold text-yellow-300 flex items-center">
+            <svg
+            viewBox="0 0 24 24"
+            className="h-[22px] w-[22px] sm:h-7 sm:w-7"
+            xmlns="http://www.w3.org/2000/svg"
           >
-            {playButtonLoading ? (
-              <div className="flex items-center text-xl md:text-2xl justify-center w-full">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                Starting Quiz...
-              </div>
-            ) : (
-              <>
-                <span className="text-3xl md:text-4xl font-bold text-white">Play</span>
-                <div className="relative">
-                  <div className="bg-white rounded-full w-14 h-14 md:w-16 md:h-16 flex flex-col items-center justify-center shadow-md">
-                    <span className="text-green-500 text-xl md:text-2xl font-bold leading-none">{userLevel}</span>
-                    <span className="text-green-500 text-xs font-medium uppercase leading-none">Level</span>
-                  </div>
-                </div>
-              </>
-            )}
-          </Button>
+            <circle cx="12" cy="12" r="8" fill="#f59e0b" />
+            <circle cx="12" cy="12" r="7" fill="#fbbf24" />
+            <circle cx="12" cy="12" r="4" fill="#f59e0b" opacity="0.4" />
+          </svg>{QUIZ_COST}
+          </span>
+        </div>
+
+        {/* RIGHT SIDE LEVEL BADGE */}
+        <div className="bg-white rounded-full w-14 h-14 md:w-16 md:h-16 
+                        flex flex-col items-center justify-center 
+                        shadow-md border-2 border-indigo-300">
+          <span className="text-green-600 text-xl md:text-2xl font-bold leading-none">
+            {userLevel}
+          </span>
+          <span className="text-green-600 text-[10px] md:text-xs font-semibold uppercase leading-none tracking-wide">
+            Level
+          </span>
+        </div>
+      </>
+    )}
+  </Button>
+
+          {/* --- MODIFICATION: Indicate not enough coins --- */}
+          {currentCoins < QUIZ_COST && !loading && (
+            <p className="text-red-400 text-sm text-center pt-1 font-medium">Not enough coins to start a quiz.</p>
+          )}
         </div>
 
         {/* My Categories */}
@@ -603,7 +718,6 @@ export default function Home() {
               ))}
             </div>
           ) : userCategories.length === 0 ? (
-            // Empty State with Better Centering
             <div className="flex justify-center items-center min-h-[200px]">
               <AddCategory
                 fetchCategories={fetchUserCategories}
@@ -613,7 +727,6 @@ export default function Home() {
               />
             </div>
           ) : (
-            // Display existing categories
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {userCategories.map((cat) => (
@@ -634,7 +747,6 @@ export default function Home() {
                 ))}
               </div>
               
-              {/* Add Category Button below existing categories */}
               <div className="mt-6">
                 <AddCategory
                   fetchCategories={fetchUserCategories}

@@ -1,235 +1,266 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Coins, Clock, Sparkles, Star, CircleDollarSign } from "lucide-react"; // Removed Gift
-import { useToast } from "@/hooks/use-toast";
+import { Clock, Sparkles } from "lucide-react";
 import { apiClient } from "@/utils/apiClient";
 
-// Ensure BASE_URL is defined in your environment variables
 const BASE_URL = import.meta.env.VITE_BASE_URL;
-const DEFAULT_BONUS = 500; // Fallback value
+const DEFAULT_BONUS = 1000;
+const COINS_GAIN_SOUND_SRC = "/knowledge-point.mp3"; 
+
 
 interface DailyCoinClaimProps {
-  userToken: string;
-  onCoinsEarned?: (amount: number) => void;
+userToken: string;
+onCoinsEarned?: (amount: number) => void;
 }
 
 export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinClaimProps) {
-  const [timeRemaining, setTimeRemaining] = useState<number>(0);
-  const [canClaim, setCanClaim] = useState<boolean>(false);
-  const [isClaiming, setIsClaiming] = useState<boolean>(false);
-  const [showRewardModal, setShowRewardModal] = useState<boolean>(false);
-  const [showAnimation, setShowAnimation] = useState<boolean>(false);
-  const [dailyBonusAmount, setDailyBonusAmount] = useState<number>(DEFAULT_BONUS); // Dynamic coin amount
-  const { toast } = useToast();
-  
-  // New function to fetch the daily bonus amount
- const fetchDailyBonusAmount = useCallback(async () => {
-    try {
-        const response = await apiClient(`${BASE_URL}/api/claimDailyCoins/amount`, {
-            method: "GET",
-        });
+const [timeRemaining, setTimeRemaining] = useState<number>(0);
+const [canClaim, setCanClaim] = useState<boolean>(false);
+const [isClaiming, setIsClaiming] = useState<boolean>(false);
 
-        if (response && response.ok) {
-            const data = await response.json();
-            if (data.dailyBonusAmount) {
-                setDailyBonusAmount(data.dailyBonusAmount);
-            }
-        }
-    } catch (error) {
-        console.error("Error fetching daily bonus amount:", error);
+const [showFlyingCoins, setShowFlyingCoins] = useState<boolean>(false);
+const [coinTokens, setCoinTokens] = useState<Array<{ id: number; delay: number }>>([]);
+
+const [dailyBonusAmount, setDailyBonusAmount] = useState<number>(DEFAULT_BONUS);
+
+// Overlay state + ref (we'll start the flying coins from this element)
+const [showDailyOverlay, setShowDailyOverlay] = useState(false);
+const earnedCoinsRef = useRef<HTMLDivElement>(null);
+
+// ADDITION: Initialize the Audio object
+const [coinGainAudio] = useState(
+    typeof Audio !== "undefined" ? new Audio(COINS_GAIN_SOUND_SRC) : null
+);
+
+const claimButtonRef = useRef<HTMLDivElement>(null);
+
+const fetchDailyBonusAmount = useCallback(async () => {
+try {
+const response = await apiClient(`${BASE_URL}/api/claimDailyCoins/amount`, {
+method: "GET",
+});
+
+  if (response && response.ok) {
+    const data = await response.json();
+    if (data.dailyBonusAmount) {
+      setDailyBonusAmount(data.dailyBonusAmount);
     }
+  }
+} catch (error) {
+  console.error("Error fetching daily bonus amount:", error);
+}
+
 }, []);
 
+useEffect(() => {
+if (!userToken) return;
 
-  // Check claim status on mount and set up interval
-  useEffect(() => {
-    if (!userToken) return;
-    
-    // 👇 Fetch the bonus amount
-    fetchDailyBonusAmount(); 
-    checkClaimStatus();
-    
-    // Check every second for countdown
-    const interval = setInterval(() => {
-      setTimeRemaining((prev) => {
-        // If remaining time is less than 1 second (1000ms), switch to canClaim
-        if (prev <= 1000) {
-          if (!canClaim) {
-            setCanClaim(true);
-          }
-          return 0;
-        }
-        return prev - 1000;
-      });
-    }, 1000);
+fetchDailyBonusAmount();
+checkClaimStatus();
 
-    return () => clearInterval(interval);
-  }, [userToken, canClaim, fetchDailyBonusAmount]); // Added fetchDailyBonusAmount dependency
-
-  const checkClaimStatus = async () => {
-    try {
-      // NOTE: Assuming apiClient handles authorization using userToken internally
-      const response = await apiClient(`${BASE_URL}/api/getUserDetails`, {
-        method: "GET",
-      });
-
-      if (!response || !response.ok) return;
-
-      const userData = await response.json();
-      
-      if (userData.lastDailyCoinClaim) {
-        const lastClaim = new Date(userData.lastDailyCoinClaim).getTime();
-        const now = Date.now();
-        const cooldown = 24 * 60 * 60 * 1000; // 24 hours
-        const remaining = cooldown - (now - lastClaim);
-
-        if (remaining > 0) {
-          setTimeRemaining(remaining);
-          setCanClaim(false);
-        } else {
-          setTimeRemaining(0);
-          setCanClaim(true);
-        }
-      } else {
-        // New user - can claim immediately on first visit
-        setTimeRemaining(0);
-        setCanClaim(true);
-      }
-    } catch (error) {
-      console.error("Error checking claim status:", error);
-      // Fallback: If status check fails, allow claiming to avoid soft-lock
-      if (timeRemaining <= 0) {
-        setCanClaim(true);
-      }
+const interval = setInterval(() => {
+  setTimeRemaining((prev) => {
+    if (prev <= 1000) {
+      if (!canClaim) setCanClaim(true);
+      return 0;
     }
-  };
+    return prev - 1000;
+  });
+}, 1000);
 
-  const handleClaimClick = () => {
-    // Only show modal if the user is allowed to claim
-    if (canClaim && !isClaiming) {
-      setShowRewardModal(true);
-    }
-  };
+return () => clearInterval(interval);
 
-  const handleConfirmClaim = async () => {
-    setIsClaiming(true);
+}, [userToken, canClaim, fetchDailyBonusAmount]);
 
-    try {
-      const response = await apiClient(`${BASE_URL}/api/claimDailyCoins`, {
-        method: "POST",
-      });
+const checkClaimStatus = async () => {
+try {
+const response = await apiClient(`${BASE_URL}/api/getUserDetails`, {
+method: "GET",
+});
 
-      if (!response) {
-        setIsClaiming(false);
-        return;
-      }
+  if (!response || !response.ok) return;
 
-      const data = await response.json();
+  const userData = await response.json();
 
-      if (response.ok) {
-        const coinsEarned = data.coinsEarned || dailyBonusAmount;
-        // Use the actual earned amount from the server, falling back to the fetched amount
-        
-        // Show coin animation
-        setShowAnimation(true);
+  if (userData.lastDailyCoinClaim) {
+    const lastClaim = new Date(userData.lastDailyCoinClaim).getTime();
+    const now = Date.now();
+    const cooldown = 24 * 60 * 60 * 1000;
+    const remaining = cooldown - (now - lastClaim);
 
-        // Hide modal after animation and reset state
-        setTimeout(() => {
-          setShowRewardModal(false);
-          setShowAnimation(false);
-          
-          // Reset cooldown states
-          setCanClaim(false);
-          setTimeRemaining(24 * 60 * 60 * 1000);
-          setIsClaiming(false); // Ensure claiming state is reset after delay
-        }, 3000);
-
-        // Notify parent immediately
-        if (onCoinsEarned) {
-          onCoinsEarned(coinsEarned);
-        }
-
-        toast({
-          title: "🎉 Daily Reward Claimed!",
-          description: `You earned ${coinsEarned} coins!`,
-        });
-      } else {
-        // Handle cooldown or other errors from server
-        if (data.timeRemainingMs) {
-          setTimeRemaining(data.timeRemainingMs);
-          setCanClaim(false);
-        } else {
-          // If server error, re-check status
-          checkClaimStatus(); 
-        }
-
-        toast({
-          title: "Already Claimed",
-          description: data.message || "Please wait for the cooldown.",
-          variant: "destructive",
-        });
-        setShowRewardModal(false);
-        setIsClaiming(false);
-      }
-    } catch (error) {
-      console.error("Error claiming coins:", error);
-      toast({
-        title: "Error",
-        description: "Failed to claim daily reward. Please try again.",
-        variant: "destructive",
-      });
-      setShowRewardModal(false);
-      setIsClaiming(false);
-    } 
-  };
-
-  const formatTimeRemaining = (ms: number) => {
-    if (ms <= 0) return "Ready!";
-
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds}s`;
+    if (remaining > 0) {
+      setTimeRemaining(remaining);
+      setCanClaim(false);
     } else {
-      return `${seconds}s`;
+      setTimeRemaining(0);
+      setCanClaim(true);
     }
-  };
+  } else {
+    setTimeRemaining(0);
+    setCanClaim(true);
+  }
+} catch (error) {
+  console.error("Error checking claim status:", error);
+  if (timeRemaining <= 0) setCanClaim(true);
+}
 
-  return (
-    <>
- <Card
-  className="
-    w-full 
-    max-w-8xl
-    rounded-[30px]
-    bg-transparent
-    border-none
-    p-2 sm:p-4
-  "
->
-  <div className="flex items-center justify-between gap-2 sm:gap-4">
+};
 
-    {/* LEFT SECTION */}
-    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-      
-      <div className="relative flex-shrink-0"> 
-          
-          {/* Coin Icon - Sizing optimized for small screens */}
-          <div
-            className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 28 28"
-              className="w-full h-full"
-            >
-              {/* Gold Coin SVG */}
+const handleClaimClick = async () => {
+if (!canClaim || isClaiming) return;
+
+setIsClaiming(true);
+
+try {
+  const response = await apiClient(`${BASE_URL}/api/claimDailyCoins`, {
+    method: "POST",
+  });
+
+  if (!response) {
+    setIsClaiming(false);
+    return;
+  }
+
+  const data = await response.json();
+
+  if (response.ok) {
+    const coinsEarned = data.coinsEarned || dailyBonusAmount;
+
+    // Show overlay (center) and then start coin animation from that overlay icon
+    setShowDailyOverlay(true);
+
+    // Delay briefly so the overlay/pop animation is visible before coins fly
+    setTimeout(() => {
+      startCoinAnimation(coinsEarned);
+    }, 900);
+
+    setCanClaim(false);
+    setTimeRemaining(24 * 60 * 60 * 1000);
+
+    // NOTE: intentionally no toast / notification so user can watch the animation
+  } else {
+    // Server returned an error (e.g. still on cooldown). Update UI quietly.
+    if (data.timeRemainingMs) {
+      setTimeRemaining(data.timeRemainingMs);
+      setCanClaim(false);
+    } else {
+      checkClaimStatus();
+    }
+    setIsClaiming(false);
+  }
+} catch (error) {
+  console.error("Error claiming coins:", error);
+  setIsClaiming(false);
+}
+
+};
+
+// START COIN ANIMATION: start from overlay icon center (earnedCoinsRef) -> header coin
+const startCoinAnimation = (coinsEarned: number) => {
+const overlayRect = earnedCoinsRef.current?.getBoundingClientRect();
+const headerCoinElement = document.querySelector("[data-coin-header]");
+const headerRect = headerCoinElement?.getBoundingClientRect();
+
+
+// If either rect is missing, fallback to notifying parent and end gracefully
+if (!overlayRect || !headerRect) {
+  if (onCoinsEarned) onCoinsEarned(coinsEarned);
+  setIsClaiming(false);
+  setShowDailyOverlay(false);
+  return;
+}
+
+const startX = overlayRect.left + overlayRect.width / 2;
+const startY = overlayRect.top + overlayRect.height / 2;
+const endX = headerRect.left + headerRect.width / 2;
+const endY = headerRect.top + headerRect.height / 2;
+
+const tokenCount = Math.min(15, Math.max(8, coinsEarned / 50));
+const newTokens = Array.from({ length: Math.floor(tokenCount) }, (_, i) => ({
+  id: i,
+  delay: i * 80,
+}));
+
+setCoinTokens(newTokens);
+setShowFlyingCoins(true);
+
+// set CSS vars used by the token animation
+document.documentElement.style.setProperty("--daily-coin-start-x", `${startX}px`);
+document.documentElement.style.setProperty("--daily-coin-start-y", `${startY}px`);
+document.documentElement.style.setProperty("--daily-coin-end-x", `${endX}px`);
+document.documentElement.style.setProperty("--daily-coin-end-y", `${endY}px`);
+
+// progressively notify parent about coins being added so header increments smoothly
+let coinsAdded = 0;
+const coinsPerToken = Math.ceil(coinsEarned / tokenCount);
+
+const coinTimer = setInterval(() => {
+  // ADDITION: Play coin gain sound
+  if (coinGainAudio) {
+      const audioClone = coinGainAudio.cloneNode(true) as HTMLAudioElement;
+      audioClone.volume = 0.2; // Lower volume slightly for repeated ticks
+      audioClone.play().catch(e => console.log("Audio play failed:", e));
+  }
+    
+  coinsAdded += coinsPerToken;
+  if (coinsAdded >= coinsEarned) {
+    coinsAdded = coinsEarned;
+    clearInterval(coinTimer);
+
+    // Give the last tokens a moment to finish their animation before hiding overlay
+    setTimeout(() => {
+      setShowFlyingCoins(false);
+      setShowDailyOverlay(false);
+      setIsClaiming(false);
+    }, 250);
+  }
+
+  if (onCoinsEarned && coinsAdded <= coinsEarned) {
+    onCoinsEarned(coinsPerToken);
+  }
+}, 150);
+
+};
+
+const formatTimeRemaining = (ms: number) => {
+if (ms <= 0) return "Ready!";
+const totalSeconds = Math.floor(ms / 1000);
+const hours = Math.floor(totalSeconds / 3600);
+const minutes = Math.floor((totalSeconds % 3600) / 60);
+const seconds = totalSeconds % 60;
+
+if (hours > 0) return `${hours}h ${minutes}m`;
+if (minutes > 0) return `${minutes}m ${seconds}s`;
+return `${seconds}s`;
+
+};
+
+return (
+<>
+{/* DAILY REWARD OVERLAY (coins will start from the center icon) */}
+{isClaiming && showDailyOverlay && ( <div className="fixed inset-0 z-[90] flex items-center justify-center pointer-events-none"> <div
+         ref={earnedCoinsRef}
+         className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
+       >
+{/* Center coin icon - coins will originate from the center of this element */} <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 shadow-lg shadow-amber-500/50 animate-pulse-glow"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-12 w-12"> <circle cx="8" cy="9" r="5" fill="#f59e0b" /> <circle cx="8" cy="9" r="4" fill="#fbbf24" /> <circle cx="8" cy="9" r="2.5" fill="#f59e0b" opacity="0.4" /> <circle cx="14" cy="13" r="6" fill="#f59e0b" /> <circle cx="14" cy="13" r="5" fill="#fbbf24" /> <circle cx="14" cy="13" r="3" fill="#f59e0b" opacity="0.4" /> </svg> </div>
+
+        {/* Large number (keeps visual feedback) */}
+        <div className="coin-text-aura text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
+          +{dailyBonusAmount}
+        </div>
+
+        {/* NOTE: no extra notifications or toasts are shown */}
+      </div>
+    </div>
+  )}
+
+  <Card className="w-full max-w-8xl rounded-[30px] bg-transparent border-none p-2 sm:p-4">
+    <div className="flex items-center justify-between gap-2 sm:gap-4">
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+        <div className="relative flex-shrink-0">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" className="w-full h-full">
               <circle cx="10" cy="11" r="7" fill="#d97706" />
               <circle cx="10" cy="11" r="6" fill="#fcd34d" />
               <circle cx="10" cy="11" r="3.5" fill="#d97706" opacity="0.4" />
@@ -239,217 +270,145 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned }: DailyCoinCl
             </svg>
           </div>
 
-          <span className="
-            absolute bottom-[-18px] left-2
-            bg-emerald-500 rounded-full 
-            border-2 border-white/80
-            px-2.5 sm:px-3 py-0.5 text-xs sm:text-sm font-bold text-white 
-            shadow-lg
-            whitespace-nowrap
-          ">
+          <span className="absolute bottom-[-18px] left-2 bg-emerald-500 rounded-full border-2 border-white/80 px-2.5 sm:px-3 py-0.5 text-xs sm:text-sm font-bold text-white shadow-lg whitespace-nowrap">
             +{dailyBonusAmount}
           </span>
+        </div>
+
+        <div className="leading-tight min-w-0 -ml-1">
+          <h3 className="text-white font-bold text-lg sm:text-2xl whitespace-nowrap">Daily Reward</h3>
+        </div>
       </div>
 
-
-      <div className="leading-tight min-w-0 -ml-1">
-        <h3 className="text-white font-bold text-lg sm:text-2xl whitespace-nowrap">
-          Daily Reward
-        </h3>
+      <div
+        ref={claimButtonRef}
+        className={`
+          flex items-center gap-1 sm:gap-2
+          px-3 py-1.5 sm:px-6 sm:py-3
+          rounded-full
+          ${
+            canClaim
+              ? "bg-yellow-500/10 border-[3px] border-yellow-400 shadow-[0_0_25px_rgba(255,255,0,0.5)] cursor-pointer hover:bg-yellow-500/20 transition-colors"
+              : "bg-[#501b9b] shadow-[0_0_15px_rgba(240,171,240,0.4),_0_4px_15px_rgba(0,0,0,0.5)] border border-purple-800/50"
+          }
+        `}
+        onClick={handleClaimClick}
+      >
+        {canClaim ? (
+          <>
+            <Sparkles className={`w-4 h-4 sm:w-6 sm:h-6 ${isClaiming ? "text-gray-400" : "text-yellow-400"}`} />
+            <span className={`font-bold text-sm sm:text-lg whitespace-nowrap ${isClaiming ? "text-gray-400" : "text-yellow-400"}`}>
+              {isClaiming ? "Claiming..." : "Claim Now"}
+            </span>
+          </>
+        ) : (
+          <>
+            <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" />
+            <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap">{formatTimeRemaining(timeRemaining)}</span>
+          </>
+        )}
       </div>
     </div>
+  </Card>
 
-    {/* RIGHT SIDE — TIMER / CLAIM BUTTON */}
-   <div
-  className={`
-    flex items-center gap-1 sm:gap-2
-    px-3 py-1.5 sm:px-6 sm:py-3
-    rounded-full
-    min-w-0
-    ${
-      canClaim 
-        ? "bg-yellow-500/10 border-[3px] border-yellow-400 shadow-[0_0_25px_rgba(255,255,0,0.5)] cursor-pointer hover:bg-yellow-500/20 transition-colors"
-        : "bg-[#501b9b] shadow-[0_0_15px_rgba(240,171,240,0.4),_0_4px_15px_rgba(0,0,0,0.5)] border border-purple-800/50" // ⭐ ADDED GLOW SHADOW (f0abf0 is the clock color)
+  {/* Flying coin tokens */}
+  {showFlyingCoins &&
+    coinTokens.map((token) => (
+      <div
+        key={token.id}
+        className="daily-coin-token"
+        style={
+          {
+            "--daily-coin-delay": `${token.delay}ms`,
+          } as any
+        }
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-full w-full p-[2px]">
+          <circle cx="8" cy="9" r="5" fill="#f59e0b" />
+          <circle cx="8" cy="9" r="4" fill="#fbbf24" />
+          <circle cx="8" cy="9" r="2.5" fill="#f59e0b" opacity="0.4" />
+          <circle cx="14" cy="13" r="6" fill="#f59e0b" />
+          <circle cx="14" cy="13" r="5" fill="#fbbf24" />
+          <circle cx="14" cy="13" r="3" fill="#f59e0b" opacity="0.4" />
+        </svg>
+      </div>
+    ))}
+
+  {/* Styles */}
+  <style>{`
+    .coin-text-aura {
+      text-shadow:
+        0 0 10px rgba(255, 193, 7, 0.9),
+        0 0 20px rgba(255, 165, 0, 0.7),
+        0 0 30px rgba(255, 140, 0, 0.5);
     }
-  `}
-  onClick={handleClaimClick}
->
-  {canClaim ? (
-    <>
-      <Sparkles className={`w-4 h-4 sm:w-6 sm:h-6 ${isClaiming ? "text-gray-400" : "text-yellow-400"}`} /> 
-      <span className={`font-bold text-sm sm:text-lg whitespace-nowrap ${isClaiming ? "text-gray-400" : "text-yellow-400"}`}>
-        {isClaiming ? 'Claiming...' : 'Claim Now'}
-      </span>
-    </>
-  ) : (
-    <>
-      <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" /> 
-      <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap"> 
-        {formatTimeRemaining(timeRemaining)}
-      </span>
-    </>
-  )}
-</div>
 
-  </div>
-</Card>
+    @keyframes pop-in {
+      0% { transform: scale(0.8); opacity: 0; }
+      50% { transform: scale(1.05); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .animate-pop-in { animation: pop-in 0.5s ease-out forwards; }
 
-      {/* Reward Modal Overlay */}
-      {showRewardModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-md mx-4">
-            {/* Sparkle Effects */}
-            <div className="absolute inset-0 pointer-events-none">
-              {[...Array(20)].map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute animate-sparkle"
-                  style={{
-                    left: `${Math.random() * 100}%`,
-                    top: `${Math.random() * 100}%`,
-                    animationDelay: `${Math.random() * 2}s`,
-                  }}
-                >
-                  <div className="w-1 h-1 bg-white rounded-full"></div>
-                </div>
-              ))}
-            </div>
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.5); transform: scale(1); }
+      50% { box-shadow: 0 0 40px rgba(251, 191, 36, 0.8); transform: scale(1.05); }
+    }
+    .animate-pulse-glow { animation: pulse-glow 2s infinite; }
 
-            {/* Main Modal Content */}
-            <div className="bg-gradient-to-b from-gray-900 to-black rounded-3xl p-8 shadow-2xl border border-yellow-500/30 relative overflow-hidden">
-              {/* Glow Effect */}
-              <div className="absolute inset-0 bg-gradient-radial from-yellow-500/20 via-transparent to-transparent"></div>
+    @keyframes number-grow {
+      0% { transform: translateY(10px) scale(0.7); opacity: 0; }
+      100% { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    .animate-number-grow { animation: number-grow 0.7s ease-out forwards; }
 
-              {/* Title */}
-              <h2 className="text-5xl font-black text-center mb-8 text-yellow-400 tracking-wider relative z-10" style={{ textShadow: '0 0 20px rgba(234, 179, 8, 0.5)' }}>
-                REWARD
-              </h2>
+    .daily-coin-token {
+      position: fixed;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background-color: #FCD34D;
+      border: 2px solid #D97706;
+      box-shadow:
+        0 0 0 3px rgba(251, 191, 36, 0.3),
+        0 0 15px rgba(251, 191, 36, 0.5),
+        0 5px 20px rgba(0, 0, 0, 0.4);
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fly-daily-coin 1200ms cubic-bezier(0.25,0.46,0.45,0.94) var(--daily-coin-delay, 0ms) forwards;
+    }
 
-              {/* Reward Icon */}
-              <div className="relative flex justify-center mb-6">
-                <div className="relative">
-                  {/* Glow Background */}
-                  <div className="absolute inset-0 bg-gradient-radial from-white/40 via-white/10 to-transparent blur-3xl scale-150"></div>
-                  
-                  {/* Main Circle */}
-                  <div className="relative w-32 h-32 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-2xl animate-bounce-slow">
-                    <Star className="w-16 h-16 text-yellow-400 fill-yellow-400" />
-                  </div>
+    @keyframes fly-daily-coin {
+      0% {
+        opacity: 0;
+        left: var(--daily-coin-start-x, 50vw);
+        top: var(--daily-coin-start-y, 50vh);
+        transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
+      }
+      10% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.3) rotate(-180deg);
+      }
+      85% {
+        opacity: 1;
+        left: var(--daily-coin-end-x, 50vw);
+        top: var(--daily-coin-end-y, 50vh);
+        transform: translate(-50%, -50%) scale(0.8) rotate(-900deg);
+      }
+      100% {
+        opacity: 0;
+        left: var(--daily-coin-end-x, 50vw);
+        top: var(--daily-coin-end-y, 50vh);
+        transform: translate(-50%, -50%) scale(0.1) rotate(-1080deg);
+      }
+    }
+  `}</style>
+</>
 
-                  {/* Floating Coins Animation */}
-                  {showAnimation && (
-                    <>
-                      {[...Array(12)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="absolute animate-float-coin-modal"
-                          style={{
-                            left: `${Math.random() * 100 - 50}px`,
-                            top: `${Math.random() * 100 - 50}px`,
-                            animationDelay: `${Math.random() * 0.5}s`,
-                          }}
-                        >
-                          <Coins className="w-6 h-6 text-yellow-400" />
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </div>
-              </div>
 
-              {/* Points Display */}
-              <div className="text-center mb-8 relative z-10">
-                <p className="text-white text-2xl font-semibold mb-1">Coins</p>
-                {/* 👇 Use dynamic amount */}
-                <p className="text-yellow-400 text-5xl font-black">x{dailyBonusAmount}</p>
-              </div>
-
-              {/* Buttons */}
-              <div className="space-y-3 relative z-10">
-                <Button
-                  onClick={handleConfirmClaim}
-                  disabled={isClaiming || showAnimation}
-                  className="w-full h-14 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold text-lg rounded-full shadow-lg"
-                >
-                  {isClaiming ? (
-                    <div className="flex items-center justify-center space-x-2">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      <span>Claiming...</span>
-                    </div>
-                  ) : showAnimation ? (
-                    <span>Claimed! 🎉</span>
-                  ) : (
-                    <span>Claim reward</span>
-                  )}
-                </Button>
-
-                {!showAnimation && (
-                  <button
-                    onClick={() => setShowRewardModal(false)}
-                    disabled={isClaiming}
-                    className="w-full text-white/70 hover:text-white text-sm py-2 transition-colors"
-                  >
-                    Tap to continue
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* CSS Styles for Animations - Unchanged */}
-      <style>{`
-        @keyframes float-coin-modal {
-          0% {
-            transform: translateY(0) scale(0) rotate(0deg);
-            opacity: 0;
-          }
-          50% {
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(-200px) scale(1) rotate(360deg);
-            opacity: 0;
-          }
-        }
-
-        @keyframes bounce-slow {
-          0%, 100% {
-            transform: translateY(0) scale(1);
-          }
-          50% {
-            transform: translateY(-10px) scale(1.05);
-          }
-        }
-
-        @keyframes sparkle {
-          0%, 100% {
-            opacity: 0;
-            transform: scale(0);
-          }
-          50% {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-
-        .animate-float-coin-modal {
-          animation: float-coin-modal 2s ease-out forwards;
-        }
-
-        .animate-bounce-slow {
-          animation: bounce-slow 2s ease-in-out infinite;
-        }
-
-        .animate-sparkle {
-          animation: sparkle 2s ease-in-out infinite;
-        }
-
-        .bg-gradient-radial {
-          background: radial-gradient(circle, var(--tw-gradient-stops));
-        }
-      `}</style>
-    </>
-  );
+);
 }
