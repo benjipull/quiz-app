@@ -558,7 +558,7 @@ export default function Quiz() {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${userToken}`,
       },
-      body: JSON.stringify({ categoryId, numQuestions: 10, userToken }),
+      body: JSON.stringify({ categoryId, userToken }),
     });
 
     if (!startResponse.ok) {
@@ -1078,7 +1078,7 @@ export default function Quiz() {
               <div
                 className="h-full rounded-full transition-all duration-300 ease-out bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 shadow-lg shadow-yellow-500/60"
                 style={{ 
-                  width: `${((quizState.currentQuestionIndex - 1) / totalQuestions) * 100}%`,
+                  width: `${((quizState.currentQuestionIndex - 0) / totalQuestions) * 100}%`,
                 }}
               />
             </div>
