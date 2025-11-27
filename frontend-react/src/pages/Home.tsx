@@ -1,4 +1,4 @@
-// Home.tsx - Refactored for a compact layout
+// Home.tsx - Refactored
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
@@ -371,15 +371,12 @@ export default function Home() {
   const avatarImage = userAvatar || undefined;
 
   return (
-    // Main container uses flex and hidden overflow to prevent scrolling.
-    <div className="h-screen flex flex-col overflow-hidden bg-background">
+    <div className="min-h-screen flex flex-col bg-background">
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
-      {/* Content wrapper: Added justify-start to stack from top. Reduced bottom padding. */}
-      {/* Removed flex-grow from the avatar container to achieve compact stacking. */}
-      <div className="flex-1 flex flex-col items-center px-4 pt-4 pb-4 overflow-y-auto justify-start">
-        {/* Top Section - Compact spacing applied */}
-        <div className="w-full max-w-md space-y-2 sm:space-y-3 my-2">
+      <div className="flex-1 flex flex-col justify-between px-4 lg:px-8 pb-24 pt-4">
+        {/* Top Section */}
+        <div className="space-y-4">
           <GameStatsHeader
             userToken={userToken}
             isParentLoading={loading}
@@ -411,44 +408,43 @@ export default function Home() {
           />
         </div>
 
-        {/* AVATAR/PROFILE Section - Removed flex-grow, replaced with fixed vertical margin (my-6) */}
-        <div className="flex flex-col items-center justify-center w-full my-6 sm:my-8 animate-fade-in">
-          <div className="relative flex flex-col items-center justify-center">
-            <Link to="/profile" className="z-10">
-              {/* Reduced Avatar Size slightly to match common mobile aesthetics */}
-              <Avatar className="w-[120px] h-[120px] sm:w-[150px] sm:h-[150px]">
-                <AvatarImage src={avatarImage} className="object-contain scale-110" />
-                <AvatarFallback className="text-white text-4xl">{alias[0]}</AvatarFallback>
-              </Avatar>
-            </Link>
+          {/*AVATAR WITH LARGE MOON */}
+          <div className="flex flex-1 items-center justify-center py-2">
+            <div className="relative flex flex-col items-center justify-center">
+              <Link to="/profile" className="z-10">
+                <Avatar className="w-[180px] h-[180px] sm:w-[200px] sm:h-[200px] md:w-[220px] md:h-[220px]">
+                  <AvatarImage src={avatarImage} className="object-contain scale-110" />
+                  <AvatarFallback className="text-white text-5xl">{alias[0]}</AvatarFallback>
+                </Avatar>
+              </Link>
 
-            <h2 className="mt-2 text-white font-extrabold text-2xl md:text-3xl drop-shadow-lg capitalize">
-              {alias}
-            </h2>
+              <h2 className="mt-4 text-white font-extrabold text-3xl md:text-4xl drop-shadow-lg capitalize">
+                {alias}
+              </h2>
+            </div>
           </div>
-        </div>
 
-        {/* Bottom Section - Play Button - Fixed at bottom of the content stack */}
-        <div className="w-full max-w-xs">
+        {/* Bottom Section - Play Button */}
+        <div className="space-y-2">
           <Button
-            variant="default"
+          variant="default"
             onClick={handleQuickQuiz}
             disabled={loading || playButtonLoading || currentCoins < QUIZ_COST}
-            className="w-full h-16 md:h-20 flex items-center justify-between px-6 rounded-[50px]"
+            className="w-full h-20 md:h-24 flex items-center justify-between px-6 rounded-[50px]"
           >
             {playButtonLoading ? (
-              <div className="flex items-center text-xl md:text-2xl justify-center w-full">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              <div className="flex items-center text-2xl md:text-3xl justify-center w-full">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
                 Starting Quiz...
               </div>
             ) : (
               <>
                 <div className="flex items-center gap-3">
-                  <span className="text-3xl md:text-4xl font-extrabold text-white leading-none">
+                  <span className="text-4xl md:text-5xl font-extrabold text-white leading-none">
                     Play
                   </span>
-                  <span className="text-base font-semibold text-yellow-300 flex items-center gap-1">
-                    <svg viewBox="0 0 24 24" className="h-6 w-6" xmlns="http://www.w3.org/2000/svg">
+                  <span className="text-base md:text-lg font-semibold text-yellow-300 flex items-center gap-1">
+                    <svg viewBox="0 0 24 24" className="h-7 w-7 sm:h-8 sm:w-8" xmlns="http://www.w3.org/2000/svg">
                       <circle cx="12" cy="12" r="8" fill="#f59e0b" />
                       <circle cx="12" cy="12" r="7" fill="#fbbf24" />
                       <circle cx="12" cy="12" r="4" fill="#f59e0b" opacity="0.4" />
@@ -457,11 +453,11 @@ export default function Home() {
                   </span>
                 </div>
 
-                <div className="bg-white rounded-full w-14 h-14 md:w-16 md:h-16 flex flex-col items-center justify-center shadow-md border-2 border-indigo-300">
-                  <span className="text-green-600 text-xl md:text-2xl font-bold leading-none">
+                <div className="bg-white rounded-full w-16 h-16 md:w-20 md:h-20 flex flex-col items-center justify-center shadow-md border-2 border-indigo-300">
+                  <span className="text-green-600 text-2xl md:text-3xl font-bold leading-none">
                     {userLevel}
                   </span>
-                  <span className="text-green-600 text-xs font-semibold uppercase leading-none tracking-wide">
+                  <span className="text-green-600 text-xs md:text-sm font-semibold uppercase leading-none tracking-wide">
                     Level
                   </span>
                 </div>
@@ -470,7 +466,7 @@ export default function Home() {
           </Button>
 
           {currentCoins < QUIZ_COST && !loading && (
-            <p className="text-red-400 text-sm text-center font-medium mt-2">
+            <p className="text-red-400 text-sm text-center font-medium">
               Not enough coins to start a quiz.
             </p>
           )}
