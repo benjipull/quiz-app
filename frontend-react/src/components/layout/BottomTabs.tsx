@@ -26,7 +26,7 @@ export const BottomTabs = () => {
   if (hideOnQuizPage) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background to-card/80 backdrop-blur-lg border-t border-border z-50 md:hidden">
+    <div className="fixed bottom-0 left-0 right-0 bg-[#220A4D] backdrop-blur-lg border-t border-border z-50 md:hidden">
       <div className="flex items-center justify-around h-20 px-2 max-w-full mx-auto">
         {tabs.map((tab, index) => {
           const isActive = location.pathname === tab.path;
