@@ -9,7 +9,7 @@
 /* Global CSS Variables */
 :root {
   /* Base Colors */
-  --background: 222 84% 6%;
+  --background: 268 88% 21%;
   --foreground: 210 40% 98%;
 
   /* Primary Colors (Purple) */
@@ -19,7 +19,7 @@
 
   /* Secondary Colors (Green #709B64) */
 --secondary: 120 18% 50%;
---secondary-foreground: 0 0% 100%; /* White text on green */
+--secondary-foreground: 0 0% 100%; 
 
 
   /* Semantic Colors */
