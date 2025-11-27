@@ -49,7 +49,7 @@ export const Header = ({
   const isMobile = useIsMobile();
 
   return (
-    <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-lg border-b border-border">
+    <header className="sticky top-0 z-40 bg-gradient-to-t from-background via-card/95 to-card/80 backdrop-blur-lg border-b border-border">
       <div className="flex items-center justify-between h-16 px-4 lg:px-8 max-w-full lg:max-w-4xl xl:max-w-6xl mx-auto">
         <div className="flex items-center gap-3">
           {showBack && (
@@ -71,7 +71,7 @@ export const Header = ({
               onClick={() => navigate("/")}
             />
           ) : (
-            <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <h1 className="text-xl font-bold bg-clip-text text-primary">
               {title}
             </h1>
           )}

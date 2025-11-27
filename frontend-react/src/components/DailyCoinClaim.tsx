@@ -270,7 +270,7 @@ return (
             </svg>
           </div>
 
-          <span className="absolute bottom-[-18px] left-2 bg-emerald-500 rounded-full border-2 border-white/80 px-2.5 sm:px-3 py-0.5 text-xs sm:text-sm font-bold text-white shadow-lg whitespace-nowrap">
+          <span className="absolute bottom-[-18px] left-2 bg-secondary rounded-full border-2 border-white/80 px-2.5 sm:px-3 py-0.5 text-xs sm:text-sm font-bold text-white shadow-lg whitespace-nowrap">
             +{dailyBonusAmount}
           </span>
         </div>
@@ -289,7 +289,7 @@ return (
           ${
             canClaim
               ? "bg-yellow-500/10 border-[3px] border-yellow-400 shadow-[0_0_25px_rgba(255,255,0,0.5)] cursor-pointer hover:bg-yellow-500/20 transition-colors"
-              : "bg-[#501b9b] shadow-[0_0_15px_rgba(240,171,240,0.4),_0_4px_15px_rgba(0,0,0,0.5)] border border-purple-800/50"
+              : "bg-secondary border border-warning"
           }
         `}
         onClick={handleClaimClick}
