@@ -2,138 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ---------------------------------
-   🎨 Design System: Custom Theme
-----------------------------------*/
+/* ----------------------------
+   Design System: Colors & Theme
+-------------------------------*/
 
-/* DARK MODE ONLY */
+/* Global CSS Variables */
 :root {
-  /* 🌑 Global Dark Purple Background */
-  --background: 283 35% 20%; 
+  /* Base Colors */
+  --background: 222 84% 6%;
   --foreground: 210 40% 98%;
 
-  --card: 283 30% 13%;
-  --card-foreground: 210 40% 98%;
-
-  --popover: 283 30% 13%;
-  --popover-foreground: 210 40% 98%;
-
-  /* ---------------------------------
-     PRIMARY + SECONDARY (Your Colors)
-  ----------------------------------*/
-
-  /* 💜 Purple = Primary (#8F649B) */
-  --primary: 283 21% 51%;
+  /* Primary Colors (Purple) */
+  --primary: 270 95% 60%;
   --primary-foreground: 0 0% 100%;
-  --primary-glow: 283 21% 70%;
+  --primary-glow: 270 95% 75%;
 
-  /* 💚 Green = Secondary (#709B64) */
-  --secondary: 103 20% 50%;
-  --secondary-foreground: 0 0% 100%;
+  /* Secondary Colors (Green #709B64) */
+--secondary: 120 18% 50%;
+--secondary-foreground: 0 0% 100%; /* White text on green */
 
-  /* ---------------------------------
-     Semantic Colors
-  ----------------------------------*/
 
-  /* 🔴 Error / Incorrect (#C45C67) */
-  --destructive: 352 45% 58%;
+  /* Semantic Colors */
+  --destructive: 0 84% 60%; /* Red */
   --destructive-foreground: 0 0% 100%;
 
-  /* 🟡 Warning (#D7A84B) */
-  --warning: 42 61% 57%;
+  --warning: 35 100% 60%; /* Yellow */
   --warning-foreground: 0 0% 100%;
 
-  /* 🔵 Neutral Blue (#5A7CA8) */
-  --accent: 216 29% 51%;
-  --accent-foreground: 0 0% 100%;
-
-  /* ---------------------------------
-     Neutral / Muted / Utility
-  ----------------------------------*/
-  --success: 140 40% 50%;
+  --success: 150 70% 45%; /* Slightly different green for success */
   --success-foreground: 0 0% 100%;
 
-  --muted: 217 20% 20%;
-  --muted-foreground: 215 20% 70%;
+  --muted: 217 32% 18%; /* Dark gray */
+  --muted-foreground: 215 20% 65%;
 
-  --border: 217 20% 20%;
-  --input: 217 20% 20%;
-  --ring: var(--primary);
+  --accent: 280 85% 65%; /* Blueish purple accent */
+  --accent-foreground: 0 0% 100%;
 
-  /* ---------------------------------
-     QUIZ-SPECIFIC
-  ----------------------------------*/
-  --quiz-background: var(--background);
-  --quiz-card: var(--card);
-  --quiz-progress: var(--primary);
-  --category-bg: var(--background);
+  /* Card / Popover / Quiz */
+  --card: 224 71% 8%;
+  --card-foreground: 210 40% 98%;
 
-  /* ---------------------------------
-     GRADIENTS
-  ----------------------------------*/
-  --gradient-primary: linear-gradient(
-    135deg,
-    hsl(var(--primary)),
-    hsl(283 35% 60%)
-  );
+  --popover: 224 71% 8%;
+  --popover-foreground: 210 40% 98%;
 
-  --gradient-secondary: linear-gradient(
-    135deg,
-    hsl(var(--secondary)),
-    hsl(103 20% 60%)
-  );
+  --quiz-background: 222 84% 6%;
+  --quiz-card: 224 71% 8%;
+  --quiz-progress: 270 95% 60%;
 
-  --gradient-success: linear-gradient(
-    135deg,
-    hsl(var(--success)),
-    hsl(140 40% 60%)
-  );
-
-  --gradient-bg: linear-gradient(
-    180deg,
-    hsl(var(--background)),
-    hsl(283 35% 9%)
-  );
-
-  /* ---------------------------------
-     Shadows
-  ----------------------------------*/
-  --shadow-card: 0 4px 20px hsl(var(--primary) / 0.15);
-  --shadow-button: 0 8px 25px hsl(var(--primary) / 0.25);
-  --shadow-quiz: 0 6px 30px hsl(var(--secondary) / 0.2);
-
-  /* ---------------------------------
-     Animation + Radius
-  ----------------------------------*/
-  --transition-smooth: all 0.3s ease;
-  --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  --radius: 12px;
-
-  /* ---------------------------------
-     Sidebar
-  ----------------------------------*/
-  --sidebar-background: 283 30% 13%;
-  --sidebar-foreground: 210 40% 98%;
-  --sidebar-primary: var(--primary);
+  /* Sidebar */
+  --sidebar-background: 240 5.9% 10%;
+  --sidebar-foreground: 240 4.8% 95.9%;
+  --sidebar-primary: 270 95% 60%; /* Purple */
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 283 25% 18%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-border: 283 25% 18%;
-  --sidebar-ring: var(--primary);
+  --sidebar-accent: 280 85% 65%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 240 3.7% 15.9%;
+  --sidebar-ring: 140 70% 50%; /* Green ring */
+
+  /* Border & Input */
+  --border: 217 32% 18%;
+  --input: 217 32% 18%;
+  --ring: 270 95% 60%;
+
+  /* Radius */
+  --radius: 1rem;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+  --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary)));
+  --gradient-bg: linear-gradient(180deg, hsl(var(--background)), hsl(var(--muted)));
 }
 
-/* ---------------------------------
-   Tailwind Base Layer Overrides
-----------------------------------*/
+/* ----------------------------
+   Base Styles
+-------------------------------*/
 @layer base {
-  * {
+  *, *::before, *::after {
     border-color: hsl(var(--border));
   }
 
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
+    @apply transition-all duration-300;
     min-height: 100vh;
-    @apply transition-[var(--transition-smooth)];
   }
 }

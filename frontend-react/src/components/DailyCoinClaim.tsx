@@ -289,7 +289,7 @@ return (
           ${
             canClaim
               ? "bg-yellow-500/10 border-[3px] border-yellow-400 shadow-[0_0_25px_rgba(255,255,0,0.5)] cursor-pointer hover:bg-yellow-500/20 transition-colors"
-              : "bg-primary shadow-[0_0_15px_rgba(240,171,240,0.4),_0_4px_15px_rgba(0,0,0,0.5)] border border-purple-800/50"
+              : "bg-[#8F649B] shadow-[0_0_15px_rgba(240,171,240,0.4),_0_4px_15px_rgba(0,0,0,0.5)] border border-purple-800/50"
           }
         `}
         onClick={handleClaimClick}

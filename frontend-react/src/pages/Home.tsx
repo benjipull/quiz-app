@@ -66,7 +66,7 @@ export default function Home() {
   const [isSmallScreen, setIsSmallScreen] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
   const [currentCoins, setCurrentCoins] = useState(0);
-  
+
   const [isInterestModalOpen, setIsInterestModalOpen] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [savingInterests, setSavingInterests] = useState(false);
@@ -121,11 +121,11 @@ export default function Home() {
   useEffect(() => {
     if (userProfile && userToken) {
       trackHomeScreen(userProfile._id);
-      
+
       if (userProfile.coins !== undefined) {
         setCurrentCoins(userProfile.coins);
       }
-      
+
       if (!userProfile.interests || userProfile.interests.length === 0) {
         setTimeout(() => {
           setIsInterestModalOpen(true);
@@ -227,7 +227,7 @@ export default function Home() {
       console.log("⚠️ You must be logged in to play.");
       return;
     }
-    
+
     const optimisticCoins = currentCoins - QUIZ_COST;
     setCurrentCoins(optimisticCoins);
     setPlayButtonLoading(true);
@@ -238,7 +238,7 @@ export default function Home() {
       });
 
       if (!response) {
-        setCurrentCoins(prev => prev + QUIZ_COST); 
+        setCurrentCoins(prev => prev + QUIZ_COST);
         setPlayButtonLoading(false);
         toast({
           title: "Network Error",
@@ -249,18 +249,18 @@ export default function Home() {
       }
 
       if (!response.ok) {
-        const errorData: ErrorResponse = await response.json().catch(() => ({ 
-          message: "Unknown error during quiz start." 
+        const errorData: ErrorResponse = await response.json().catch(() => ({
+          message: "Unknown error during quiz start."
         }));
-        
+
         toast({
           title: "Quiz Start Failed",
-          description: errorData.message.includes("refunded") 
-            ? errorData.message 
+          description: errorData.message.includes("refunded")
+            ? errorData.message
             : `Unable to start quiz: ${errorData.message}`,
           variant: "destructive",
         });
-        
+
         await loadUserProfile();
         throw new Error(`Failed to get category to play: ${response.status}`);
       }
@@ -270,7 +270,7 @@ export default function Home() {
       if (data.categoryId) {
         navigate(`/quiz/${data.categoryId}`);
       } else {
-        setCurrentCoins(prev => prev + QUIZ_COST); 
+        setCurrentCoins(prev => prev + QUIZ_COST);
         throw new Error("No category ID returned from server");
       }
     } catch (error) {
@@ -315,13 +315,13 @@ export default function Home() {
 
       setUserProfile(updatedUser);
       localStorage.setItem("user", JSON.stringify(updatedUser));
-      
+
       trackEvent("update_interests", {
         user_id: userProfile._id,
         interest_count: selectedInterests.length,
         context: "home_screen_modal",
       });
-      
+
       toast({
         title: "Success",
         description: `Interests updated successfully! (${selectedInterests.length} selected)`,
@@ -343,7 +343,7 @@ export default function Home() {
   const handleCoinsEarned = (amount: number) => {
     setCurrentCoins(prev => {
       const newTotal = prev + amount;
-      
+
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
         try {
@@ -354,7 +354,7 @@ export default function Home() {
           console.error("Failed to update coins in localStorage:", e);
         }
       }
-      
+
       return newTotal;
     });
   };
@@ -377,11 +377,11 @@ export default function Home() {
       <div className="flex-1 flex flex-col justify-between px-4 lg:px-8 pb-24 pt-4">
         {/* Top Section */}
         <div className="space-y-4">
-          <GameStatsHeader 
-            userToken={userToken} 
+          <GameStatsHeader
+            userToken={userToken}
             isParentLoading={loading}
             onCoinsUpdate={handleCoinsUpdate}
-            currentCoinsFromParent={currentCoins} 
+            currentCoinsFromParent={currentCoins}
           />
 
           {isGuest && (
@@ -402,13 +402,13 @@ export default function Home() {
             </Card>
           )}
 
-          <DailyCoinClaim 
+          <DailyCoinClaim
             userToken={userToken}
             onCoinsEarned={handleCoinsEarned}
           />
         </div>
 
-         {/*  AVATAR WITH LARGE MOON */}
+          {/*AVATAR WITH LARGE MOON */}
           <div className="flex flex-1 items-center justify-center">
             <div
               className="
@@ -419,7 +419,7 @@ export default function Home() {
                 lg:w-[480px] lg:h-[480px]
               "
               style={{
-                background: "primary",
+                background: "#8F649B", // Changed to primary color
                 boxShadow: "0 0 40px rgba(255,255,255,0.2)",
               }}
             >
@@ -439,6 +439,7 @@ export default function Home() {
         {/* Bottom Section - Play Button */}
         <div className="space-y-2">
           <Button
+          variant="default"
             onClick={handleQuickQuiz}
             disabled={loading || playButtonLoading || currentCoins < QUIZ_COST}
             className="w-full h-20 md:h-24 flex items-center justify-between px-6 rounded-[50px]"
@@ -495,7 +496,7 @@ export default function Home() {
               Help us personalize your experience by selecting topics you're interested in.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="py-4">
             {userProfile?._id && (
               <InterestSelector
@@ -515,7 +516,7 @@ export default function Home() {
             >
               Skip for Now
             </Button>
-            <Button 
+            <Button
               onClick={handleSaveInterests}
               disabled={savingInterests || selectedInterests.length === 0}
             >
