@@ -2,140 +2,138 @@
 @tailwind components;
 @tailwind utilities;
 
-/* -----------------------------------
-   Design System: Unified Theme Tokens
--------------------------------------*/
+/* ---------------------------------
+   🎨 Design System: Custom Theme
+----------------------------------*/
 
+/* DARK MODE ONLY */
 :root {
-  /* --- Custom Brand Colors (yours) --- */
-  --color-primary: #8F649B;    /* Soft Royal Purple */
-  --color-secondary: #709B64;  /* Natural Green */
-  --color-error: #C45C67;      /* Warm Red */
-  --color-warning: #D7A84B;    /* Amber */
-  --color-info: #5A7CA8;       /* Steel Blue */
-
-  --radius: 12px;
-
-  /* --------------------------------
-     Core HSL Theme (mixed + upgraded)
-  ----------------------------------*/
-
-  /* Background System */
-  --background: 222 84% 5%;
+  /* 🌑 Global Dark Purple Background */
+  --background: 283 35% 20%; 
   --foreground: 210 40% 98%;
 
-  --card: 224 71% 8%;
+  --card: 283 30% 13%;
   --card-foreground: 210 40% 98%;
 
-  --popover: 224 71% 8%;
+  --popover: 283 30% 13%;
   --popover-foreground: 210 40% 98%;
 
-  /* ---------------------------------------------
-     Primary System (Blended with your brand purple)
-  ----------------------------------------------*/
+  /* ---------------------------------
+     PRIMARY + SECONDARY (Your Colors)
+  ----------------------------------*/
 
-  /* old: 270 95% 60% replaced by your #8F649B tone */
-  --primary: 276 22% 50%; /* Converted blend tone of #8F649B */
+  /* 💜 Purple = Primary (#8F649B) */
+  --primary: 283 21% 51%;
   --primary-foreground: 0 0% 100%;
-  --primary-glow: 276 22% 65%;
+  --primary-glow: 283 21% 70%;
 
-  /* Accent stays bright to contrast—still purple family */
-  --accent: 280 85% 65%;
-  --accent-foreground: 0 0% 100%;
-
-  /* --------------------------------------------
-     Secondary (Integrated with your green color)
-  ---------------------------------------------*/
-  --secondary: 108 22% 51%; /* blended #709B64 */
+  /* 💚 Green = Secondary (#709B64) */
+  --secondary: 103 20% 50%;
   --secondary-foreground: 0 0% 100%;
 
-  /* Semantic Colors */
-  --success: 140 70% 50%;
-  --success-foreground: 0 0% 100%;
+  /* ---------------------------------
+     Semantic Colors
+  ----------------------------------*/
 
-  --warning: 35 100% 60%;
-  --warning-foreground: 0 0% 100%;
-
-  --destructive: 0 84% 60%;
+  /* 🔴 Error / Incorrect (#C45C67) */
+  --destructive: 352 45% 58%;
   --destructive-foreground: 0 0% 100%;
 
-  /* Muted System */
-  --muted: 217 32% 18%;
-  --muted-foreground: 215 20% 65%;
+  /* 🟡 Warning (#D7A84B) */
+  --warning: 42 61% 57%;
+  --warning-foreground: 0 0% 100%;
 
-  /* Border / Input */
-  --border: 217 32% 18%;
-  --input: 217 32% 18%;
+  /* 🔵 Neutral Blue (#5A7CA8) */
+  --accent: 216 29% 51%;
+  --accent-foreground: 0 0% 100%;
+
+  /* ---------------------------------
+     Neutral / Muted / Utility
+  ----------------------------------*/
+  --success: 140 40% 50%;
+  --success-foreground: 0 0% 100%;
+
+  --muted: 217 20% 20%;
+  --muted-foreground: 215 20% 70%;
+
+  --border: 217 20% 20%;
+  --input: 217 20% 20%;
   --ring: var(--primary);
 
-  /* ------------------------------------------------
-     Quiz-specific — preserved + unified
-  --------------------------------------------------*/
-  --quiz-background: 222 84% 6%;
-  --quiz-card: 224 71% 8%;
+  /* ---------------------------------
+     QUIZ-SPECIFIC
+  ----------------------------------*/
+  --quiz-background: var(--background);
+  --quiz-card: var(--card);
   --quiz-progress: var(--primary);
-  --category-bg: 222 84% 5%;
+  --category-bg: var(--background);
 
-  /* Gradients (updated to blend with your purple) */
+  /* ---------------------------------
+     GRADIENTS
+  ----------------------------------*/
   --gradient-primary: linear-gradient(
     135deg,
     hsl(var(--primary)),
-    hsl(var(--accent))
+    hsl(283 35% 60%)
   );
 
   --gradient-secondary: linear-gradient(
     135deg,
     hsl(var(--secondary)),
-    hsl(108 22% 60%)
+    hsl(103 20% 60%)
   );
 
   --gradient-success: linear-gradient(
     135deg,
-    hsl(140 70% 50%),
-    hsl(160 60% 55%)
+    hsl(var(--success)),
+    hsl(140 40% 60%)
   );
 
   --gradient-bg: linear-gradient(
     180deg,
-    hsl(222 84% 6%),
-    hsl(222 84% 5%)
+    hsl(var(--background)),
+    hsl(283 35% 9%)
   );
 
-  /* Shadows (softened + unified with your purple tone) */
+  /* ---------------------------------
+     Shadows
+  ----------------------------------*/
   --shadow-card: 0 4px 20px hsl(var(--primary) / 0.15);
   --shadow-button: 0 8px 25px hsl(var(--primary) / 0.25);
   --shadow-quiz: 0 6px 30px hsl(var(--secondary) / 0.2);
 
-  /* Animation */
-  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* ---------------------------------
+     Animation + Radius
+  ----------------------------------*/
+  --transition-smooth: all 0.3s ease;
   --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --radius: 12px;
 
-  /* Sidebar (updated to align with the main palette) */
-  --sidebar-background: 240 5.9% 10%;
-  --sidebar-foreground: 240 4.8% 95.9%;
+  /* ---------------------------------
+     Sidebar
+  ----------------------------------*/
+  --sidebar-background: 283 30% 13%;
+  --sidebar-foreground: 210 40% 98%;
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 240 3.7% 15.9%;
-  --sidebar-accent-foreground: 240 4.8% 95.9%;
-  --sidebar-border: 240 3.7% 15.9%;
+  --sidebar-accent: 283 25% 18%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-border: 283 25% 18%;
   --sidebar-ring: var(--primary);
 }
 
-/* ----------------------------
-   Base Styles
--------------------------------*/
+/* ---------------------------------
+   Tailwind Base Layer Overrides
+----------------------------------*/
 @layer base {
   * {
     border-color: hsl(var(--border));
   }
 
   body {
-    background-color: var(--primary);
+    background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    @apply transition-[var(--transition-smooth)];
     min-height: 100vh;
+    @apply transition-[var(--transition-smooth)];
   }
-}
-* {
-  background-color: var(--primary);
 }

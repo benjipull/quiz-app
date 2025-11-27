@@ -277,7 +277,7 @@ export default function Categories() {
   }
 
   return (
-    <div className="min-h-screen bg-primary pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] pb-20">
       <Header title="Quizzes" showSearch />
 
       <div className="px-4 lg:px-8 space-y-6 max-w-full mx-auto">

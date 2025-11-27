@@ -48,11 +48,11 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-secondary text-white border-[3px] border-secondary shadow-[0_4px_20px_rgba(0,255,0,0.3)] hover:shadow-[0_6px_30px_rgba(0,255,0,0.5)]",
+          "bg-secondary text-white border-radius border-secondary shadow-[0_4px_20px_rgba(0,255,0,0.3)] hover:shadow-[0_6px_30px_rgba(0,255,0,0.5)]",
         destructive:
           "bg-error text-white border-2 border-error",
         blue:
-          "bg-info text-white border-2 border-info",
+          "bg-accent text-white border-2 border-info",
         purple:
           "bg-primary text-white border-2 border-primary",
         warning:
