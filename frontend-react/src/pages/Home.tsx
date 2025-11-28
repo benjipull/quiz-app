@@ -1,4 +1,4 @@
-// Home.tsx - Refactored
+// Home.tsx - Fixed Layout (No Scroll, Perfect Fit)
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
@@ -371,12 +371,12 @@ export default function Home() {
   const avatarImage = userAvatar || undefined;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="fixed inset-0 flex flex-col bg-background overflow-hidden">
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
-      <div className="flex-1 flex flex-col justify-between px-4 lg:px-8 pb-24 pt-4">
-        {/* Top Section */}
-        <div className="space-y-4">
+      <div className="flex-1 flex flex-col px-4 lg:px-8 w-full overflow-hidden">
+        {/* Top Section - Stats and Notifications */}
+        <div className={`space-y-3 flex-shrink-0 ${isSmallScreen ? 'pt-2' : 'pt-3'} max-w-4xl mx-auto w-full`}>
           <GameStatsHeader
             userToken={userToken}
             isParentLoading={loading}
@@ -408,42 +408,42 @@ export default function Home() {
           />
         </div>
 
-          {/*AVATAR WITH LARGE MOON */}
-          <div className="flex flex-1 items-center justify-center py-2">
-            <div className="relative flex flex-col items-center justify-center">
-              <Link to="/profile" className="z-10">
-                <Avatar className="w-[180px] h-[180px] sm:w-[200px] sm:h-[200px] md:w-[220px] md:h-[220px]">
-                  <AvatarImage src={avatarImage} className="object-contain scale-110" />
-                  <AvatarFallback className="text-white text-5xl">{alias[0]}</AvatarFallback>
-                </Avatar>
-              </Link>
+        {/* Middle Section - Avatar (Flexibly sized) */}
+        <div className="flex items-center justify-center flex-1 min-h-0">
+          <div className="relative flex flex-col items-center justify-center">
+            <Link to="/profile" className="z-10">
+              <Avatar className={`${isSmallScreen ? 'w-[190px] h-[190px]' : 'w-[180px] h-[180px] sm:w-[200px] sm:h-[200px]'}`}>
+                <AvatarImage src={avatarImage} className="object-contain scale-110" />
+                <AvatarFallback className="text-white text-5xl">{alias[0]}</AvatarFallback>
+              </Avatar>
+            </Link>
 
-              <h2 className="mt-4 text-white font-extrabold text-3xl md:text-4xl drop-shadow-lg capitalize">
-                {alias}
-              </h2>
-            </div>
+            <h2 className={`mt-4 text-white font-extrabold drop-shadow-lg capitalize ${isSmallScreen ? 'text-3xl' : 'text-3xl sm:text-4xl'}`}>
+              {alias}
+            </h2>
           </div>
+        </div>
 
-        {/* Bottom Section - Play Button */}
-        <div className="space-y-2">
+        {/* Bottom Section - Play Button (Fixed) */}
+        <div className={`space-y-2 flex-shrink-0 max-w-4xl mx-auto w-full ${isSmallScreen ? 'pb-32' : 'pb-20'}`}>
           <Button
-          variant="default"
+            variant="default"
             onClick={handleQuickQuiz}
             disabled={loading || playButtonLoading || currentCoins < QUIZ_COST}
-            className="w-full h-20 md:h-24 flex items-center justify-between px-6 rounded-[50px]"
+            className="w-full h-20 sm:h-24 flex items-center justify-between px-6 rounded-[50px]"
           >
             {playButtonLoading ? (
-              <div className="flex items-center text-2xl md:text-3xl justify-center w-full">
+              <div className="flex items-center text-2xl sm:text-3xl justify-center w-full">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
                 Starting Quiz...
               </div>
             ) : (
               <>
                 <div className="flex items-center gap-3">
-                  <span className="text-4xl md:text-5xl font-extrabold text-white leading-none">
+                  <span className="text-4xl sm:text-5xl font-extrabold text-white leading-none">
                     Play
                   </span>
-                  <span className="text-base md:text-lg font-semibold text-yellow-300 flex items-center gap-1">
+                  <span className="text-base sm:text-lg font-semibold text-yellow-300 flex items-center gap-1">
                     <svg viewBox="0 0 24 24" className="h-7 w-7 sm:h-8 sm:w-8" xmlns="http://www.w3.org/2000/svg">
                       <circle cx="12" cy="12" r="8" fill="#f59e0b" />
                       <circle cx="12" cy="12" r="7" fill="#fbbf24" />
@@ -453,11 +453,11 @@ export default function Home() {
                   </span>
                 </div>
 
-                <div className="bg-white rounded-full w-16 h-16 md:w-20 md:h-20 flex flex-col items-center justify-center shadow-md border-2 border-indigo-300">
-                  <span className="text-green-600 text-2xl md:text-3xl font-bold leading-none">
+                <div className="bg-white rounded-full w-16 h-16 sm:w-20 sm:h-20 flex flex-col items-center justify-center shadow-md border-2 border-indigo-300">
+                  <span className="text-green-600 text-2xl sm:text-3xl font-bold leading-none">
                     {userLevel}
                   </span>
-                  <span className="text-green-600 text-xs md:text-sm font-semibold uppercase leading-none tracking-wide">
+                  <span className="text-green-600 text-xs sm:text-sm font-semibold uppercase leading-none tracking-wide">
                     Level
                   </span>
                 </div>
