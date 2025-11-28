@@ -39,25 +39,42 @@ function playClick() {
 }
 
 /* ------------------------------------------------------------------
-    BUTTON STYLING
+    BUTTON STYLING — ALL OVAL
 ------------------------------------------------------------------ */
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-bold transition-all duration-150 active:scale-95 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition-all duration-150 \
+   active:scale-95 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none",
   {
     variants: {
-  variant: {
-    default: "bg-secondary text-white rounded-lg border-2 border-secondary shadow-[0_4px_20px_rgba(0,255,0,0.3)] hover:shadow-[0_6px_30px_rgba(0,255,0,0.5)]",
-    destructive: "bg-destructive text-white border-2 border-destructive",
-    blue: "bg-accent text-white border-2 border-accent",
-    purple: "bg-primary text-white border-2 border-primary",
-    warning: "bg-warning text-white border-2 border-warning",
-    outline: "bg-transparent text-white border-2 border-secondary",
-    ghost: "bg-destructive text-white border-2 border-secondary",
-    link: "bg-transparent text-white border-2 border-secondary shadow-none",
-  },
+      variant: {
+        default:
+          "bg-secondary text-white border-2 border-secondary shadow-[0_4px_20px_rgba(0,255,0,0.3)] hover:shadow-[0_6px_30px_rgba(0,255,0,0.5)]",
+
+        destructive:
+          "bg-destructive text-white border-2 border-destructive",
+
+        blue:
+          "bg-accent text-white border-2 border-accent",
+
+        purple:
+          "bg-primary text-white border-2 border-primary",
+
+        warning:
+          "bg-warning text-white border-2 border-warning",
+
+        outline:
+          "bg-transparent text-white border-2 border-secondary",
+
+        ghost:
+          "bg-transparent text-white border-2 border-secondary",
+
+        link:
+          "bg-transparent text-primary border-none shadow-none underline-offset-4 hover:underline",
+      },
+
       size: {
-        default: "h-12 px-6 py-3 text-sm",
+        default: "h-12 px-6 text-sm",
         sm: "h-9 px-4 text-sm",
         lg: "h-14 px-8 text-base",
         xl: "h-16 px-10 text-lg",

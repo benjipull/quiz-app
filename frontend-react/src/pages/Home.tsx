@@ -371,7 +371,7 @@ export default function Home() {
   const avatarImage = userAvatar || undefined;
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-background overflow-hidden">
+    <div className="fixed inset-0 flex flex-col bg-[#0a0114] overflow-hidden">
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
       <div className="flex-1 flex flex-col px-4 lg:px-8 w-full overflow-hidden">
@@ -412,25 +412,30 @@ export default function Home() {
         <div className="flex items-center justify-center flex-1 min-h-0">
           <div className="relative flex flex-col items-center justify-center">
             <Link to="/profile" className="z-10">
-              <Avatar className={`${isSmallScreen ? 'w-[190px] h-[190px]' : 'w-[180px] h-[180px] sm:w-[200px] sm:h-[200px]'}`}>
-                <AvatarImage src={avatarImage} className="object-contain scale-110" />
-                <AvatarFallback className="text-white text-5xl">{alias[0]}</AvatarFallback>
-              </Avatar>
+              <div className={`${isSmallScreen ? 'w-[220px] h-[220px]' : 'w-[180px] h-[180px] sm:w-[200px] sm:h-[200px]'}`}>
+                {avatarImage ? (
+                  <img src={avatarImage} alt={alias} className="w-full h-full object-contain" style={{ background: 'transparent' }} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white"></div>
+                  </div>
+                )}
+              </div>
             </Link>
 
-            <h2 className={`mt-4 text-white font-extrabold drop-shadow-lg capitalize ${isSmallScreen ? 'text-3xl' : 'text-3xl sm:text-4xl'}`}>
+            <h2 className={`mt-4 text-white font-extrabold drop-shadow-lg capitalize ${isSmallScreen ? 'text-4xl' : 'text-3xl sm:text-4xl'}`}>
               {alias}
             </h2>
           </div>
         </div>
 
         {/* Bottom Section - Play Button (Fixed) */}
-        <div className={`space-y-2 flex-shrink-0 max-w-4xl mx-auto w-full ${isSmallScreen ? 'pb-32' : 'pb-20'}`}>
+        <div className={`space-y-2 flex-shrink-0 max-w-4xl mx-auto w-full ${isSmallScreen ? 'pb-28' : 'pb-20'}`}>
           <Button
             variant="default"
             onClick={handleQuickQuiz}
             disabled={loading || playButtonLoading || currentCoins < QUIZ_COST}
-            className="w-full h-20 sm:h-24 flex items-center justify-between px-6 rounded-[50px]"
+            className={`w-full flex items-center justify-between px-6 ${isSmallScreen ? 'h-24' : 'h-20 sm:h-24'}`}
           >
             {playButtonLoading ? (
               <div className="flex items-center text-2xl sm:text-3xl justify-center w-full">
@@ -443,7 +448,7 @@ export default function Home() {
                   <span className="text-4xl sm:text-5xl font-extrabold text-white leading-none">
                     Play
                   </span>
-                  <span className="text-base sm:text-lg font-semibold text-yellow-300 flex items-center gap-1">
+                  <span className="text-base sm:text-lg font-semibold text-yellow-300 flex items-center gap-1 bg-gray-700/70 px-3 py-1.5 rounded-full">
                     <svg viewBox="0 0 24 24" className="h-7 w-7 sm:h-8 sm:w-8" xmlns="http://www.w3.org/2000/svg">
                       <circle cx="12" cy="12" r="8" fill="#f59e0b" />
                       <circle cx="12" cy="12" r="7" fill="#fbbf24" />
