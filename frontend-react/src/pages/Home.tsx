@@ -1,5 +1,5 @@
-// Home.tsx - Fixed Layout (No Scroll, Perfect Fit)
-import { useState, useEffect } from "react";
+// Home.tsx - Instant Quiz Start with Preloading
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,10 @@ export default function Home() {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [savingInterests, setSavingInterests] = useState(false);
 
+  // Preloading state
+  const preloadedCategoryRef = useRef<CategoryToPlayResponse | null>(null);
+  const isPreloadingRef = useRef(false);
+
   const navigate = useNavigate();
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
   const { toast, dismiss } = useToast();
@@ -101,9 +105,13 @@ export default function Home() {
           setTimeout(() => {
             setShowSplash(false);
             setLoading(false);
+            // Start preloading after splash
+            preloadNextCategory();
           }, remainingTime);
         } else {
           setLoading(false);
+          // Start preloading immediately
+          preloadNextCategory();
         }
       } catch (err) {
         console.error("Init error:", err);
@@ -222,12 +230,57 @@ export default function Home() {
     }
   };
 
+  // Preload next category in the background
+  const preloadNextCategory = async () => {
+    if (!userToken || isPreloadingRef.current) return;
+
+    isPreloadingRef.current = true;
+    try {
+      const response = await apiClient(`${BASE_URL}/api/getGetegoryToPlay`, {
+        method: "GET",
+      });
+
+      if (response && response.ok) {
+        const data: CategoryToPlayResponse = await response.json();
+        if (data.categoryId) {
+          preloadedCategoryRef.current = data;
+          console.log("✅ Preloaded category:", data.categoryId);
+        }
+      }
+    } catch (error) {
+      console.error("Error preloading category:", error);
+    } finally {
+      isPreloadingRef.current = false;
+    }
+  };
+
   const handleQuickQuiz = async () => {
     if (!userToken) {
       console.log("⚠️ You must be logged in to play.");
       return;
     }
 
+    // Check if we have a preloaded category
+    if (preloadedCategoryRef.current && preloadedCategoryRef.current.categoryId) {
+      const categoryId = preloadedCategoryRef.current.categoryId;
+      
+      // Optimistically update coins
+      const optimisticCoins = currentCoins - QUIZ_COST;
+      setCurrentCoins(optimisticCoins);
+      
+      // Clear preloaded data
+      preloadedCategoryRef.current = null;
+      
+      // Navigate instantly without loading
+      navigate(`/quiz/${categoryId}`);
+      
+      // Start preloading next category in background
+      setTimeout(() => preloadNextCategory(), 1000);
+      
+      return;
+    }
+
+    // Fallback: if no preloaded data, fetch normally
     const optimisticCoins = currentCoins - QUIZ_COST;
     setCurrentCoins(optimisticCoins);
     setPlayButtonLoading(true);
