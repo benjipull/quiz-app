@@ -78,12 +78,12 @@ const StarfieldBackground = () => {
 
 const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmText, cancelText }: any) => (
   <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <Card className="max-w-sm w-full p-6 space-y-4 bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67]">
-      <h3 className="text-lg font-bold">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
+    <Card className="max-w-sm w-full p-6 space-y-4 bg-primary]">
+      <h3 className="text-lg text-warning font-bold">{title}</h3>
+      <p className="text-sm text-white">{description}</p>
       <div className="flex justify-end gap-3">
         <Button variant="outline" onClick={onCancel}>{cancelText}</Button>
-        <Button variant="warning" className="text-white" onClick={onConfirm}>{confirmText}</Button>
+        <Button variant="destructive" className="text-white" onClick={onConfirm}>{confirmText}</Button>
       </div>
     </Card>
   </div>
@@ -558,7 +558,7 @@ export default function Quiz() {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${userToken}`,
       },
-      body: JSON.stringify({ categoryId, numQuestions: 10, userToken }),
+      body: JSON.stringify({ categoryId, userToken }),
     });
 
     if (!startResponse.ok) {
@@ -1078,7 +1078,7 @@ export default function Quiz() {
               <div
                 className="h-full rounded-full transition-all duration-300 ease-out bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 shadow-lg shadow-yellow-500/60"
                 style={{ 
-                  width: `${((quizState.currentQuestionIndex - 1) / totalQuestions) * 100}%`,
+                  width: `${((quizState.currentQuestionIndex - 0) / totalQuestions) * 100}%`,
                 }}
               />
             </div>

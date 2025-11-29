@@ -23,7 +23,7 @@ const difficultyNames = {
 router.post("/", authenticateToken, async (req, res) => {
     const { categoryId, numQuestions } = req.body;
 
-    const noQuestions = 5;
+    const questionsCount = numQuestions || 5;
     
     const authHeader = req.headers["authorization"];
     const userToken = authHeader && authHeader.startsWith("Bearer ")
@@ -34,8 +34,9 @@ router.post("/", authenticateToken, async (req, res) => {
         return res.status(401).json({ message: "Missing or invalid Authorization header." });
     }
 
-    if (!categoryId || !noQuestions) {
-        return res.status(400).json({ message: "Missing required fields: categoryId, noQuestions." });
+    // Use the corrected variable in the validation check
+    if (!categoryId || !questionsCount) {
+        return res.status(400).json({ message: "Missing required fields: categoryId, questionsCount." });
     }
 
     const userId = req.user.id;
@@ -88,12 +89,12 @@ router.post("/", authenticateToken, async (req, res) => {
                 // 🟡 Second priority: higher popularity ranks higher
                 return b.popularity - a.popularity;
             })
-            .slice(0, noQuestions);
+            // Use the corrected questionsCount variable here
+            .slice(0, questionsCount); 
 
-        if (selectedQuestions.length < noQuestions) {
+        if (selectedQuestions.length < questionsCount) {
             // ----------------------------------------------------------------
             // 💰 2. COIN REFUND IF QUIZ FAILS TO START (Not enough questions)
-            // Ledger tracking for this coin transaction is REMOVED.
             // ----------------------------------------------------------------
             user.coins += QUIZ_COST; // Refund the coins
             await user.save();

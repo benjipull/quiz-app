@@ -19,7 +19,7 @@ router.post("/", async (req, res) => {
         // Create new user
         const newUser = new User({ alias, email, password, age, userType });
         
-        newUser.coins = 1000; 
+        newUser.coins = 3000; 
         
         await newUser.save();
 

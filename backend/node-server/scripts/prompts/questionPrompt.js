@@ -41,6 +41,15 @@ Output STRICT JSON only (no prose, no markdown)
   • a shared property among the answer options (region, field, timeframe, etc.)
 - Do NOT generate globally ambiguous questions — all four answers must logically fit within the same contextual frame.
 
+=== CATEGORY SPECIALIZATION RULES ===
+- You must generate questions that are uniquely and specifically tied to the full meaning of the category name.
+- Do NOT generate generic questions that could reasonably belong in another category.
+- For categories containing similar words (e.g., "Languages" vs. "World Languages"), you must differentiate by focusing on what makes this category unique.
+    • "Languages" = basic facts about language as a human communication system.
+    • "World Languages" = global linguistic diversity, families, regions, classifications, distributions, writing systems, and formal linguistic properties as recognized worldwide.
+- The question MUST reflect details that would ONLY fit the provided category and not its related categories.
+- Every question must highlight a factual detail that clearly belongs within the category's unique conceptual scope.
+
 == Before generating the question ==
 - Interpret what the category *represents conceptually* (e.g., field, subject, or theme).
 - Generate a factual, verifiable, non-ambiguous question clearly connected to that concept.

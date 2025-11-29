@@ -5,7 +5,9 @@ WORKDIR /app
 
 # Accept build-time environment variable from Cloud Build
 ARG VITE_API_BASE_URL
-ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+# write it to file
+RUN echo "VITE_BASE_URL=${VITE_API_BASE_URL}" > .env
 
 
 COPY package.json package-lock.json ./

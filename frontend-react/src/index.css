@@ -6,89 +6,85 @@
    Design System: Colors & Theme
 -------------------------------*/
 
-/* Default Variables (Dark Mode only) */
+/* Global CSS Variables */
 :root {
-  --background: 222 84% 5%;
+  /* Base Colors */
+--background: 268 80% 6%;
   --foreground: 210 40% 98%;
 
+  /* Primary Colors (Purple) */
+  --primary: 270 95% 60%;
+  --primary-foreground: 0 0% 100%;
+  --primary-glow: 270 95% 75%;
+
+  /* Secondary Colors (Green #709B64) */
+--secondary: 120 18% 50%;
+--secondary-foreground: 0 0% 100%; 
+
+
+  /* Semantic Colors */
+  --destructive: 0 84% 60%; /* Red */
+  --destructive-foreground: 0 0% 100%;
+
+  --warning: 35 100% 60%; /* Yellow */
+  --warning-foreground: 0 0% 100%;
+
+  --success: 150 70% 45%; /* Slightly different green for success */
+  --success-foreground: 0 0% 100%;
+
+  --muted: 217 32% 18%; /* Dark gray */
+  --muted-foreground: 215 20% 65%;
+
+  --accent: 280 85% 65%; /* Blueish purple accent */
+  --accent-foreground: 0 0% 100%;
+
+  /* Card / Popover / Quiz */
   --card: 224 71% 8%;
   --card-foreground: 210 40% 98%;
 
   --popover: 224 71% 8%;
   --popover-foreground: 210 40% 98%;
 
-  --primary: 270 95% 60%;
-  --primary-foreground: 0 0% 100%;
-  --primary-glow: 270 95% 75%;
-
-  --secondary: 220 100% 65%;
-  --secondary-foreground: 0 0% 100%;
-
-  --success: 140 70% 50%;
-  --success-foreground: 0 0% 100%;
-
-  --warning: 35 100% 60%;
-  --warning-foreground: 0 0% 100%;
-
-  --muted: 217 32% 18%;
-  --muted-foreground: 215 20% 65%;
-
-  --accent: 280 85% 65%;
-  --accent-foreground: 0 0% 100%;
-
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 100%;
-
-  --border: 217 32% 18%;
-  --input: 217 32% 18%;
-  --ring: 270 95% 60%;
-
-  /* Quiz-specific */
   --quiz-background: 222 84% 6%;
   --quiz-card: 224 71% 8%;
   --quiz-progress: 270 95% 60%;
-  --category-bg: 222 84% 5%;
-
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, hsl(270 95% 60%), hsl(280 85% 65%));
-  --gradient-secondary: linear-gradient(135deg, hsl(220 100% 65%), hsl(220 100% 75%));
-  --gradient-success: linear-gradient(135deg, hsl(140 70% 50%), hsl(160 60% 55%));
-  --gradient-bg: linear-gradient(180deg, hsl(222 84% 6%), hsl(222 84% 5%));
-
-  /* Shadows */
-  --shadow-card: 0 4px 20px hsl(270 95% 60% / 0.15);
-  --shadow-button: 0 8px 25px hsl(270 95% 60% / 0.25);
-  --shadow-quiz: 0 6px 30px hsl(220 100% 65% / 0.2);
-
-  /* Animations & radius */
-  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  --radius: 1rem;
 
   /* Sidebar */
   --sidebar-background: 240 5.9% 10%;
   --sidebar-foreground: 240 4.8% 95.9%;
-  --sidebar-primary: 224.3 76.3% 48%;
+  --sidebar-primary: 270 95% 60%; /* Purple */
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 240 3.7% 15.9%;
-  --sidebar-accent-foreground: 240 4.8% 95.9%;
+  --sidebar-accent: 280 85% 65%;
+  --sidebar-accent-foreground: 0 0% 100%;
   --sidebar-border: 240 3.7% 15.9%;
-  --sidebar-ring: 217.2 91.2% 59.8%;
+  --sidebar-ring: 140 70% 50%; /* Green ring */
+
+  /* Border & Input */
+  --border: 217 32% 18%;
+  --input: 217 32% 18%;
+  --ring: 270 95% 60%;
+
+  /* Radius */
+  --radius: 1rem;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+  --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary)));
+  --gradient-bg: linear-gradient(180deg, hsl(var(--background)), hsl(var(--muted)));
 }
 
 /* ----------------------------
-   Tailwind Base Layer
+   Base Styles
 -------------------------------*/
 @layer base {
-  /* Apply border variable globally */
-  * {
+  *, *::before, *::after {
     border-color: hsl(var(--border));
   }
 
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    @apply transition-[var(--transition-smooth)];
+    @apply transition-all duration-300;
     min-height: 100vh;
   }
 }

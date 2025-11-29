@@ -4,7 +4,7 @@ const authenticateToken = require("../middleware/auth");
 
 const router = express.Router();
 // 👇 EXPORTED FOR FRONTEND USE
-const DAILY_BONUS_COINS = 500; // 500 coins to claim 
+const DAILY_BONUS_COINS = 1000;  
 const DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 // Endpoint to get the daily bonus amount (New endpoint for frontend)

@@ -1,8 +1,7 @@
-// Home.tsx
-import { useState, useEffect } from "react";
+// Home.tsx - Instant Quiz Start with Preloading
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
-import { CategoryCard } from "@/components/quiz/CategoryCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,18 +16,11 @@ import {
 import InterestSelector from "@/components/InterestSelector";
 import { trackEvent } from "@/utils/analytics";
 
-import {
-  Brain,
-  AlertTriangle,
-  Heart,
-  Trophy,
-} from "lucide-react";
+import { AlertTriangle, Heart } from "lucide-react";
 import logo from "../assets/images/QuizicleLogo.png";
 import SplashScreen from "../components/SplashScreen";
 import GameStatsHeader from "../components/GameStatsHeader";
-import AddCategory from "@/components/AddCategory";
 import { useToast } from "@/hooks/use-toast";
-
 import { apiClient } from "@/utils/apiClient";
 import DailyCoinClaim from "@/components/DailyCoinClaim";
 
@@ -39,21 +31,7 @@ const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
 const avatars: string[] = Object.values(avatarImages) as string[];
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
-
-interface Category {
-  _id: string;
-  name: string;
-  description?: string;
-  createdBy?: string;
-  completionCount?: number;
-  completionsCount?: number;
-  questionCount?: number;
-  averageRating?: number;
-  difficulty?: "Easy" | "Medium" | "Hard";
-  imageUrl?: string;
-  createdAt?: string;
-  timeEstimate?: string;
-}
+const QUIZ_COST = 100;
 
 interface CategoryToPlayResponse {
   message: string;
@@ -70,14 +48,16 @@ interface UserDetails {
   avatar: number;
   userType?: "Guest" | "Registered" | "Admin";
   interests?: string[];
+  coins?: number;
+}
+
+interface ErrorResponse {
+  message: string;
 }
 
 export default function Home() {
-  const [userCategories, setUserCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
-  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [userProfile, setUserProfile] = useState<UserDetails | null>(null);
@@ -85,17 +65,20 @@ export default function Home() {
   const [userLevel, setUserLevel] = useState(1);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
-  
-  // Interest modal state
+  const [currentCoins, setCurrentCoins] = useState(0);
+
   const [isInterestModalOpen, setIsInterestModalOpen] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [savingInterests, setSavingInterests] = useState(false);
+
+  // Preloading state
+  const preloadedCategoryRef = useRef<CategoryToPlayResponse | null>(null);
+  const isPreloadingRef = useRef(false);
 
   const navigate = useNavigate();
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
   const { toast, dismiss } = useToast();
 
-  // Initial load effect
   useEffect(() => {
     const initializeApp = async () => {
       const hasShownSplash = typeof window !== 'undefined' ? sessionStorage.getItem("splashShown") : null;
@@ -122,11 +105,14 @@ export default function Home() {
           setTimeout(() => {
             setShowSplash(false);
             setLoading(false);
+            // Start preloading after splash
+            preloadNextCategory();
           }, remainingTime);
         } else {
           setLoading(false);
+          // Start preloading immediately
+          preloadNextCategory();
         }
-
       } catch (err) {
         console.error("Init error:", err);
         setLoading(false);
@@ -143,11 +129,12 @@ export default function Home() {
   useEffect(() => {
     if (userProfile && userToken) {
       trackHomeScreen(userProfile._id);
-      fetchUserCategories();
-      
-      // Check if user has no interests selected - show modal if needed
+
+      if (userProfile.coins !== undefined) {
+        setCurrentCoins(userProfile.coins);
+      }
+
       if (!userProfile.interests || userProfile.interests.length === 0) {
-        // Small delay to ensure smooth UI load
         setTimeout(() => {
           setIsInterestModalOpen(true);
           trackEvent("view_interests", {
@@ -164,11 +151,12 @@ export default function Home() {
       const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
       if (storedUser) {
         try {
-          const parsedUser = JSON.parse(storedUser);
+          const parsedUser: UserDetails = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
           setIsGuest(parsedUser.userType === 'Guest');
           setSelectedInterests(parsedUser.interests || []);
+          if (parsedUser.coins !== undefined) setCurrentCoins(parsedUser.coins);
         } catch (e) {
           console.error("Failed to parse local user data:", e);
         }
@@ -189,11 +177,12 @@ export default function Home() {
         console.warn(`Failed to fetch user details (Status: ${response.status}). Falling back to local storage.`);
         const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
         if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
+          const parsedUser: UserDetails = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
           setIsGuest(parsedUser.userType === 'Guest');
           setSelectedInterests(parsedUser.interests || []);
+          if (parsedUser.coins !== undefined) setCurrentCoins(parsedUser.coins);
         }
         return;
       }
@@ -204,6 +193,7 @@ export default function Home() {
       setUserLevel(apiUser.level || 1);
       setIsGuest(apiUser.userType === 'Guest');
       setSelectedInterests(apiUser.interests || []);
+      if (apiUser.coins !== undefined) setCurrentCoins(apiUser.coins);
 
       const avatarIndex = apiUser.avatar ? apiUser.avatar - 1 : 0;
       const calculatedAvatar = avatars[avatarIndex] || null;
@@ -215,23 +205,24 @@ export default function Home() {
           level: apiUser.level || 1,
           userType: apiUser.userType || 'Registered',
           interests: apiUser.interests || [],
+          coins: apiUser.coins || 0,
         };
         localStorage.setItem("user", JSON.stringify(userToStore));
         if (calculatedAvatar) {
           localStorage.setItem("userAvatar", calculatedAvatar);
         }
       }
-
     } catch (error) {
       console.error("Error fetching user details from API:", error);
       const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
       if (storedUser) {
         try {
-          const parsedUser = JSON.parse(storedUser);
+          const parsedUser: UserDetails = JSON.parse(storedUser);
           setUserProfile(parsedUser);
           if (parsedUser.level) setUserLevel(parsedUser.level);
           setIsGuest(parsedUser.userType === 'Guest');
           setSelectedInterests(parsedUser.interests || []);
+          if (parsedUser.coins !== undefined) setCurrentCoins(parsedUser.coins);
         } catch (e) {
           console.error("Failed to parse local user data on API error:", e);
         }
@@ -239,49 +230,28 @@ export default function Home() {
     }
   };
 
-  const fetchUserCategories = async () => {
-    setCategoriesLoading(true);
-    setError(null);
+  // Preload next category in the background
+  const preloadNextCategory = async () => {
+    if (!userToken || isPreloadingRef.current) return;
+
+    isPreloadingRef.current = true;
     try {
-      const response = await apiClient(`${BASE_URL}/api/getUserCategories`, {
+      const response = await apiClient(`${BASE_URL}/api/getGetegoryToPlay`, {
         method: "GET",
       });
 
-      if (!response) {
-        setCategoriesLoading(false);
-        return;
+      if (response && response.ok) {
+        const data: CategoryToPlayResponse = await response.json();
+        if (data.categoryId) {
+          preloadedCategoryRef.current = data;
+          console.log("✅ Preloaded category:", data.categoryId);
+        }
       }
-
-      if (!response.ok) throw new Error(`Failed: ${response.status}`);
-
-      const data = await response.json();
-      const transformed: Category[] = data.map((c: any, i: number) => ({
-        _id: c._id,
-        name: c.name,
-        description: c.description || `Test your knowledge in ${c.name}`,
-        createdBy: c.createdBy || userProfile?.alias || "QuizMaster",
-        completionCount: c.completionCount || 0,
-        completionsCount: c.completionsCount || 0,
-        questionCount: c.questionCount || 10,
-        averageRating: c.averageRating ?? (3 + Math.random() * 2),
-        difficulty: c.difficulty || ["Easy", "Medium", "Hard"][i % 3],
-        imageUrl: c.imageUrl || c.image,
-        timeEstimate: `${Math.ceil((c.questionCount || 10) * 0.6)} min`,
-      }));
-      setUserCategories(transformed);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (error) {
+      console.error("Error preloading category:", error);
     } finally {
-      setCategoriesLoading(false);
+      isPreloadingRef.current = false;
     }
-  };
-
-  const handlePlayQuiz = (categoryId: string) => {
-    if (!userToken) {
-      console.log("⚠️ You must be logged in to play.");
-      return;
-    }
-    navigate(`/quiz/${categoryId}`);
   };
 
   const handleQuickQuiz = async () => {
@@ -290,6 +260,29 @@ export default function Home() {
       return;
     }
 
+    // Check if we have a preloaded category
+    if (preloadedCategoryRef.current && preloadedCategoryRef.current.categoryId) {
+      const categoryId = preloadedCategoryRef.current.categoryId;
+      
+      // Optimistically update coins
+      const optimisticCoins = currentCoins - QUIZ_COST;
+      setCurrentCoins(optimisticCoins);
+      
+      // Clear preloaded data
+      preloadedCategoryRef.current = null;
+      
+      // Navigate instantly without loading
+      navigate(`/quiz/${categoryId}`);
+      
+      // Start preloading next category in background
+      setTimeout(() => preloadNextCategory(), 1000);
+      
+      return;
+    }
+
+    // Fallback: if no preloaded data, fetch normally
+    const optimisticCoins = currentCoins - QUIZ_COST;
+    setCurrentCoins(optimisticCoins);
     setPlayButtonLoading(true);
 
     try {
@@ -298,11 +291,30 @@ export default function Home() {
       });
 
       if (!response) {
+        setCurrentCoins(prev => prev + QUIZ_COST);
         setPlayButtonLoading(false);
+        toast({
+          title: "Network Error",
+          description: "Could not connect to the server. Coins refunded.",
+          variant: "destructive",
+        });
         return;
       }
 
       if (!response.ok) {
+        const errorData: ErrorResponse = await response.json().catch(() => ({
+          message: "Unknown error during quiz start."
+        }));
+
+        toast({
+          title: "Quiz Start Failed",
+          description: errorData.message.includes("refunded")
+            ? errorData.message
+            : `Unable to start quiz: ${errorData.message}`,
+          variant: "destructive",
+        });
+
+        await loadUserProfile();
         throw new Error(`Failed to get category to play: ${response.status}`);
       }
 
@@ -311,49 +323,14 @@ export default function Home() {
       if (data.categoryId) {
         navigate(`/quiz/${data.categoryId}`);
       } else {
+        setCurrentCoins(prev => prev + QUIZ_COST);
         throw new Error("No category ID returned from server");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error getting category to play:", error);
-      if (userCategories.length > 0) {
-        navigate(`/quiz/${userCategories[0]._id}`);
-      } else {
-        console.log("❌ Unable to start quiz. Please try again later.");
-      }
+      console.log("❌ Unable to start quiz. Please try again later.");
     } finally {
       setPlayButtonLoading(false);
-    }
-  };
-
-  const handleCreateCategoryAttempt = () => {
-    if (isGuest) {
-      const { id: toastId } = toast({
-        title: "🔒 Registration Required",
-        description: "You must complete your registration to create a quiz.",
-        variant: "destructive",
-        action: (
-          <div className="flex space-x-2">
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => {
-                navigate("/profile");
-                dismiss(toastId);
-              }}
-              className="bg-primary hover:bg-primary/80"
-            >
-              Register
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => dismiss(toastId)}
-            >
-              Cancel
-            </Button>
-          </div>
-        ),
-      });
     }
   };
 
@@ -391,29 +368,52 @@ export default function Home() {
 
       setUserProfile(updatedUser);
       localStorage.setItem("user", JSON.stringify(updatedUser));
-      
+
       trackEvent("update_interests", {
         user_id: userProfile._id,
         interest_count: selectedInterests.length,
         context: "home_screen_modal",
       });
-      
+
       toast({
         title: "Success",
         description: `Interests updated successfully! (${selectedInterests.length} selected)`,
       });
 
       setIsInterestModalOpen(false);
-
     } catch (error) {
+      const err = error as Error;
       toast({
         title: "Error",
-        description: `Failed to save interests: ${(error as Error).message}`,
+        description: `Failed to save interests: ${err.message}`,
         variant: "destructive",
       });
     } finally {
       setSavingInterests(false);
     }
+  };
+
+  const handleCoinsEarned = (amount: number) => {
+    setCurrentCoins(prev => {
+      const newTotal = prev + amount;
+
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        try {
+          const user: UserDetails = JSON.parse(storedUser);
+          const updatedUser = { ...user, coins: newTotal };
+          localStorage.setItem("user", JSON.stringify(updatedUser));
+        } catch (e) {
+          console.error("Failed to update coins in localStorage:", e);
+        }
+      }
+
+      return newTotal;
+    });
+  };
+
+  const handleCoinsUpdate = (coins: number) => {
+    setCurrentCoins(coins);
   };
 
   if (showSplash) {
@@ -423,232 +423,114 @@ export default function Home() {
   const alias = userProfile?.alias || "Guest";
   const avatarImage = userAvatar || undefined;
 
-  // Improved background style with better positioning
-  const backgroundStyle = {
-    backgroundImage: `url('/homebg1.jpg')`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center center',
-    backgroundRepeat: 'no-repeat',
-    backgroundAttachment: 'fixed',
-    backgroundColor: '#100321',
-    minHeight: '100vh',
-  };
-
   return (
-    <div
-      className="min-h-screen"
-      style={backgroundStyle}
-    >
+    <div className="fixed inset-0 flex flex-col bg-[#0a0114] overflow-hidden">
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
-      <div className="mx-auto max-w-full space-y-4 px-4 pb-20 lg:px-8 lg:pb-8">
-        <GameStatsHeader userToken={userToken} isParentLoading={loading} />
+      <div className="flex-1 flex flex-col px-4 lg:px-8 w-full overflow-hidden">
+        {/* Top Section - Stats and Notifications */}
+        <div className={`space-y-3 flex-shrink-0 ${isSmallScreen ? 'pt-2' : 'pt-3'} max-w-4xl mx-auto w-full`}>
+          <GameStatsHeader
+            userToken={userToken}
+            isParentLoading={loading}
+            onCoinsUpdate={handleCoinsUpdate}
+            currentCoinsFromParent={currentCoins}
+          />
 
-        {/* Guest User Registration Panel */}
-        {isGuest && (
-          <Card
-            className="bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] border-gray-200 dark:border-gray-700 dark:text-white p-3 shadow-lg flex items-center justify-between space-x-3"
-          >
-            <div className="flex items-center space-x-3 flex-shrink-0">
-              <AlertTriangle className="w-5 h-5 text-red-500 dark:text-purple-400" />
-            </div>
+          {isGuest && (
+            <Card className="bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] border-gray-200 dark:border-gray-700 dark:text-white p-3 shadow-lg flex items-center justify-between space-x-3">
+              <div className="flex items-center space-x-3 flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-500 dark:text-purple-400" />
+              </div>
+              <p className="text-sm text-white font-semibold leading-snug flex-grow">
+                Don't lose your progress
+              </p>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => navigate("/profile")}
+              >
+                Register Now
+              </Button>
+            </Card>
+          )}
 
-            <p className="text-sm text-white font-semibold leading-snug flex-grow">
-              Don't lose your progress
-            </p>
+          <DailyCoinClaim
+            userToken={userToken}
+            onCoinsEarned={handleCoinsEarned}
+          />
+        </div>
 
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => navigate("/profile")}
-            >
-              Register Now
-            </Button>
-          </Card>
-        )}
-{/* Daily Coin Claim */}
-<DailyCoinClaim 
-  userToken={userToken}
-  onCoinsEarned={(amount) => {
-    console.log(`Earned ${amount} coins!`);
-  }}
-/>
-    {/* User Avatar and Alias */}
-<div className="flex flex-col items-center py-6">
-  <div
-    className="
-      relative 
-      rounded-full 
-      flex items-center justify-center
-      overflow-visible
-      mx-auto
-      w-[180px] h-[180px]    /* base size */
-      sm:w-[200px] sm:h-[200px]
-      md:w-[240px] md:h-[240px]
-      lg:w-[260px] lg:h-[260px]
-      xl:w-[280px] xl:h-[280px]
-    "
-    style={{
-      backgroundImage: `url('/image.png')`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      backgroundRepeat: "no-repeat",
-    }}
-  >
-    <Link to="/profile" className="no-underline relative z-10">
-      <Avatar
-        className="
-          rounded-full 
-          overflow-visible 
-          relative 
-          w-[130px] h-[130px]
-          sm:w-[150px] sm:h-[150px]
-          md:w-[180px] md:h-[180px]
-          lg:w-[200px] lg:h-[200px]
-          xl:w-[220px] xl:h-[220px]
-        "
-      >
-        <AvatarImage
-          src={avatarImage}
-          alt={alias}
-          className="object-contain scale-[1.12] relative z-10"
-        />
-        <AvatarFallback className="bg-transparent border-none text-white font-bold text-3xl md:text-4xl">
-          {alias.charAt(0).toUpperCase()}
-        </AvatarFallback>
-      </Avatar>
-    </Link>
+        {/* Middle Section - Avatar (Flexibly sized) */}
+        <div className="flex items-center justify-center flex-1 min-h-0">
+          <div className="relative flex flex-col items-center justify-center">
+            <Link to="/profile" className="z-10">
+              <div className={`${isSmallScreen ? 'w-[220px] h-[220px]' : 'w-[180px] h-[180px] sm:w-[200px] sm:h-[200px]'}`}>
+                {avatarImage ? (
+                  <img src={avatarImage} alt={alias} className="w-full h-full object-contain" style={{ background: 'transparent' }} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white"></div>
+                  </div>
+                )}
+              </div>
+            </Link>
 
-    {/* Username */}
-    <h2
-      className="
-        absolute 
-        left-1/2 -translate-x-1/2 
-        text-white font-extrabold text-center whitespace-nowrap
-        -bottom-6
-        text-xl
-        sm:text-2xl
-        md:text-3xl
-        lg:text-4xl
-        max-w-[220px] sm:max-w-[260px] md:max-w-[300px]
-      "
-      style={{
-        textShadow:
-          "0 0 8px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.4)",
-      }}
-    >
-      {alias
-        .split(/[\s-_]+/)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ")}
-    </h2>
-  </div>
-</div>
+            <h2 className={`mt-4 text-white font-extrabold drop-shadow-lg capitalize ${isSmallScreen ? 'text-4xl' : 'text-3xl sm:text-4xl'}`}>
+              {alias}
+            </h2>
+          </div>
+        </div>
 
-        {/* Play Button */}
-        <div className="pb-3 relative">
+        {/* Bottom Section - Play Button (Fixed) */}
+        <div className={`space-y-2 flex-shrink-0 max-w-4xl mx-auto w-full ${isSmallScreen ? 'pb-28' : 'pb-20'}`}>
           <Button
+            variant="default"
             onClick={handleQuickQuiz}
-            disabled={loading || playButtonLoading}
-            className="w-full h-16 md:h-20 flex items-center justify-between px-6 relative overflow-hidden rounded-full shadow-lg"
+            disabled={loading || playButtonLoading || currentCoins < QUIZ_COST}
+            className={`w-full flex items-center justify-between px-6 ${isSmallScreen ? 'h-24' : 'h-20 sm:h-24'}`}
           >
             {playButtonLoading ? (
-              <div className="flex items-center text-xl md:text-2xl justify-center w-full">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+              <div className="flex items-center text-2xl sm:text-3xl justify-center w-full">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
                 Starting Quiz...
               </div>
             ) : (
               <>
-                <span className="text-3xl md:text-4xl font-bold text-white">Play</span>
-                <div className="relative">
-                  <div className="bg-white rounded-full w-14 h-14 md:w-16 md:h-16 flex flex-col items-center justify-center shadow-md">
-                    <span className="text-green-500 text-xl md:text-2xl font-bold leading-none">{userLevel}</span>
-                    <span className="text-green-500 text-xs font-medium uppercase leading-none">Level</span>
-                  </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-4xl sm:text-5xl font-extrabold text-white leading-none">
+                    Play
+                  </span>
+                  <span className="text-base sm:text-lg font-semibold text-yellow-300 flex items-center gap-1 bg-gray-700/70 px-3 py-1.5 rounded-full">
+                    <svg viewBox="0 0 24 24" className="h-7 w-7 sm:h-8 sm:w-8" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="12" cy="12" r="8" fill="#f59e0b" />
+                      <circle cx="12" cy="12" r="7" fill="#fbbf24" />
+                      <circle cx="12" cy="12" r="4" fill="#f59e0b" opacity="0.4" />
+                    </svg>
+                    {QUIZ_COST}
+                  </span>
+                </div>
+
+                <div className="bg-white rounded-full w-16 h-16 sm:w-20 sm:h-20 flex flex-col items-center justify-center shadow-md border-2 border-indigo-300">
+                  <span className="text-green-600 text-2xl sm:text-3xl font-bold leading-none">
+                    {userLevel}
+                  </span>
+                  <span className="text-green-600 text-xs sm:text-sm font-semibold uppercase leading-none tracking-wide">
+                    Level
+                  </span>
                 </div>
               </>
             )}
           </Button>
-        </div>
 
-        {/* My Categories */}
-        <div className="mt-4 pb-20">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg md:text-xl font-bold flex items-center text-white">
-              <Brain className="w-5 h-5 mr-2" />
-              Your Quizzes
-            </h3>
-          </div>
-
-          {error ? (
-            <Card className="p-8 text-center bg-white/5 backdrop-blur-sm border-white/10">
-              <div className="space-y-3">
-                <p className="text-red-500">Error: {error}</p>
-                <Button onClick={fetchUserCategories} variant="outline" size="sm">
-                  Try Again
-                </Button>
-              </div>
-            </Card>
-          ) : categoriesLoading ? (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i} className="p-4 animate-pulse bg-white/5 backdrop-blur-sm border-white/10">
-                  <div className="h-32 bg-muted/20 rounded mb-4" />
-                  <div className="space-y-2">
-                    <div className="h-4 bg-muted/20 rounded w-3/4" />
-                    <div className="h-3 bg-muted/20 rounded w-1/2" />
-                    <div className="h-3 bg-muted/20 rounded w-1/2" />
-                  </div>
-                </Card>
-              ))}
-            </div>
-          ) : userCategories.length === 0 ? (
-            // Empty State with Better Centering
-            <div className="flex justify-center items-center min-h-[200px]">
-              <AddCategory
-                fetchCategories={fetchUserCategories}
-                isGuest={isGuest}
-                onRegistrationRequired={handleCreateCategoryAttempt}
-                isEmbeddedInEmptyState={true} 
-              />
-            </div>
-          ) : (
-            // Display existing categories
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {userCategories.map((cat) => (
-                  <CategoryCard
-                    key={cat._id}
-                    id={cat._id}
-                    title={cat.name}
-                    description={cat.description}
-                    difficulty={cat.difficulty || "Medium"}
-                    questionCount={cat.questionCount || 10}
-                    completions={cat.completionCount || cat.completionsCount || 0}
-                    rating={cat.averageRating || 0}
-                    timeEstimate={cat.timeEstimate || "5 min"}
-                    imageUrl={cat.imageUrl || `coming soon`}
-                    createdBy={cat.createdBy || alias}
-                    onPlay={handlePlayQuiz}
-                  />
-                ))}
-              </div>
-              
-              {/* Add Category Button below existing categories */}
-              <div className="mt-6">
-                <AddCategory
-                  fetchCategories={fetchUserCategories}
-                  isGuest={isGuest}
-                  onRegistrationRequired={handleCreateCategoryAttempt}
-                  isEmbeddedInEmptyState={false}
-                />
-              </div>
-            </div>
+          {currentCoins < QUIZ_COST && !loading && (
+            <p className="text-red-400 text-sm text-center font-medium">
+              Not enough coins to start a quiz.
+            </p>
           )}
         </div>
       </div>
 
-      {/* Interest Selection Modal */}
       <Dialog open={isInterestModalOpen} onOpenChange={setIsInterestModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -660,7 +542,7 @@ export default function Home() {
               Help us personalize your experience by selecting topics you're interested in.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="py-4">
             {userProfile?._id && (
               <InterestSelector
@@ -680,7 +562,7 @@ export default function Home() {
             >
               Skip for Now
             </Button>
-            <Button 
+            <Button
               onClick={handleSaveInterests}
               disabled={savingInterests || selectedInterests.length === 0}
             >
