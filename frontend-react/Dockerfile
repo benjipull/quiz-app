@@ -3,11 +3,11 @@ FROM node:18 AS build
 
 WORKDIR /app
 
-# Accept build-time environment variable from Cloud Build
 ARG VITE_API_BASE_URL
+ARG ANALYTICS_ENABLED
 
-# write it to file
-RUN echo "VITE_BASE_URL=${VITE_API_BASE_URL}" > .env
+RUN echo "VITE_BASE_URL=${VITE_API_BASE_URL}" > .env \
+ && echo "VITE_ANALYTICS_ENABLED=${ANALYTICS_ENABLED}" >> .env
 
 
 COPY package.json package-lock.json ./

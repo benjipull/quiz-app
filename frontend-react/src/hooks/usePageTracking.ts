@@ -2,11 +2,13 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import ReactGA from 'react-ga4';
+const analyticsEnabled = import.meta.env.VITE_ANALYTICS_ENABLED === "true";
 
 export function usePageTracking() {
   const location = useLocation();
 
   useEffect(() => {
+    if (!analyticsEnabled) return; 
     if (ReactGA.isInitialized) {
       ReactGA.send({
         hitType: 'pageview',
