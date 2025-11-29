@@ -44,7 +44,7 @@ function playClick() {
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-5 whitespace-nowrap font-semibold \
-   rounded-[18px] border-none \
+   rounded-[12px] border-none \
    transition-all duration-150 active:scale-95 hover:scale-105 \
    disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none \
    shadow-[0_2px_4px_rgba(0,0,0,0.18)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.25)]",
@@ -70,8 +70,7 @@ const buttonVariants = cva(
            text-[hsl(var(--warning-foreground))]",
 
         outline:
-          "bg-transparent text-white border-2 border-[hsl(var(--secondary))] \
-           shadow-none hover:shadow-none",
+  "bg-transparent border-2 shadow-none hover:shadow-none focus-visible:outline-none transition-colors duration-150",
 
         ghost:
           "bg-transparent text-white shadow-none \
@@ -101,7 +100,6 @@ const buttonVariants = cva(
     },
   }
 );
-
 
 /* ------------------------------------------------------------------
     BUTTON COMPONENT

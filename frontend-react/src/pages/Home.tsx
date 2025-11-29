@@ -424,7 +424,12 @@ export default function Home() {
   const avatarImage = userAvatar || undefined;
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden">
+      <div
+        className="fixed inset-0 flex flex-col overflow-hidden"
+        style={{
+          background: `radial-gradient(circle at center, #2a0a3b 0%, #180524 55%, #0e0316 100%)`,
+        }}
+      >     
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
       <div className="flex-1 flex flex-col px-4 lg:px-8 w-full overflow-hidden">
@@ -483,45 +488,46 @@ export default function Home() {
         </div>
 
         {/* Bottom Section - Play Button (Fixed) */}
-        <div className={`space-y-2 flex-shrink-0 max-w-4xl mx-auto w-full ${isSmallScreen ? 'pb-28' : 'pb-20'}`}>
+        <div className={`space-y-2 flex-shrink-0 max-w-4xl mx-auto w-full ${isSmallScreen ? 'pb-36' : 'pb-32'}`}>
           <Button
-            variant="default"
-            onClick={handleQuickQuiz}
-            disabled={loading || playButtonLoading || currentCoins < QUIZ_COST}
-            className={`w-full flex items-center justify-between px-6 ${isSmallScreen ? 'h-24' : 'h-20 sm:h-24'}`}
-          >
-            {playButtonLoading ? (
-              <div className="flex items-center text-2xl sm:text-3xl justify-center w-full">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
-                Starting Quiz...
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-3">
-                  <span className="text-4xl sm:text-5xl font-extrabold text-white leading-none">
-                    Play
-                  </span>
-                  <span className="text-base sm:text-lg font-semibold text-yellow-300 flex items-center gap-1 bg-gray-700/70 px-3 py-1.5 rounded-full">
-                    <svg viewBox="0 0 24 24" className="h-7 w-7 sm:h-8 sm:w-8" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="12" cy="12" r="8" fill="#f59e0b" />
-                      <circle cx="12" cy="12" r="7" fill="#fbbf24" />
-                      <circle cx="12" cy="12" r="4" fill="#f59e0b" opacity="0.4" />
-                    </svg>
-                    {QUIZ_COST}
-                  </span>
-                </div>
+  variant="default"
+  onClick={handleQuickQuiz}
+  disabled={loading || playButtonLoading || currentCoins < QUIZ_COST}
+  className={`w-full flex items-center justify-between px-4 ${isSmallScreen ? 'h-16' : 'h-20 sm:h-20'}`}
+>
+  {playButtonLoading ? (
+    <div className="flex items-center text-xl sm:text-2xl justify-center w-full gap-2">
+      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+      Starting Quiz...
+    </div>
+  ) : (
+    <>
+      <div className="flex items-center gap-2 sm:gap-3">
+        <span className="text-3xl sm:text-4xl font-extrabold text-white leading-none">
+          Play
+        </span>
+        <span className="text-sm sm:text-base font-semibold text-yellow-300 flex items-center gap-1 bg-gray-700/70 px-2 py-1 rounded-full">
+          <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="8" fill="#f59e0b" />
+            <circle cx="12" cy="12" r="7" fill="#fbbf24" />
+            <circle cx="12" cy="12" r="4" fill="#f59e0b" opacity="0.4" />
+          </svg>
+          {QUIZ_COST}
+        </span>
+      </div>
 
-                <div className="bg-white rounded-full w-16 h-16 sm:w-20 sm:h-20 flex flex-col items-center justify-center shadow-md border-2 border-indigo-300">
-                  <span className="text-green-600 text-2xl sm:text-3xl font-bold leading-none">
-                    {userLevel}
-                  </span>
-                  <span className="text-green-600 text-xs sm:text-sm font-semibold uppercase leading-none tracking-wide">
-                    Level
-                  </span>
-                </div>
-              </>
-            )}
-          </Button>
+      <div className="bg-white rounded-full w-12 h-12 sm:w-16 sm:h-16 flex flex-col items-center justify-center shadow-md border-2 border-indigo-300">
+        <span className="text-green-600 text-xl sm:text-2xl font-bold leading-none">
+          {userLevel}
+        </span>
+        <span className="text-green-600 text-xs sm:text-sm font-semibold uppercase leading-none tracking-wide">
+          Level
+        </span>
+      </div>
+    </>
+  )}
+</Button>
+
 
           {currentCoins < QUIZ_COST && !loading && (
             <p className="text-red-400 text-sm text-center font-medium">

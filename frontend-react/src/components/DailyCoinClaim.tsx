@@ -300,8 +300,8 @@ className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
     >
       {canClaim ? (
         <>
-          <Sparkles className={`w-5 h-5 ${isClaiming ? "text-gray-400" : "text-yellow-400"}`} />
-          <span className={`font-bold whitespace-nowrap ${isClaiming ? "text-gray-400" : "text-yellow-400"}`}>
+          <Sparkles className={`w-5 h-5 ${isClaiming ? "text-gray-400" : "text-white/80"}`} />
+          <span className={`font-bold whitespace-nowrap ${isClaiming ? "text-gray-400" : "text-white/80"}`}>
             {isClaiming ? "Claiming..." : "Claim Now"}
           </span>
         </>

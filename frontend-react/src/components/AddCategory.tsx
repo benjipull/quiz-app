@@ -141,8 +141,8 @@ const AddCategory: React.FC<AddCategoryProps> = ({
                     onClick={handleCreateCategory}
                     disabled={loading || !categoryName.trim()}
                     size="sm"
-                    className="flex-1"
-                  >
+    className="flex-1 border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+>
                     {loading ? "Creating..." : "Create"}
                   </Button>
 
