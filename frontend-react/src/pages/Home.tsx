@@ -470,7 +470,7 @@ export default function Home() {
         <div className="flex items-center justify-center flex-1 min-h-0">
           <div className="relative flex flex-col items-center justify-center">
             <Link to="/profile" className="z-10">
-              <div className={`${isSmallScreen ? 'w-[220px] h-[220px]' : 'w-[180px] h-[180px] sm:w-[200px] sm:h-[200px]'}`}>
+              <div className={`${isSmallScreen ? 'w-[180px] h-[1800px]' : 'w-[2200px] h-[2200px] sm:w-[200px] sm:h-[200px]'}`}>
                 {avatarImage ? (
                   <img src={avatarImage} alt={alias} className="w-full h-full object-contain" style={{ background: 'transparent' }} />
                 ) : (
