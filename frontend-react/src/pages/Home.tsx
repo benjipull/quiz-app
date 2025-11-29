@@ -488,7 +488,7 @@ export default function Home() {
         </div>
 
         {/* Bottom Section - Play Button (Fixed) */}
-        <div className={`space-y-2 flex-shrink-0 max-w-4xl mx-auto w-full ${isSmallScreen ? 'pb-36' : 'pb-32'}`}>
+        <div className={`space-y-2 flex-shrink-0 max-w-4xl mx-auto w-full ${isSmallScreen ? 'pb-36' : 'pb-24'}`}>
           <Button
   variant="default"
   onClick={handleQuickQuiz}
