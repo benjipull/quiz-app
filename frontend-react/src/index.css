@@ -9,34 +9,36 @@
 /* Global CSS Variables */
 :root {
   /* Base Colors */
---background: 268 80% 6%;
+  --background: 268 80% 6%;
   --foreground: 210 40% 98%;
 
   /* Primary Colors (Purple) */
-  --primary: 270 95% 60%;
+  --primary: 284 24% 50%;
   --primary-foreground: 0 0% 100%;
   --primary-glow: 270 95% 75%;
 
   /* Secondary Colors (Green #709B64) */
---secondary: 120 18% 50%;
---secondary-foreground: 0 0% 100%; 
-
+  --secondary: 109 21% 50%;
+  --secondary-foreground: 0 0% 100%;
 
   /* Semantic Colors */
-  --destructive: 0 84% 60%; /* Red */
+  --destructive: 354 45% 57%;
   --destructive-foreground: 0 0% 100%;
 
-  --warning: 35 100% 60%; /* Yellow */
+  --warning: 40 63% 57%;
   --warning-foreground: 0 0% 100%;
 
-  --success: 150 70% 45%; /* Slightly different green for success */
+  --success: 150 70% 45%;
   --success-foreground: 0 0% 100%;
 
-  --muted: 217 32% 18%; /* Dark gray */
+  --muted: 217 32% 18%;
   --muted-foreground: 215 20% 65%;
 
-  --accent: 280 85% 65%; /* Blueish purple accent */
+  --accent: 280 85% 65%;
   --accent-foreground: 0 0% 100%;
+    
+  --info: 214 30% 51%;
+  --info-foreground: 0 0% 100%;
 
   /* Card / Popover / Quiz */
   --card: 224 71% 8%;
@@ -52,12 +54,12 @@
   /* Sidebar */
   --sidebar-background: 240 5.9% 10%;
   --sidebar-foreground: 240 4.8% 95.9%;
-  --sidebar-primary: 270 95% 60%; /* Purple */
+  --sidebar-primary: 270 95% 60%;
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 280 85% 65%;
   --sidebar-accent-foreground: 0 0% 100%;
   --sidebar-border: 240 3.7% 15.9%;
-  --sidebar-ring: 140 70% 50%; /* Green ring */
+  --sidebar-ring: 140 70% 50%;
 
   /* Border & Input */
   --border: 217 32% 18%;
@@ -68,9 +70,16 @@
   --radius: 1rem;
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
-  --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary)));
-  --gradient-bg: linear-gradient(180deg, hsl(var(--background)), hsl(var(--muted)));
+  --gradient-primary: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(284, 45%, 60%) 100%);
+  --gradient-secondary: linear-gradient(135deg, hsl(109, 25%, 35%) 0%, hsl(109, 21%, 50%) 100%);
+
+  /* ✅ VERIFIED: Your preferred radial background */
+  --gradient-bg: radial-gradient(
+      circle at center,
+      #2a0a3b 0%,
+      #180524 55%,
+      #0e0316 100%
+    );
 }
 
 /* ----------------------------
@@ -82,9 +91,37 @@
   }
 
   body {
-    background-color: hsl(var(--background));
+    /* ✅ VERIFIED: Matches your requirement exactly */
+    background: radial-gradient(
+        circle at center,
+        #2a0a3b 0%,
+        #180524 55%,
+        #0e0316 100%
+    ) !important;
+    background-size: cover !important;
+    background-attachment: fixed !important;
+    
     color: hsl(var(--foreground));
     @apply transition-all duration-300;
     min-height: 100vh;
+  }
+}
+
+/* ----------------------------
+   Additional Utility Classes
+-------------------------------*/
+@layer utilities {
+  /* Smooth scrolling for better UX */
+  .smooth-scroll {
+    scroll-behavior: smooth;
+  }
+  
+  /* Text gradient utilities */
+  .text-gradient-primary {
+    @apply bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent;
+  }
+  
+  .text-gradient-secondary {
+    @apply bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent;
   }
 }

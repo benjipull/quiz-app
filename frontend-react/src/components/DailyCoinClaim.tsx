@@ -38,8 +38,7 @@ const [coinGainAudio] = useState(
 typeof Audio !== "undefined" ? new Audio(COINS_GAIN_SOUND_SRC) : null
 );
 
-const claimButtonRef = useRef<HTMLDivElement>(null);
-
+const claimButtonRef = useRef<HTMLButtonElement>(null);
 const fetchDailyBonusAmount = useCallback(async () => {
 try {
 const response = await apiClient(`${BASE_URL}/api/claimDailyCoins/amount`, {
@@ -262,59 +261,59 @@ className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
 
  <Card className="w-full max-w-8xl rounded-[30px] bg-transparent border-none p-2 sm:p-4">
   <div className="flex items-center justify-between gap-2 sm:gap-4">
-   <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-    <div className="relative flex-shrink-0">
- <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center">
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" className="w-full h-full">
-   <circle cx="10" cy="11" r="7" fill="#d97706" />
-   <circle cx="10" cy="11" r="6" fill="#fcd34d" />
-   <circle cx="10" cy="11" r="3.5" fill="#d97706" opacity="0.4" />
-   <circle cx="17" cy="16" r="8" fill="#d97706" />
-   <circle cx="17" cy="16" r="7" fill="#fcd34d" />
-   <circle cx="17" cy="16" r="4.2" fill="#d97706" opacity="0.4" />
-  </svg>
- </div>
+    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+      <div className="relative flex-shrink-0">
+        <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" className="w-full h-full">
+            <circle cx="10" cy="11" r="7" fill="#d97706" />
+            <circle cx="10" cy="11" r="6" fill="#fcd34d" />
+            <circle cx="10" cy="11" r="3.5" fill="#d97706" opacity="0.4" />
+            <circle cx="17" cy="16" r="8" fill="#d97706" />
+            <circle cx="17" cy="16" r="7" fill="#fcd34d" />
+            <circle cx="17" cy="16" r="4.2" fill="#d97706" opacity="0.4" />
+          </svg>
+        </div>
 
- <span className="absolute bottom-[-18px] left-2 bg-secondary rounded-full border-2 border-white/80 px-2.5 sm:px-3 py-0.5 text-xs sm:text-sm font-bold text-white shadow-lg whitespace-nowrap">
-  +{dailyBonusAmount}
- </span>
+       <span className="absolute bottom-[-18px] left-2 bg-secondary rounded-[10px] border-2 border-white/80 px-2.5 sm:px-3 py-0.5 text-xs sm:text-sm font-bold text-white shadow-lg whitespace-nowrap">
+      +{dailyBonusAmount}
+      </span>
+      </div>
+
+      <div className="leading-tight min-w-0 -ml-1">
+        <h3 className="text-white font-bold text-lg sm:text-2xl whitespace-nowrap">Daily Reward</h3>
+      </div>
     </div>
 
-    <div className="leading-tight min-w-0 -ml-1">
- <h3 className="text-white font-bold text-lg sm:text-2xl whitespace-nowrap">Daily Reward</h3>
-    </div>
-   </div>
-
-   <div
-    ref={claimButtonRef}
-    className={`
- flex items-center gap-1 sm:gap-2
- px-3 py-1.5 sm:px-6 sm:py-3
- rounded-full
- ${
-  canClaim
-   ? "bg-yellow-500/10 border-[3px] border-yellow-400 shadow-[0_0_25px_rgba(255,255,0,0.5)] cursor-pointer hover:bg-yellow-500/20 transition-colors"
-   : "bg-[#8F649B] shadow-[0_0_15px_rgba(240,171,240,0.4),_0_4px_15px_rgba(0,0,0,0.5)] border border-purple-800/50"
- }
-    `}
-    onClick={handleClaimClick}
-   >
-    {canClaim ? (
- <>
-  <Sparkles className={`w-4 h-4 sm:w-6 sm:h-6 ${isClaiming ? "text-gray-400" : "text-yellow-400"}`} />
-  <span className={`font-bold text-sm sm:text-lg whitespace-nowrap ${isClaiming ? "text-gray-400" : "text-yellow-400"}`}>
-   {isClaiming ? "Claiming..." : "Claim Now"}
-  </span>
- </>
-    ) : (
- <>
-  <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" />
-  <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap">{formatTimeRemaining(timeRemaining)}</span>
- </>
-    )}
-   </div>
+    <Button
+      ref={claimButtonRef}
+      size="sm"
+      variant={canClaim ? "warning" : "purple"}
+      onClick={handleClaimClick}
+      disabled={!canClaim || isClaiming}
+      className={`
+        flex items-center gap-2
+        ${canClaim 
+          ? "!bg-yellow-500/10 !border-[3px] !border-yellow-400 !shadow-[0_0_25px_rgba(255,255,0,0.5)] hover:!bg-yellow-500/20" 
+          : "!bg-[#8F649B] !shadow-[0_0_15px_rgba(240,171,240,0.4),_0_4px_15px_rgba(0,0,0,0.5)] !border-purple-800/50"
+        }
+      `}
+    >
+      {canClaim ? (
+        <>
+          <Sparkles className={`w-5 h-5 ${isClaiming ? "text-gray-400" : "text-yellow-400"}`} />
+          <span className={`font-bold whitespace-nowrap ${isClaiming ? "text-gray-400" : "text-yellow-400"}`}>
+            {isClaiming ? "Claiming..." : "Claim Now"}
+          </span>
+        </>
+      ) : (
+        <>
+          <Clock className="w-5 h-5 text-[#f0abf0] opacity-90" />
+          <span className="text-white font-bold whitespace-nowrap">{formatTimeRemaining(timeRemaining)}</span>
+        </>
+      )}
+    </Button>
   </div>
- </Card>
+</Card>
 
  {/* Flying coin tokens */}
  {showFlyingCoins &&

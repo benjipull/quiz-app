@@ -530,7 +530,7 @@ const Profile = () => {
             <Button
               type="submit"
               disabled={updating || savingInterests}
-              className={`w-full h-10 transition-colors ${isGuest ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-primary hover:bg-primary/90"}`}
+              className='w-full h-10 transition-colors'
             >
               {updating ? (
                 <div className="flex items-center space-x-2">
@@ -583,9 +583,9 @@ const Profile = () => {
               Cancel
             </Button>
             <Button 
+              variant="blue"
               onClick={handleSaveInterests}
               disabled={savingInterests}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               {savingInterests ? (
                 <div className="flex items-center space-x-2">

@@ -424,7 +424,7 @@ export default function Home() {
   const avatarImage = userAvatar || undefined;
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-[#0a0114] overflow-hidden">
+    <div className="fixed inset-0 flex flex-col overflow-hidden">
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
       <div className="flex-1 flex flex-col px-4 lg:px-8 w-full overflow-hidden">

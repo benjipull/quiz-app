@@ -45,7 +45,7 @@ export const BottomTabs = () => {
                   "flex items-center justify-center rounded-full transition-all duration-300 shadow-lg",
                   isCenter
                     ? isActive
-                      ? "w-16 h-16 bg-gradient-to-r from-primary to-accent text-primary-foreground scale-110 shadow-xl"
+                      ? "w-16 h-16 bg-primary text-primary-foreground scale-110 shadow-xl"
                       : "w-16 h-16 bg-background border-2 border-primary/30 text-primary hover:scale-105 shadow-xl"
                     : isActive
                     ? "w-12 h-12 bg-primary text-primary-foreground"
