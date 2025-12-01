@@ -5,7 +5,7 @@ const User = require("../models/user");
 const authenticateToken = require("../middleware/auth");
 const { userQuestions } = require("../index"); // Import shared store
 
-const QUIZ_COST = 100; // Define the quiz cost (100 coins)
+const QUIZ_COST = 50; 
 
 const difficultyNames = {
     1: "Basic",
