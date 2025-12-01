@@ -304,6 +304,8 @@ export default function Quiz() {
   const storedUser = localStorage.getItem("user");
   const userId = storedUser ? JSON.parse(storedUser)._id : null;
   const [answeredIndex, setAnsweredIndex] = useState(0);
+  const [playButtonLoading, setPlayButtonLoading] = useState(false);
+
 
 
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
@@ -359,6 +361,38 @@ export default function Quiz() {
       setIsReporting(false);
     }
   };
+
+const handleNextQuiz = async () => {
+  if (!userToken) {
+    console.error("User must be logged in");
+    return;
+  }
+
+  setPlayButtonLoading(true);
+
+  try {
+    const response = await fetch(
+      `${BASE_URL}/api/getGetegoryToPlay?exclude=${categoryId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (response.ok && data.categoryId) {
+      window.location.href = `/quiz/${data.categoryId}`;
+    }
+  } catch (error) {
+    console.error("Error loading next quiz:", error);
+  } finally {
+    setPlayButtonLoading(false);
+  }
+};
 
   const closeReportDialog = () => {
     const wasSuccessful = reportSuccess; 
@@ -1149,6 +1183,56 @@ export default function Quiz() {
                 );
               })}
             </div>
+            {/* NEXT QUIZ BUTTON ON FIRST QUESTION BEFORE ANSWERING */}
+{quizState.currentQuestionIndex === 1 && !selectedAnswer && (
+  <div className="mt-6 px-4">
+    <Button
+      onClick={handleNextQuiz}
+      disabled={playButtonLoading}
+      className="w-full flex items-center justify-between px-6 h-16 sm:h-20 text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
+    >
+      {playButtonLoading ? (
+        <div className="flex items-center text-xl sm:text-2xl justify-center w-full gap-2">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+          Loading...
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-3 sm:gap-4">
+            <span className="text-2xl sm:text-3xl font-extrabold text-white leading-none">
+              Next Quiz
+            </span>
+            <span className="text-base sm:text-lg font-semibold text-yellow-300 flex items-center gap-1.5 bg-gray-700/70 px-3 py-1.5 rounded-full">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6">
+                <circle cx="12" cy="12" r="8" fill="#f59e0b" />
+                <circle cx="12" cy="12" r="7" fill="#fbbf24" />
+                <circle cx="12" cy="12" r="4" fill="#f59e0b" opacity="0.4" />
+              </svg>
+              50
+            </span>
+          </div>
+
+          <div className="flex items-center">
+            <svg
+              className="w-6 h-6 sm:w-8 sm:h-8 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </div>
+        </>
+      )}
+    </Button>
+  </div>
+)}
+
 
             {timeUp && (
               <div ref={explanationRef}>
