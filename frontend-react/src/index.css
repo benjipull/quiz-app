@@ -12,33 +12,26 @@
   --background: 268 80% 6%;
   --foreground: 210 40% 98%;
 
-  /* Primary Colors (Purple) */
-  --primary: 284 24% 50%;
+  /* Primary & Secondary */
+  --primary: 143 39% 61%;          /* 💜 Purple */
   --primary-foreground: 0 0% 100%;
   --primary-glow: 270 95% 75%;
 
-  /* Secondary Colors (Green #709B64) */
-  --secondary: 109 21% 50%;
+  --secondary: 112 25% 48%;        /* 💚 Green */
   --secondary-foreground: 0 0% 100%;
 
   /* Semantic Colors */
-  --destructive: 354 45% 57%;
+  --destructive: 354 45% 57%;      /* 🔴 Red */
   --destructive-foreground: 0 0% 100%;
 
-  --warning: 40 63% 57%;
+  --warning: 40 63% 57%;           /* 🟡 Amber */
   --warning-foreground: 0 0% 100%;
 
-  --success: 150 70% 45%;
-  --success-foreground: 0 0% 100%;
-
-  --muted: 217 32% 18%;
-  --muted-foreground: 215 20% 65%;
-
-  --accent: 280 85% 65%;
-  --accent-foreground: 0 0% 100%;
-    
-  --info: 214 30% 51%;
+  --info: 214 30% 51%;             /* 🔵 Blue (neutral) */
   --info-foreground: 0 0% 100%;
+
+  --success: 150 70% 45%;          /* Optional Success (green-like) */
+  --success-foreground: 0 0% 100%;
 
   /* Card / Popover / Quiz */
   --card: 224 71% 8%;
@@ -70,16 +63,23 @@
   --radius: 1rem;
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(284, 45%, 60%) 100%);
-  --gradient-secondary: linear-gradient(135deg, hsl(109, 25%, 35%) 0%, hsl(109, 21%, 50%) 100%);
+  --gradient-primary: linear-gradient(
+    135deg,
+    hsl(var(--primary)) 0%,
+    hsl(284, 45%, 60%) 100%
+  );
+  --gradient-secondary: linear-gradient(
+    135deg,
+    hsl(var(--secondary)) 0%,
+    hsl(109, 21%, 50%) 100%
+  );
 
-  /* ✅ VERIFIED: Your preferred radial background */
   --gradient-bg: radial-gradient(
-      circle at center,
-      #2a0a3b 0%,
-      #180524 55%,
-      #0e0316 100%
-    );
+    circle at center,
+    #2a0a3b 0%,
+    #180524 55%,
+    #0e0316 100%
+  );
 }
 
 /* ----------------------------
@@ -91,16 +91,9 @@
   }
 
   body {
-    /* ✅ VERIFIED: Matches your requirement exactly */
-    background: radial-gradient(
-        circle at center,
-        #2a0a3b 0%,
-        #180524 55%,
-        #0e0316 100%
-    ) !important;
+    background: var(--gradient-bg) !important;
     background-size: cover !important;
     background-attachment: fixed !important;
-    
     color: hsl(var(--foreground));
     @apply transition-all duration-300;
     min-height: 100vh;
@@ -108,19 +101,17 @@
 }
 
 /* ----------------------------
-   Additional Utility Classes
+   Utility Classes
 -------------------------------*/
 @layer utilities {
-  /* Smooth scrolling for better UX */
   .smooth-scroll {
     scroll-behavior: smooth;
   }
-  
-  /* Text gradient utilities */
+
   .text-gradient-primary {
     @apply bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent;
   }
-  
+
   .text-gradient-secondary {
     @apply bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent;
   }

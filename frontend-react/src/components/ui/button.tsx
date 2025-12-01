@@ -44,7 +44,7 @@ function playClick() {
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-5 whitespace-nowrap font-semibold \
-   rounded-[12px] border-none \
+   rounded-[12px] \
    transition-all duration-150 active:scale-95 hover:scale-105 \
    disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none \
    shadow-[0_2px_4px_rgba(0,0,0,0.18)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.25)]",
@@ -54,24 +54,23 @@ const buttonVariants = cva(
          default:
      "bg-[linear-gradient(to_bottom,#72a06f_0%,#639260_100%)] text-white",
 
-  purple:
-    "bg-[linear-gradient(135deg,hsl(var(--primary))_0%,hsl(var(--accent))_100%)] \
-     text-white",
+ purple:
+  "bg-[linear-gradient(135deg,hsl(var(--primary))_0%,hsl(var(--primary-glow))_100%)] text-white",
         destructive:
           "bg-[linear-gradient(to_bottom,hsl(var(--destructive)),hsl(var(--destructive)))] \
            text-[hsl(var(--destructive-foreground))]",
 
         blue:
-          "bg-[linear-gradient(to_bottom,hsl(var(--accent)),hsl(var(--accent)))] \
-           text-[hsl(var(--accent-foreground))]",
+          "bg-[linear-gradient(to_bottom,hsl(var(--info)),hsl(var(--info)))] \
+          text-[hsl(var(--info-foreground))] border-none",
+
 
         warning:
           "bg-[linear-gradient(to_bottom,hsl(var(--warning)),hsl(var(--warning)))] \
            text-[hsl(var(--warning-foreground))]",
 
         outline:
-  "bg-transparent border-2 shadow-none hover:shadow-none focus-visible:outline-none transition-colors duration-150",
-
+  "bg-transparent border-2 border-white text-white shadow-none hover:shadow-none hover:bg-white/10 focus-visible:outline-none transition-colors duration-150",
         ghost:
           "bg-transparent text-white shadow-none \
            hover:bg-[rgba(255,255,255,0.1)] hover:shadow-none",

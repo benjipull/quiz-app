@@ -82,7 +82,7 @@ const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmTe
       <h3 className="text-lg text-warning font-bold">{title}</h3>
       <p className="text-sm text-white">{description}</p>
       <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={onCancel}>{cancelText}</Button>
+        <Button variant="outline" onClick={onCancel} className="border-green-600 text-white">{cancelText}</Button>
         <Button variant="destructive" className="text-white" onClick={onConfirm}>{confirmText}</Button>
       </div>
     </Card>
@@ -303,6 +303,8 @@ export default function Quiz() {
   const userToken = localStorage.getItem("token");
   const storedUser = localStorage.getItem("user");
   const userId = storedUser ? JSON.parse(storedUser)._id : null;
+  const [answeredIndex, setAnsweredIndex] = useState(0);
+
 
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
 
@@ -773,81 +775,85 @@ export default function Quiz() {
     }
   };
 
-  const handleAnswerSelection = async (answer: string) => {
-    if (selectedAnswer !== null || timeUp || !userToken) return;
+ const handleAnswerSelection = async (answer: string) => {
+  if (selectedAnswer !== null || timeUp || !userToken) return;
 
-    if (timerInSecondsRef.current) {
-      clearInterval(timerInSecondsRef.current);
-      timerInSecondsRef.current = null;
-    }
+  if (timerInSecondsRef.current) {
+    clearInterval(timerInSecondsRef.current);
+    timerInSecondsRef.current = null;
+  }
 
-    setSelectedAnswer(answer);
-    setQuizState((prev) => ({
-      ...prev,
-      isAnswerSelected: true,
-    }));
+  setSelectedAnswer(answer);
+  setQuizState((prev) => ({
+    ...prev,
+    isAnswerSelected: true,
+  }));
 
-    try {
-      const response = await fetch(`${BASE_URL}/api/answerQuestion/${userToken}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({ answer }),
-      });
+  // ✅ UPDATE PROGRESS BAR ONLY WHEN ANSWERING
+  setAnsweredIndex(quizState.currentQuestionIndex);
 
-      if (response.ok) {
-        const answerData: AnswerResponse = await response.json();
-        setAnswerResponse(answerData);
+  try {
+    const response = await fetch(`${BASE_URL}/api/answerQuestion/${userToken}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${userToken}`,
+      },
+      body: JSON.stringify({ answer }),
+    });
 
-        const isCorrect = answerData.isCorrect;
+    if (response.ok) {
+      const answerData: AnswerResponse = await response.json();
+      setAnswerResponse(answerData);
 
-        handleVibration(isCorrect);
+      const isCorrect = answerData.isCorrect;
 
-        setQuizState((prev) => ({
-          ...prev,
-          correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
-          incorrectAnswers: prev.incorrectAnswers + (isCorrect ? 0 : 1),
-          userAnswers: [
-            ...prev.userAnswers,
-            {
-              questionId: prev.question?._id || "",
-              selectedAnswer: answer,
-              correctAnswer: answerData.correctAnswer,
-              isCorrect,
-            }
-          ]
-        }));
+      handleVibration(isCorrect);
 
-        if (isCorrect) {
-          correctSound.play().catch(() => { });
-        } else {
-          incorrectSound.play().catch(() => { });
-        }
+      setQuizState((prev) => ({
+        ...prev,
+        correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
+        incorrectAnswers: prev.incorrectAnswers + (isCorrect ? 0 : 1),
+        userAnswers: [
+          ...prev.userAnswers,
+          {
+            questionId: prev.question?._id || "",
+            selectedAnswer: answer,
+            correctAnswer: answerData.correctAnswer,
+            isCorrect,
+          }
+        ]
+      }));
 
-        trackQuestionAnswered(quizState.question?._id || "", isCorrect, userId);
-
-        setTimeout(() => {
-          setShowBars(true);
-        }, 300);
-
-        setTimeout(() => {
-          setShowExplanation(true);
-        }, 1200);
-
-        if (!isLastQuestion) {
-          preloadNextQuestion();
-        }
-
+      if (isCorrect) {
+        correctSound.play().catch(() => {});
       } else {
-        setError("Failed to submit answer. Please try again.");
+        incorrectSound.play().catch(() => {});
       }
-    } catch (error) {
-      console.error("Error submitting answer:", error);
-      setError("Error submitting answer. Please try again.");
+
+      trackQuestionAnswered(quizState.question?._id || "", isCorrect, userId);
+
+      setTimeout(() => {
+        setShowBars(true);
+      }, 300);
+
+      setTimeout(() => {
+        setShowExplanation(true);
+      }, 1200);
+
+      if (!isLastQuestion) {
+        preloadNextQuestion();
+      }
+
+    } else {
+      setError("Failed to submit answer. Please try again.");
     }
-  };
+  } catch (error) {
+    console.error("Error submitting answer:", error);
+    setError("Error submitting answer. Please try again.");
+  }
+};
+
 
   const handleNextQuestion = () => {
     if (isLastQuestion) {
@@ -1038,14 +1044,15 @@ export default function Quiz() {
           <div className="px-2 py-2 md:py-4 max-w-full mx-auto">
             <div className="flex items-center justify-between gap-2 mb-3">
               <Button
-                variant="purple"
-                size="sm"
-                onClick={handleBackNavigation}
-                className="flex items-center gap-1 hover:bg-blue-800 text-purple-100 text-sm md:text-base px-2 py-1 flex-shrink-0 min-w-0"
-              >
-                <ArrowLeft className="h-4 w-4 flex-shrink-0" />
-                <span className="hidden sm:inline truncate">Back</span>
-              </Button>
+              variant="purple"
+              size="sm"
+              onClick={handleBackNavigation}
+              className="flex items-center gap-2 px-3 py-2 w-auto h-auto max-h-[56px] min-w-[64px]"
+            >
+              <ArrowLeft className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden sm:inline truncate">Back</span>
+            </Button>
+
 
               <div className="text-center flex-1 min-w-0 px-2">
                 <div className="text-sm md:text-base font-semibold text-purple-200 truncate">
@@ -1074,15 +1081,17 @@ export default function Quiz() {
               </div>
             </div>
 
-            <div className="w-full bg-purple-950/50 rounded-full h-3 overflow-hidden border-2 border-purple-500/40">
-              <div
-                className="h-full rounded-full transition-all duration-300 ease-out bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 shadow-lg shadow-yellow-500/60"
-                style={{ 
-                  width: `${((quizState.currentQuestionIndex - 0) / totalQuestions) * 100}%`,
-                }}
-              />
-            </div>
-          </div>
+         <div className="w-full bg-purple-950/50 rounded-full h-3 overflow-hidden border-2 border-purple-500/40">
+  <div
+    className="h-full rounded-full transition-all duration-300 ease-out bg-secondary shadow-lg shadow-yellow-500/60"
+    style={{
+      width: `${(answeredIndex / totalQuestions) * 100}%`,
+    }}
+  />
+</div>
+
+</div>
+
         </div>
 
         <div className="flex-1 px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-4xl">
@@ -1182,64 +1191,72 @@ export default function Quiz() {
                 </Card>
 
                 <div className="mt-6 space-y-4 animate-fade-in">
-                  <Card className="p-4 md:p-6 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
-                    <div className="space-y-4">
-                      <p className="text-sm font-medium text-center text-white">Did you like this question?</p>
+    <Card className="p-4 md:p-6 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
+      <div className="space-y-4">
+        <p className="text-sm font-medium text-center text-white">Did you like?</p>
 
-                      <div className="flex gap-3 md:gap-4 justify-center">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleFeedback("up")}
-                          disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${feedbackType === "up"
-                              ? "bg-green-100 border-green-500 text-green-600"
-                              : feedbackGiven
-                                ? "opacity-50 cursor-not-allowed"
-                                : "border-green-500 text-green-600 hover:bg-green-500 hover:text-white"
-                            }`}
-                        >
-                          <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:ml-2">Yes</span>
-                        </Button>
+        <div className="flex gap-3 md:gap-4 justify-center">
+          {/* 👍 Positive Feedback */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleFeedback("up")}
+            disabled={feedbackGiven}
+            className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${
+              feedbackType === "up"
+                ? "bg-[hsl(var(--secondary))] border-[hsl(var(--secondary))] text-white"
+                : feedbackGiven
+                ? "opacity-50 cursor-not-allowed"
+                : "border-[hsl(var(--secondary))] text-[hsl(var(--secondary))] hover:bg-[hsl(var(--secondary))] hover:text-white"
+            }`}
+          >
+            <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
+          </Button>
 
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleFeedback("down")}
-                          disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${feedbackType === "down"
-                              ? "bg-red-100 border-red-600 text-red-600"
-                              : feedbackGiven
-                                ? "opacity-50 cursor-not-allowed"
-                                : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
-                            }`}
-                        >
-                          <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:ml-2">No</span>
-                        </Button>
+          {/* 👎 Negative Feedback */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleFeedback("down")}
+            disabled={feedbackGiven}
+            className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${
+              feedbackType === "down"
+                ? "bg-[hsl(var(--destructive))] border-[hsl(var(--destructive))] text-white"
+                : feedbackGiven
+                ? "opacity-50 cursor-not-allowed"
+                : "border-[hsl(var(--destructive))] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))] hover:text-white"
+            }`}
+          >
+            <span className="ml-1 sm:ml-2">No</span>
+          </Button>
 
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowReportDialog(true)}
-                          className="text-sm flex-1 max-w-[120px] h-10 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
-                        >
-                          <Flag className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:ml-2">Report</span>
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
+          {/* 🚩 Report */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowReportDialog(true)}
+            className="text-sm flex-1 max-w-[120px] h-10 border-[hsl(var(--info))] text-[hsl(var(--info))] hover:bg-[hsl(var(--info))] hover:text-white transition-colors"
+          >
+            <Flag className="h-5 w-5 md:h-6 md:w-6" />
+          </Button>
+        </div>
+      </div>
+    </Card>
 
-                  <Button
-                    className="w-full h-14 md:h-16 text-base md:text-lg text-white font-bold"
-                    onClick={handleNextQuestion}
-                    disabled={isCompletingQuiz}
-                  >
-                    {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
-                  </Button>
-                </div>
+  {/* Next Question / Finish Quiz */}
+  <Button
+    className="w-full h-14 md:h-16 text-base md:text-lg text-white font-bold bg-[hsl(var(--secondary))] hover:brightness-110 transition-colors"
+    onClick={handleNextQuestion}
+    disabled={isCompletingQuiz}
+  >
+    {isCompletingQuiz
+      ? "Completing..."
+      : isLastQuestion
+      ? "Finish Quiz"
+      : "Next Question"}
+  </Button>
+</div>
+
               </div>
             )}
           </div>

@@ -285,33 +285,36 @@ className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
     </div>
 
     <Button
-      ref={claimButtonRef}
-      size="sm"
-      variant={canClaim ? "warning" : "purple"}
-      onClick={handleClaimClick}
-      disabled={!canClaim || isClaiming}
-      className={`
-        flex items-center gap-2
-        ${canClaim 
-          ? "!bg-yellow-500/10 !border-[3px] !border-yellow-400 !shadow-[0_0_25px_rgba(255,255,0,0.5)] hover:!bg-yellow-500/20" 
-          : "!bg-[#8F649B] !shadow-[0_0_15px_rgba(240,171,240,0.4),_0_4px_15px_rgba(0,0,0,0.5)] !border-purple-800/50"
-        }
-      `}
-    >
-      {canClaim ? (
-        <>
-          <Sparkles className={`w-5 h-5 ${isClaiming ? "text-gray-400" : "text-white/80"}`} />
-          <span className={`font-bold whitespace-nowrap ${isClaiming ? "text-gray-400" : "text-white/80"}`}>
-            {isClaiming ? "Claiming..." : "Claim Now"}
-          </span>
-        </>
-      ) : (
-        <>
-          <Clock className="w-5 h-5 text-[#f0abf0] opacity-90" />
-          <span className="text-white font-bold whitespace-nowrap">{formatTimeRemaining(timeRemaining)}</span>
-        </>
-      )}
-    </Button>
+    ref={claimButtonRef}
+    size="sm"
+    variant={canClaim ? "blue" : "purple"}
+    onClick={handleClaimClick}
+    disabled={!canClaim || isClaiming}
+    className="min-w-[140px] flex items-center justify-center gap-2 sm:flex-initial"
+  >
+    {canClaim ? (
+      <>
+        <Sparkles
+          className={`w-5 h-5 ${isClaiming ? "text-gray-400" : "text-white/80"}`}
+        />
+        <span
+          className={`font-bold whitespace-nowrap ${
+            isClaiming ? "text-gray-400" : "text-white/80"
+          }`}
+        >
+          {isClaiming ? "Claiming..." : "Claim"}
+        </span>
+      </>
+    ) : (
+      <>
+        <Clock className="w-5 h-5 text-[#f0abf0] opacity-90" />
+        <span className="text-white font-bold whitespace-nowrap">
+          {formatTimeRemaining(timeRemaining)}
+        </span>
+      </>
+    )}
+  </Button>
+
   </div>
 </Card>
 
