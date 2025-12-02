@@ -1181,65 +1181,65 @@ export default function Quiz() {
                   </div>
                 </Card>
 
-                <div className="mt-6 space-y-4 animate-fade-in">
-                  <Card className="p-4 md:p-6 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
-                    <div className="space-y-4">
-                      <p className="text-sm font-medium text-center text-white">Did you like this question?</p>
+               <div className="mt-6 space-y-3 animate-fade-in px-1">
+  <Card className="p-3 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
+    <div className="space-y-2.5">
+      <p className="text-xs font-medium text-center text-white">Did you like this question?</p>
 
-                      <div className="flex gap-3 md:gap-4 justify-center">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleFeedback("up")}
-                          disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${feedbackType === "up"
-                              ? "bg-green-100 border-green-500 text-green-600"
-                              : feedbackGiven
-                                ? "opacity-50 cursor-not-allowed"
-                                : "border-green-500 text-green-600 hover:bg-green-500 hover:text-white"
-                            }`}
-                        >
-                          <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:ml-2">Yes</span>
-                        </Button>
+      <div className="flex gap-1.5 justify-center">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleFeedback("up")}
+          disabled={feedbackGiven}
+          className={`text-xs flex-1 max-w-[95px] h-10 px-2 transition-colors ${feedbackType === "up"
+              ? "bg-green-100 border-green-500 text-green-600"
+              : feedbackGiven
+                ? "opacity-50 cursor-not-allowed"
+                : "border-green-500 text-green-600 hover:bg-green-500 hover:text-white"
+            }`}
+        >
+          <ThumbsUp className="h-3.5 w-3.5" />
+          <span className="ml-1">Yes</span>
+        </Button>
 
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleFeedback("down")}
-                          disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${feedbackType === "down"
-                              ? "bg-red-100 border-red-600 text-red-600"
-                              : feedbackGiven
-                                ? "opacity-50 cursor-not-allowed"
-                                : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
-                            }`}
-                        >
-                          <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:ml-2">No</span>
-                        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleFeedback("down")}
+          disabled={feedbackGiven}
+          className={`text-xs flex-1 max-w-[95px] h-10 px-2 transition-colors ${feedbackType === "down"
+              ? "bg-red-100 border-red-600 text-red-600"
+              : feedbackGiven
+                ? "opacity-50 cursor-not-allowed"
+                : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+            }`}
+        >
+          <ThumbsDown className="h-3.5 w-3.5" />
+          <span className="ml-1">No</span>
+        </Button>
 
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowReportDialog(true)}
-                          className="text-sm flex-1 max-w-[120px] h-10 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
-                        >
-                          <Flag className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:ml-2">Report</span>
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowReportDialog(true)}
+          className="text-xs flex-1 max-w-[95px] h-10 px-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
+        >
+          <Flag className="h-3.5 w-3.5" />
+          <span className="ml-1">Report</span>
+        </Button>
+      </div>
+    </div>
+  </Card>
 
-                  <Button
-                    className="w-full h-14 md:h-16 text-base md:text-lg text-white font-bold"
-                    onClick={handleNextQuestion}
-                    disabled={isCompletingQuiz}
-                  >
-                    {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
-                  </Button>
-                </div>
+  <Button
+    className="w-full h-12 text-sm text-white font-bold"
+    onClick={handleNextQuestion}
+    disabled={isCompletingQuiz}
+  >
+    {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
+  </Button>
+</div>
               </div>
             )}
           </div>
