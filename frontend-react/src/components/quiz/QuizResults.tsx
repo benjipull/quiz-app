@@ -157,7 +157,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   // XP STATE
   const [animatedKnowledge, setAnimatedKnowledge] = useState(0);
   const [animatedTotalXP, setAnimatedTotalXP] = useState(totalKnowledge - knowledgeGained);
-  const [showXPOverlay, setShowXPOverlay] = useState(true); 
+  const [showXPOverlay, setShowXPOverlay] = useState(false); // Changed to false by default
   const [showFlyingTokens, setShowFlyingTokens] = useState(false);
   const [tokens, setTokens] = useState<Array<{id: number; delay: number}>>([]);
   
@@ -214,7 +214,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             if (knowledgeGained > 0) {
                 startXPAnimation();
             } else {
-                // If no XP, jump directly to coin animation
+                // If no XP, jump directly to coin animation check
                 startCoinAnimation(); 
             }
             return percentage;
@@ -234,6 +234,9 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   // ----------------------------------------------------
 
   const startXPAnimation = () => {
+    // 1. Show XP Overlay
+    setShowXPOverlay(true); 
+
     // Points earned animation
     const earnedTimer = setTimeout(() => {
       let count = 0;
@@ -843,7 +846,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
             >
                 <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full
-                 bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-yellow-500/50 animate-pulse-glow">
+                 bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-yellow-300/50 animate-pulse-glow">
                   <KnowledgePointIcon className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
@@ -999,17 +1002,25 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           animation: number-grow 0.8s ease-out forwards;
         }
         
-        /* XP Text Aura (Yellow/Orange Glow) */
+        /* XP Text Aura (Yellow/Orange Glow) - IMPROVED READABILITY */
         .xp-text-aura {
           text-shadow: 
+            -1px -1px 0 #000, 
+            1px -1px 0 #000, 
+            -1px 1px 0 #000, 
+            1px 1px 0 #000, /* Strong Black Outline */
             0 0 10px rgba(255, 193, 7, 0.9),
             0 0 20px rgba(255, 165, 0, 0.7),
             0 0 30px rgba(255, 140, 0, 0.5);
         }
         
-        /* Coin Text Aura (MODIFIED to match XP's Gold/Yellow Glow) */
+        /* Coin Text Aura (MODIFIED to match XP's Gold/Yellow Glow) - IMPROVED READABILITY */
         .coin-text-aura { 
           text-shadow: 
+            -1px -1px 0 #000, 
+            1px -1px 0 #000, 
+            -1px 1px 0 #000, 
+            1px 1px 0 #000, /* Strong Black Outline */
             0 0 10px rgba(255, 193, 7, 0.9), /* Yellow */
             0 0 20px rgba(255, 165, 0, 0.7), /* Orange */
             0 0 30px rgba(255, 140, 0, 0.5); /* Dark Orange */

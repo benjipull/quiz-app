@@ -1,9 +1,10 @@
-// Home.tsx - Using Preloaded Data (No Loading States)
-import { useState, useEffect } from "react";
+// Home.tsx - Instant Quiz Start with Preloading
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { trackHomeScreen } from "@/utils/analytics";
 import {
   Dialog,
@@ -14,12 +15,14 @@ import {
 } from "@/components/ui/dialog";
 import InterestSelector from "@/components/InterestSelector";
 import { trackEvent } from "@/utils/analytics";
+
 import { AlertTriangle, Heart } from "lucide-react";
 import logo from "../assets/images/QuizicleLogo.png";
+import SplashScreen from "../components/SplashScreen";
 import GameStatsHeader from "../components/GameStatsHeader";
 import { useToast } from "@/hooks/use-toast";
 import DailyCoinClaim from "@/components/DailyCoinClaim";
-import { appCache } from "@/App"; // Import the preloaded cache
+// import { apiClient } from "@/utils/apiClient"; // REMOVED
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
@@ -29,6 +32,14 @@ const avatars: string[] = Object.values(avatarImages) as string[];
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const QUIZ_COST = 50;
+
+interface CategoryToPlayResponse {
+  message: string;
+  categoryId: string;
+  name: string;
+  averageRating: number;
+  questionsCount: number;
+}
 
 interface UserDetails {
   _id: string;
@@ -40,7 +51,36 @@ interface UserDetails {
   coins?: number;
 }
 
+interface ErrorResponse {
+  message: string;
+}
+
+// Helper function to make authenticated fetch calls
+// Assumes userToken is a Bearer token
+const authenticatedFetch = async (url: string, options: RequestInit) => {
+    const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+    const headers = {
+        ...options.headers,
+        "Authorization": `Bearer ${userToken}`,
+        "Content-Type": "application/json",
+    };
+    
+    // Remove Content-Type if body is not set for GET/HEAD requests
+    if (!options.body && (options.method === 'GET' || options.method === 'HEAD')) {
+        delete headers["Content-Type"];
+    }
+
+    return fetch(url, {
+        ...options,
+        headers,
+    });
+};
+
 export default function Home() {
+  const [loading, setLoading] = useState(true);
+  const [playButtonLoading, setPlayButtonLoading] = useState(false);
+  const [showSplash, setShowSplash] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [userProfile, setUserProfile] = useState<UserDetails | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [userLevel, setUserLevel] = useState(1);
@@ -52,28 +92,55 @@ export default function Home() {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [savingInterests, setSavingInterests] = useState(false);
 
+  // Preloading state
+  const preloadedCategoryRef = useRef<CategoryToPlayResponse | null>(null);
+  const isPreloadingRef = useRef(false);
+
   const navigate = useNavigate();
-  const userToken = localStorage.getItem("token") || "";
-  const { toast } = useToast();
+  const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+  const { toast, dismiss } = useToast();
 
   useEffect(() => {
-    // Load from preloaded cache instantly - NO API CALLS
-    if (appCache.userProfile) {
-      const cachedProfile = appCache.userProfile;
-      
-      setUserProfile(cachedProfile);
-      setUserLevel(cachedProfile.level || 1);
-      setIsGuest(cachedProfile.userType === 'Guest');
-      setSelectedInterests(cachedProfile.interests || []);
-      setCurrentCoins(cachedProfile.coins || 0);
+    const initializeApp = async () => {
+      const hasShownSplash = typeof window !== 'undefined' ? sessionStorage.getItem("splashShown") : null;
+      const shouldShowSplash = !hasShownSplash;
 
-      const avatarIndex = cachedProfile.avatar ? cachedProfile.avatar - 1 : 0;
-      const calculatedAvatar = avatars[avatarIndex] || null;
-      setUserAvatar(calculatedAvatar);
+      if (shouldShowSplash) {
+        setShowSplash(true);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem("splashShown", "true");
+        }
+      }
 
-      console.log("✅ Loaded profile from cache");
-    }
+      const startTime = Date.now();
+      const minSplashDuration = shouldShowSplash ? 2500 : 0;
 
+      try {
+        await loadUserProfile();
+        setDataLoaded(true);
+
+        if (shouldShowSplash) {
+          const elapsedTime = Date.now() - startTime;
+          const remainingTime = Math.max(0, minSplashDuration - elapsedTime);
+
+          setTimeout(() => {
+            setShowSplash(false);
+            setLoading(false);
+            // Start preloading after splash
+            preloadNextCategory();
+          }, remainingTime);
+        } else {
+          setLoading(false);
+          // Start preloading immediately
+          preloadNextCategory();
+        }
+      } catch (err) {
+        console.error("Init error:", err);
+        setLoading(false);
+      }
+    };
+
+    initializeApp();
     const checkScreenSize = () => setIsSmallScreen(window.innerWidth < 768);
     checkScreenSize();
     window.addEventListener("resize", checkScreenSize);
@@ -83,6 +150,10 @@ export default function Home() {
   useEffect(() => {
     if (userProfile && userToken) {
       trackHomeScreen(userProfile._id);
+
+      if (userProfile.coins !== undefined) {
+        setCurrentCoins(userProfile.coins);
+      }
 
       if (!userProfile.interests || userProfile.interests.length === 0) {
         setTimeout(() => {
@@ -96,48 +167,190 @@ export default function Home() {
     }
   }, [userProfile, userToken]);
 
-  const handleQuickQuiz = () => {
+  const loadUserProfile = async () => {
+    if (!userToken) {
+      const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+      if (storedUser) {
+        try {
+          const parsedUser: UserDetails = JSON.parse(storedUser);
+          setUserProfile(parsedUser);
+          if (parsedUser.level) setUserLevel(parsedUser.level);
+          setIsGuest(parsedUser.userType === 'Guest');
+          setSelectedInterests(parsedUser.interests || []);
+          if (parsedUser.coins !== undefined) setCurrentCoins(parsedUser.coins);
+        } catch (e) {
+          console.error("Failed to parse local user data:", e);
+        }
+      } else {
+        navigate("/auth");
+      }
+      return;
+    }
+
+    try {
+      const response = await authenticatedFetch(`${BASE_URL}/api/getUserDetails`, {
+        method: "GET",
+      });
+
+      if (!response.ok) {
+        console.warn(`Failed to fetch user details (Status: ${response.status}). Falling back to local storage.`);
+        const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+        if (storedUser) {
+          const parsedUser: UserDetails = JSON.parse(storedUser);
+          setUserProfile(parsedUser);
+          if (parsedUser.level) setUserLevel(parsedUser.level);
+          setIsGuest(parsedUser.userType === 'Guest');
+          setSelectedInterests(parsedUser.interests || []);
+          if (parsedUser.coins !== undefined) setCurrentCoins(parsedUser.coins);
+        }
+        return;
+      }
+
+      const apiUser: UserDetails = await response.json();
+
+      setUserProfile(apiUser);
+      setUserLevel(apiUser.level || 1);
+      setIsGuest(apiUser.userType === 'Guest');
+      setSelectedInterests(apiUser.interests || []);
+      if (apiUser.coins !== undefined) setCurrentCoins(apiUser.coins);
+
+      const avatarIndex = apiUser.avatar ? apiUser.avatar - 1 : 0;
+      const calculatedAvatar = avatars[avatarIndex] || null;
+      setUserAvatar(calculatedAvatar);
+
+      if (typeof window !== 'undefined') {
+        const userToStore = {
+          ...apiUser,
+          level: apiUser.level || 1,
+          userType: apiUser.userType || 'Registered',
+          interests: apiUser.interests || [],
+          coins: apiUser.coins || 0,
+        };
+        localStorage.setItem("user", JSON.stringify(userToStore));
+        if (calculatedAvatar) {
+          localStorage.setItem("userAvatar", calculatedAvatar);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user details from API:", error);
+      const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+      if (storedUser) {
+        try {
+          const parsedUser: UserDetails = JSON.parse(storedUser);
+          setUserProfile(parsedUser);
+          if (parsedUser.level) setUserLevel(parsedUser.level);
+          setIsGuest(parsedUser.userType === 'Guest');
+          setSelectedInterests(parsedUser.interests || []);
+          if (parsedUser.coins !== undefined) setCurrentCoins(parsedUser.coins);
+        } catch (e) {
+          console.error("Failed to parse local user data on API error:", e);
+        }
+      }
+    }
+  };
+
+  // Preload next category in the background
+  const preloadNextCategory = async () => {
+    if (!userToken || isPreloadingRef.current) return;
+
+    isPreloadingRef.current = true;
+    try {
+      const response = await authenticatedFetch(`${BASE_URL}/api/getGetegoryToPlay`, {
+        method: "GET",
+      });
+
+      if (response && response.ok) {
+        const data: CategoryToPlayResponse = await response.json();
+        if (data.categoryId) {
+          preloadedCategoryRef.current = data;
+          console.log("✅ Preloaded category:", data.categoryId);
+        }
+      }
+    } catch (error) {
+      console.error("Error preloading category:", error);
+    } finally {
+      isPreloadingRef.current = false;
+    }
+  };
+
+  const handleQuickQuiz = async () => {
     if (!userToken) {
       console.log("⚠️ You must be logged in to play.");
       return;
     }
 
-    // Check coins
-    if (currentCoins < QUIZ_COST) {
-      toast({
-        title: "Not Enough Coins",
-        description: `You need ${QUIZ_COST} coins to start a quiz.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Use preloaded category from cache
-    if (appCache.firstQuestion && appCache.firstQuestion.categoryId) {
-      const categoryId = appCache.firstQuestion.categoryId;
+    // Check if we have a preloaded category
+    if (preloadedCategoryRef.current && preloadedCategoryRef.current.categoryId) {
+      const categoryId = preloadedCategoryRef.current.categoryId;
       
       // Optimistically update coins
-      setCurrentCoins(prev => prev - QUIZ_COST);
+      const optimisticCoins = currentCoins - QUIZ_COST;
+      setCurrentCoins(optimisticCoins);
       
-      // Navigate instantly - NO LOADING
+      // Clear preloaded data
+      preloadedCategoryRef.current = null;
+      
+      // Navigate instantly without loading
       navigate(`/quiz/${categoryId}`);
       
-      console.log("✅ Starting quiz instantly with preloaded category");
+      // Start preloading next category in background
+      setTimeout(() => preloadNextCategory(), 1000);
+      
       return;
     }
 
-    // Fallback if cache is empty (shouldn't happen)
-    toast({
-      title: "Loading Quiz",
-      description: "Please wait a moment...",
-    });
-    
-    setTimeout(() => {
-      if (appCache.firstQuestion?.categoryId) {
-        setCurrentCoins(prev => prev - QUIZ_COST);
-        navigate(`/quiz/${appCache.firstQuestion.categoryId}`);
+    // Fallback: if no preloaded data, fetch normally
+    const optimisticCoins = currentCoins - QUIZ_COST;
+    setCurrentCoins(optimisticCoins);
+    setPlayButtonLoading(true);
+
+    try {
+      const response = await authenticatedFetch(`${BASE_URL}/api/getGetegoryToPlay`, {
+        method: "GET",
+      });
+
+      if (!response) {
+        setCurrentCoins(prev => prev + QUIZ_COST);
+        setPlayButtonLoading(false);
+        toast({
+          title: "Network Error",
+          description: "Could not connect to the server. Coins refunded.",
+          variant: "destructive",
+        });
+        return;
       }
-    }, 500);
+
+      if (!response.ok) {
+        const errorData: ErrorResponse = await response.json().catch(() => ({
+          message: "Unknown error during quiz start."
+        }));
+
+        toast({
+          title: "Quiz Start Failed",
+          description: errorData.message.includes("refunded")
+            ? errorData.message
+            : `Unable to start quiz: ${errorData.message}`,
+          variant: "destructive",
+        });
+
+        await loadUserProfile();
+        throw new Error(`Failed to get category to play: ${response.status}`);
+      }
+
+      const data: CategoryToPlayResponse = await response.json();
+
+      if (data.categoryId) {
+        navigate(`/quiz/${data.categoryId}`);
+      } else {
+        setCurrentCoins(prev => prev + QUIZ_COST);
+        throw new Error("No category ID returned from server");
+      }
+    } catch (error) {
+      console.error("Error getting category to play:", error);
+      console.log("❌ Unable to start quiz. Please try again later.");
+    } finally {
+      setPlayButtonLoading(false);
+    }
   };
 
   const handleInterestChange = (newSelectedIds: string[]) => {
@@ -167,6 +380,11 @@ export default function Home() {
         throw new Error("Failed to update interests.");
       }
 
+      // No need to parse response if the API returns 204 or just status, 
+      // but assuming a successful update will return the updated user or a success message.
+      // Since the original code did not parse, we will proceed assuming success on !ok check.
+      // Optional: Add response.json() if API returns updated data.
+
       const updatedUser = {
         ...userProfile,
         interests: selectedInterests,
@@ -174,9 +392,6 @@ export default function Home() {
 
       setUserProfile(updatedUser);
       localStorage.setItem("user", JSON.stringify(updatedUser));
-      
-      // Update cache
-      appCache.userProfile = updatedUser;
 
       trackEvent("update_interests", {
         user_id: userProfile._id,
@@ -212,9 +427,8 @@ export default function Home() {
           const user: UserDetails = JSON.parse(storedUser);
           const updatedUser = { ...user, coins: newTotal };
           localStorage.setItem("user", JSON.stringify(updatedUser));
-          appCache.userProfile = updatedUser;
         } catch (e) {
-          console.error("Failed to update coins:", e);
+          console.error("Failed to update coins in localStorage:", e);
         }
       }
 
@@ -226,16 +440,20 @@ export default function Home() {
     setCurrentCoins(coins);
   };
 
+  if (showSplash) {
+    return <SplashScreen dataLoaded={dataLoaded} />;
+  }
+
   const alias = userProfile?.alias || "Guest";
   const avatarImage = userAvatar || undefined;
 
   return (
-    <div
-      className="fixed inset-0 flex flex-col overflow-hidden"
-      style={{
-        background: `radial-gradient(circle at center, #2a0a3b 0%, #180524 55%, #0e0316 100%)`,
-      }}
-    >     
+      <div
+        className="fixed inset-0 flex flex-col overflow-hidden"
+        style={{
+          background: `radial-gradient(circle at center, #2a0a3b 0%, #180524 55%, #0e0316 100%)`,
+        }}
+      >     
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
       <div className="flex-1 flex flex-col px-4 lg:px-8 w-full overflow-hidden">
@@ -243,7 +461,7 @@ export default function Home() {
         <div className={`space-y-3 flex-shrink-0 ${isSmallScreen ? 'pt-2' : 'pt-3'} max-w-4xl mx-auto w-full`}>
           <GameStatsHeader
             userToken={userToken}
-            isParentLoading={false}
+            isParentLoading={loading}
             onCoinsUpdate={handleCoinsUpdate}
             currentCoinsFromParent={currentCoins}
           />
@@ -272,80 +490,92 @@ export default function Home() {
           />
         </div>
 
-        {/* Middle Section - Avatar */}
+        {/* Middle Section - Avatar (Flexibly sized) */}
         <div className="flex items-center justify-center flex-1 min-h-0">
-          <div className="relative flex flex-col items-center justify-center">
-            <Link to="/profile" className="z-10">
-              <div
-                className={
-                  isSmallScreen
-                    ? "w-[180px] h-[180px]"
-                    : "w-[220px] h-[220px] sm:w-[240px] sm:h-[240px]"
-                }
-              >
-                {avatarImage ? (
-                  <img
-                    src={avatarImage}
-                    alt={alias}
-                    className="w-full h-full object-contain"
-                    style={{ background: "transparent" }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white"></div>
-                  </div>
-                )}
-              </div>
-            </Link>
+        <div className="relative flex flex-col items-center justify-center">
 
-            <h2
-              className={`mt-6 text-white font-extrabold drop-shadow-lg capitalize lg:pb-20 ${
-                isSmallScreen ? "text-5xl" : "text-4xl sm:text-5xl"
-              } tracking-wide`}
+          <Link to="/profile" className="z-10">
+            <div
+              className={
+                isSmallScreen
+                  ? "w-[180px] h-[180px]"
+                  : "w-[220px] h-[220px] sm:w-[240px] sm:h-[240px]"
+              }
             >
-              {alias}
-            </h2>
-          </div>
-        </div>
+              {avatarImage ? (
+                <img
+                  src={avatarImage}
+                  alt={alias}
+                  className="w-full h-full object-contain"
+                  style={{ background: "transparent" }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white"></div>
+                </div>
+              )}
+            </div>
+          </Link>
 
-        {/* Bottom Section - Play Button */}
-        <div className={`space-y-2 flex-shrink-0 max-w-4xl mx-auto w-full ${isSmallScreen ? 'pb-36' : 'pb-24'}`}>
-          <Button
-            variant="default"
-            onClick={handleQuickQuiz}
-            disabled={currentCoins < QUIZ_COST}
-            className={`w-full flex items-center justify-between px-6 ${isSmallScreen ? 'h-16' : 'h-20 sm:h-20'}`}
+          <h2
+            className={`mt-6 text-white font-extrabold drop-shadow-lg capitalize lg:pb-20 ${
+              isSmallScreen ? "text-5xl" : "text-4xl sm:text-5xl"
+            } tracking-wide`}
           >
-            <div className="flex items-center gap-3 sm:gap-4">
-              <span className="text-3xl sm:text-4xl font-extrabold text-white leading-none">
-                Play
-              </span>
-              <span className="text-base sm:text-lg font-semibold text-yellow-300 flex items-center gap-1.5 bg-gray-700/70 px-3 py-1.5 rounded-full">
-                <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="8" fill="#f59e0b" />
-                  <circle cx="12" cy="12" r="7" fill="#fbbf24" />
-                  <circle cx="12" cy="12" r="4" fill="#f59e0b" opacity="0.4" />
-                </svg>
-                {QUIZ_COST}
-              </span>
-            </div>
+            {alias}
+          </h2>
 
-            <div className="bg-white rounded-full w-14 h-14 sm:w-[72px] sm:h-[72px] flex flex-col items-center justify-center shadow-md border-2 border-indigo-300">
-              <span className="text-green-600 text-2xl sm:text-3xl font-bold leading-none">
-                {userLevel}
-              </span>
-              <span className="text-green-600 text-[10px] sm:text-xs font-semibold uppercase leading-none tracking-wide mt-0.5">
-                Level
-              </span>
-            </div>
-          </Button>
-
-          {currentCoins < QUIZ_COST && (
-            <p className="text-red-400 text-sm text-center font-medium">
-              Not enough coins to start a quiz.
-            </p>
-          )}
         </div>
+      </div>
+
+
+        {/* Bottom Section - Play Button (Fixed) */}
+      <div className={`space-y-2 flex-shrink-0 max-w-4xl mx-auto w-full ${isSmallScreen ? 'pb-36' : 'pb-24'}`}>
+        <Button
+          variant="default"
+          onClick={handleQuickQuiz}
+          disabled={loading || playButtonLoading || currentCoins < QUIZ_COST}
+          className={`w-full flex items-center justify-between px-6 ${isSmallScreen ? 'h-16' : 'h-20 sm:h-20'}`}
+        >
+          {playButtonLoading ? (
+            <div className="flex items-center text-xl sm:text-2xl justify-center w-full gap-2">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              Starting Quiz...
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 sm:gap-4">
+                <span className="text-3xl sm:text-4xl font-extrabold text-white leading-none">
+                  Play
+                </span>
+                <span className="text-base sm:text-lg font-semibold text-yellow-300 flex items-center gap-1.5 bg-gray-700/70 px-3 py-1.5 rounded-full">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="8" fill="#f59e0b" />
+                    <circle cx="12" cy="12" r="7" fill="#fbbf24" />
+                    <circle cx="12" cy="12" r="4" fill="#f59e0b" opacity="0.4" />
+                  </svg>
+                  {QUIZ_COST}
+                </span>
+              </div>
+
+              <div className="bg-white rounded-full w-14 h-14 sm:w-[72px] sm:h-[72px] flex flex-col items-center justify-center shadow-md border-2 border-indigo-300">
+                <span className="text-green-600 text-2xl sm:text-3xl font-bold leading-none">
+                  {userLevel}
+                </span>
+                <span className="text-green-600 text-[10px] sm:text-xs font-semibold uppercase leading-none tracking-wide mt-0.5">
+                  Level
+                </span>
+              </div>
+            </>
+          )}
+        </Button>
+
+        {currentCoins < QUIZ_COST && !loading && (
+          <p className="text-red-400 text-sm text-center font-medium">
+            Not enough coins to start a quiz.
+          </p>
+        )}
+      </div>
       </div>
 
       <Dialog open={isInterestModalOpen} onOpenChange={setIsInterestModalOpen}>
