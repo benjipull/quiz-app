@@ -10,6 +10,7 @@ import {
   trackQuestionAnswered,
   trackQuizComplete,
 } from "@/utils/analytics";
+import { appCache } from "@/App";
 
 const StarfieldBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -82,7 +83,7 @@ const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmTe
       <h3 className="text-lg text-warning font-bold">{title}</h3>
       <p className="text-sm text-white">{description}</p>
       <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={onCancel} className="border-green-600 text-white">{cancelText}</Button>
+        <Button variant="default" onClick={onCancel} className="border-green-600 text-white">{cancelText}</Button>
         <Button variant="destructive" className="text-white" onClick={onConfirm}>{confirmText}</Button>
       </div>
     </Card>
@@ -304,8 +305,6 @@ export default function Quiz() {
   const storedUser = localStorage.getItem("user");
   const userId = storedUser ? JSON.parse(storedUser)._id : null;
   const [answeredIndex, setAnsweredIndex] = useState(0);
-  const [playButtonLoading, setPlayButtonLoading] = useState(false);
-
 
 
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
@@ -361,38 +360,6 @@ export default function Quiz() {
       setIsReporting(false);
     }
   };
-
-const handleNextQuiz = async () => {
-  if (!userToken) {
-    console.error("User must be logged in");
-    return;
-  }
-
-  setPlayButtonLoading(true);
-
-  try {
-    const response = await fetch(
-      `${BASE_URL}/api/getGetegoryToPlay?exclude=${categoryId}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userToken}`,
-        },
-      }
-    );
-
-    const data = await response.json();
-
-    if (response.ok && data.categoryId) {
-      window.location.href = `/quiz/${data.categoryId}`;
-    }
-  } catch (error) {
-    console.error("Error loading next quiz:", error);
-  } finally {
-    setPlayButtonLoading(false);
-  }
-};
 
   const closeReportDialog = () => {
     const wasSuccessful = reportSuccess; 
@@ -537,47 +504,38 @@ const handleNextQuiz = async () => {
   }, [quizState.currentQuestionIndex]);
 
   const startQuiz = async (categoryId: string) => {
-  if (!userToken) {
-    console.log("You must be logged in to play.");
-    return;
-  }
+    if (!userToken) {
+      console.log("You must be logged in to play.");
+      return;
+    }
 
-  // FRONTEND CHECK: If already loading or started, don't proceed
-  if (loading || quizState.started) {
-    console.log("Quiz already starting or in progress");
-    return;
-  }
+    // FRONTEND CHECK: If already loading or started, don't proceed
+    if (loading || quizState.started) {
+      console.log("Quiz already starting or in progress");
+      return;
+    }
 
-  setLoading(true);
-  setError(null);
-  setIsCompletingQuiz(false);
+    setLoading(true);
+    setError(null);
+    setIsCompletingQuiz(false);
 
-  setQuizState({
-    started: true, // Set this IMMEDIATELY
-    completed: false,
-    selectedCategory: null,
-    question: null,
-    currentQuestionIndex: 0,
-    correctAnswers: 0,
-    incorrectAnswers: 0,
-    results: null,
-    isAnswerSelected: false,
-    userAnswers: [],
-  });
-  setCategoryImage(undefined);
-  setTotalQuestions(10);
-  nextQuestionRef.current = null;
-
-  try {
-    const categoryResponse = await fetch(`${BASE_URL}/api/categories`, {
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${userToken}`,
-      },
+    // Reset State
+    setQuizState({
+      started: true,
+      completed: false,
+      selectedCategory: null,
+      question: null,
+      currentQuestionIndex: 0,
+      correctAnswers: 0,
+      incorrectAnswers: 0,
+      results: null,
+      isAnswerSelected: false,
+      userAnswers: [],
     });
-    if (categoryResponse.ok) {
-      const categories = await categoryResponse.json();
-      const category = categories.find((cat: any) => cat._id === categoryId);
+
+    // Use preloaded categories from cache
+    if (appCache.categories) {
+      const category = appCache.categories.find((cat: any) => cat._id === categoryId);
       if (category) {
         setCategoryTitle(category.name);
         setCategoryImage(category.imageUrl || category.image);
@@ -585,51 +543,57 @@ const handleNextQuiz = async () => {
           ...prev,
           selectedCategory: { id: categoryId, name: category.name }
         }));
+        console.log("✅ Loaded category from cache");
       }
     }
 
-    const startResponse = await fetch(`${BASE_URL}/api/startQuiz`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${userToken}`,
-      },
-      body: JSON.stringify({ categoryId, userToken }),
-    });
+    setTotalQuestions(10);
+    nextQuestionRef.current = null;
 
-    if (!startResponse.ok) {
-      // If the start fails, we must allow a retry, so we reset the ref.
-      // This is only safe because the server side also handles refunding the coins.
+    try {
+      // Start quiz session on backend
+      const startResponse = await fetch(`${BASE_URL}/api/startQuiz`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({ categoryId, userToken }),
+      });
+
+      if (!startResponse.ok) {
+        hasStartedRef.current = false;
+        
+        const errorData = await startResponse.json();
+        
+        if (startResponse.status === 400 || startResponse.status === 429) {
+          console.log("Quiz already in progress or starting");
+          setLoading(false);
+          return;
+        }
+        
+        throw new Error(errorData.message || "Error starting quiz session.");
+      } else {
+        const startData = await startResponse.json();
+        
+        if (startData.total) {
+          setTotalQuestions(startData.total);
+          console.log(`✅ Quiz started with ${startData.total} questions`);
+        }
+        
+        trackQuizStart(categoryId, userId);
+        
+        // Fetch first question immediately (This is where the second load happens)
+        await fetchNextQuestion();
+      }
+
+    } catch (error: any) {
+      setError(error.message);
+      setLoading(false);
       hasStartedRef.current = false;
-      
-      const errorData = await startResponse.json();
-      
-      // If it's a "quiz already starting" error, don't show error
-      if (startResponse.status === 400 || startResponse.status === 429) {
-        console.log("Quiz already in progress or starting");
-        setLoading(false);
-        return;
-      }
-      
-      throw new Error(errorData.message || "Error starting quiz session.");
-    } else {
-      const startData = await startResponse.json();
-      
-      if (startData.total) {
-        setTotalQuestions(startData.total);
-        console.log(`Quiz started with ${startData.total} questions`);
-      }
-      
-      trackQuizStart(categoryId, userId);
-      await fetchNextQuestion();
     }
+  };
 
-  } catch (error: any) {
-    setError(error.message);
-    setLoading(false);
-    hasStartedRef.current = false; // Reset on error
-  }
-};
   const fetchNextQuestion = async () => {
     if (!userToken || quizState.completed || isCompletingQuiz) return;
 
@@ -792,10 +756,9 @@ const handleNextQuiz = async () => {
       console.error("Error completing quiz:", error);
       setError("Error completing quiz. Please try again.");
     } finally {
+      // FIX: Resetting both flags unconditionally to prevent loading spinner persistence
       setLoading(false);
-      if (!quizState.completed) { 
-        setIsCompletingQuiz(false); 
-      }
+      setIsCompletingQuiz(false); 
     }
   };
 
@@ -1183,56 +1146,6 @@ const handleNextQuiz = async () => {
                 );
               })}
             </div>
-            {/* NEXT QUIZ BUTTON ON FIRST QUESTION BEFORE ANSWERING */}
-{quizState.currentQuestionIndex === 1 && !selectedAnswer && (
-  <div className="mt-6 px-4">
-    <Button
-      onClick={handleNextQuiz}
-      disabled={playButtonLoading}
-      className="w-full flex items-center justify-between px-6 h-16 sm:h-20 text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
-    >
-      {playButtonLoading ? (
-        <div className="flex items-center text-xl sm:text-2xl justify-center w-full gap-2">
-          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-          Loading...
-        </div>
-      ) : (
-        <>
-          <div className="flex items-center gap-3 sm:gap-4">
-            <span className="text-2xl sm:text-3xl font-extrabold text-white leading-none">
-              Next Quiz
-            </span>
-            <span className="text-base sm:text-lg font-semibold text-yellow-300 flex items-center gap-1.5 bg-gray-700/70 px-3 py-1.5 rounded-full">
-              <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6">
-                <circle cx="12" cy="12" r="8" fill="#f59e0b" />
-                <circle cx="12" cy="12" r="7" fill="#fbbf24" />
-                <circle cx="12" cy="12" r="4" fill="#f59e0b" opacity="0.4" />
-              </svg>
-              50
-            </span>
-          </div>
-
-          <div className="flex items-center">
-            <svg
-              className="w-6 h-6 sm:w-8 sm:h-8 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
-          </div>
-        </>
-      )}
-    </Button>
-  </div>
-)}
-
 
             {timeUp && (
               <div ref={explanationRef}>

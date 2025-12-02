@@ -55,7 +55,7 @@ const buttonVariants = cva(
      "bg-[linear-gradient(to_bottom,#72a06f_0%,#639260_100%)] text-white",
 
  purple:
-  "bg-[linear-gradient(135deg,hsl(var(--primary))_0%,hsl(var(--primary-glow))_100%)] text-white",
+  "bg-[#8F649B] text-white",
         destructive:
           "bg-[linear-gradient(to_bottom,hsl(var(--destructive)),hsl(var(--destructive)))] \
            text-[hsl(var(--destructive-foreground))]",
