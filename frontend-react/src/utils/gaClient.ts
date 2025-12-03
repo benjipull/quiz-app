@@ -10,7 +10,6 @@ export const initGA = (userId?: string) => {
   if (initialized) return;
   ReactGA.initialize(GA_ID);
   if (userId) ReactGA.set({ userId });
-  ReactGA.send({ hitType: "pageview", page: window.location.pathname + window.location.search });
   initialized = true;
 };
 
