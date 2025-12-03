@@ -6,20 +6,20 @@ WORKDIR /app
 ARG VITE_API_BASE_URL
 ARG ANALYTICS_ENABLED
 
-RUN echo "VITE_BASE_URL=${VITE_API_BASE_URL}" > .env \
- && echo "VITE_ANALYTICS_ENABLED=${ANALYTICS_ENABLED}" >> .env
-
-
 COPY package.json package-lock.json ./
 RUN npm install
 
-# Optional safeguard: ensure react-ga4 exists
 RUN npm install react-ga4
 
 COPY . .
 RUN npm run build
 
-# Stage 2: Serve with Nginx
+RUN echo "VITE_BASE_URL=${VITE_API_BASE_URL}" > .env \
+ && echo "VITE_ANALYTICS_ENABLED=${ANALYTICS_ENABLED}" >> .env
+
+RUN cat .env
+
+# Serve with Nginx
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
