@@ -9,6 +9,7 @@ ARG ANALYTICS_ENABLED
 RUN echo "VITE_BASE_URL=${VITE_API_BASE_URL}" > .env \
  && echo "VITE_ANALYTICS_ENABLED=${ANALYTICS_ENABLED}" >> .env
 
+RUN cat .env
 
 COPY package.json package-lock.json ./
 RUN npm install
