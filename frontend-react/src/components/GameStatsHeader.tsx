@@ -169,7 +169,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
   if (isParentLoading || !userToken) {
     return (
       <div className="w-full px-4 mb-3 mt-2">
-        <div className="flex items-center justify-between w-full max-w-lg mx-auto p-4 bg-slate-800/60 rounded-xl border-2 border-slate-600 backdrop-blur-sm">
+        <div className="flex items-center justify-between w-full max-w-lg mx-auto p-4 bg-info rounded-xl border-2 border-slate-600 backdrop-blur-sm">
           <div className="h-6 w-1/4 bg-slate-700 rounded animate-pulse"></div>
           <div className="h-6 w-1/4 bg-slate-700 rounded animate-pulse"></div>
           <div className="h-6 w-1/4 bg-slate-700 rounded animate-pulse"></div>
@@ -275,7 +275,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
           flex items-center justify-between 
           w-full max-w-lg sm:max-w-2xl md:max-w-3xl lg:max-w-4xl 
           p-2 sm:p-3 md:p-4 
-          bg-slate-800/60 rounded-xl border-2 border-slate-600 backdrop-blur-sm mx-auto
+          bg-background rounded-xl border-2 border-slate-600 backdrop-blur-sm mx-auto
         "
       >
         {statItems.map((item, i) => (

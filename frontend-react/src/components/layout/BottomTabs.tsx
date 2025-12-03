@@ -26,7 +26,7 @@ export const BottomTabs = () => {
   if (hideOnQuizPage) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-card/95 to-card/80 backdrop-blur-lg border-t border-border z-50 md:hidden">
+    <div className="fixed bottom-0 left-0 right-0 bg-card/80 backdrop-blur-lg border-t border-border z-50 md:hidden">
       <div className="flex items-center justify-around h-20 px-2 max-w-full mx-auto">
         {tabs.map((tab, index) => {
           const isActive = location.pathname === tab.path;
@@ -45,7 +45,7 @@ export const BottomTabs = () => {
                   "flex items-center justify-center rounded-full transition-all duration-300 shadow-lg",
                   isCenter
                     ? isActive
-                      ? "w-16 h-16 bg-gradient-to-r from-primary to-accent text-primary-foreground scale-110 shadow-xl"
+                      ? "w-16 h-16 bg-primary text-primary-foreground scale-110 shadow-xl"
                       : "w-16 h-16 bg-background border-2 border-primary/30 text-primary hover:scale-105 shadow-xl"
                     : isActive
                     ? "w-12 h-12 bg-primary text-primary-foreground"

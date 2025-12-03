@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,8 @@ const KNOWLEDGE_GAIN_SOUND_SRC = "/knowledge-point.mp3";
 const LEVEL_UP_SOUND_SRC = "/player-level-up.mp3";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
+const QUIZ_COST = 50;
+
 
 interface QuizResultsProps {
   results: {
@@ -124,7 +126,6 @@ const CoinIcon = ({ className }: { className: string }) => (
 
 
 export default function QuizResults({ results, onPlayAgain, onClose }: QuizResultsProps) {
-  const navigate = useNavigate();
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const {
@@ -156,7 +157,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   // XP STATE
   const [animatedKnowledge, setAnimatedKnowledge] = useState(0);
   const [animatedTotalXP, setAnimatedTotalXP] = useState(totalKnowledge - knowledgeGained);
-  const [showXPOverlay, setShowXPOverlay] = useState(true); 
+  const [showXPOverlay, setShowXPOverlay] = useState(false); // Changed to false by default
   const [showFlyingTokens, setShowFlyingTokens] = useState(false);
   const [tokens, setTokens] = useState<Array<{id: number; delay: number}>>([]);
   
@@ -213,7 +214,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             if (knowledgeGained > 0) {
                 startXPAnimation();
             } else {
-                // If no XP, jump directly to coin animation
+                // If no XP, jump directly to coin animation check
                 startCoinAnimation(); 
             }
             return percentage;
@@ -233,6 +234,9 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   // ----------------------------------------------------
 
   const startXPAnimation = () => {
+    // 1. Show XP Overlay
+    setShowXPOverlay(true); 
+
     // Points earned animation
     const earnedTimer = setTimeout(() => {
       let count = 0;
@@ -243,7 +247,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           clearInterval(interval);
           
           setTimeout(() => {
-            startXPTokenAnimation();
+            startXPTokenAnimation(); // <-- CALL XP TOKEN ANIMATION
           }, 800);
         }
         setAnimatedKnowledge(count);
@@ -254,14 +258,14 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     return () => clearTimeout(earnedTimer);
   }
 
-  // XP Token flying animation
+  // XP Token flying animation - Refactored from startTokenAnimation
   const startXPTokenAnimation = () => {
     const earnedRect = earnedPointsRef.current?.getBoundingClientRect();
     const headerRect = headerXPRef.current?.getBoundingClientRect();
 
     if (!earnedRect || !headerRect) {
       setAnimatedTotalXP(totalKnowledge);
-      startCoinAnimation();
+      startCoinAnimation(); // If refs fail, skip token animation and move to Coins
       return;
     }
 
@@ -292,10 +296,11 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         currentXP = totalKnowledge;
         clearInterval(xpTimer);
         
+        // Trigger Coin Animation after XP is done
         setTimeout(() => {
             setShowFlyingTokens(false);
-            setShowXPOverlay(false);
-            startCoinAnimation();
+            setShowXPOverlay(false); // Hide XP overlay permanently
+            startCoinAnimation(); // <-- TRIGGER COIN ANIMATION
         }, 200); 
 
       }
@@ -309,20 +314,25 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       }
     }, 150);
 
+    // Set CSS variables for XP token animation
     document.documentElement.style.setProperty('--xp-token-start-x', `${startX}px`);
     document.documentElement.style.setProperty('--xp-token-start-y', `${startY}px`);
     document.documentElement.style.setProperty('--xp-token-end-x', `${endX}px`);
     document.documentElement.style.setProperty('--xp-token-end-y', `${endY}px`);
   };
 
+  // New function to handle the coin animation sequence
   const startCoinAnimation = () => {
+    // If no coins were earned, skip to the level up check
     if (coinsEarned <= 0) {
         finishRewardSequence();
         return;
     }
     
+    // 1. Show Coin Overlay
     setShowCoinOverlay(true); 
 
+    // 2. Animate Coin Count
     const earnedTimer = setTimeout(() => {
         let count = 0;
         const interval = setInterval(() => {
@@ -332,24 +342,26 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 clearInterval(interval);
                 
                 setTimeout(() => {
-                    startCoinTokenAnimation();
+                    startCoinTokenAnimation(); // <-- TRIGGER COIN TOKEN ANIMATION
                 }, 800);
             }
             setAnimatedCoins(count);
         }, 60);
         return () => clearInterval(interval);
-    }, 300);
+    }, 300); // Wait a short time to start coin count
 
     return () => clearTimeout(earnedTimer);
   };
 
+
+// New function for coin flying tokens
   const startCoinTokenAnimation = () => {
     const earnedRect = earnedCoinsRef.current?.getBoundingClientRect();
     const headerRect = headerCoinRef.current?.getBoundingClientRect();
 
     if (!earnedRect || !headerRect) {
       setAnimatedTotalCoins(totalCoins);
-      finishRewardSequence();
+      finishRewardSequence(); // If refs fail, skip token animation and finish
       return;
     }
 
@@ -358,6 +370,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     const endX = headerRect.left + headerRect.width / 2;
     const endY = headerRect.top + headerRect.height / 2;
     
+    // Coin token count is based on coinsEarned
     const tokenCount = Math.min(15, Math.max(8, coinsEarned / 8));
     const newTokens = Array.from({ length: Math.floor(tokenCount) }, (_, i) => ({
       id: i,
@@ -380,16 +393,18 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         currentCoins = totalCoins;
         clearInterval(coinTimer);
         
+        // Finish Sequence after Coins are done
         setTimeout(() => {
             setShowFlyingCoins(false);
-            setShowCoinOverlay(false);
-            finishRewardSequence();
+            setShowCoinOverlay(false); // Hide coin overlay permanently
+            finishRewardSequence(); // <-- FINAL STEP
         }, 200); 
 
       }
 
       setAnimatedTotalCoins(Math.min(currentCoins, totalCoins));
       
+      // Re-use knowledge gain sound for coins for simplicity
       if (knowledgeGainAudio) {
         const audioClone = knowledgeGainAudio.cloneNode(true) as HTMLAudioElement;
         audioClone.volume = 0.2;
@@ -397,13 +412,16 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       }
     }, 150);
 
+    // Set CSS variables for Coin token animation
     document.documentElement.style.setProperty('--coin-token-start-x', `${startX}px`);
     document.documentElement.style.setProperty('--coin-token-start-y', `${startY}px`);
     document.documentElement.style.setProperty('--coin-token-end-x', `${endX}px`);
     document.documentElement.style.setProperty('--coin-token-end-y', `${endY}px`);
   };
 
+  // New function to handle the final check after all rewards
   const finishRewardSequence = () => {
+      // Level up check
       if (hasLeveledUp) {
         setTimeout(() => {
           setShowLevelUp(true);
@@ -451,8 +469,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       const data = await response.json();
 
       if (data.categoryId) {
-        // ✅ FIXED: Use navigate instead of window.location.href
-        navigate(`/quiz/${data.categoryId}`, { replace: true });
+        window.location.href = `/quiz/${data.categoryId}`;
       } else {
         throw new Error("No category ID returned from server");
       }
@@ -507,28 +524,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
   const performanceData = useMemo(() => getPerformanceData(percentage), [percentage]);
   
-  // 🔥 Update localStorage with new coin/XP values when component mounts
-  useEffect(() => {
-    if (totalCoins && totalKnowledge) {
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) {
-        try {
-          const user = JSON.parse(storedUser);
-          const updatedUser = {
-            ...user,
-            coins: totalCoins,
-            knowledgePoints: totalKnowledge,
-            level: currentLevel,
-          };
-          localStorage.setItem("user", JSON.stringify(updatedUser));
-          console.log('💾 Updated localStorage with new coins:', totalCoins);
-        } catch (e) {
-          console.error("Failed to update user in localStorage:", e);
-        }
-      }
-    }
-  }, [totalCoins, totalKnowledge, currentLevel]);
-  
   if (!mounted) {
     return null;
   }
@@ -536,10 +531,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   return (
     <div className="h-screen w-full z-50 flex flex-col items-center p-2 sm:p-4 font-sans bg-gradient-to-br from-[#100221] via-[#4f187a] to-[#380d67] overflow-hidden">
       
-      {/* Header with Stats */}
+      {/* Header with Stats (The XP target) */}
       <div className="w-full max-w-lg flex-shrink-0 animate-fade-in-down">
         <div className="flex items-center justify-between p-2 sm:p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 backdrop-blur-sm">
-          {/* Stat Item: Coins */}
+          {/* Stat Item: Coins - TARGET FOR COIN TOKENS */}
           <div ref={headerCoinRef} className="flex items-center gap-1 sm:gap-1.5 relative">
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
               <CoinIcon className="h-5 w-5" />
@@ -549,7 +544,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             </div>
           </div>
 
-           {/* Stat Item - XP */}
+           {/* Stat Item - XP - TARGET FOR XP TOKENS */}
            <div ref={headerXPRef} className="flex items-center gap-1 sm:gap-1.5 relative">
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center transition-all duration-300">
               <KnowledgePointIcon className="h-4 w-4 text-amber-500" />
@@ -644,7 +639,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </div>
       )}
 
-      {/* Main Results Card Container */}
+      {/* Main Results Card Container - Takes remaining space */}
       <div className="relative z-10 w-full max-w-lg mx-auto flex-1 flex flex-col min-h-0 mt-3">
         <Card className="relative overflow-hidden bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in flex-1 flex flex-col">
           
@@ -652,7 +647,6 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           <Link
             to={"/"}
             className="absolute top-3 right-3 z-20 h-8 w-8 bg-red-600 hover:bg-red-700 rounded-full transition-colors flex items-center justify-center shadow-lg"
-            onClick={onClose}
             aria-label="Close Results and go to Categories"
           >
             <X className="h-5 w-5 text-white" />
@@ -794,14 +788,51 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               </Card>
 
               {/* Next Quiz Button */}
-              <Button
-                onClick={handleNextQuiz}
-                disabled={playButtonLoading}
-                size="lg"
-                className="w-full h-11 sm:h-12 text-sm sm:text-base font-black text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
-              >
-                {playButtonLoading ? "LOADING..." : "NEXT QUIZ"}
-              </Button>
+            <Button
+              onClick={handleNextQuiz}
+              disabled={playButtonLoading}
+              className="w-full flex items-center justify-between px-6 h-16 sm:h-20 text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
+            >
+              {playButtonLoading ? (
+                <div className="flex items-center text-xl sm:text-2xl justify-center w-full gap-2">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  Loading...
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <span className="text-2xl sm:text-3xl font-extrabold text-white leading-none">
+                      Next Quiz
+                    </span>
+                    <span className="text-base sm:text-lg font-semibold text-yellow-300 flex items-center gap-1.5 bg-gray-700/70 px-3 py-1.5 rounded-full">
+                      <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="8" fill="#f59e0b" />
+                        <circle cx="12" cy="12" r="7" fill="#fbbf24" />
+                        <circle cx="12" cy="12" r="4" fill="#f59e0b" opacity="0.4" />
+                      </svg>
+                      {QUIZ_COST}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <svg
+                      className="w-6 h-6 sm:w-8 sm:h-8 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </div>
+                </>
+              )}
+            </Button>
             </div>
           </div>
         </Card>
@@ -814,11 +845,13 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 ref={earnedPointsRef} 
                 className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
             >
-                <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-yellow-500/50 animate-pulse-glow">
+                <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full
+                 bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-yellow-300/50 animate-pulse-glow">
                   <KnowledgePointIcon className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
-                  <div className="xp-text-aura text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
+                  <div className="xp-text-aura text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300
+                   via-yellow-400 to-orange-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
                     {animatedKnowledge}
                   </div>
                   <div className="text-yellow-400/80 font-bold text-sm sm:text-base mt-1 sm:mt-2">
@@ -843,7 +876,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 </div>
                 <div>
                   {/* COIN COUNT: Changed gradient to gold/yellow and uses the modified coin-text-aura */}
-                  <div className="coin-text-aura text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
+                  <div className="coin-text-aura text-5xl sm:text-6xl font-extrabold bg-gradient-to-b from-yellow-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
                     {animatedCoins}
                   </div>
                   {/* SUBTITLE: Changed color to amber-400 */}
@@ -855,30 +888,32 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         </div>
       )}
 
-      {/* Flying XP Tokens */}
-      {showFlyingTokens && tokens.map((token) => (
-        <div
-          key={token.id}
-          className="xp-token"
-          style={{
-            '--xp-token-delay': `${token.delay}ms`,
-          } as any}
-        />
-      ))}
-      
-      {/* Flying Coin Tokens */}
-      {showFlyingCoins && coinTokens.map((token) => (
-        <div
-          key={token.id}
-          className="coin-token"
-          style={{
-            '--coin-token-delay': `${token.delay}ms`,
-          } as any}
-        >
-          {/* Embed the Coin Icon inside the flying div */}
-          <CoinIcon className="h-full w-full p-[2px] transition-all duration-700" />
-        </div>
-      ))}
+    {/* Flying XP Tokens */}
+    {showFlyingTokens && tokens.map((token) => (
+      <div
+        key={token.id}
+        className="xp-token"
+        style={{
+          ['--xp-token-delay']: `${token.delay}ms`,
+        } as Record<string, string>}
+      />
+    ))}
+
+
+        {/* Flying Coin Tokens */}
+    {showFlyingCoins && coinTokens.map((token) => (
+      <div
+        key={token.id}
+        className="coin-token"
+        style={{
+          '--coin-token-delay': `${token.delay}ms`,
+        } as Record<string, string>}
+      >
+        {/* Embed the Coin Icon inside the flying div */}
+        <CoinIcon className="h-full w-full p-[2px] transition-all duration-700" />
+      </div>
+    ))}
+
 
       {/* CSS Animations and Styles */}
       <style>{`
@@ -967,17 +1002,25 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           animation: number-grow 0.8s ease-out forwards;
         }
         
-        /* XP Text Aura (Yellow/Orange Glow) */
+        /* XP Text Aura (Yellow/Orange Glow) - IMPROVED READABILITY */
         .xp-text-aura {
           text-shadow: 
+            -1px -1px 0 #000, 
+            1px -1px 0 #000, 
+            -1px 1px 0 #000, 
+            1px 1px 0 #000, /* Strong Black Outline */
             0 0 10px rgba(255, 193, 7, 0.9),
             0 0 20px rgba(255, 165, 0, 0.7),
             0 0 30px rgba(255, 140, 0, 0.5);
         }
         
-        /* Coin Text Aura (MODIFIED to match XP's Gold/Yellow Glow) */
+        /* Coin Text Aura (MODIFIED to match XP's Gold/Yellow Glow) - IMPROVED READABILITY */
         .coin-text-aura { 
           text-shadow: 
+            -1px -1px 0 #000, 
+            1px -1px 0 #000, 
+            -1px 1px 0 #000, 
+            1px 1px 0 #000, /* Strong Black Outline */
             0 0 10px rgba(255, 193, 7, 0.9), /* Yellow */
             0 0 20px rgba(255, 165, 0, 0.7), /* Orange */
             0 0 30px rgba(255, 140, 0, 0.5); /* Dark Orange */

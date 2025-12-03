@@ -39,36 +39,58 @@ function playClick() {
 }
 
 /* ------------------------------------------------------------------
-    BUTTON STYLING
+    BUTTON STYLING — ALL UNIFORM SHAPE
 ------------------------------------------------------------------ */
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-bold transition-all duration-150 active:scale-95 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none",
+  "inline-flex items-center justify-center gap-5 whitespace-nowrap font-semibold \
+   rounded-[12px] \
+   transition-all duration-150 active:scale-95 hover:scale-105 \
+   disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none \
+   shadow-[0_2px_4px_rgba(0,0,0,0.18)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.25)]",
   {
     variants: {
       variant: {
-        default:
-          "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white border-[3px] border-[#00ff00] shadow-[0_4px_20px_rgba(0,255,0,0.3)] hover:shadow-[0_6px_30px_rgba(0,255,0,0.5)]",
+         default:
+     "bg-[linear-gradient(to_bottom,#72a06f_0%,#639260_100%)] text-white",
+
+ purple:
+  "bg-[#8F649B] text-white",
         destructive:
-          "bg-gradient-to-b from-[#aa00aa] via-[#880088] to-[#660066] text-white border-2 border-[#ff00ff]",
+          "bg-[linear-gradient(to_bottom,hsl(var(--destructive)),hsl(var(--destructive)))] \
+           text-[hsl(var(--destructive-foreground))]",
+
         blue:
-          "bg-gradient-to-b from-[#0088cc] via-[#006699] to-[#004466] text-white border-2 border-[#00ffff]",
-        purple:
-          "bg-gradient-to-b from-[#9900aa] via-[#770088] to-[#550066] text-white border-2 border-[#dd00ff]",
+          "bg-[linear-gradient(to_bottom,hsl(var(--info)),hsl(var(--info)))] \
+          text-[hsl(var(--info-foreground))] border-none",
+
+
         warning:
-          "bg-gradient-to-b from-[#cc3333] via-[#aa1111] to-[#880000] text-white border-2 border-[#ff4d4d]",
-        outline: "bg-transparent text-white border-2 border-[#00ff41]",
+          "bg-[linear-gradient(to_bottom,hsl(var(--warning)),hsl(var(--warning)))] \
+           text-[hsl(var(--warning-foreground))]",
+
+        outline:
+  "bg-transparent border-2 border-white text-white shadow-none hover:shadow-none hover:bg-white/10 focus-visible:outline-none transition-colors duration-150",
         ghost:
-          "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white border-2 border-[#00ff41]",
+          "bg-transparent text-white shadow-none \
+           hover:bg-[rgba(255,255,255,0.1)] hover:shadow-none",
+
         link:
-          "bg-transparent text-white border-2 border-[#00ff41] shadow-none",
+          "bg-transparent text-[hsl(var(--primary))] shadow-none \
+           underline-offset-4 hover:underline hover:shadow-none \
+           h-auto px-0 rounded-none",
+
+        greenGradient:
+          "bg-[linear-gradient(to_bottom,#7ba773_0%,#6b8f67_100%)] \
+           text-white",
       },
+
       size: {
-        default: "h-12 px-6 py-3 text-sm",
-        sm: "h-9 px-4 text-sm",
-        lg: "h-14 px-8 text-base",
-        xl: "h-16 px-10 text-lg",
-        icon: "h-12 w-12",
+        default: "h-[72px] px-6 text-sm",
+        sm: "h-[56px] px-5 text-sm",
+        lg: "h-[80px] px-8 text-base",
+        xl: "h-[88px] px-10 text-lg",
+        icon: "h-[72px] w-[72px] px-0",
       },
     },
     defaultVariants: {

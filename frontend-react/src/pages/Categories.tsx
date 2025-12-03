@@ -1,3 +1,4 @@
+// Categories.tsx - Refactored with Your Quizzes / All Quizzes tabs
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
@@ -5,11 +6,11 @@ import { CategoryCard } from "@/components/quiz/CategoryCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Search, Plus, AlertTriangle } from "lucide-react";
+import { Search, Plus, Brain, Globe } from "lucide-react";
 import AddCategory from "@/components/AddCategory";
 import { useToast } from "@/hooks/use-toast";
-// ⬅️ CRITICAL: Import the apiClient utility
-import { apiClient } from "@/utils/apiClient"; 
+import { apiClient } from "@/utils/apiClient";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Category {
   _id: string;
@@ -44,19 +45,26 @@ export default function Categories() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [userCategories, setUserCategories] = useState<Category[]>([]);
+  const [filteredAllCategories, setFilteredAllCategories] = useState<Category[]>([]);
+  const [filteredUserCategories, setFilteredUserCategories] = useState<Category[]>([]);
+  
   const [loading, setLoading] = useState(true);
+  const [userCategoriesLoading, setUserCategoriesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isGuest, setIsGuest] = useState(false);
+  const [activeTab, setActiveTab] = useState("your");
+  
   const { toast, dismiss } = useToast();
 
   const searchQueryFromParams = searchParams.get("search") || "";
 
   useEffect(() => {
     loadUserType();
-    fetchCategories();
+    fetchAllCategories();
+    fetchUserCategories();
   }, []);
 
   useEffect(() => {
@@ -64,41 +72,31 @@ export default function Categories() {
       setSearchQuery(searchQueryFromParams);
       handleSearch(searchQueryFromParams);
     }
-  }, [searchQueryFromParams]);
+  }, [searchQueryFromParams, allCategories, userCategories]);
 
-  // ----------------------------------------------------------------
-  // REVISED loadUserType to use apiClient
-  // ----------------------------------------------------------------
   const loadUserType = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
-      // Logic for token-less users (Guests) remains the same
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
-        const parsed = JSON.parse(storedUser);
+        const parsed: User = JSON.parse(storedUser);
         setIsGuest(parsed.userType === "Guest");
       } else {
-        setIsGuest(true); // default to guest if no data
+        setIsGuest(true);
       }
       return;
     }
 
     try {
-      // ⬅️ Use apiClient instead of fetch
       const response = await apiClient(`${BASE_URL}/api/getUserDetails`, {
         method: "GET",
       });
 
-      // ⬅️ Check if response is undefined (401 handled by apiClient)
-      if (!response) {
-        // If apiClient redirects on 401, this function halts.
-        return; 
-      }
+      if (!response) return;
       
       if (!response.ok) throw new Error("Failed to load user info");
       
       const data: User = await response.json();
-      
       setIsGuest(data.userType === "Guest");
       localStorage.setItem("user", JSON.stringify(data));
       
@@ -106,28 +104,23 @@ export default function Categories() {
       console.warn("⚠️ Failed to fetch user type, fallback to local storage:", error);
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
-        const parsed = JSON.parse(storedUser);
+        const parsed: User = JSON.parse(storedUser);
         setIsGuest(parsed.userType === "Guest");
       }
     }
   };
 
-  // ----------------------------------------------------------------
-  // REVISED fetchCategories to use apiClient
-  // ----------------------------------------------------------------
-  const fetchCategories = async () => {
+  const fetchAllCategories = async () => {
     setError(null);
     setLoading(true);
 
     try {
-      // ⬅️ Use apiClient instead of fetch
       const response = await apiClient(`${BASE_URL}/api/categories`, {
         method: "GET",
       });
       
-      // ⬅️ Check if response is undefined (401 handled by apiClient)
       if (!response) {
-        setLoading(false); // Stop loading state as we're leaving the page
+        setLoading(false);
         return;
       }
       
@@ -135,9 +128,9 @@ export default function Categories() {
         throw new Error(`Failed to fetch categories. Status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data: Category[] = await response.json();
 
-      const transformed: Category[] = data.map((category: any, index: number) => ({
+      const transformed: Category[] = data.map((category, index) => ({
         _id: category._id,
         name: category.name,
         description: category.description || `Test your knowledge in ${category.name}`,
@@ -146,40 +139,84 @@ export default function Categories() {
         completionsCount: category.completionsCount || category.completionCount || 0,
         questionCount: category.questionCount || 10,
         averageRating: category.averageRating ?? (3 + Math.random() * 2),
-        difficulty:
-          category.difficulty ||
-          (index % 3 === 0 ? "Easy" : index % 3 === 1 ? "Medium" : "Hard"),
+        difficulty: category.difficulty || (index % 3 === 0 ? "Easy" : index % 3 === 1 ? "Medium" : "Hard"),
         image: category.imageUrl || category.image,
         imageUrl: category.imageUrl || category.image,
-        trending:
-          (category.completionsCount || category.completionCount || 0) > 50,
-        isNew:
-          index < 2 ||
-          new Date().getTime() - new Date(category.createdAt || 0).getTime() <
-            7 * 24 * 60 * 60 * 1000,
+        trending: (category.completionsCount || category.completionCount || 0) > 50,
+        isNew: index < 2 || new Date().getTime() - new Date(category.createdAt || 0).getTime() < 7 * 24 * 60 * 60 * 1000,
         timeEstimate: `${Math.ceil((category.questionCount || 10) * 0.6)} min`,
       }));
 
-      setCategories(transformed);
-      setFilteredCategories(transformed);
-    } catch (error: any) {
-      setError(error.message);
+      setAllCategories(transformed);
+      setFilteredAllCategories(transformed);
+    } catch (error) {
+      const err = error as Error;
+      setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUserCategories = async () => {
+    setUserCategoriesLoading(true);
+    setError(null);
+    
+    try {
+      const response = await apiClient(`${BASE_URL}/api/getUserCategories`, {
+        method: "GET",
+      });
+
+      if (!response) {
+        setUserCategoriesLoading(false);
+        return;
+      }
+
+      if (!response.ok) throw new Error(`Failed: ${response.status}`);
+
+      const data: Category[] = await response.json();
+      
+      const storedUser = localStorage.getItem("user");
+      const userAlias = storedUser ? JSON.parse(storedUser).alias : "QuizMaster";
+      
+      const transformed: Category[] = data.map((c, i) => ({
+        _id: c._id,
+        name: c.name,
+        description: c.description || `Test your knowledge in ${c.name}`,
+        createdBy: c.createdBy || userAlias,
+        completionCount: c.completionCount || 0,
+        completionsCount: c.completionsCount || 0,
+        questionCount: c.questionCount || 10,
+        averageRating: c.averageRating ?? (3 + Math.random() * 2),
+        difficulty: c.difficulty || (["Easy", "Medium", "Hard"] as const)[i % 3],
+        imageUrl: c.imageUrl || c.image,
+        timeEstimate: `${Math.ceil((c.questionCount || 10) * 0.6)} min`,
+      }));
+      
+      setUserCategories(transformed);
+      setFilteredUserCategories(transformed);
+    } catch (e) {
+      const error = e as Error;
+      setError(error.message);
+    } finally {
+      setUserCategoriesLoading(false);
     }
   };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     if (query) {
-      const filtered = categories.filter(
-        (c) =>
-          c.name.toLowerCase().includes(query.toLowerCase()) ||
-          c.description?.toLowerCase().includes(query.toLowerCase())
-      );
-      setFilteredCategories(filtered);
+      const filterCategories = (categories: Category[]) =>
+        categories.filter(
+          (c) =>
+            c.name.toLowerCase().includes(query.toLowerCase()) ||
+            c.description?.toLowerCase().includes(query.toLowerCase())
+        );
+      
+      setFilteredAllCategories(filterCategories(allCategories));
+      setFilteredUserCategories(filterCategories(userCategories));
     } else {
-      setFilteredCategories(categories);
+      setFilteredAllCategories(allCategories);
+      setFilteredUserCategories(userCategories);
     }
   };
 
@@ -192,13 +229,11 @@ export default function Categories() {
     navigate(`/quiz/${categoryId}`);
   };
 
-  // ✅ Restrict category creation for guests
   const handleCreateCategoryAttempt = () => {
     if (isGuest) {
       const { id: toastId } = toast({
         title: "🔒 Registration Required",
-        description:
-          "You must complete your registration to create a quiz",
+        description: "You must complete your registration to create a quiz",
         variant: "destructive",
         action: (
           <div className="flex space-x-2">
@@ -214,7 +249,7 @@ export default function Categories() {
               Register
             </Button>
             <Button
-              variant="warning"
+              variant="outline"
               size="sm"
               onClick={() => dismiss(toastId)}
             >
@@ -230,11 +265,12 @@ export default function Categories() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] flex items-center justify-center">
         <div className="text-center space-y-4">
-          <h2 className="text-2xl font-bold text-red-500">
-            Error Loading Categories
-          </h2>
+          <h2 className="text-2xl font-bold text-red-500">Error Loading Categories</h2>
           <p className="text-gray-400">{error}</p>
-          <Button onClick={fetchCategories}>Try Again</Button>
+          <Button onClick={() => {
+            fetchAllCategories();
+            fetchUserCategories();
+          }}>Try Again</Button>
         </div>
       </div>
     );
@@ -257,78 +293,145 @@ export default function Categories() {
             />
           </div>
 
-          {/* ✅ AddCategory now restricted for guests */}
           <AddCategory
-            fetchCategories={fetchCategories}
+            fetchCategories={() => {
+              fetchAllCategories();
+              fetchUserCategories();
+            }}
             isGuest={isGuest}
             onRegistrationRequired={handleCreateCategoryAttempt}
           />
         </div>
 
-        {/* Categories Grid */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-foreground">
-              {loading
-                ? "Loading..."
-                : `${filteredCategories.length} Categories`}
-            </h3>
-          </div>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="your" className="flex items-center gap-2">
+              <Brain className="w-4 h-4" />
+              Your Quizzes
+            </TabsTrigger>
+            <TabsTrigger value="all" className="flex items-center gap-2">
+              <Globe className="w-4 h-4" />
+              All Quizzes
+            </TabsTrigger>
+          </TabsList>
 
-          {loading ? (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Card key={i} className="p-4 animate-pulse">
-                  <div className="h-32 bg-muted/20 rounded mb-4" />
-                  <div className="space-y-2">
-                    <div className="h-4 bg-muted/20 rounded w-3/4" />
-                    <div className="h-3 bg-muted/20 rounded w-full" />
-                    <div className="h-3 bg-muted/20 rounded w-1/2" />
-                  </div>
-                </Card>
-              ))}
+          {/* Your Quizzes Tab */}
+          <TabsContent value="your" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-foreground">
+                {userCategoriesLoading ? "Loading..." : `${filteredUserCategories.length} Your Quizzes`}
+              </h3>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredCategories.map((category) => (
-                <CategoryCard
-                  key={category._id}
-                  id={category._id}
-                  title={category.name}
-                  description={category.description}
-                  difficulty={category.difficulty || "Medium"}
-                  questionCount={category.questionCount || 10}
-                  completions={
-                    category.completionCount || category.completionsCount || 0
-                  }
-                  rating={category.averageRating || 0}
-                  timeEstimate={category.timeEstimate || "5 min"}
-                  imageUrl={category.imageUrl || "coming soon"}
-                  createdBy={category.createdBy || "Quizicle"}
-                  onPlay={handlePlayQuiz}
-                />
-              ))}
-            </div>
-          )}
-        </div>
 
-        {searchQuery && filteredCategories.length === 0 && !loading && (
-          <Card className="p-8 text-center">
-            <Search className="h-12 w-12 mx-auto text-muted-foreground" />
-            <h4 className="font-semibold text-foreground">No quizzes found</h4>
-            <p className="text-sm text-muted-foreground">
-              Try searching with different keywords or create your own Quiz
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCreateCategoryAttempt}
-            >
-              <Plus className="h-4 w-4" />
-              Create "{searchQuery}" Quiz
-            </Button>
-          </Card>
-        )}
+            {userCategoriesLoading ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Card key={i} className="p-4 animate-pulse">
+                    <div className="h-32 bg-muted/20 rounded mb-4" />
+                    <div className="space-y-2">
+                      <div className="h-4 bg-muted/20 rounded w-3/4" />
+                      <div className="h-3 bg-muted/20 rounded w-full" />
+                      <div className="h-3 bg-muted/20 rounded w-1/2" />
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : filteredUserCategories.length === 0 ? (
+              <Card className="p-8 text-center">
+                <Brain className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h4 className="font-semibold text-foreground mb-2">No quizzes yet</h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {searchQuery 
+                    ? "No matching quizzes found. Try a different search or create a new quiz." 
+                    : "Create your first quiz to get started!"}
+                </p>
+                {searchQuery && (
+                  <Button variant="outline" size="sm" onClick={handleCreateCategoryAttempt}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create "{searchQuery}" Quiz
+                  </Button>
+                )}
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredUserCategories.map((category) => (
+                  <CategoryCard
+                    key={category._id}
+                    id={category._id}
+                    title={category.name}
+                    description={category.description}
+                    difficulty={category.difficulty || "Medium"}
+                    questionCount={category.questionCount || 10}
+                    completions={category.completionCount || category.completionsCount || 0}
+                    rating={category.averageRating || 0}
+                    timeEstimate={category.timeEstimate || "5 min"}
+                    imageUrl={category.imageUrl || "coming soon"}
+                    createdBy={category.createdBy || "You"}
+                    onPlay={handlePlayQuiz}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* All Quizzes Tab */}
+          <TabsContent value="all" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-foreground">
+                {loading ? "Loading..." : `${filteredAllCategories.length} Quizzes`}
+              </h3>
+            </div>
+
+            {loading ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Card key={i} className="p-4 animate-pulse">
+                    <div className="h-32 bg-muted/20 rounded mb-4" />
+                    <div className="space-y-2">
+                      <div className="h-4 bg-muted/20 rounded w-3/4" />
+                      <div className="h-3 bg-muted/20 rounded w-full" />
+                      <div className="h-3 bg-muted/20 rounded w-1/2" />
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredAllCategories.map((category) => (
+                  <CategoryCard
+                    key={category._id}
+                    id={category._id}
+                    title={category.name}
+                    description={category.description}
+                    difficulty={category.difficulty || "Medium"}
+                    questionCount={category.questionCount || 10}
+                    completions={category.completionCount || category.completionsCount || 0}
+                    rating={category.averageRating || 0}
+                    timeEstimate={category.timeEstimate || "5 min"}
+                    imageUrl={category.imageUrl || "coming soon"}
+                    createdBy={category.createdBy || "Quizicle"}
+                    onPlay={handlePlayQuiz}
+                  />
+                ))}
+              </div>
+            )}
+
+            {searchQuery && filteredAllCategories.length === 0 && !loading && (
+              <Card className="p-8 text-center">
+                <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h4 className="font-semibold text-foreground mb-2">No quizzes found</h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Try searching with different keywords or create your own Quiz
+                </p>
+                <Button variant="outline" size="sm" onClick={handleCreateCategoryAttempt}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create "{searchQuery}" Quiz
+                </Button>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

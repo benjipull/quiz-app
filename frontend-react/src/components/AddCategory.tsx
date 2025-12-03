@@ -98,7 +98,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({
       <>
         <Button
           onClick={handleMainButtonClick}
-          className="flex items-center gap-2 px-6 py-3 rounded-lg text-white text-base shadow-xl bg-purple-600 hover:bg-purple-700 transition-all duration-200"
+          size="sm"
         >
           <Plus className="h-5 w-5" />
           <span>Create Your First Quiz</span>
@@ -118,7 +118,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({
                 onClick={() => setIsOpen(false)}
                 variant="destructive"
                 size="icon"
-                className="absolute top-4 right-4 rounded-full p-2 shadow-md"
+                className="absolute top-4 right-4 !h-10 !w-10"
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -140,15 +140,17 @@ const AddCategory: React.FC<AddCategoryProps> = ({
                   <Button
                     onClick={handleCreateCategory}
                     disabled={loading || !categoryName.trim()}
-                    className="flex-1"
-                  >
+                    size="sm"
+    className="flex-1 border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+>
                     {loading ? "Creating..." : "Create"}
                   </Button>
 
                   <Button
                     onClick={() => setIsOpen(false)}
                     variant="outline"
-                    className="flex-1 border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                    size="sm"
+                    className="flex-1"
                   >
                     Cancel
                   </Button>
@@ -183,6 +185,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({
 
         <Button
           onClick={handleMainButtonClick}
+          size="sm"
         >
           <Plus className="h-4 w-4" />
           <span>Create Quiz</span>
@@ -203,7 +206,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({
               onClick={() => setIsOpen(false)}
               variant="destructive"
               size="icon"
-              className="absolute top-4 right-4 rounded-full p-2 shadow-md"
+              className="absolute top-4 right-4 !h-10 !w-10"
             >
               <X className="w-4 h-4" />
             </Button>
@@ -225,6 +228,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({
                 <Button
                   onClick={handleCreateCategory}
                   disabled={loading || !categoryName.trim()}
+                  size="sm"
                   className="flex-1"
                 >
                   {loading ? "Creating..." : "Create"}
@@ -233,7 +237,8 @@ const AddCategory: React.FC<AddCategoryProps> = ({
                 <Button
                   onClick={() => setIsOpen(false)}
                   variant="outline"
-                  className="flex-1 border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                  size="sm"
+                  className="flex-1"
                 >
                   Cancel
                 </Button>
