@@ -1,4 +1,4 @@
-// src/contexts/UserContext.tsx - Updated with Caching
+// src/contexts/UserContext.tsx - Updated with Debug Logging
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { globalCache } from '@/hooks/useAppPreloader';
 
@@ -51,24 +51,29 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<UserDetails | null>(null);
   const [loading, setLoading] = useState(true);
 
+  console.log("👤 UserProvider render - loading:", loading, "user:", !!user);
+
   const loadUserFromStorage = () => {
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
     if (storedUser) {
       try {
         const parsedUser: UserDetails = JSON.parse(storedUser);
+        console.log("💾 Loaded user from localStorage:", parsedUser.alias);
         setUser(parsedUser);
         return parsedUser;
       } catch (e) {
-        console.error("Failed to parse local user data:", e);
+        console.error("❌ Failed to parse local user data:", e);
       }
     }
     return null;
   };
 
   const refreshUser = async () => {
+    console.log("🔄 refreshUser called");
     const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
     
     if (!userToken) {
+      console.log("⚠️ No token found, loading from storage");
       loadUserFromStorage();
       setLoading(false);
       return;
@@ -84,28 +89,30 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         interests: cachedUser.interests || [],
         coins: cachedUser.coins || 0,
       };
+      console.log("⚡ User loaded from cache:", userToStore.alias);
       setUser(userToStore);
       if (typeof window !== 'undefined') {
         localStorage.setItem("user", JSON.stringify(userToStore));
       }
       setLoading(false);
-      console.log("✅ User loaded from cache");
       return;
     }
 
+    console.log("🌐 Fetching user from API...");
     try {
       const response = await authenticatedFetch(`${BASE_URL}/api/getUserDetails`, {
         method: "GET",
       });
 
       if (!response.ok) {
-        console.warn(`Failed to fetch user details (Status: ${response.status}). Using cached data.`);
+        console.warn(`⚠️ Failed to fetch user details (Status: ${response.status}). Using cached data.`);
         loadUserFromStorage();
         setLoading(false);
         return;
       }
 
       const apiUser: UserDetails = await response.json();
+      console.log("✅ User fetched from API:", apiUser.alias);
       
       const userToStore = {
         ...apiUser,
@@ -128,9 +135,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       };
       globalCache.lastUpdated.home = Date.now();
     } catch (error) {
-      console.error("Error fetching user details from API:", error);
+      console.error("❌ Error fetching user details from API:", error);
       loadUserFromStorage();
     } finally {
+      console.log("🏁 User loading complete, setting loading to false");
       setLoading(false);
     }
   };
@@ -155,6 +163,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   useEffect(() => {
+    console.log("🚀 UserProvider mounted, calling refreshUser");
     refreshUser();
   }, []);
 

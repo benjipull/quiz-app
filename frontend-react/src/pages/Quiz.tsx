@@ -83,7 +83,7 @@ const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmTe
       <p className="text-sm text-white">{description}</p>
       <div className="flex justify-end gap-3">
         <Button variant="default" onClick={onCancel} className="border-green-600 text-white">{cancelText}</Button>
-        <Button variant="destructive" className="text-white" onClick={onConfirm}>{confirmText}</Button>
+        <Button variant="outline" className="text-white border-red-600 bg-red-700" onClick={onConfirm}>{confirmText}</Button>
       </div>
     </Card>
   </div>
