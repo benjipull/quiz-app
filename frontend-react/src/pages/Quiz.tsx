@@ -78,12 +78,12 @@ const StarfieldBackground = () => {
 
 const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmText, cancelText }: any) => (
   <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <Card className="max-w-sm w-full p-6 space-y-4 bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67]">
-      <h3 className="text-lg font-bold">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
+    <Card className="max-w-sm w-full p-6 space-y-4 bg-primary]">
+      <h3 className="text-lg text-warning font-bold">{title}</h3>
+      <p className="text-sm text-white">{description}</p>
       <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={onCancel}>{cancelText}</Button>
-        <Button variant="warning" className="text-white" onClick={onConfirm}>{confirmText}</Button>
+        <Button variant="default" onClick={onCancel} className="border-green-600 text-white">{cancelText}</Button>
+        <Button variant="destructive" className="text-white" onClick={onConfirm}>{confirmText}</Button>
       </div>
     </Card>
   </div>
@@ -1181,71 +1181,56 @@ export default function Quiz() {
                   </div>
                 </Card>
 
-                <div className="mt-6 space-y-4 animate-fade-in">
-                  <Card className="p-4 md:p-6 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
-                    <div className="space-y-4">
-                      <p className="text-sm font-medium text-center text-white">Did you like this question?</p>
+               <div className="mt-6 flex flex-col items-center space-y-3">
+                <div className="flex items-center gap-4">
+                  {/* Text */}
+                  <p className="text-md font-medium text-white">Did you like?</p>
 
-                      <div className="flex gap-3 md:gap-4 justify-center">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleFeedback("up")}
-                          disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${feedbackType === "up"
-                              ? "bg-green-100 border-green-500 text-green-600"
-                              : feedbackGiven
-                                ? "opacity-50 cursor-not-allowed"
-                                : "border-green-500 text-green-600 hover:bg-green-500 hover:text-white"
-                            }`}
-                        >
-                          <ThumbsUp className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:ml-2">Yes</span>
-                        </Button>
+                  {/* Icons */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleFeedback("up")}
+                      disabled={feedbackGiven}
+                      className="p-1 text-white hover:text-green-500 transition-colors"
+                    >
+                      <ThumbsUp className="h-5 w-5" />
+                    </button>
 
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleFeedback("down")}
-                          disabled={feedbackGiven}
-                          className={`text-sm flex-1 max-w-[120px] h-10 transition-colors ${feedbackType === "down"
-                              ? "bg-red-100 border-red-600 text-red-600"
-                              : feedbackGiven
-                                ? "opacity-50 cursor-not-allowed"
-                                : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
-                            }`}
-                        >
-                          <ThumbsDown className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:ml-2">No</span>
-                        </Button>
+                    <button
+                      onClick={() => handleFeedback("down")}
+                      disabled={feedbackGiven}
+                      className="p-1 text-white hover:text-red-500 transition-colors"
+                    >
+                      <ThumbsDown className="h-5 w-5" />
+                    </button>
 
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowReportDialog(true)}
-                          className="text-sm flex-1 max-w-[120px] h-10 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
-                        >
-                          <Flag className="h-4 w-4 md:h-5 md:w-5" />
-                          <span className="ml-1 sm:ml-2">Report</span>
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-
-                  <Button
-                    className="w-full h-14 md:h-16 text-base md:text-lg text-white font-bold"
-                    onClick={handleNextQuestion}
-                    disabled={isCompletingQuiz}
-                  >
-                    {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
-                  </Button>
+                    <button
+                      onClick={() => setShowReportDialog(true)}
+                      className="p-1 text-white hover:text-blue-500 transition-colors"
+                    >
+                      <Flag className="h-5 w-5" />
+                    </button>
+                  </div>
                 </div>
+
+                {/* Next Question button */}
+                <Button
+                  className="w-full h-12 text-sm text-white font-bold"
+                  onClick={handleNextQuestion}
+                  disabled={isCompletingQuiz}
+                >
+                  {isCompletingQuiz
+                    ? "Completing..."
+                    : isLastQuestion
+                    ? "Finish Quiz"
+                    : "Next Question"}
+                </Button>
+              </div>
               </div>
             )}
           </div>
         </div>
       </div>
-
       {showExitDialog && (
         <ConfirmationDialog
           title="Stop Quiz?"

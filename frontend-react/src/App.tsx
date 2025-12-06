@@ -1,15 +1,13 @@
-import React, { useLayoutEffect } from "react"; // 💡 Import useLayoutEffect
+import React, { useLayoutEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"; // 💡 Import useLocation
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"; 
 import { MobileLayout } from "@/components/layout/MobileLayout";
 import Home from "./pages/Home";
-// ... (other page imports)
 import Quiz from "./pages/Quiz";
 import AuthSection from "./pages/AuthSection";
-// ... (other page imports)
 import { usePageTracking } from "./hooks/usePageTracking";
 import Leaderboard from "./pages/Leaderboard";
 import Categories from "./pages/Categories";

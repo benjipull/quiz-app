@@ -1,4 +1,4 @@
-// Profile.tsx
+// Profile.tsx - Optimized with User Context
 
 "use client";
 
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import InterestSelector from "@/components/InterestSelector";
 import { trackEvent } from "@/utils/analytics";
+import { useUser } from "@/contexts/UserContext";
 import {
   Dialog,
   DialogContent,
@@ -35,15 +36,16 @@ interface Interest {
 }
 
 const Profile = () => {
-  const [user, setUser] = useState<any | null>(null);
+  const { user, loading: userLoading, refreshUser, updateUserLocally } = useUser();
   const [alias, setAlias] = useState("");
   const [age, setAge] = useState("");
+  const [email, setEmail] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [selectedAvatarIndex, setSelectedAvatarIndex] = useState(0);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [allInterests, setAllInterests] = useState<Interest[]>([]);
   const [updating, setUpdating] = useState(false);
   const [savingInterests, setSavingInterests] = useState(false); 
-  const [userType, setUserType] = useState<"Guest" | "Registered" | "Admin">("Registered");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -51,6 +53,8 @@ const Profile = () => {
 
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const isGuest = user?.userType === "Guest";
 
   // Fetch all interests for display
   useEffect(() => {
@@ -69,36 +73,26 @@ const Profile = () => {
   }, []);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-      setAlias(parsedUser.alias || "");
-      setAge(parsedUser.age || "");
-      setUserType(parsedUser.userType || "Registered");
+    if (user) {
+      setAlias(user.alias || "");
+      setAge(user.age?.toString() || "");
+      setEmail(user.email || "");
+      setSelectedInterests(user.interests || []);
       
-      setSelectedInterests(parsedUser.interests || []);
-      
-      const avatarIndex = parsedUser.avatar - 1;
+      const avatarIndex = user.avatar - 1;
       const initialAvatar = avatars[avatarIndex] || avatars[0] || null;
       setAvatar(initialAvatar);
-      
-      if (parsedUser.userType === "Guest" && !localStorage.getItem("userAvatarIndex")) {
-        const defaultIndex = 0;
-        localStorage.setItem("userAvatar", avatars[defaultIndex]);
-        localStorage.setItem("userAvatarIndex", defaultIndex.toString());
-      }
-    } else {
+      setSelectedAvatarIndex(avatarIndex >= 0 ? avatarIndex : 0);
+    } else if (!userLoading) {
       navigate("/auth");
     }
-  }, [navigate]);
+  }, [user, userLoading, navigate]);
 
   const handleAvatarSelection = (selectedAvatar: string, index: number) => {
-    if (userType === "Registered" || userType === "Admin") {
-      setAvatar(selectedAvatar);
-      localStorage.setItem("userAvatar", selectedAvatar);
-      localStorage.setItem("userAvatarIndex", index.toString());
-    }
+    setAvatar(selectedAvatar);
+    setSelectedAvatarIndex(index);
+    localStorage.setItem("userAvatar", selectedAvatar);
+    localStorage.setItem("userAvatarIndex", index.toString());
   };
 
   const handleInterestChange = (newSelectedIds: string[]) => {
@@ -128,25 +122,14 @@ const Profile = () => {
         throw new Error("Failed to update interests.");
       }
 
-      const updatedUser = {
-        ...user,
-        interests: interestsToSave,
-      };
-
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
+      updateUserLocally({ interests: interestsToSave });
       
-      // Track interest update
       trackEvent("update_interests", {
         user_id: user._id,
         interest_count: interestsToSave.length,
+        context: "profile_page",
       });
       
-      toast({
-        title: "Success",
-        description: `Interests updated successfully! (${interestsToSave.length} selected)`,
-      });
-
     } catch (error) {
       toast({
         title: "Error",
@@ -166,16 +149,13 @@ const Profile = () => {
   const updateUserDetails = async (isRegistration: boolean) => {
     setUpdating(true);
     try {
-      const avatarIndex = localStorage.getItem("userAvatarIndex");
-      const avatarValue = avatarIndex
-        ? parseInt(avatarIndex) + 1
-        : user.avatar || 1;
+      const avatarValue = selectedAvatarIndex + 1;
 
       const updateData = {
         alias,
         age: parseInt(age),
         avatar: avatarValue,
-        ...(isRegistration ? { email: user.email, password, interests: selectedInterests } : {}),
+        ...(isRegistration ? { email, password, interests: selectedInterests } : {}),
       };
       
       const token = localStorage.getItem("token");
@@ -201,39 +181,24 @@ const Profile = () => {
         localStorage.setItem("token", data.token);
       }
 
-      const newType: "Guest" | "Registered" | "Admin" =
-        data.user?.userType || "Registered";
+      // Refresh user from API after successful update
+      await refreshUser();
 
-      const updatedUser = {
-        ...user,
-        ...data.user,
-        alias,
-        age: parseInt(age),
-        avatar: avatarValue,
-        userType: newType,
-        interests: selectedInterests, 
-      };
-
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      setUserType(newType);
+      const newType = data.user?.userType || "Registered";
 
       if (newType === "Registered" && isRegistration) {
-        // Successful Guest registration
         toast({
           title: "Registration Complete",
           description: "Welcome! Your account is now fully registered.",
         });
-        setTimeout(() => navigate("/"), 1500); // Redirect to /
+        setTimeout(() => navigate("/"), 1500);
       } else if (newType !== "Guest" && !isRegistration) {
-        // Successful Registered/Admin update
         toast({
           title: "Success",
           description: "Profile updated successfully! Redirecting to home.",
         });
-        setTimeout(() => navigate("/"), 1500); // Redirect to /
+        setTimeout(() => navigate("/"), 1500);
       } else {
-        // Other updates 
         toast({
           title: "Success",
           description: "Profile updated successfully!",
@@ -252,12 +217,11 @@ const Profile = () => {
 
   const handleSaveClick = async (e: React.FormEvent) => {
     e.preventDefault();
-    const isGuest = userType === "Guest";
 
     if (!validateBasicFields(isGuest)) return;
 
     if (isGuest) {
-      if (!user.email || !user.email.includes("@")) {
+      if (!email || !email.includes("@")) {
         toast({ title: "Validation Error", description: "Enter a valid email.", variant: "destructive" });
         return;
       }
@@ -283,14 +247,13 @@ const Profile = () => {
       toast({ title: "Validation Error", description: "Enter a valid age.", variant: "destructive" });
       return false;
     }
-    if (!isRegistration && !avatar) {
+    if (!avatar) {
       toast({ title: "Validation Error", description: "Please select an avatar.", variant: "destructive" });
       return false;
     }
     return true;
   };
 
-  // Get selected interest names for display
   const getSelectedInterestNames = () => {
     return allInterests
       .filter(interest => selectedInterests.includes(interest._id))
@@ -305,15 +268,14 @@ const Profile = () => {
     });
   };
 
-  if (!user) {
+  if (userLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
-        Loading profile...
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white"></div>
       </div>
     );
   }
 
-  const isGuest = userType === "Guest";
   const selectedInterestNames = getSelectedInterestNames();
 
   return (
@@ -373,29 +335,35 @@ const Profile = () => {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input
-                type="email"
-                value={user.email || ""}
-                onChange={(e) =>
-                  isGuest ? setUser({ ...user, email: e.target.value }) : null
-                }
-                placeholder={
-                  isGuest ? "Enter your email for registration" : "Your registered email"
-                }
-                disabled={!isGuest}
-                className={`${!isGuest ? "cursor-not-allowed bg-muted/50 border-border/70" : ""}`}
-              />
-              {isGuest && (
-                <p className="text-xs text-muted-foreground">
-                  Email is required to complete registration.
-                </p>
-              )}
-            </div>
-            
+            {!isGuest && (
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={email}
+                  placeholder="Your registered email"
+                  disabled
+                  className="cursor-not-allowed bg-muted/50 border-border/70"
+                />
+              </div>
+            )}
+
             {isGuest && (
               <>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email for registration"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Email is required to complete registration.
+                  </p>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <div className="relative">
@@ -458,11 +426,9 @@ const Profile = () => {
               />
             </div>
 
-            {/* Interest Selection with Tags */}
             <div className="space-y-2">
               <Label>Your Interests</Label>
               
-              {/* Display selected interests as tags */}
               {selectedInterestNames.length > 0 ? (
                 <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-lg border border-border/50 min-h-[60px] max-h-32 overflow-y-auto">
                   {selectedInterestNames.map((name, index) => (
@@ -480,7 +446,6 @@ const Profile = () => {
                 </div>
               )}
               
-              {/* Button to open modal */}
               <Button
                 type="button"
                 variant="blue" 
@@ -500,37 +465,37 @@ const Profile = () => {
               </p>
             </div>
 
-            {!isGuest && (
-              <div className="space-y-2">
-                <Label>Select Avatar</Label>
-                <div className="grid grid-cols-5 gap-3 p-3 border border-border rounded-lg bg-card/70">
-                  {avatars.map((avatarImg, index) => (
-                    <Avatar
-                      key={index}
-                      className={`w-14 h-14 cursor-pointer border-2 transition-all duration-200 ${
-                        avatar === avatarImg
-                          ? "border-primary ring-2 ring-primary/50 shadow-xl scale-110"
-                          : "border-transparent hover:border-primary/50 hover:scale-105"
-                      }`}
-                      onClick={() => handleAvatarSelection(avatarImg, index)}
-                    >
-                      <AvatarImage src={avatarImg} alt={`Avatar ${index + 1}`} />
-                      <AvatarFallback className="bg-muted text-muted-foreground">
-                        AV
-                      </AvatarFallback>
-                    </Avatar>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Guests receive a default avatar upon registration and can change it here later.
-                </p>
+            <div className="space-y-2">
+              <Label>Select Avatar</Label>
+              <div className="grid grid-cols-5 gap-3 p-3 border border-border rounded-lg bg-card/70">
+                {avatars.map((avatarImg, index) => (
+                  <Avatar
+                    key={index}
+                    className={`w-14 h-14 cursor-pointer border-2 transition-all duration-200 ${
+                      selectedAvatarIndex === index
+                        ? "border-primary ring-2 ring-primary/50 shadow-xl scale-110"
+                        : "border-transparent hover:border-primary/50 hover:scale-105"
+                    }`}
+                    onClick={() => handleAvatarSelection(avatarImg, index)}
+                  >
+                    <AvatarImage src={avatarImg} alt={`Avatar ${index + 1}`} />
+                    <AvatarFallback className="bg-muted text-muted-foreground">
+                      AV
+                    </AvatarFallback>
+                  </Avatar>
+                ))}
               </div>
-            )}
+              <p className="text-xs text-muted-foreground">
+                {isGuest 
+                  ? "Choose your avatar. You can change it anytime after registration." 
+                  : "Select an avatar to update your profile picture."}
+              </p>
+            </div>
 
             <Button
               type="submit"
               disabled={updating || savingInterests}
-              className={`w-full h-10 transition-colors ${isGuest ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-primary hover:bg-primary/90"}`}
+              className='w-full'
             >
               {updating ? (
                 <div className="flex items-center space-x-2">
@@ -550,7 +515,6 @@ const Profile = () => {
         </CardContent>
       </Card>
 
-      {/* Interest Selection Modal */}
       <Dialog open={isInterestModalOpen} onOpenChange={setIsInterestModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card/95 backdrop-blur-sm">
           <DialogHeader>
@@ -583,9 +547,9 @@ const Profile = () => {
               Cancel
             </Button>
             <Button 
+              variant="blue"
               onClick={handleSaveInterests}
               disabled={savingInterests}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               {savingInterests ? (
                 <div className="flex items-center space-x-2">

@@ -9,7 +9,7 @@ const About = () => {
       <div className='flex flex-col items-center justify-center px-4 py-16'>
         <div className='text-center space-y-6'>
           <div className='mb-8'>
-            <img src="/QuizicleLogo.png" alt="Logo" className='h-16 mx-auto' />
+            <img src="/QuizicleLogo.png" alt="Logo" className='h-20 mx-auto' />
           </div>
           
           <div className='bg-background rounded-lg shadow-sm px-8 py-6 border border-gray-200'>

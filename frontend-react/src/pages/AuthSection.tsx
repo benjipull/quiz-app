@@ -80,12 +80,6 @@ const AuthSection = () => {
                 localStorage.setItem("user", JSON.stringify(data.user));
                 setGAUser(data.user._id);
                 trackLogin("user_login", data.user._id);
-
-                toast({
-                    title: "Success",
-                    description: "Login successful! Welcome back.",
-                });
-
                 const from = location.state?.from?.pathname || "/";
                 navigate(from);
             } else {
@@ -160,10 +154,6 @@ const AuthSection = () => {
             const data = await response.json();
 
             if (response.ok) {
-                toast({
-                    title: "Success",
-                    description: "Registration successful! Please sign in to continue.",
-                });
 
                 setAuthMode('login');
                 setShowAuthOptions(false);
@@ -199,11 +189,6 @@ const AuthSection = () => {
 
                 setGAUser(data.user._id);
                 trackLogin("user_login", data.user._id);
-
-                toast({
-                    title: "Welcome Guest",
-                    description: "Enjoy limited access. Complete your profile to register!",
-                });
                 navigate("/");
             } else {
                 throw new Error(data.message || "Guest login failed.");
@@ -326,7 +311,7 @@ const AuthSection = () => {
             <Button
                 type="button"
                 onClick={handleGuestLogin}
-                variant="blue"
+                variant="default"
                 className="w-full h-14 text-lg font-semibold text-white"
                 disabled={isLoading}
             >
@@ -346,6 +331,7 @@ const AuthSection = () => {
 
             {/* Secondary CTA - Sign Up */}
             <Button
+            variant="blue"
                 type="button"
                 onClick={() => {
                     setShowAuthOptions(false);

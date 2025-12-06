@@ -33,7 +33,7 @@ const [coinGainAudio] = useState(
     typeof Audio !== "undefined" ? new Audio(COINS_GAIN_SOUND_SRC) : null
 );
 
-const claimButtonRef = useRef<HTMLDivElement>(null);
+const claimButtonRef = useRef<HTMLButtonElement>(null);
 
 const fetchDailyBonusAmount = useCallback(async () => {
 try {
@@ -270,9 +270,15 @@ return (
             </svg>
           </div>
 
-          <span className="absolute bottom-[-18px] left-2 bg-emerald-500 rounded-full border-2 border-white/80 px-2.5 sm:px-3 py-0.5 text-xs sm:text-sm font-bold text-white shadow-lg whitespace-nowrap">
-            +{dailyBonusAmount}
-          </span>
+          <Button
+          variant="ghost"
+          size="sm"
+          className="absolute bottom-[-18px] left-2  px-2.5 sm:px-3 py-0.5 font-bold text-white s pointer-events-none"
+          disabled
+        >
+          +{dailyBonusAmount}
+        </Button>
+
         </div>
 
         <div className="leading-tight min-w-0 -ml-1">
@@ -280,34 +286,48 @@ return (
         </div>
       </div>
 
-      <div
-        ref={claimButtonRef}
-        className={`
-          flex items-center gap-1 sm:gap-2
-          px-3 py-1.5 sm:px-6 sm:py-3
-          rounded-full
-          ${
-            canClaim
-              ? "bg-yellow-500/10 border-[3px] border-yellow-400 shadow-[0_0_25px_rgba(255,255,0,0.5)] cursor-pointer hover:bg-yellow-500/20 transition-colors"
-              : "bg-[#501b9b] shadow-[0_0_15px_rgba(240,171,240,0.4),_0_4px_15px_rgba(0,0,0,0.5)] border border-purple-800/50"
-          }
-        `}
-        onClick={handleClaimClick}
+   <Button
+  ref={claimButtonRef}
+  onClick={handleClaimClick}
+  className="flex items-center gap-1 sm:gap-2 px-3 py-1.5 sm:px-6 sm:py-3 "
+  variant={canClaim ? "warning" : "purple"}
+  style={{
+    ...(canClaim
+      ? {
+          border: "3px solid #fcd34d",
+          boxShadow: "0 0 25px rgba(255,255,0,0.5)",
+        }
+      : {
+          border: "1px solid rgba(128,90,213,0.5)",
+          boxShadow: "0 0 15px rgba(240,171,240,0.4), 0 4px 15px rgba(0,0,0,0.5)",
+        }),
+  }}
+>
+  {canClaim ? (
+    <>
+      <Sparkles
+        className={`w-4 h-4 sm:w-6 sm:h-6 ${
+          isClaiming ? "text-gray-400" : "text-yellow-400"
+        }`}
+      />
+      <span
+        className={`font-bold text-sm sm:text-lg whitespace-nowrap ${
+          isClaiming ? "text-gray-400" : "text-yellow-400"
+        }`}
       >
-        {canClaim ? (
-          <>
-            <Sparkles className={`w-4 h-4 sm:w-6 sm:h-6 ${isClaiming ? "text-gray-400" : "text-yellow-400"}`} />
-            <span className={`font-bold text-sm sm:text-lg whitespace-nowrap ${isClaiming ? "text-gray-400" : "text-yellow-400"}`}>
-              {isClaiming ? "Claiming..." : "Claim Now"}
-            </span>
-          </>
-        ) : (
-          <>
-            <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" />
-            <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap">{formatTimeRemaining(timeRemaining)}</span>
-          </>
-        )}
-      </div>
+        {isClaiming ? "Claiming..." : "Claim Now"}
+      </span>
+    </>
+  ) : (
+    <>
+      <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" />
+      <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap">
+        {formatTimeRemaining(timeRemaining)}
+      </span>
+    </>
+  )}
+</Button>
+
     </div>
   </Card>
 
