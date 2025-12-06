@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { ThemeProvider } from "next-themes";
+import { UserProvider } from "@/contexts/UserContext"; // 👈 ADD THIS IMPORT
 import App from "./App.tsx";
 import "./index.css";
 import "./App.css";
@@ -24,7 +25,9 @@ initGA(userId);
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-      <App />
+      <UserProvider> 
+        <App />
+      </UserProvider>
     </ThemeProvider>
   </React.StrictMode>
 );
