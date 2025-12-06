@@ -1,4 +1,4 @@
-// Home.tsx - Complete with Zero Loading Implementation, Updated UI/Style
+// Home.tsx - Fixed version with synchronized loading
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
@@ -34,7 +34,6 @@ const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
 const avatars: string[] = Object.values(avatarImages) as string[];
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
-// Using the QUIZ_COST from the second file as requested
 const QUIZ_COST = 50;
 
 interface CategoryToPlayResponse {
@@ -69,10 +68,8 @@ const authenticatedFetch = async (url: string, options: RequestInit) => {
 
 export default function Home() {
   const { user, loading: userLoading, updateUserLocally, updateCoins } = useUser();
-  const [loading, setLoading] = useState(true);
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
   const [currentCoins, setCurrentCoins] = useState(0);
@@ -81,16 +78,17 @@ export default function Home() {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [savingInterests, setSavingInterests] = useState(false);
 
-  // Preloading Refs (from first file)
+  // Preloading Refs
   const preloadedCategoryRef = useRef<CategoryToPlayResponse | null>(null);
   const isPreloadingRef = useRef(false);
   const hasPreloadedLeaderboardRef = useRef(false);
+  const hasInitializedRef = useRef(false);
 
   const navigate = useNavigate();
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
   const { toast } = useToast();
 
-  // --- UI/Screen Size Effect (from both files) ---
+  // Check screen size
   useEffect(() => {
     const checkScreenSize = () => setIsSmallScreen(window.innerWidth < 768);
     checkScreenSize();
@@ -98,54 +96,62 @@ export default function Home() {
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
-
-  // --- Initialization and Splash Screen (from first file) ---
+  // Initialization effect
   useEffect(() => {
-    const initializeApp = async () => {
-      const hasShownSplash = typeof window !== 'undefined' ? sessionStorage.getItem("splashShown") : null;
-      const shouldShowSplash = !hasShownSplash;
+    // Prevent double initialization
+    if (hasInitializedRef.current) {
+      console.log("⏭️ Already initialized, skipping");
+      return;
+    }
+    
+    console.log("🔍 Home Init - userLoading:", userLoading, "user:", !!user, "showSplash:", showSplash);
+    
+    // Only run initialization once user has loaded
+    if (userLoading) {
+      console.log("⏳ Waiting for user to load...");
+      return;
+    }
+    
+    // Mark as initialized
+    hasInitializedRef.current = true;
+    console.log("✅ User loaded, initializing app");
+    
+    const hasShownSplash = typeof window !== 'undefined' ? sessionStorage.getItem("splashShown") : null;
+    const shouldShowSplash = !hasShownSplash;
 
-      if (shouldShowSplash) {
-        setShowSplash(true);
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem("splashShown", "true");
-        }
+    if (shouldShowSplash) {
+      console.log("✨ Showing splash screen for first time");
+      setShowSplash(true);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem("splashShown", "true");
       }
-
-      const startTime = Date.now();
-      const minSplashDuration = shouldShowSplash ? 2500 : 0;
-
-      // Wait for user context to load
-      const checkUserLoaded = setInterval(() => {
-        if (!userLoading) {
-          clearInterval(checkUserLoaded);
-          setDataLoaded(true);
-
-          if (shouldShowSplash) {
-            const elapsedTime = Date.now() - startTime;
-            const remainingTime = Math.max(0, minSplashDuration - elapsedTime);
-
-            setTimeout(() => {
-              setShowSplash(false);
-              setLoading(false);
-              // Start preloading after splash
-              preloadNextCategory();
-              preloadLeaderboardInBackground();
-            }, remainingTime);
-          } else {
-            setLoading(false);
-            // Start preloading immediately
-            preloadNextCategory();
-            preloadLeaderboardInBackground();
-          }
-        }
-      }, 100);
-    };
-
-    initializeApp();
+      
+      // Set timer to hide splash after minimum duration
+      const minSplashTime = 2500;
+      const timer = setTimeout(() => {
+        console.log("🎬 Hiding splash screen after", minSplashTime, "ms");
+        setShowSplash(false);
+        // Start preloading after splash hides
+        setTimeout(() => {
+          console.log("🚀 Starting preload after splash");
+          preloadNextCategory();
+          preloadLeaderboardInBackground();
+        }, 300);
+      }, minSplashTime);
+      
+      return () => {
+        console.log("🧹 Cleaning up splash timer");
+        clearTimeout(timer);
+      };
+    } else {
+      // No splash needed, start preloading immediately
+      console.log("⚡ No splash needed, preloading immediately");
+      preloadNextCategory();
+      preloadLeaderboardInBackground();
+    }
   }, [userLoading]);
 
-  // --- User Data Setup and Interest Modal Logic (from first file) ---
+  // User data setup and interest modal logic
   useEffect(() => {
     if (user && userToken) {
       trackHomeScreen(user._id);
@@ -172,20 +178,17 @@ export default function Home() {
           });
         }, 500);
       }
-    } else if (!user && !userToken) {
+    } else if (!user && !userLoading && !userToken) {
       navigate("/auth");
     }
-  }, [user, userToken, navigate]);
+  }, [user, userToken, userLoading, navigate]);
 
-  // --- Preloading Functions (from first file) ---
-
-  // Preload leaderboard data in background (runs once)
+  // Preload leaderboard data in background
   const preloadLeaderboardInBackground = () => {
     if (hasPreloadedLeaderboardRef.current) return;
     
     hasPreloadedLeaderboardRef.current = true;
     
-    // Wait 2 seconds after home loads, then preload
     setTimeout(() => {
       preloadLeaderboardData().then(() => {
         console.log("🎯 Leaderboard preloaded in background");
@@ -200,7 +203,7 @@ export default function Home() {
     // Check global cache first
     if (globalCache.nextCategory) {
       const cacheAge = Date.now() - globalCache.lastUpdated.category;
-      if (cacheAge < 2 * 60 * 1000) { // 2 minutes
+      if (cacheAge < 2 * 60 * 1000) {
         preloadedCategoryRef.current = globalCache.nextCategory;
         console.log("✅ Using cached category:", globalCache.nextCategory.categoryId);
         return;
@@ -217,11 +220,8 @@ export default function Home() {
         const data: CategoryToPlayResponse = await response.json();
         if (data.categoryId) {
           preloadedCategoryRef.current = data;
-          
-          // Update global cache
           globalCache.nextCategory = data;
           globalCache.lastUpdated.category = Date.now();
-          
           console.log("✅ Preloaded category:", data.categoryId);
         }
       }
@@ -232,14 +232,13 @@ export default function Home() {
     }
   };
 
-  // --- Handle Quick Quiz (from first file - zero loading logic) ---
+  // Handle Quick Quiz
   const handleQuickQuiz = async () => {
     if (!userToken) {
       console.log("⚠️ You must be logged in to play.");
       return;
     }
 
-    // Check if user has enough coins
     if (currentCoins < QUIZ_COST) {
       toast({
         title: "Insufficient Coins",
@@ -249,28 +248,23 @@ export default function Home() {
       return;
     }
 
-    // Try cache first - check both local ref and global cache
     const cachedCategory = preloadedCategoryRef.current || globalCache.nextCategory;
     
     if (cachedCategory && cachedCategory.categoryId) {
       const categoryId = cachedCategory.categoryId;
       
-      // Optimistic UI update (Deduct coins immediately for visual effect)
       const optimisticCoins = currentCoins - QUIZ_COST;
       setCurrentCoins(optimisticCoins);
       updateCoins(optimisticCoins);
       
-      // Clear both caches
       preloadedCategoryRef.current = null;
       globalCache.nextCategory = null;
       globalCache.lastUpdated.category = 0;
       
       console.log("🚀 Instant quiz start with cached category:", categoryId);
       
-      // Navigate immediately - ZERO loading time
       navigate(`/quiz/${categoryId}`);
       
-      // Preload next category in background for next time
       setTimeout(() => {
         preloadNextCategory();
       }, 1000);
@@ -278,10 +272,8 @@ export default function Home() {
       return;
     }
 
-    // Fallback: No cache available, fetch category (should rarely happen)
     console.log("⚠️ No cached category, fetching...");
     
-    // Optimistic coin deduction for the fallback path as well
     const optimisticCoins = currentCoins - QUIZ_COST;
     setCurrentCoins(optimisticCoins);
     updateCoins(optimisticCoins);
@@ -293,7 +285,6 @@ export default function Home() {
       });
 
       if (!response) {
-        // Refund coins on network error
         setCurrentCoins(prev => prev + QUIZ_COST);
         updateCoins(currentCoins);
         setPlayButtonLoading(false);
@@ -310,8 +301,6 @@ export default function Home() {
           message: "Unknown error during quiz start."
         }));
 
-        // Refund coins on error (The server should handle the actual refund, but we revert the optimistic update)
-        // Note: For robustness, a subsequent GameStatsHeader fetch or manual user stats refresh should confirm the balance.
         setCurrentCoins(prev => prev + QUIZ_COST);
         updateCoins(currentCoins);
 
@@ -330,12 +319,10 @@ export default function Home() {
 
       if (data.categoryId) {
         navigate(`/quiz/${data.categoryId}`);
-        // Preload next category in background for next time
         setTimeout(() => {
           preloadNextCategory();
         }, 1000);
       } else {
-        // Refund coins if no category returned
         setCurrentCoins(prev => prev + QUIZ_COST);
         updateCoins(currentCoins);
         throw new Error("No category ID returned from server");
@@ -352,8 +339,7 @@ export default function Home() {
     }
   };
 
-
-  // --- Interest Modal Handlers (from first file) ---
+  // Interest Modal Handlers
   const handleInterestChange = (newSelectedIds: string[]) => {
     setSelectedInterests(newSelectedIds);
   };
@@ -410,26 +396,24 @@ export default function Home() {
   const handleCoinsEarned = (amount: number) => {
     setCurrentCoins(prev => {
       const newTotal = prev + amount;
-      updateCoins(newTotal); // Update global context/localStorage
+      updateCoins(newTotal);
       return newTotal;
     });
   };
 
   const handleCoinsUpdate = (coins: number) => {
-    // Used by GameStatsHeader to update the parent state after a successful fetch
     setCurrentCoins(coins);
-    updateCoins(coins); // Keep global context in sync
+    updateCoins(coins);
   };
-
-  // --- Render Logic ---
 
   // Show splash screen
   if (showSplash) {
-    return <SplashScreen dataLoaded={dataLoaded} />;
+    console.log("🎬 Rendering splash screen - userLoading:", userLoading);
+    return <SplashScreen dataLoaded={!userLoading} />;
   }
 
-  // Show loading if no user data yet
-  if (!user) {
+  // Show loading if user context is still loading
+  if (userLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center"
         style={{
@@ -441,13 +425,17 @@ export default function Home() {
     );
   }
 
+  // If no user after loading completes, navigate to auth
+  if (!user) {
+    return null;
+  }
+
   const alias = user.alias || "Guest";
   const avatarImage = userAvatar || undefined;
   const isGuest = user.userType === 'Guest';
   const userLevel = user.level || 1;
 
   const backgroundStyle = {
-    // Using the radial-gradient from the first file, as the second file's image is missing
     background: `radial-gradient(circle at center, #2a0a3b 0%, #180524 55%, #0e0316 100%)`,
   };
 
@@ -459,11 +447,10 @@ export default function Home() {
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
       <div className="flex-1 flex flex-col px-4 lg:px-8 w-full max-w-4xl mx-auto">
-        {/* Top Header Section */}
         <div className={`space-y-3 flex-shrink-0 ${isSmallScreen ? 'pt-2' : 'pt-3'} w-full`}>
           <GameStatsHeader
             userToken={userToken}
-            isParentLoading={loading}
+            isParentLoading={false}
             onCoinsUpdate={handleCoinsUpdate}
             currentCoinsFromParent={currentCoins}
           />
@@ -492,86 +479,51 @@ export default function Home() {
           />
         </div>
 
-       <div className="flex items-center justify-center flex-1 min-h-0 pt-6">
-  <div className="relative flex flex-col items-center justify-center">
-    <div
-      className="
-        relative 
-        rounded-full 
-        flex items-center justify-center
-        overflow-visible
-        mx-auto
-        w-[260px] h-[260px]
-        sm:w-[450px] sm:h-[450px]
-        md:w-[400px] md:h-[400px]
-        lg:w-[260px] lg:h-[260px]
-        xl:w-[280px] xl:h-[280px]
-      "
-      style={{
-        backgroundImage: `url('/image.png')`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-      }}
-    >
-      <Link to="/profile" className="no-underline relative z-10">
-        <Avatar
-          className="
-            rounded-full 
-            overflow-visible 
-            relative 
-            w-[200px] h-[200px]
-            sm:w-[240px] sm:h-[240px]
-            md:w-[280px] md:h-[280px]
-            lg:w-[200px] lg:h-[200px]
-            xl:w-[220px] xl:h-[220px]
-          "
-        >
-          <AvatarImage
-            src={avatarImage}
-            alt={alias}
-            className="object-contain scale-[1.12] relative z-10"
-          />
-          <AvatarFallback className="bg-transparent border-none text-white font-bold text-3xl md:text-4xl">
-            {alias.charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-      </Link>
+        <div className="flex items-center justify-center flex-1 min-h-0 pt-6">
+          <div className="relative flex flex-col items-center justify-center">
+            <div
+              className="relative rounded-full flex items-center justify-center overflow-visible mx-auto w-[260px] h-[260px] sm:w-[450px] sm:h-[450px] md:w-[400px] md:h-[400px] lg:w-[260px] lg:h-[260px] xl:w-[280px] xl:h-[280px]"
+              style={{
+                backgroundImage: `url('/image.png')`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+              }}
+            >
+              <Link to="/profile" className="no-underline relative z-10">
+                <Avatar className="rounded-full overflow-visible relative w-[200px] h-[200px] sm:w-[240px] sm:h-[240px] md:w-[280px] md:h-[280px] lg:w-[200px] lg:h-[200px] xl:w-[220px] xl:h-[220px]">
+                  <AvatarImage
+                    src={avatarImage}
+                    alt={alias}
+                    className="object-contain scale-[1.12] relative z-10"
+                  />
+                  <AvatarFallback className="bg-transparent border-none text-white font-bold text-3xl md:text-4xl">
+                    {alias.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
 
-      <h2
-        className="
-          absolute 
-          left-1/2 -translate-x-1/2 
-          text-white font-extrabold text-center whitespace-nowrap
-          -bottom-6
-          text-xl
-          sm:text-2xl
-          md:text-3xl
-          lg:text-4xl
-          max-w-[220px] sm:max-w-[260px] md:max-w-[300px]
-        "
-        style={{
-          textShadow:
-            '0 0 8px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.4)',
-        }}
-      >
-        {alias
-          .split(/[\s-_]+/)
-          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(" ")}
-      </h2>
-    </div>
-  </div>
-</div>
+              <h2
+                className="absolute left-1/2 -translate-x-1/2 text-white font-extrabold text-center whitespace-nowrap -bottom-6 text-xl sm:text-2xl md:text-3xl lg:text-4xl max-w-[220px] sm:max-w-[260px] md:max-w-[300px]"
+                style={{
+                  textShadow: '0 0 8px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.4)',
+                }}
+              >
+                {alias
+                  .split(/[\s-_]+/)
+                  .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                  .join(" ")}
+              </h2>
+            </div>
+          </div>
+        </div>
 
-
-        {/* Play Button (Styled from second file) */}
         <div className={`space-y-2 flex-shrink-0 w-full ${isSmallScreen ? 'pb-36 pt-10' : 'pb-24 pt-16'}`}>
           <Button
             variant="default"
             onClick={handleQuickQuiz}
-            disabled={loading || playButtonLoading || currentCoins < QUIZ_COST}
-            className={`w-full flex items-center justify-between px-6  ${isSmallScreen ? 'h-16' : 'h-20 sm:h-20'}`}
+            disabled={playButtonLoading || currentCoins < QUIZ_COST}
+            className={`w-full flex items-center justify-between px-6 ${isSmallScreen ? 'h-16' : 'h-20 sm:h-20'}`}
           >
             {playButtonLoading ? (
               <div className="flex items-center text-xl sm:text-2xl justify-center w-full gap-2">
@@ -594,8 +546,7 @@ export default function Home() {
                   </span>
                 </div>
 
-                <div className="bg-white rounded-full w-14 h-14 sm:w-[72px] sm:h-[72px] flex flex-col items-center 
-                justify-center shadow-md border-2 border-green-500">
+                <div className="bg-white rounded-full w-14 h-14 sm:w-[72px] sm:h-[72px] flex flex-col items-center justify-center shadow-md border-2 border-green-500">
                   <span className="text-green-600 text-2xl sm:text-3xl font-bold leading-none">
                     {userLevel}
                   </span>
@@ -607,7 +558,7 @@ export default function Home() {
             )}
           </Button>
 
-          {currentCoins < QUIZ_COST && !loading && (
+          {currentCoins < QUIZ_COST && (
             <p className="text-red-400 text-sm text-center font-medium">
               Not enough coins to start a quiz.
             </p>
@@ -615,7 +566,6 @@ export default function Home() {
         </div>
       </div>
       
-      {/* Interest Selection Modal */}
       <Dialog open={isInterestModalOpen} onOpenChange={setIsInterestModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

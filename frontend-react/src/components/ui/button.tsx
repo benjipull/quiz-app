@@ -56,7 +56,7 @@ const buttonVariants = cva(
         purple:
           "bg-gradient-to-b from-[#9900aa] via-[#770088] to-[#550066] text-white rounded-[12px] border-2 border-[#dd00ff]",
         warning:
-          "bg-gradient-to-b from-[#cc3333] via-[#aa1111] to-[#880000] text-white rounded-[12px] border-2 border-[#ff4d4d]",
+          "bg-gradient-to-b from-[#ff8800] via-[#dd6600] to-[#bb4400] text-white rounded-[12px] border-2 border-[#ffccaa]",
         outline: "bg-transparent text-white rounded-[12px] border-2 border-[#00ff41]",
         ghost:
           "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white rounded-[12px] border-2 border-[#00ff41]",

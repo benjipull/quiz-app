@@ -1,11 +1,11 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { ThemeProvider } from "next-themes";
-import { UserProvider } from "@/contexts/UserContext"; // 👈 ADD THIS IMPORT
+import { UserProvider } from "@/contexts/UserContext";
 import App from "./App.tsx";
 import "./index.css";
 import "./App.css";
-import { initGA, setGAUser } from "@/utils/gaClient";
+import { initGA } from "@/utils/gaClient";
 
 const storedUser = localStorage.getItem("user");
 let userId: string | undefined;
@@ -14,6 +14,7 @@ if (storedUser) {
   try {
     const user = JSON.parse(storedUser);
     userId = user?._id;
+    console.log("👤 Found stored user:", user.alias);
   } catch {
     console.warn("⚠️ Failed to parse user from localStorage");
   }
@@ -22,12 +23,13 @@ if (storedUser) {
 // Initialize GA only once, and set userId if available
 initGA(userId);
 
+console.log("🚀 App starting...");
+
 createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-      <UserProvider> 
-        <App />
-      </UserProvider>
-    </ThemeProvider>
-  </React.StrictMode>
+  // Removed React.StrictMode to prevent double renders during development
+  <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+    <UserProvider> 
+      <App />
+    </UserProvider>
+  </ThemeProvider>
 );
