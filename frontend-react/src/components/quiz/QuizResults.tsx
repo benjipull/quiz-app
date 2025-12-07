@@ -17,6 +17,9 @@ import {
 } from "lucide-react";
 import Confetti from "react-confetti";
 
+// NEW IMPORTS: Assuming these are custom hooks/utilities for preloading
+import { preloadQuizSession, isQuizSessionReady } from "@/hooks/useAppPreloader";
+
 const KNOWLEDGE_GAIN_SOUND_SRC = "/knowledge-point.mp3"; 
 const LEVEL_UP_SOUND_SRC = "/player-level-up.mp3";
 
@@ -147,6 +150,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     currentLevel,
   } = completionData;
 
+  // NEW STATE FOR PRELOADING
+  const [nextCategoryId, setNextCategoryId] = useState<string | null>(null);
+  const [hasPreloadedNext, setHasPreloadedNext] = useState(false);
+
   const percentage = Math.min(Math.max(percentageCorrect, 0), 100);
   const hasLeveledUp = currentLevel > previousLevel;
 
@@ -201,6 +208,49 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+  
+  // NEW EFFECT: Start preloading the next quiz after a delay
+  useEffect(() => {
+    // Start preloading the next quiz after a short delay
+    const timer = setTimeout(() => {
+      fetchAndPreloadNextCategory();
+    }, 2000); // Wait 2 seconds to let animations settle
+
+    return () => clearTimeout(timer);
+  }, [userToken, categoryId]); // Re-run if user or current category changes
+
+  // NEW FUNCTION: Fetch and preload the next category
+  const fetchAndPreloadNextCategory = async () => {
+    if (!userToken || hasPreloadedNext) return;
+    
+    try {
+      console.log("🎯 Fetching next category for preload...");
+      const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay?exclude=${categoryId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.categoryId) {
+          setNextCategoryId(data.categoryId);
+          console.log("✅ Next category ID:", data.categoryId);
+          
+          // Preload the quiz session
+          const success = await preloadQuizSession(data.categoryId);
+          if (success) {
+            setHasPreloadedNext(true);
+            console.log("✅ Next quiz preloaded successfully!");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error preloading next quiz:", error);
+    }
+  };
 
   // Animated score counter
   useEffect(() => {
@@ -444,6 +494,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [ratingMessage, setRatingMessage] = useState<string | null>(null);
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
 
+  // REPLACED handleNextQuiz function with the one supporting preloading logic
   const handleNextQuiz = async () => {
     if (!userToken) {
       console.error("User must be logged in to play the next quiz.");
@@ -451,6 +502,15 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       return;
     }
 
+    // If we have a preloaded category, use it immediately
+    if (nextCategoryId && isQuizSessionReady(nextCategoryId)) {
+      console.log("🚀 Using preloaded next quiz - Instant navigation!");
+      window.location.href = `/quiz/${nextCategoryId}`;
+      return;
+    }
+
+    // Fallback: Fetch and navigate normally
+    console.log("⚠️ No preloaded quiz, fetching...");
     setPlayButtonLoading(true);
 
     try {
@@ -480,6 +540,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       setPlayButtonLoading(false);
     }
   };
+
 
   const handleRatingSubmit = async (value: number) => {
     if (!userToken) {
@@ -787,9 +848,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 )}
               </Card>
 
-              {/* Next Quiz Button */}
+              {/* Next Quiz Button - UPDATED for preloading */}
             <Button
               onClick={handleNextQuiz}
+              onMouseEnter={fetchAndPreloadNextCategory} // ADDED: Trigger preload on hover
               disabled={playButtonLoading}
               className="w-full flex items-center justify-between px-6 h-16 sm:h-20 text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
             >

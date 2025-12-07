@@ -17,6 +17,7 @@ interface CategoryCardProps {
   timeEstimate?: string;
   createdBy?: string;
   onPlay: (id: string) => void;
+  onMouseEnter?: () => void; // NEW: For hover preloading
 }
 
 export const CategoryCard = ({
@@ -28,10 +29,12 @@ export const CategoryCard = ({
   rating,
   createdBy,
   onPlay,
+  onMouseEnter, // NEW
 }: CategoryCardProps) => {
   return (
     <Card
       onClick={() => onPlay(id)}
+      onMouseEnter={onMouseEnter} // NEW: Trigger preload on hover
       className={cn(
         "group relative overflow-hidden border border-border/40 cursor-pointer",
         "bg-gradient-to-b from-zinc-900/80 via-zinc-900/70 to-black/80 backdrop-blur-md",
