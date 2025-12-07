@@ -1,4 +1,4 @@
-// Home.tsx - Fixed version with synchronized loading
+// Home.tsx - Complete file with enhanced preloading
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
@@ -25,7 +25,7 @@ import GameStatsHeader from "../components/GameStatsHeader";
 import { useToast } from "@/hooks/use-toast";
 import DailyCoinClaim from "@/components/DailyCoinClaim";
 import { useUser } from "@/contexts/UserContext";
-import { globalCache, preloadNextCategory as preloadNextCategoryGlobal, preloadLeaderboardData } from "@/hooks/useAppPreloader";
+import { globalCache, preloadLeaderboardData, preloadQuizSession, isQuizSessionReady } from "@/hooks/useAppPreloader";
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
@@ -83,6 +83,7 @@ export default function Home() {
   const isPreloadingRef = useRef(false);
   const hasPreloadedLeaderboardRef = useRef(false);
   const hasInitializedRef = useRef(false);
+  const preloadingSessionRef = useRef(false);
 
   const navigate = useNavigate();
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
@@ -98,7 +99,6 @@ export default function Home() {
 
   // Initialization effect
   useEffect(() => {
-    // Prevent double initialization
     if (hasInitializedRef.current) {
       console.log("⏭️ Already initialized, skipping");
       return;
@@ -106,13 +106,11 @@ export default function Home() {
     
     console.log("🔍 Home Init - userLoading:", userLoading, "user:", !!user, "showSplash:", showSplash);
     
-    // Only run initialization once user has loaded
     if (userLoading) {
       console.log("⏳ Waiting for user to load...");
       return;
     }
     
-    // Mark as initialized
     hasInitializedRef.current = true;
     console.log("✅ User loaded, initializing app");
     
@@ -126,15 +124,13 @@ export default function Home() {
         sessionStorage.setItem("splashShown", "true");
       }
       
-      // Set timer to hide splash after minimum duration
       const minSplashTime = 2500;
       const timer = setTimeout(() => {
         console.log("🎬 Hiding splash screen after", minSplashTime, "ms");
         setShowSplash(false);
-        // Start preloading after splash hides
         setTimeout(() => {
           console.log("🚀 Starting preload after splash");
-          preloadNextCategory();
+          preloadNextCategoryAndSession();
           preloadLeaderboardInBackground();
         }, 300);
       }, minSplashTime);
@@ -144,9 +140,8 @@ export default function Home() {
         clearTimeout(timer);
       };
     } else {
-      // No splash needed, start preloading immediately
       console.log("⚡ No splash needed, preloading immediately");
-      preloadNextCategory();
+      preloadNextCategoryAndSession();
       preloadLeaderboardInBackground();
     }
   }, [userLoading]);
@@ -160,15 +155,12 @@ export default function Home() {
         setCurrentCoins(user.coins);
       }
 
-      // Set avatar
       const avatarIndex = user.avatar ? user.avatar - 1 : 0;
       const calculatedAvatar = avatars[avatarIndex] || null;
       setUserAvatar(calculatedAvatar);
 
-      // Set interests
       setSelectedInterests(user.interests || []);
 
-      // Show interest modal if no interests
       if (!user.interests || user.interests.length === 0) {
         setTimeout(() => {
           setIsInterestModalOpen(true);
@@ -196,22 +188,28 @@ export default function Home() {
     }, 2000);
   };
 
-  // Preload next category with smart caching
-  const preloadNextCategory = async () => {
-    if (!userToken || isPreloadingRef.current) return;
+  // Enhanced: Preload next category AND quiz session together
+  const preloadNextCategoryAndSession = async () => {
+    if (!userToken || isPreloadingRef.current || preloadingSessionRef.current) {
+      console.log("⏭️ Already preloading or no token");
+      return;
+    }
 
-    // Check global cache first
-    if (globalCache.nextCategory) {
+    // Check if we already have valid cached data
+    if (globalCache.nextCategory && isQuizSessionReady(globalCache.nextCategory.categoryId)) {
       const cacheAge = Date.now() - globalCache.lastUpdated.category;
       if (cacheAge < 2 * 60 * 1000) {
         preloadedCategoryRef.current = globalCache.nextCategory;
-        console.log("✅ Using cached category:", globalCache.nextCategory.categoryId);
+        console.log("✅ Using fully cached category + session:", globalCache.nextCategory.categoryId);
         return;
       }
     }
 
     isPreloadingRef.current = true;
+    preloadingSessionRef.current = true;
+    
     try {
+      console.log("🎯 Fetching next category...");
       const response = await authenticatedFetch(`${BASE_URL}/api/getGetegoryToPlay`, {
         method: "GET",
       });
@@ -222,13 +220,19 @@ export default function Home() {
           preloadedCategoryRef.current = data;
           globalCache.nextCategory = data;
           globalCache.lastUpdated.category = Date.now();
-          console.log("✅ Preloaded category:", data.categoryId);
+          console.log("✅ Category fetched:", data.categoryId);
+          
+          // Now preload the FULL quiz session (startQuiz + first question)
+          console.log("🚀 Starting full quiz session preload...");
+          await preloadQuizSession(data.categoryId);
+          console.log("✅ Full quiz session preloaded!");
         }
       }
     } catch (error) {
-      console.error("Error preloading category:", error);
+      console.error("❌ Error preloading category:", error);
     } finally {
       isPreloadingRef.current = false;
+      preloadingSessionRef.current = false;
     }
   };
 
@@ -253,26 +257,40 @@ export default function Home() {
     if (cachedCategory && cachedCategory.categoryId) {
       const categoryId = cachedCategory.categoryId;
       
+      // Check if the full session is ready
+      const sessionReady = isQuizSessionReady(categoryId);
+      
+      if (sessionReady) {
+        console.log("🚀 INSTANT START - Full session ready!");
+      } else {
+        console.log("⚠️ Session not fully ready, will load on quiz page");
+      }
+      
+      // Optimistically update coins
       const optimisticCoins = currentCoins - QUIZ_COST;
       setCurrentCoins(optimisticCoins);
       updateCoins(optimisticCoins);
       
+      // Clear refs so next time we preload fresh
       preloadedCategoryRef.current = null;
       globalCache.nextCategory = null;
       globalCache.lastUpdated.category = 0;
       
-      console.log("🚀 Instant quiz start with cached category:", categoryId);
-      
+      // Navigate immediately - no loading!
+      console.log("🎮 Navigating to quiz:", categoryId);
       navigate(`/quiz/${categoryId}`);
       
+      // Start preloading NEXT category in background
       setTimeout(() => {
-        preloadNextCategory();
+        console.log("🔄 Preloading next quiz in background...");
+        preloadNextCategoryAndSession();
       }, 1000);
       
       return;
     }
 
-    console.log("⚠️ No cached category, fetching...");
+    // Fallback: No cached category (should rarely happen)
+    console.log("⚠️ No cached category, fetching fresh...");
     
     const optimisticCoins = currentCoins - QUIZ_COST;
     setCurrentCoins(optimisticCoins);
@@ -320,7 +338,7 @@ export default function Home() {
       if (data.categoryId) {
         navigate(`/quiz/${data.categoryId}`);
         setTimeout(() => {
-          preloadNextCategory();
+          preloadNextCategoryAndSession();
         }, 1000);
       } else {
         setCurrentCoins(prev => prev + QUIZ_COST);
@@ -406,13 +424,11 @@ export default function Home() {
     updateCoins(coins);
   };
 
-  // Show splash screen
   if (showSplash) {
     console.log("🎬 Rendering splash screen - userLoading:", userLoading);
     return <SplashScreen dataLoaded={!userLoading} />;
   }
 
-  // Show loading if user context is still loading
   if (userLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center"
@@ -425,7 +441,6 @@ export default function Home() {
     );
   }
 
-  // If no user after loading completes, navigate to auth
   if (!user) {
     return null;
   }
