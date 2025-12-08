@@ -4,7 +4,7 @@ import { ThemeProvider } from "next-themes";
 import App from "./App.tsx";
 import "./index.css";
 import "./App.css";
-import { initGA, setGAUser } from "@/utils/gaClient";
+import { initGA } from "@/utils/gaClient";
 
 const storedUser = localStorage.getItem("user");
 let userId: string | undefined;
