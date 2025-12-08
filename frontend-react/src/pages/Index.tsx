@@ -1,5 +1,6 @@
 const Index = () => {
   return (
+<<<<<<< HEAD
     <div className="min-h-screen flex items-center justify-center bg-quiz-background p-6">
       <div className="max-w-lg w-full bg-quiz-card text-card-foreground rounded-xl shadow-card p-8 flex flex-col items-center gap-6">
         {/* Title */}
@@ -35,6 +36,11 @@ const Index = () => {
             </span>
           </div>
         </div>
+=======
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold mb-4">Welcome to Quizicle</h1>
+>>>>>>> 2b43673ab1ab33b55376fa17425e311778f7108e
       </div>
     </div>
   );

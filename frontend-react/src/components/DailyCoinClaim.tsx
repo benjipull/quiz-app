@@ -39,6 +39,10 @@ typeof Audio !== "undefined" ? new Audio(COINS_GAIN_SOUND_SRC) : null
 );
 
 const claimButtonRef = useRef<HTMLButtonElement>(null);
+<<<<<<< HEAD
+=======
+
+>>>>>>> 2b43673ab1ab33b55376fa17425e311778f7108e
 const fetchDailyBonusAmount = useCallback(async () => {
 try {
 const response = await apiClient(`${BASE_URL}/api/claimDailyCoins/amount`, {
@@ -315,6 +319,7 @@ className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
     )}
   </Button>
 
+<<<<<<< HEAD
   </div>
 </Card>
 
@@ -328,6 +333,99 @@ className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
  {
   "--daily-coin-delay": `${token.delay}ms`,
  } as DailyCoinStyle // FIXED: Cast to the custom DailyCoinStyle type instead of 'any'
+=======
+          <Button
+          variant="ghost"
+          size="sm"
+          className="absolute bottom-[-18px] left-2  px-2.5 sm:px-3 py-0.5 font-bold text-white s pointer-events-none"
+          disabled
+        >
+          +{dailyBonusAmount}
+        </Button>
+
+        </div>
+
+        <div className="leading-tight min-w-0 -ml-1">
+          <h3 className="text-white font-bold text-lg sm:text-2xl whitespace-nowrap">Daily Reward</h3>
+        </div>
+      </div>
+
+   <Button
+  ref={claimButtonRef}
+  onClick={handleClaimClick}
+  className="flex items-center gap-1 sm:gap-2 px-3 py-1.5 sm:px-6 sm:py-3 "
+  variant={canClaim ? "warning" : "purple"}
+  style={{
+    ...(canClaim
+      ? {
+          border: "3px solid #fcd34d",
+          boxShadow: "0 0 25px rgba(255,255,0,0.5)",
+        }
+      : {
+          border: "1px solid rgba(128,90,213,0.5)",
+          boxShadow: "0 0 15px rgba(240,171,240,0.4), 0 4px 15px rgba(0,0,0,0.5)",
+        }),
+  }}
+>
+  {canClaim ? (
+    <>
+      <Sparkles
+        className={`w-4 h-4 sm:w-6 sm:h-6 ${
+          isClaiming ? "text-gray-400" : "text-yellow-400"
+        }`}
+      />
+      <span
+        className={`font-bold text-sm sm:text-lg whitespace-nowrap ${
+          isClaiming ? "text-gray-400" : "text-yellow-400"
+        }`}
+      >
+        {isClaiming ? "Claiming..." : "Claim Now"}
+      </span>
+    </>
+  ) : (
+    <>
+      <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" />
+      <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap">
+        {formatTimeRemaining(timeRemaining)}
+      </span>
+    </>
+  )}
+</Button>
+
+    </div>
+  </Card>
+
+  {/* Flying coin tokens */}
+  {showFlyingCoins &&
+    coinTokens.map((token) => (
+      <div
+        key={token.id}
+        className="daily-coin-token"
+        style={
+          {
+            "--daily-coin-delay": `${token.delay}ms`,
+          } as any
+        }
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-full w-full p-[2px]">
+          <circle cx="8" cy="9" r="5" fill="#f59e0b" />
+          <circle cx="8" cy="9" r="4" fill="#fbbf24" />
+          <circle cx="8" cy="9" r="2.5" fill="#f59e0b" opacity="0.4" />
+          <circle cx="14" cy="13" r="6" fill="#f59e0b" />
+          <circle cx="14" cy="13" r="5" fill="#fbbf24" />
+          <circle cx="14" cy="13" r="3" fill="#f59e0b" opacity="0.4" />
+        </svg>
+      </div>
+    ))}
+
+  {/* Styles */}
+  <style>{`
+    .coin-text-aura {
+      text-shadow:
+        0 0 10px rgba(255, 193, 7, 0.9),
+        0 0 20px rgba(255, 165, 0, 0.7),
+        0 0 30px rgba(255, 140, 0, 0.5);
+>>>>>>> 2b43673ab1ab33b55376fa17425e311778f7108e
     }
    >
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-full w-full p-[2px]">

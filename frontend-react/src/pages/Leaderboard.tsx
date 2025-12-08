@@ -1,8 +1,13 @@
+// Leaderboard.tsx - Updated with instant cache loading
 import React, { useState, useEffect, useRef } from "react";
 import { Clock, ArrowLeft } from "lucide-react";
 import { apiClient } from "@/utils/apiClient";
 import { useNavigate } from "react-router-dom";
+<<<<<<< HEAD
 import { globalLeaderboardCache, waitForCache } from "@/hooks/useLeaderboardPreloader";
+=======
+import { globalCache } from "@/hooks/useAppPreloader";
+>>>>>>> 2b43673ab1ab33b55376fa17425e311778f7108e
 
 // Avatar Imports
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
@@ -35,7 +40,7 @@ const Leaderboard = () => {
 
   const [currentPeriod, setCurrentPeriod] = useState<"day" | "week" | "month" | "year">("day");
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardPlayer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Changed to false by default
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [previousLeaderboardData, setPreviousLeaderboardData] = useState<LeaderboardPlayer[]>([]);
@@ -44,6 +49,7 @@ const Leaderboard = () => {
   const currentUserRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+<<<<<<< HEAD
   // Load initial data - wait for cache if needed
   useEffect(() => {
     const loadInitialData = async () => {
@@ -68,6 +74,22 @@ const Leaderboard = () => {
     };
 
     loadInitialData();
+=======
+  // Load initial data from cache INSTANTLY
+  useEffect(() => {
+    const cachedData = globalCache.leaderboardData[currentPeriod];
+    
+    if (cachedData && cachedData.length > 0) {
+      // Cache is ready - load instantly with no loading state
+      setLeaderboardData(cachedData);
+      setLoading(false);
+      console.log("✅ Leaderboard loaded from cache instantly");
+    } else {
+      // No cache - fetch it
+      setLoading(true);
+      fetchLeaderboard(currentPeriod);
+    }
+>>>>>>> 2b43673ab1ab33b55376fa17425e311778f7108e
   }, []);
 
   // Load current user
@@ -92,15 +114,27 @@ const Leaderboard = () => {
 
   // Switch between periods using cache
   useEffect(() => {
+<<<<<<< HEAD
     const cachedData = globalLeaderboardCache[currentPeriod];
     if (cachedData && cachedData.length > 0) {
       if (leaderboardData.length > 0) setPreviousLeaderboardData(leaderboardData);
       setLeaderboardData(cachedData);
       setLoading(false);
+=======
+    const cachedData = globalCache.leaderboardData[currentPeriod];
+    
+    if (cachedData && cachedData.length > 0) {
+      // Instant switch with cache
+      if (leaderboardData.length > 0) setPreviousLeaderboardData(leaderboardData);
+      setLeaderboardData(cachedData);
+      setLoading(false);
+      console.log(`✅ Switched to ${currentPeriod} from cache`);
+>>>>>>> 2b43673ab1ab33b55376fa17425e311778f7108e
       return;
     }
 
     // If not in cache, fetch it
+<<<<<<< HEAD
     const fetchLeaderboard = async () => {
       setLoading(true);
       if (leaderboardData.length > 0) setPreviousLeaderboardData(leaderboardData);
@@ -122,7 +156,36 @@ const Leaderboard = () => {
     };
 
     fetchLeaderboard();
+=======
+    fetchLeaderboard(currentPeriod);
+>>>>>>> 2b43673ab1ab33b55376fa17425e311778f7108e
   }, [currentPeriod]);
+
+  const fetchLeaderboard = async (period: "day" | "week" | "month" | "year") => {
+    setLoading(true);
+    if (leaderboardData.length > 0) setPreviousLeaderboardData(leaderboardData);
+
+    try {
+      const res = await apiClient(`${BASE_URL}/api/leaderboard?period=${period}`);
+      if (res?.ok) {
+        const data = await res.json();
+        const leaderboard = data.leaderboard || [];
+        setLeaderboardData(leaderboard);
+        
+        // Update global cache
+        globalCache.leaderboardData[period] = leaderboard;
+        globalCache.lastUpdated.leaderboard = Date.now();
+        
+        console.log(`✅ Fetched ${period} leaderboard and cached it`);
+      } else {
+        setLeaderboardData([]);
+      }
+    } catch (e) {
+      setLeaderboardData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Auto scroll to current user
   useEffect(() => {

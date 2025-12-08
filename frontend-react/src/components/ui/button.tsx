@@ -51,6 +51,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+<<<<<<< HEAD
          default:
      "bg-[linear-gradient(to_bottom,#72a06f_0%,#639260_100%)] text-white",
 
@@ -83,6 +84,23 @@ const buttonVariants = cva(
         greenGradient:
           "bg-[linear-gradient(to_bottom,#7ba773_0%,#6b8f67_100%)] \
            text-white",
+=======
+        default:
+          "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white rounded-[12px] border-[3px] border-[#00ff00] shadow-[0_4px_20px_rgba(0,255,0,0.3)] hover:shadow-[0_6px_30px_rgba(0,255,0,0.5)]",
+        destructive:
+          "bg-gradient-to-b from-[#aa00aa] via-[#880088] to-[#660066] text-white rounded-[12px] border-2 border-[#ff00ff]",
+        blue:
+          "bg-gradient-to-b from-[#0088cc] via-[#006699] to-[#004466] text-white rounded-[12px] border-2 border-[#00ffff]",
+        purple:
+          "bg-gradient-to-b from-[#9900aa] via-[#770088] to-[#550066] text-white rounded-[12px] border-2 border-[#dd00ff]",
+        warning:
+          "bg-gradient-to-b from-[#ff8800] via-[#dd6600] to-[#bb4400] text-white rounded-[12px] border-2 border-[#ffccaa]",
+        outline: "bg-transparent text-white rounded-[12px] border-2 border-[#00ff41]",
+        ghost:
+          "bg-gradient-to-b from-[#00aa00] via-[#008800] to-[#006600] text-white rounded-[12px] border-2 border-[#00ff41]",
+        link:
+          "bg-transparent text-white rounded-[12px] border-2 border-[#00ff41] shadow-none",
+>>>>>>> 2b43673ab1ab33b55376fa17425e311778f7108e
       },
 
       size: {

@@ -65,7 +65,7 @@ async function populateAllCategories() {
         );
 
         // Call your AI population logic
-        const added = await populateCategoryLoop(category._id, QUESTIONS_TO_FILL, "very easy");
+        const added = await populateCategoryLoop(category._id, QUESTIONS_TO_FILL, "extremely easy");
 
         if (added > 0) {
           newQuestionsAdded += added;

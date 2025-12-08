@@ -1,4 +1,34 @@
+<<<<<<< HEAD
 // Categories.tsx - Refactored with Your Quizzes / All Quizzes tabs
+=======
+// Add this instruction at the top of the file:
+
+/*
+ * IMPORTANT: Update CategoryCard.tsx to accept onMouseEnter prop:
+ * 
+ * interface CategoryCardProps {
+ *   // ... existing props
+ *   onMouseEnter?: () => void;  // ADD THIS
+ * }
+ * 
+ * export const CategoryCard = ({
+ *   // ... existing props
+ *   onMouseEnter,  // ADD THIS
+ * }: CategoryCardProps) => {
+ *   return (
+ *     <Card
+ *       onClick={() => onPlay(id)}
+ *       onMouseEnter={onMouseEnter}  // ADD THIS
+ *       className={...}
+ *     >
+ *       ...
+ *     </Card>
+ *   );
+ * };
+ */
+
+// Categories.tsx - With hover preloading for instant quiz starts
+>>>>>>> 2b43673ab1ab33b55376fa17425e311778f7108e
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
@@ -11,6 +41,10 @@ import AddCategory from "@/components/AddCategory";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/utils/apiClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+<<<<<<< HEAD
+=======
+import { preloadQuizSession, isQuizSessionReady } from "@/hooks/useAppPreloader";
+>>>>>>> 2b43673ab1ab33b55376fa17425e311778f7108e
 
 interface Category {
   _id: string;
@@ -57,7 +91,15 @@ export default function Categories() {
   const [isGuest, setIsGuest] = useState(false);
   const [activeTab, setActiveTab] = useState("your");
   
+<<<<<<< HEAD
+=======
+  // Hover preloading state
+  const [preloadedCategories, setPreloadedCategories] = useState<Set<string>>(new Set());
+  const [currentlyPreloading, setCurrentlyPreloading] = useState<string | null>(null);
+  
+>>>>>>> 2b43673ab1ab33b55376fa17425e311778f7108e
   const { toast, dismiss } = useToast();
+  const userToken = localStorage.getItem("token");
 
   const searchQueryFromParams = searchParams.get("search") || "";
 
@@ -217,6 +259,41 @@ export default function Categories() {
     } else {
       setFilteredAllCategories(allCategories);
       setFilteredUserCategories(userCategories);
+<<<<<<< HEAD
+=======
+    }
+  };
+
+  // NEW: Handle hover preloading
+  const handleCategoryHover = async (categoryId: string) => {
+    // Only preload if:
+    // 1. User is logged in
+    // 2. Not already preloaded
+    // 3. Not currently preloading this category
+    // 4. Not already ready
+    if (!userToken || 
+        preloadedCategories.has(categoryId) || 
+        currentlyPreloading === categoryId ||
+        isQuizSessionReady(categoryId)) {
+      return;
+    }
+
+    console.log("🎯 Hover detected - Preloading quiz session for:", categoryId);
+    setCurrentlyPreloading(categoryId);
+
+    try {
+      const success = await preloadQuizSession(categoryId);
+      if (success) {
+        setPreloadedCategories(prev => new Set([...prev, categoryId]));
+        console.log("✅ Hover preload completed for:", categoryId);
+      } else {
+        console.log("⚠️ Hover preload failed for:", categoryId);
+      }
+    } catch (error) {
+      console.error("❌ Error during hover preload:", error);
+    } finally {
+      setCurrentlyPreloading(null);
+>>>>>>> 2b43673ab1ab33b55376fa17425e311778f7108e
     }
   };
 
@@ -226,6 +303,14 @@ export default function Categories() {
       alert("❌ You must be logged in to play.");
       return;
     }
+    
+    const sessionReady = isQuizSessionReady(categoryId);
+    if (sessionReady) {
+      console.log("🚀 Quiz session ready - Instant navigation!");
+    } else {
+      console.log("⚠️ Quiz session not ready - Will load on quiz page");
+    }
+    
     navigate(`/quiz/${categoryId}`);
   };
 
@@ -369,6 +454,10 @@ export default function Categories() {
                     imageUrl={category.imageUrl || "coming soon"}
                     createdBy={category.createdBy || "You"}
                     onPlay={handlePlayQuiz}
+<<<<<<< HEAD
+=======
+                    onMouseEnter={() => handleCategoryHover(category._id)}
+>>>>>>> 2b43673ab1ab33b55376fa17425e311778f7108e
                   />
                 ))}
               </div>
@@ -412,6 +501,10 @@ export default function Categories() {
                     imageUrl={category.imageUrl || "coming soon"}
                     createdBy={category.createdBy || "Quizicle"}
                     onPlay={handlePlayQuiz}
+<<<<<<< HEAD
+=======
+                    onMouseEnter={() => handleCategoryHover(category._id)}
+>>>>>>> 2b43673ab1ab33b55376fa17425e311778f7108e
                   />
                 ))}
               </div>
