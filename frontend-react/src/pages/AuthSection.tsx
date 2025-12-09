@@ -50,160 +50,179 @@ const AuthSection = () => {
         }
     }, [navigate]);
 
-    const handleLogin = async () => {
-        if (!loginEmail || !loginPassword) {
-            toast({
-                title: "Validation Error",
-                description: "Please enter both email and password.",
-                variant: "destructive",
-            });
-            return;
+// AuthSection.tsx - Fixed login handlers with proper async storage
+
+const handleLogin = async () => {
+    if (!loginEmail || !loginPassword) {
+        toast({
+            title: "Validation Error",
+            description: "Please enter both email and password.",
+            variant: "destructive",
+        });
+        return;
+    }
+
+    setIsLoading(true);
+    try {
+        const response = await fetch(`${BASE_URL}/api/users/login`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                email: loginEmail,
+                password: loginPassword
+            }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Store token and user SYNCHRONOUSLY
+            localStorage.setItem("token", data.token);
+            localStorage.setItem("user", JSON.stringify(data.user));
+            
+            // Set analytics
+            setGAUser(data.user._id);
+            trackLogin("user_login", data.user._id);
+            
+            // Give localStorage a moment to write (helps with some browsers)
+            await new Promise(resolve => setTimeout(resolve, 50));
+            
+            const from = location.state?.from?.pathname || "/";
+            navigate(from);
+        } else {
+            throw new Error(data.message || "Invalid credentials or login failed.");
         }
+    } catch (error) {
+        console.error("Login Error:", error);
+        toast({
+            title: "Login Failed",
+            description: (error as Error).message,
+            variant: "destructive",
+        });
+    } finally {
+        setIsLoading(false);
+    }
+};
 
-        setIsLoading(true);
-        try {
-            const response = await fetch(`${BASE_URL}/api/users/login`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    email: loginEmail,
-                    password: loginPassword
-                }),
-            });
+const handleSignup = async () => {
+    if (!signupAlias || !signupEmail || !signupPassword || !signupConfirmPassword || !signupAge) {
+        toast({
+            title: "Validation Error",
+            description: "Please fill out all fields.",
+            variant: "destructive",
+        });
+        return;
+    }
 
-            const data = await response.json();
+    const ageNum = parseInt(signupAge);
+    if (isNaN(ageNum) || ageNum < 5) {
+        toast({
+            title: "Validation Error",
+            description: "You must be at least 5 years old to sign up.",
+            variant: "destructive",
+        });
+        return;
+    }
 
-            if (response.ok) {
-                localStorage.setItem("token", data.token);
-                localStorage.setItem("user", JSON.stringify(data.user));
-                setGAUser(data.user._id);
-                trackLogin("user_login", data.user._id);
-                const from = location.state?.from?.pathname || "/";
-                navigate(from);
-            } else {
-                throw new Error(data.message || "Invalid credentials or login failed.");
-            }
-        } catch (error) {
-            console.error("Login Error:", error);
+    if (signupPassword.length < 6) {
+        toast({
+            title: "Validation Error",
+            description: "Password must be at least 6 characters.",
+            variant: "destructive",
+        });
+        return;
+    }
+
+    if (signupPassword !== signupConfirmPassword) {
+        toast({
+            title: "Validation Error",
+            description: "Passwords do not match.",
+            variant: "destructive",
+        });
+        return;
+    }
+
+    setIsLoading(true);
+    try {
+        const response = await fetch(`${BASE_URL}/api/users/register`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                alias: signupAlias,
+                email: signupEmail,
+                password: signupPassword,
+                age: ageNum,
+                userType: "Registered",
+            }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
             toast({
-                title: "Login Failed",
-                description: (error as Error).message,
-                variant: "destructive",
+                title: "Success!",
+                description: "Account created successfully. Please log in.",
             });
-        } finally {
-            setIsLoading(false);
+            
+            setAuthMode('login');
+            setShowAuthOptions(false);
+            setLoginEmail(signupEmail);
+            setLoginPassword("");
+        } else {
+            throw new Error(data.message || "Registration failed.");
         }
-    };
+    } catch (error) {
+        console.error("Signup Error:", error);
+        toast({
+            title: "Registration Failed",
+            description: (error as Error).message,
+            variant: "destructive",
+        });
+    } finally {
+        setIsLoading(false);
+    }
+};
 
-    const handleSignup = async () => {
-        if (!signupAlias || !signupEmail || !signupPassword || !signupConfirmPassword || !signupAge) {
-            toast({
-                title: "Validation Error",
-                description: "Please fill out all fields.",
-                variant: "destructive",
-            });
-            return;
+const handleGuestLogin = async () => {
+    setIsLoading(true);
+    try {
+        const response = await fetch(`${BASE_URL}/api/users/guestLogin`, {
+            method: "POST",
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Store token and user SYNCHRONOUSLY
+            localStorage.setItem("token", data.token);
+            localStorage.setItem("user", JSON.stringify(data.user));
+
+            // Set analytics
+            setGAUser(data.user._id);
+            trackLogin("user_login", data.user._id);
+            
+            // Give localStorage a moment to write (helps with some browsers)
+            await new Promise(resolve => setTimeout(resolve, 50));
+            
+            navigate("/");
+        } else {
+            throw new Error(data.message || "Guest login failed.");
         }
-
-        const ageNum = parseInt(signupAge);
-        if (isNaN(ageNum) || ageNum < 5) {
-            toast({
-                title: "Validation Error",
-                description: "You must be at least 5 years old to sign up.",
-                variant: "destructive",
-            });
-            return;
-        }
-
-        if (signupPassword.length < 6) {
-            toast({
-                title: "Validation Error",
-                description: "Password must be at least 6 characters.",
-                variant: "destructive",
-            });
-            return;
-        }
-
-        if (signupPassword !== signupConfirmPassword) {
-            toast({
-                title: "Validation Error",
-                description: "Passwords do not match.",
-                variant: "destructive",
-            });
-            return;
-        }
-
-        setIsLoading(true);
-        try {
-            const response = await fetch(`${BASE_URL}/api/users/register`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    alias: signupAlias,
-                    email: signupEmail,
-                    password: signupPassword,
-                    age: ageNum,
-                    userType: "Registered",
-                }),
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-
-                setAuthMode('login');
-                setShowAuthOptions(false);
-                setLoginEmail(signupEmail);
-                setLoginPassword("");
-            } else {
-                throw new Error(data.message || "Registration failed.");
-            }
-        } catch (error) {
-            console.error("Signup Error:", error);
-            toast({
-                title: "Registration Failed",
-                description: (error as Error).message,
-                variant: "destructive",
-            });
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleGuestLogin = async () => {
-        setIsLoading(true);
-        try {
-            const response = await fetch(`${BASE_URL}/api/users/guestLogin`, {
-                method: "POST",
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                localStorage.setItem("token", data.token);
-                localStorage.setItem("user", JSON.stringify(data.user));
-
-                setGAUser(data.user._id);
-                trackLogin("user_login", data.user._id);
-                navigate("/");
-            } else {
-                throw new Error(data.message || "Guest login failed.");
-            }
-        } catch (error) {
-            console.error("Guest Login Error:", error);
-            toast({
-                title: "Guest Access Failed",
-                description: (error as Error).message,
-                variant: "destructive",
-            });
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    } catch (error) {
+        console.error("Guest Login Error:", error);
+        toast({
+            title: "Guest Access Failed",
+            description: (error as Error).message,
+            variant: "destructive",
+        });
+    } finally {
+        setIsLoading(false);
+    }
+};
 
     const handleForgotPassword = async () => {
         if (!resetEmail) {
