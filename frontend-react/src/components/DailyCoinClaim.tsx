@@ -1,72 +1,50 @@
+// DailyCoinClaim.tsx - OPTIMIZED VERSION
+// Uses cached daily bonus amount from UserContext
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Clock, Sparkles } from "lucide-react";
 import { apiClient } from "@/utils/apiClient";
-// NOTE: Assuming UserDetails type is accessible or defined elsewhere if needed.
-// For this file, we only need the structure for updateUserLocally.
+import { preloadSounds } from "@/utils/soundCache"; 
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const DEFAULT_BONUS = 1000;
-const COINS_GAIN_SOUND_SRC = "/knowledge-point.mp3"; 
-const COOLDOWN_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const COOLDOWN_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 interface DailyCoinClaimProps {
   userToken: string;
   onCoinsEarned: (amount: number) => void;
-  // 🔥 NEW PROPS from Home.tsx/UserContext
   isClaimAvailable: boolean;
   updateUserLocally: (updates: { dailyClaimAvailable: boolean; coins?: number }) => void;
+  cachedBonusAmount?: number; // ✅ NEW: Get from UserContext cache
 }
 
-export default function DailyCoinClaim({ userToken, onCoinsEarned, isClaimAvailable, updateUserLocally }: DailyCoinClaimProps) {
-  // 🔥 REVISED STATE: timeRemaining is initialized based on the cached prop.
-  // We no longer use internal 'canClaim' state; it's replaced by the prop.
+export default function DailyCoinClaim({ 
+  userToken, 
+  onCoinsEarned, 
+  isClaimAvailable, 
+  updateUserLocally,
+  cachedBonusAmount = DEFAULT_BONUS // ✅ Use cached value
+}: DailyCoinClaimProps) {
   const [timeRemaining, setTimeRemaining] = useState<number>(
     isClaimAvailable ? 0 : COOLDOWN_DURATION
   );
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
-
   const [showFlyingCoins, setShowFlyingCoins] = useState<boolean>(false);
   const [coinTokens, setCoinTokens] = useState<Array<{ id: number; delay: number }>>([]);
-
-  const [dailyBonusAmount, setDailyBonusAmount] = useState<number>(DEFAULT_BONUS);
+  
+  // ✅ Use cached bonus amount from props (already in UserContext)
+  const [dailyBonusAmount] = useState<number>(cachedBonusAmount);
 
   const [showDailyOverlay, setShowDailyOverlay] = useState(false);
   const earnedCoinsRef = useRef<HTMLDivElement>(null);
   const claimButtonRef = useRef<HTMLButtonElement>(null);
 
-  const [coinGainAudio] = useState(
-      typeof Audio !== "undefined" ? new Audio(COINS_GAIN_SOUND_SRC) : null
-  );
+  // ✅ REMOVED: fetchDailyBonusAmount - now comes from cache
 
-  const fetchDailyBonusAmount = useCallback(async () => {
-    try {
-      // NOTE: This call is independent of user status and should be fast.
-      const response = await apiClient(`${BASE_URL}/api/claimDailyCoins/amount`, {
-        method: "GET",
-      });
-
-      if (response && response.ok) {
-        const data = await response.json();
-        if (data.dailyBonusAmount) {
-          setDailyBonusAmount(data.dailyBonusAmount);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching daily bonus amount:", error);
-    }
-  }, []);
-
-  // 🔥 REMOVED: checkClaimStatus function is no longer needed
-
-  // 🔥 REVISED useEffect: Now manages timer only, and initiates a check 
-  // for exact time remaining if the cached prop says it's not available.
   useEffect(() => {
-    fetchDailyBonusAmount();
-
-    // Secondary check: If cache says false, try to get the exact time remaining 
-    // instead of showing 24h by default.
+    // Get initial time remaining if not claimable
     const getInitialTimeRemaining = async () => {
       if (isClaimAvailable) {
         setTimeRemaining(0);
@@ -90,7 +68,6 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned, isClaimAvaila
           if (remaining > 0) {
             setTimeRemaining(remaining);
           } else {
-            // It should be claimable now! Update cache to true and set timer to 0.
             updateUserLocally({ dailyClaimAvailable: true }); 
             setTimeRemaining(0);
           }
@@ -109,7 +86,6 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned, isClaimAvaila
         setTimeRemaining((prev) => {
           const newTime = prev - 1000;
           if (newTime <= 1000) {
-            // Once the timer hits 0, update the UserContext cache to be ready to claim
             updateUserLocally({ dailyClaimAvailable: true });
             return 0;
           }
@@ -119,11 +95,9 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned, isClaimAvaila
     }
 
     return () => clearInterval(interval);
-
-  }, [userToken, isClaimAvailable, timeRemaining, fetchDailyBonusAmount, updateUserLocally]);
+  }, [userToken, isClaimAvailable, timeRemaining, updateUserLocally]);
 
   const handleClaimClick = async () => {
-    // 🔥 REVISED CHECK: Use the prop for the button state
     if (!isClaimAvailable || isClaiming) return; 
 
     setIsClaiming(true);
@@ -143,26 +117,19 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned, isClaimAvaila
       if (response.ok) {
         const coinsEarned = data.coinsEarned || dailyBonusAmount;
 
-        // 🔥 FIX 1: Update local cache immediately
         updateUserLocally({ dailyClaimAvailable: false });
 
-        // Start animation and set UI cooldown time
         setShowDailyOverlay(true);
         setTimeout(() => {
           startCoinAnimation(coinsEarned);
         }, 900);
 
-        // Set the UI cooldown immediately
         setTimeRemaining(COOLDOWN_DURATION);
       } else {
-        // Server returned an error (e.g., still on cooldown).
         if (data.timeRemainingMs) {
-          // Use the exact time remaining from the server response
           setTimeRemaining(data.timeRemainingMs);
-          // Ensure the local cache is false
           updateUserLocally({ dailyClaimAvailable: false }); 
         } else {
-          // Fallback to previous state if claim failed unexpectedly
           setIsClaiming(false);
         }
       }
@@ -177,8 +144,6 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned, isClaimAvaila
     const headerCoinElement = document.querySelector("[data-coin-header]");
     const headerRect = headerCoinElement?.getBoundingClientRect();
 
-
-    // If either rect is missing, fallback to notifying parent and end gracefully
     if (!overlayRect || !headerRect) {
       if (onCoinsEarned) onCoinsEarned(coinsEarned);
       setIsClaiming(false);
@@ -209,19 +174,14 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned, isClaimAvaila
     const coinsPerToken = Math.ceil(coinsEarned / tokenCount);
 
     const coinTimer = setInterval(() => {
-      // ADDITION: Play coin gain sound
-      if (coinGainAudio) {
-          const audioClone = coinGainAudio.cloneNode(true) as HTMLAudioElement;
-          audioClone.volume = 0.2; // Lower volume slightly for repeated ticks
-          audioClone.play().catch(e => console.log("Audio play failed:", e));
-      }
+      // ✅ Use cached sound system
+      preloadSounds("/knowledge-point.mp3", 0.2);
         
       coinsAdded += coinsPerToken;
       if (coinsAdded >= coinsEarned) {
         coinsAdded = coinsEarned;
         clearInterval(coinTimer);
 
-        // Give the last tokens a moment to finish their animation before hiding overlay
         setTimeout(() => {
           setShowFlyingCoins(false);
           setShowDailyOverlay(false);
@@ -233,7 +193,6 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned, isClaimAvaila
         onCoinsEarned(coinsPerToken);
       }
     }, 150);
-
   };
 
   const formatTimeRemaining = (ms: number) => {
@@ -246,25 +205,31 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned, isClaimAvaila
     if (hours > 0) return `${hours}h ${minutes}m`;
     if (minutes > 0) return `${minutes}m ${seconds}s`;
     return `${seconds}s`;
-
   };
 
   return (
     <>
-      {/* DAILY REWARD OVERLAY (coins will start from the center icon) */}
-      {isClaiming && showDailyOverlay && ( <div className="fixed inset-0 z-[90] flex items-center justify-center pointer-events-none"> <div
-          ref={earnedCoinsRef}
-          className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
-        >
-          {/* Center coin icon - coins will originate from the center of this element */} <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 shadow-lg shadow-amber-500/50 animate-pulse-glow"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-12 w-12"> <circle cx="8" cy="9" r="5" fill="#f59e0b" /> <circle cx="8" cy="9" r="4" fill="#fbbf24" /> <circle cx="8" cy="9" r="2.5" fill="#f59e0b" opacity="0.4" /> <circle cx="14" cy="13" r="6" fill="#f59e0b" /> <circle cx="14" cy="13" r="5" fill="#fbbf24" /> <circle cx="14" cy="13" r="3" fill="#f59e0b" opacity="0.4" /> </svg> </div>
+      {isClaiming && showDailyOverlay && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center pointer-events-none">
+          <div
+            ref={earnedCoinsRef}
+            className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
+          >
+            <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 shadow-lg shadow-amber-500/50 animate-pulse-glow">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-12 w-12">
+                <circle cx="8" cy="9" r="5" fill="#f59e0b" />
+                <circle cx="8" cy="9" r="4" fill="#fbbf24" />
+                <circle cx="8" cy="9" r="2.5" fill="#f59e0b" opacity="0.4" />
+                <circle cx="14" cy="13" r="6" fill="#f59e0b" />
+                <circle cx="14" cy="13" r="5" fill="#fbbf24" />
+                <circle cx="14" cy="13" r="3" fill="#f59e0b" opacity="0.4" />
+              </svg>
+            </div>
 
-          {/* Large number (keeps visual feedback) */}
-          <div className="coin-text-aura text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
-            +{dailyBonusAmount}
+            <div className="coin-text-aura text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
+              +{dailyBonusAmount}
+            </div>
           </div>
-
-          {/* NOTE: no extra notifications or toasts are shown */}
-        </div>
         </div>
       )}
 
@@ -284,14 +249,13 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned, isClaimAvaila
               </div>
 
               <Button
-              variant="ghost"
-              size="sm"
-              className="absolute bottom-[-18px] left-2 px-2.5 sm:px-3 py-0.5 font-bold text-white s pointer-events-none"
-              disabled
+                variant="ghost"
+                size="sm"
+                className="absolute bottom-[-18px] left-2 px-2.5 sm:px-3 py-0.5 font-bold text-white pointer-events-none"
+                disabled
               >
-              +{dailyBonusAmount}
+                +{dailyBonusAmount}
               </Button>
-
             </div>
 
             <div className="leading-tight min-w-0 -ml-1">
@@ -299,54 +263,50 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned, isClaimAvaila
             </div>
           </div>
 
-        <Button
-          ref={claimButtonRef}
-          onClick={handleClaimClick}
-          // 🔥 REVISED: Use the prop for determining button variant
-          className="flex items-center gap-1 sm:gap-2 px-3 py-1.5 sm:px-6 sm:py-3 "
-          variant={isClaimAvailable ? "warning" : "purple"}
-          style={{
-            ...(isClaimAvailable
-              ? {
-                  border: "3px solid #fcd34d",
-                  boxShadow: "0 0 25px rgba(255,255,0,0.5)",
-                }
-              : {
-                  border: "1px solid rgba(128,90,213,0.5)",
-                  boxShadow: "0 0 15px rgba(240,171,240,0.4), 0 4px 15px rgba(0,0,0,0.5)",
-                }),
-          }}
-        >
-          {/* 🔥 REVISED: Use the prop for determining button content */}
-          {isClaimAvailable ? (
-            <>
-              <Sparkles
-                className={`w-4 h-4 sm:w-6 sm:h-6 ${
-                  isClaiming ? "text-gray-400" : "text-yellow-400"
-                }`}
-              />
-              <span
-                className={`font-bold text-sm sm:text-lg whitespace-nowrap ${
-                  isClaiming ? "text-gray-400" : "text-yellow-400"
-                }`}
-              >
-                {isClaiming ? "Claiming..." : "Claim Now"}
-              </span>
-            </>
-          ) : (
-            <>
-              <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" />
-              <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap">
-                {formatTimeRemaining(timeRemaining)}
-              </span>
-            </>
-          )}
-        </Button>
-
+          <Button
+            ref={claimButtonRef}
+            onClick={handleClaimClick}
+            className="flex items-center gap-1 sm:gap-2 px-3 py-1.5 sm:px-6 sm:py-3"
+            variant={isClaimAvailable ? "warning" : "purple"}
+            style={{
+              ...(isClaimAvailable
+                ? {
+                    border: "3px solid #fcd34d",
+                    boxShadow: "0 0 25px rgba(255,255,0,0.5)",
+                  }
+                : {
+                    border: "1px solid rgba(128,90,213,0.5)",
+                    boxShadow: "0 0 15px rgba(240,171,240,0.4), 0 4px 15px rgba(0,0,0,0.5)",
+                  }),
+            }}
+          >
+            {isClaimAvailable ? (
+              <>
+                <Sparkles
+                  className={`w-4 h-4 sm:w-6 sm:h-6 ${
+                    isClaiming ? "text-gray-400" : "text-yellow-400"
+                  }`}
+                />
+                <span
+                  className={`font-bold text-sm sm:text-lg whitespace-nowrap ${
+                    isClaiming ? "text-gray-400" : "text-yellow-400"
+                  }`}
+                >
+                  {isClaiming ? "Claiming..." : "Claim Now"}
+                </span>
+              </>
+            ) : (
+              <>
+                <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" />
+                <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap">
+                  {formatTimeRemaining(timeRemaining)}
+                </span>
+              </>
+            )}
+          </Button>
         </div>
       </Card>
 
-      {/* Flying coin tokens */}
       {showFlyingCoins &&
         coinTokens.map((token) => (
           <div
@@ -369,7 +329,6 @@ export default function DailyCoinClaim({ userToken, onCoinsEarned, isClaimAvaila
           </div>
         ))}
 
-      {/* Styles */}
       <style>{`
         .coin-text-aura {
           text-shadow:

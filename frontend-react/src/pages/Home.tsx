@@ -25,7 +25,6 @@ import GameStatsHeader from "../components/GameStatsHeader";
 import { useToast } from "@/hooks/use-toast";
 import DailyCoinClaim from "@/components/DailyCoinClaim";
 import { useUser } from "@/contexts/UserContext";
-// NOTE: Avatar and Sound preloading is now handled in useAppPreloader.ts
 import { globalCache, preloadLeaderboardData, preloadQuizSession, isQuizSessionReady, clearQuizCache } from "@/hooks/useAppPreloader"; 
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
