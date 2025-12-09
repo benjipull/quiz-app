@@ -576,24 +576,30 @@ const handleQuickQuiz = async () => {
 
         <div className={`space-y-2 flex-shrink-0 w-full ${isSmallScreen ? 'pb-36 pt-10' : 'pb-24 pt-16'}`}>
           <Button
-            variant="default"
-            onClick={handleQuickQuiz}
-            disabled={playButtonLoading || currentCoins < QUIZ_COST}
-            className={`w-full flex items-center justify-between px-6 ${isSmallScreen ? 'h-16' : 'h-20 sm:h-20'}`}
-          >
-            {playButtonLoading ? (
-              <div className="flex items-center text-xl sm:text-2xl justify-center w-full gap-2">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                Starting Quiz...
-              </div>
-            ) : (
+          variant="default"
+          onClick={handleQuickQuiz}
+          disabled={playButtonLoading || currentCoins < QUIZ_COST}
+          className={`w-full flex items-center justify-between px-6 ${isSmallScreen ? 'h-20' : 'h-24 sm:h-24'}`}
+        >
+          {playButtonLoading ? (
+            <div className="flex items-center justify-center w-full gap-2 text-xl sm:text-2xl">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              Starting Quiz...
+            </div>
+          ) : (
               <>
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <span className="text-3xl sm:text-4xl font-extrabold text-white leading-none">
+                {/* Left side: Play + coins */}
+                <div className="flex items-center justify-center gap-3 sm:gap-4 h-full">
+                  <span className="text-4xl sm:text-5xl font-bold text-white leading-none flex items-center -translate-y-[1px]">
                     Play
                   </span>
+
                   <span className="text-base sm:text-lg font-semibold text-yellow-300 flex items-center gap-1.5 bg-gray-700/70 px-3 py-1.5 rounded-full">
-                    <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6" xmlns="http://www.w3.org/2000/svg">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-5 w-5 sm:h-6 sm:w-6"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
                       <circle cx="12" cy="12" r="8" fill="#f59e0b" />
                       <circle cx="12" cy="12" r="7" fill="#fbbf24" />
                       <circle cx="12" cy="12" r="4" fill="#f59e0b" opacity="0.4" />
@@ -602,17 +608,18 @@ const handleQuickQuiz = async () => {
                   </span>
                 </div>
 
-                <div className="bg-white rounded-full w-14 h-14 sm:w-[72px] sm:h-[72px] flex flex-col items-center justify-center shadow-md border-2 border-green-500">
-                  <span className="text-green-600 text-2xl sm:text-3xl font-bold leading-none">
-                    {userLevel}
-                  </span>
-                  <span className="text-green-600 text-[10px] sm:text-xs font-semibold uppercase leading-none tracking-wide mt-0.5">
-                    Level
-                  </span>
-                </div>
-              </>
-            )}
-          </Button>
+              <div className="bg-white rounded-full w-14 h-14 sm:w-[72px] sm:h-[72px] flex flex-col items-center justify-center shadow-md border-2 border-green-500">
+                <span className="text-green-600 text-2xl sm:text-3xl font-bold leading-none">
+                  {userLevel}
+                </span>
+                <span className="text-green-600 text-[10px] sm:text-xs font-semibold uppercase leading-none tracking-wide mt-0.5">
+                  Level
+                </span>
+              </div>
+            </>
+          )}
+        </Button>
+
 
           {currentCoins < QUIZ_COST && (
             <p className="text-red-400 text-sm text-center font-medium">
