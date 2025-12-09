@@ -17,6 +17,8 @@ interface UserDetails {
   knowledgePoints?: number;
   wisdomGems?: number;
   enlightenmentCrystals?: number;
+  // 🔥 NEW: Add daily claim status to the cached user details
+  dailyClaimAvailable?: boolean;
 }
 
 interface UserContextType {
@@ -88,6 +90,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Then fetch fresh data in background
     console.log("🌐 Fetching fresh user data from API in background...");
     try {
+      // NOTE: The backend API /api/getUserDetails should ideally be split or return minimal data 
+      // for economy (coins, dailyClaimAvailable) and more for core (alias, level, avatar).
+      // Since we assume it returns all, we ensure we cache all.
       const response = await authenticatedFetch(`${BASE_URL}/api/getUserDetails`, {
         method: "GET",
       });
@@ -109,6 +114,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         userType: apiUser.userType || 'Registered',
         interests: apiUser.interests || [],
         coins: apiUser.coins || 0,
+        dailyClaimAvailable: apiUser.dailyClaimAvailable ?? false, // 🔥 NEW: Cache daily claim status
       };
 
       setUser(userToStore);
@@ -119,7 +125,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Update global cache
       globalCache.homeData = {
-        user: apiUser,
+        user: userToStore, // Use userToStore which includes defaults/claim
         timestamp: Date.now(),
       };
       globalCache.lastUpdated.home = Date.now();
