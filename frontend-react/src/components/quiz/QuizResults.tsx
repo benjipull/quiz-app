@@ -919,10 +919,14 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   <KnowledgePointIcon className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
-                  <div className="xp-text-aura text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300
-                   via-yellow-400 to-orange-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
+                  <div className="
+                    text-5xl sm:text-6xl font-black
+                    tabular-nums animate-number-grow
+                    text-amber-400 outlined-text amber-glow
+                  ">
                     {animatedKnowledge}
                   </div>
+
                   <div className="text-yellow-400/80 font-bold text-sm sm:text-base mt-1 sm:mt-2">
                     XP EARNED
                   </div>
@@ -945,9 +949,14 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 </div>
                 <div>
                   {/* COIN COUNT: Changed gradient to gold/yellow and uses the modified coin-text-aura */}
-                  <div className="coin-text-aura text-5xl sm:text-6xl font-extrabold bg-gradient-to-b from-yellow-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
-                    {animatedCoins}
-                  </div>
+                  <div className="
+                  text-5xl sm:text-6xl font-extrabold
+                  tabular-nums animate-number-grow
+                  text-amber-400 outlined-text amber-glow
+                ">
+                  {animatedCoins}
+                </div>
+
                   {/* SUBTITLE: Changed color to amber-400 */}
                   <div className="text-amber-400/80 font-bold text-sm sm:text-base mt-1 sm:mt-2">
                     COINS EARNED
