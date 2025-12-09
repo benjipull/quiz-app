@@ -1,4 +1,4 @@
-// src/contexts/UserContext.tsx - Updated with Debug Logging
+// src/contexts/UserContext.tsx - Complete Fixed Version
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { globalCache } from '@/hooks/useAppPreloader';
 
@@ -73,32 +73,20 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
     
     if (!userToken) {
-      console.log("⚠️ No token found, loading from storage");
-      loadUserFromStorage();
+      console.log("⚠️ No token found");
       setLoading(false);
       return;
     }
 
-    // Check if we have cached data first
-    if (globalCache.homeData?.user) {
-      const cachedUser = globalCache.homeData.user;
-      const userToStore = {
-        ...cachedUser,
-        level: cachedUser.level || 1,
-        userType: cachedUser.userType || 'Registered',
-        interests: cachedUser.interests || [],
-        coins: cachedUser.coins || 0,
-      };
-      console.log("⚡ User loaded from cache:", userToStore.alias);
-      setUser(userToStore);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem("user", JSON.stringify(userToStore));
-      }
-      setLoading(false);
-      return;
+    // 🔥 CRITICAL FIX: Load from localStorage FIRST and set loading to false immediately
+    const cachedUser = loadUserFromStorage();
+    if (cachedUser) {
+      console.log("⚡ User loaded from localStorage immediately - loading set to FALSE");
+      setLoading(false); // This prevents blank screen!
     }
 
-    console.log("🌐 Fetching user from API...");
+    // Then fetch fresh data in background
+    console.log("🌐 Fetching fresh user data from API in background...");
     try {
       const response = await authenticatedFetch(`${BASE_URL}/api/getUserDetails`, {
         method: "GET",
@@ -106,13 +94,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (!response.ok) {
         console.warn(`⚠️ Failed to fetch user details (Status: ${response.status}). Using cached data.`);
-        loadUserFromStorage();
-        setLoading(false);
+        if (!cachedUser) {
+          setLoading(false);
+        }
         return;
       }
 
       const apiUser: UserDetails = await response.json();
-      console.log("✅ User fetched from API:", apiUser.alias);
+      console.log("✅ Fresh user data fetched from API:", apiUser.alias);
       
       const userToStore = {
         ...apiUser,
@@ -136,10 +125,11 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       globalCache.lastUpdated.home = Date.now();
     } catch (error) {
       console.error("❌ Error fetching user details from API:", error);
-      loadUserFromStorage();
     } finally {
-      console.log("🏁 User loading complete, setting loading to false");
-      setLoading(false);
+      console.log("✓ User refresh complete");
+      if (!cachedUser) {
+        setLoading(false);
+      }
     }
   };
 

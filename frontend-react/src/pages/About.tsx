@@ -1,5 +1,6 @@
 import { Header } from '@/components/layout/Header'
 import React from 'react'
+import Menu  from './Menu'
 
 const About = () => {
   return (
@@ -23,6 +24,7 @@ const About = () => {
           </div>
         </div>
       </div>
+      <Menu/>
     </div>
   )
 }
