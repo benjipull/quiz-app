@@ -502,12 +502,13 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   // REPLACED handleNextQuiz function with the one supporting preloading logic
   const handleNextQuiz = async () => {
     if (!userToken) {
-      trackNextQuiz(nextCategoryId, userId);
       console.error("User must be logged in to play the next quiz.");
       setRatingMessage("You must be logged in to play the next quiz.");
       return;
     }
 
+    trackNextQuiz(nextCategoryId, userId);
+    
     // If we have a preloaded category, use it immediately
     if (nextCategoryId && isQuizSessionReady(nextCategoryId)) {
       console.log("🚀 Using preloaded next quiz - Instant navigation!");
