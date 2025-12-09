@@ -1,5 +1,8 @@
 // src/hooks/useAppPreloader.ts - Complete Fixed Version
 import { useEffect, useRef } from 'react';
+// 🔥 NEW: Import sound and avatar preloading utilities
+import { preloadSounds } from '@/utils/soundCache'; 
+import { preloadAvatars } from '@/utils/avatarCache'; 
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -59,6 +62,9 @@ const preloadHomeData = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
+    // NOTE: This fetch is still necessary for the full UserContext to refresh.
+    // The goal of separation is achieved by having UserContext manage the full details
+    // and ensuring this function updates the cache with the most recent economy data.
     const userResponse = await authenticatedFetch(`${BASE_URL}/api/getUserDetails`, {
       method: "GET",
     });
@@ -70,7 +76,7 @@ const preloadHomeData = async () => {
         timestamp: now,
       };
       globalCache.lastUpdated.home = now;
-      console.log("✅ Home data preloaded");
+      console.log("✅ Home data preloaded (includes core details and economy)");
     }
   } catch (error) {
     console.error("Error preloading home data:", error);
@@ -273,11 +279,17 @@ export const preloadCategoryAndSession = async () => {
 // Main preloader function
 export const preloadAllData = async () => {
   const token = localStorage.getItem("token");
+  // 🔥 NEW: Proactive asset caching (avatars and sounds)
+  console.log("🎵 Preloading sounds...");
+  preloadSounds();
+  console.log("🖼️ Preloading avatars...");
+  preloadAvatars();
+  
   if (!token) return;
 
   console.log("🔄 Starting comprehensive preload...");
 
-  // Run all preloads in parallel
+  // Run all other preloads in parallel
   await Promise.allSettled([
     preloadHomeData(),
     preloadLeaderboardData(),
