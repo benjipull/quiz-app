@@ -15,6 +15,9 @@ import {
   Award,
   Trophy,
 } from "lucide-react";
+import {
+  trackNextQuiz
+} from "@/utils/analytics";
 import Confetti from "react-confetti";
 
 // NEW IMPORTS: Assuming these are custom hooks/utilities for preloading
@@ -26,6 +29,8 @@ const LEVEL_UP_SOUND_SRC = "/player-level-up.mp3";
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const QUIZ_COST = 50;
 
+const storedUser = localStorage.getItem("user");
+const userId = storedUser ? JSON.parse(storedUser)._id : null;
 
 interface QuizResultsProps {
   results: {
@@ -497,6 +502,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   // REPLACED handleNextQuiz function with the one supporting preloading logic
   const handleNextQuiz = async () => {
     if (!userToken) {
+      trackNextQuiz(nextCategoryId, userId);
       console.error("User must be logged in to play the next quiz.");
       setRatingMessage("You must be logged in to play the next quiz.");
       return;
