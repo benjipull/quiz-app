@@ -1,4 +1,4 @@
-// src/hooks/useAppPreloader.ts - Enhanced with better preloading
+// src/hooks/useAppPreloader.ts - Complete Fixed Version
 import { useEffect, useRef } from 'react';
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
@@ -27,7 +27,7 @@ const CACHE_DURATION = {
   HOME: 5 * 60 * 1000,
   LEADERBOARD: 10 * 60 * 1000,
   CATEGORY: 2 * 60 * 1000,
-  QUIZ_SESSION: 30 * 60 * 1000, // 30 minutes - keep session alive longer
+  QUIZ_SESSION: 5 * 60 * 1000, // 5 minutes - shorter to avoid stale sessions
 };
 
 // Track ongoing preload operations
@@ -130,11 +130,11 @@ const preloadNextCategory = async () => {
   }
 };
 
-// Enhanced preload quiz session with better deduplication
+// 🔥 FIXED: Enhanced preload quiz session with category name
 export const preloadQuizSession = async (categoryId: string): Promise<boolean> => {
   const now = Date.now();
   
-  // Check if we already have a valid cached session for this category
+  // Check if we already have a valid cached session for THIS EXACT category
   if (globalCache.quizSession && 
       globalCache.quizSession.categoryId === categoryId &&
       globalCache.firstQuestion &&
@@ -143,13 +143,16 @@ export const preloadQuizSession = async (categoryId: string): Promise<boolean> =
     return true;
   }
 
-  // If already preloading this session, return the existing promise
+  // If already preloading, wait for it
   if (isPreloadingSession && sessionPreloadPromise) {
     console.log("⏳ Quiz session preload already in progress, waiting...");
     return sessionPreloadPromise;
   }
 
-  // Start new preload operation
+  // Clear any old session data before starting new preload
+  console.log("🧹 Clearing old session before preloading new one");
+  clearQuizCache();
+
   isPreloadingSession = true;
   sessionPreloadPromise = (async () => {
     try {
@@ -161,6 +164,22 @@ export const preloadQuizSession = async (categoryId: string): Promise<boolean> =
 
       console.log("🎯 Starting full quiz session preload for:", categoryId);
 
+      // 🔥 CRITICAL FIX: Fetch category info FIRST
+      let categoryName = "Quiz";
+      try {
+        const categoriesResponse = await authenticatedFetch(`${BASE_URL}/api/categories`);
+        if (categoriesResponse.ok) {
+          const categories = await categoriesResponse.json();
+          const category = categories.find((cat: any) => cat._id === categoryId);
+          if (category) {
+            categoryName = category.name;
+            console.log("✅ Found category name:", categoryName);
+          }
+        }
+      } catch (err) {
+        console.warn("⚠️ Could not fetch category name, using default");
+      }
+
       // Start the quiz session
       const startResponse = await authenticatedFetch(`${BASE_URL}/api/startQuiz`, {
         method: "POST",
@@ -169,8 +188,6 @@ export const preloadQuizSession = async (categoryId: string): Promise<boolean> =
 
       if (!startResponse.ok) {
         console.error("❌ Failed to start quiz session for preload");
-        globalCache.quizSession = null;
-        globalCache.firstQuestion = null;
         return false;
       }
 
@@ -178,14 +195,10 @@ export const preloadQuizSession = async (categoryId: string): Promise<boolean> =
       console.log("✅ Quiz session started, total questions:", startData.total);
       
       // Fetch the first question
-      const questionResponse = await authenticatedFetch(`${BASE_URL}/api/nextQuestion/${token}`, {
-        method: "GET",
-      });
+      const questionResponse = await authenticatedFetch(`${BASE_URL}/api/nextQuestion/${token}`);
 
       if (!questionResponse.ok) {
         console.error("❌ Failed to fetch first question");
-        globalCache.quizSession = null;
-        globalCache.firstQuestion = null;
         return false;
       }
 
@@ -197,25 +210,26 @@ export const preloadQuizSession = async (categoryId: string): Promise<boolean> =
           timerInSeconds: questionData.timerInSeconds,
         };
 
-        // Cache both session and first question
+        // 🔥 CRITICAL FIX: Store session WITH category name
         globalCache.quizSession = {
-          categoryId,
+          categoryId: categoryId,
+          categoryName: categoryName, // ← THIS IS CRITICAL!
           totalQuestions: startData.total || 10,
           started: true,
+          timestamp: now,
         };
         globalCache.firstQuestion = questionWithTimer;
         globalCache.lastUpdated.quizSession = now;
         
         console.log("✅ FULL quiz session preloaded successfully!");
-        console.log("   - Category:", categoryId);
+        console.log("   - Category ID:", categoryId);
+        console.log("   - Category Name:", categoryName);
         console.log("   - Total questions:", startData.total);
         console.log("   - First question loaded:", !!questionWithTimer);
         
         return true;
       } else {
         console.error("❌ No question data received");
-        globalCache.quizSession = null;
-        globalCache.firstQuestion = null;
         return false;
       }
     } catch (error) {
@@ -248,6 +262,7 @@ export const preloadCategoryAndSession = async () => {
     
     // Then preload the full quiz session if we have a category
     if (globalCache.nextCategory?.categoryId) {
+      console.log("🚀 Preloading session for next category:", globalCache.nextCategory.categoryId);
       await preloadQuizSession(globalCache.nextCategory.categoryId);
     }
   } catch (error) {
@@ -266,7 +281,7 @@ export const preloadAllData = async () => {
   await Promise.allSettled([
     preloadHomeData(),
     preloadLeaderboardData(),
-    preloadCategoryAndSession(), // This now does both category + session
+    preloadCategoryAndSession(),
   ]);
   
   console.log("✅ Comprehensive preload complete");
@@ -282,9 +297,13 @@ export const useAppPreloader = () => {
       preloadAllData();
     }
 
-    // Set up periodic refresh - preload fresh data every minute
+    // Set up periodic refresh - but DON'T refresh quiz sessions automatically
     const interval = setInterval(() => {
-      preloadAllData();
+      // Only refresh home and leaderboard data, NOT quiz sessions
+      Promise.allSettled([
+        preloadHomeData(),
+        preloadLeaderboardData(),
+      ]);
     }, 60 * 1000);
 
     return () => clearInterval(interval);
@@ -309,13 +328,18 @@ export const isQuizSessionReady = (categoryId: string): boolean => {
   const isReady = !!(
     globalCache.quizSession && 
     globalCache.quizSession.categoryId === categoryId &&
-    globalCache.firstQuestion
+    globalCache.firstQuestion &&
+    globalCache.quizSession.categoryName // Ensure we have the name too
   );
   
   if (isReady) {
-    console.log("✅ Quiz session IS ready for:", categoryId);
+    console.log("✅ Quiz session IS ready for:", categoryId, "-", globalCache.quizSession.categoryName);
   } else {
     console.log("⚠️ Quiz session NOT ready for:", categoryId);
+    if (globalCache.quizSession) {
+      console.log("   - Cached category:", globalCache.quizSession.categoryId);
+      console.log("   - Has question:", !!globalCache.firstQuestion);
+    }
   }
   
   return isReady;

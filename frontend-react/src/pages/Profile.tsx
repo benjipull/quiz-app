@@ -72,21 +72,27 @@ const Profile = () => {
     fetchAllInterests();
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      setAlias(user.alias || "");
-      setAge(user.age?.toString() || "");
-      setEmail(user.email || "");
-      setSelectedInterests(user.interests || []);
-      
-      const avatarIndex = user.avatar - 1;
-      const initialAvatar = avatars[avatarIndex] || avatars[0] || null;
-      setAvatar(initialAvatar);
-      setSelectedAvatarIndex(avatarIndex >= 0 ? avatarIndex : 0);
-    } else if (!userLoading) {
+ useEffect(() => {
+  if (user) {
+    // User is loaded (could be Guest or Registered)
+    setAlias(user.alias || "");
+    setAge(user.age?.toString() || "");
+    setEmail(user.email || "");
+    setSelectedInterests(user.interests || []);
+    
+    const avatarIndex = user.avatar - 1;
+    const initialAvatar = avatars[avatarIndex] || avatars[0] || null;
+    setAvatar(initialAvatar);
+    setSelectedAvatarIndex(avatarIndex >= 0 ? avatarIndex : 0);
+  } else if (!userLoading) {
+    // Only redirect if user is not loaded AND loading is complete
+    // This means they're truly not logged in (no token)
+    const hasToken = localStorage.getItem("token");
+    if (!hasToken) {
       navigate("/auth");
     }
-  }, [user, userLoading, navigate]);
+  }
+}, [user, userLoading, navigate]);
 
   const handleAvatarSelection = (selectedAvatar: string, index: number) => {
     setAvatar(selectedAvatar);
