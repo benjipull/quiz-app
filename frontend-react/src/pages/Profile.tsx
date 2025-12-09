@@ -1,5 +1,3 @@
-// Profile.tsx - Optimized with User Context
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -77,7 +75,11 @@ const Profile = () => {
     // User is loaded (could be Guest or Registered)
     setAlias(user.alias || "");
     setAge(user.age?.toString() || "");
-    setEmail(user.email || "");
+    
+    // MODIFICATION START: Set email to empty string if user is Guest
+    setEmail(user.userType === "Guest" ? "" : user.email || "");
+    // MODIFICATION END
+    
     setSelectedInterests(user.interests || []);
     
     const avatarIndex = user.avatar - 1;
@@ -193,22 +195,13 @@ const Profile = () => {
       const newType = data.user?.userType || "Registered";
 
       if (newType === "Registered" && isRegistration) {
-        toast({
-          title: "Registration Complete",
-          description: "Welcome! Your account is now fully registered.",
-        });
+        // Successful registration, navigate to home without toast
         setTimeout(() => navigate("/"), 1500);
       } else if (newType !== "Guest" && !isRegistration) {
-        toast({
-          title: "Success",
-          description: "Profile updated successfully! Redirecting to home.",
-        });
+        // Successful profile update, navigate to home without toast
         setTimeout(() => navigate("/"), 1500);
       } else {
-        toast({
-          title: "Success",
-          description: "Profile updated successfully!",
-        });
+        // Successful profile update for non-guest/non-registration scenario, no toast
       }
     } catch (error) {
       toast({
