@@ -11,6 +11,8 @@ import {
   trackQuizComplete,
 } from "@/utils/analytics";
 import { globalCache, clearQuizCache, preloadQuizSession } from "@/hooks/useAppPreloader";
+import { preloadSounds } from "@/utils/soundCache"; 
+
 
 const StarfieldBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -306,9 +308,11 @@ export default function Quiz() {
 
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
 
-  const startSound = new Audio("/intro-sound.mp3");
-  const correctSound = new Audio("/victory-beat.mp3");
-  const incorrectSound = new Audio("/incorrect.mp3");
+ // Instead of creating Audio objects
+const startSound = () => preloadSounds("/intro-sound.mp3", 0.5); // NOTE: Changed to .m4a based on soundCache.ts
+const correctSound = () => preloadSounds("/victory-beat.mp3", 0.7);
+const incorrectSound = () => preloadSounds("/incorrect.mp3", 0.7);
+
 
   const handleBackNavigation = () => {
     setShowExitDialog(true);
@@ -565,8 +569,8 @@ const startQuiz = async (categoryId: string) => {
     // Fire and forget category info fetch
     fetchCategoryInfo();
     
-    // Play sound
-    startSound.play().catch(() => {});
+    // Play sound (FIXED: Call the function instead of trying to access .play())
+    startSound();
     
     // Clear the used cache
     globalCache.firstQuestion = null;
@@ -675,7 +679,8 @@ const startQuiz = async (categoryId: string) => {
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1;
           if (newIndex === 1) {
-            startSound.play().catch(() => { });
+            // FIXED: Call the function
+            startSound(); 
           }
           return {
             ...prev,
@@ -705,7 +710,8 @@ const startQuiz = async (categoryId: string) => {
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1;
           if (newIndex === 1) {
-            startSound.play().catch(() => { });
+            // FIXED: Call the function
+            startSound(); 
           }
           return {
             ...prev,
@@ -893,9 +899,11 @@ const startQuiz = async (categoryId: string) => {
         }));
 
         if (isCorrect) {
-          correctSound.play().catch(() => { });
+          // FIXED: Call the function
+          correctSound();
         } else {
-          incorrectSound.play().catch(() => { });
+          // FIXED: Call the function
+          incorrectSound();
         }
 
         trackQuestionAnswered(quizState.question?._id || "", isCorrect, userId);
