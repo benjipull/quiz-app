@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-// 🔥 NEW: Import sound and avatar preloading utilities
 import { preloadSounds } from '@/utils/soundCache'; 
 import { preloadAvatars } from '@/utils/avatarCache'; 
 
@@ -32,9 +31,13 @@ const CACHE_DURATION = {
   QUIZ_SESSION: 5 * 60 * 1000,
 };
 
-// Track ongoing preload operations
-let isPreloadingSession = false;
-let sessionPreloadPromise: Promise<boolean> | null = null;
+// 🔥 NEW: Track ongoing fetch operations to prevent duplicates
+const ongoingFetches = {
+  home: null as Promise<void> | null,
+  leaderboard: null as Promise<void> | null,
+  category: null as Promise<void> | null,
+  quizSession: null as Promise<void> | null,
+};
 
 const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
   const userToken = localStorage.getItem("token") || "";
@@ -49,79 +52,128 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
 };
 
 // -------------------- HOME --------------------
-const preloadHomeData = async () => {
+const preloadHomeData = async (): Promise<void> => {
   const now = Date.now();
-  if (globalCache.homeData && (now - globalCache.lastUpdated.home) < CACHE_DURATION.HOME) return;
-
-  try {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    const userResponse = await authenticatedFetch(`${BASE_URL}/api/getUserDetails`);
-    if (userResponse.ok) {
-      const userData = await userResponse.json();
-      globalCache.homeData = { user: userData, timestamp: now };
-      globalCache.lastUpdated.home = now;
-      console.log("✅ Home data preloaded");
-    }
-  } catch (err) {
-    console.error("Error preloading home:", err);
+  if (globalCache.homeData && (now - globalCache.lastUpdated.home) < CACHE_DURATION.HOME) {
+    return;
   }
+
+  // 🔥 Return existing promise if already fetching
+  if (ongoingFetches.home) {
+    console.log("⏭️ Home data already fetching, reusing promise");
+    return ongoingFetches.home;
+  }
+
+  ongoingFetches.home = (async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      console.log("🌐 Fetching home data...");
+      const userResponse = await authenticatedFetch(`${BASE_URL}/api/getUserDetails`);
+      if (userResponse.ok) {
+        const userData = await userResponse.json();
+        globalCache.homeData = { user: userData, timestamp: now };
+        globalCache.lastUpdated.home = now;
+        console.log("✅ Home data preloaded");
+      }
+    } catch (err) {
+      console.error("Error preloading home:", err);
+    } finally {
+      ongoingFetches.home = null;
+    }
+  })();
+
+  return ongoingFetches.home;
 };
 
 // -------------------- LEADERBOARD --------------------
-const preloadLeaderboardData = async () => {
+export const preloadLeaderboardData = async (): Promise<void> => {
   const now = Date.now();
+  
+  // Check if already cached and valid
   if (
     globalCache.leaderboardData.day.length &&
     (now - globalCache.lastUpdated.leaderboard) < CACHE_DURATION.LEADERBOARD
-  ) return;
-
-  try {
-    const periods = ['day', 'week', 'month', 'year'] as const;
-
-    await Promise.allSettled(
-      periods.map(async (period) => {
-        const res = await authenticatedFetch(`${BASE_URL}/api/leaderboard?period=${period}`);
-        if (res.ok) {
-          const data = await res.json();
-          globalCache.leaderboardData[period] = data.leaderboard || [];
-        }
-      })
-    );
-
-    globalCache.lastUpdated.leaderboard = now;
-    console.log("✅ Leaderboard preloaded");
-  } catch (err) {
-    console.error("Leaderboard preload error:", err);
+  ) {
+    console.log("✅ Using cached leaderboard data");
+    return;
   }
+
+  // 🔥 Return existing promise if already fetching
+  if (ongoingFetches.leaderboard) {
+    console.log("⏭️ Leaderboard already fetching, reusing promise");
+    return ongoingFetches.leaderboard;
+  }
+
+  ongoingFetches.leaderboard = (async () => {
+    try {
+      console.log("🌐 Fetching all leaderboard periods...");
+      const periods = ['day', 'week', 'month', 'year'] as const;
+
+      // Fetch all periods in parallel
+      const results = await Promise.allSettled(
+        periods.map(async (period) => {
+          const res = await authenticatedFetch(`${BASE_URL}/api/leaderboard?period=${period}`);
+          if (res.ok) {
+            const data = await res.json();
+            globalCache.leaderboardData[period] = data.leaderboard || [];
+            console.log(`✅ ${period} leaderboard cached`);
+          }
+        })
+      );
+
+      globalCache.lastUpdated.leaderboard = now;
+      console.log("✅ All leaderboards preloaded");
+    } catch (err) {
+      console.error("Leaderboard preload error:", err);
+    } finally {
+      ongoingFetches.leaderboard = null;
+    }
+  })();
+
+  return ongoingFetches.leaderboard;
 };
 
 // -------------------- CATEGORY --------------------
-const preloadNextCategory = async () => {
+export const preloadNextCategory = async (): Promise<void> => {
   const now = Date.now();
   if (
     globalCache.nextCategory &&
     (now - globalCache.lastUpdated.category) < CACHE_DURATION.CATEGORY
-  ) return;
-
-  try {
-    const res = await authenticatedFetch(`${BASE_URL}/api/getGetegoryToPlay`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.categoryId) {
-        globalCache.nextCategory = data;
-        globalCache.lastUpdated.category = now;
-        console.log("✅ Next category cached:", data.categoryId);
-      }
-    }
-  } catch (err) {
-    console.error("Category preload error:", err);
+  ) {
+    return;
   }
+
+  // 🔥 Return existing promise if already fetching
+  if (ongoingFetches.category) {
+    console.log("⏭️ Category already fetching, reusing promise");
+    return ongoingFetches.category;
+  }
+
+  ongoingFetches.category = (async () => {
+    try {
+      console.log("🌐 Fetching next category...");
+      const res = await authenticatedFetch(`${BASE_URL}/api/getGetegoryToPlay`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.categoryId) {
+          globalCache.nextCategory = data;
+          globalCache.lastUpdated.category = now;
+          console.log("✅ Next category cached:", data.categoryId);
+        }
+      }
+    } catch (err) {
+      console.error("Category preload error:", err);
+    } finally {
+      ongoingFetches.category = null;
+    }
+  })();
+
+  return ongoingFetches.category;
 };
 
 // -------------------- SAFE QUIZ SESSION PRELOAD --------------------
-// ✅ SAFE: NO coin deduction, no real session creation
 export const preloadQuizSession = async (categoryId: string): Promise<boolean> => {
   const now = Date.now();
 
@@ -134,16 +186,18 @@ export const preloadQuizSession = async (categoryId: string): Promise<boolean> =
     return true;
   }
 
-  if (isPreloadingSession && sessionPreloadPromise) {
-    return sessionPreloadPromise;
+  // 🔥 Return existing promise if already fetching
+  if (ongoingFetches.quizSession) {
+    console.log("⏭️ Quiz session already fetching, reusing promise");
+    await ongoingFetches.quizSession;
+    return globalCache.quizSession?.categoryId === categoryId;
   }
 
-  isPreloadingSession = true;
-  clearQuizCache();
-
-  sessionPreloadPromise = (async () => {
+  ongoingFetches.quizSession = (async () => {
     try {
-      // ✅ Fetch category name safely
+      console.log("🌐 Fetching category name for:", categoryId);
+      
+      // Fetch category name safely
       let categoryName = "Quiz";
       try {
         const res = await authenticatedFetch(`${BASE_URL}/api/categories`);
@@ -152,9 +206,11 @@ export const preloadQuizSession = async (categoryId: string): Promise<boolean> =
           const match = cats.find((c: any) => c._id === categoryId);
           if (match) categoryName = match.name;
         }
-      } catch {}
+      } catch (err) {
+        console.warn("Failed to fetch category name:", err);
+      }
 
-      // ✅ SAFE: only cache metadata
+      // Cache metadata
       globalCache.quizSession = {
         categoryId,
         categoryName,
@@ -164,20 +220,17 @@ export const preloadQuizSession = async (categoryId: string): Promise<boolean> =
       };
 
       globalCache.lastUpdated.quizSession = now;
-
-      console.log("✅ Safe quiz metadata cached:", categoryName);
-      return true;
+      console.log("✅ Quiz metadata cached:", categoryName);
     } catch (err) {
       console.error("Quiz preload failed:", err);
       clearQuizCache();
-      return false;
     } finally {
-      isPreloadingSession = false;
-      sessionPreloadPromise = null;
+      ongoingFetches.quizSession = null;
     }
   })();
 
-  return sessionPreloadPromise;
+  await ongoingFetches.quizSession;
+  return globalCache.quizSession?.categoryId === categoryId;
 };
 
 // -------------------- CACHE CLEAR --------------------
@@ -207,13 +260,14 @@ export const preloadAllData = async () => {
 
   if (!token) return;
 
-  await Promise.allSettled([
+  // 🔥 CRITICAL: Use Promise.all to prevent multiple simultaneous calls
+  await Promise.all([
     preloadHomeData(),
     preloadLeaderboardData(),
     preloadCategoryAndSession(),
   ]);
 
-  console.log("✅ Preload done");
+  console.log("✅ All preloading complete");
 };
 
 // -------------------- HOOK --------------------
@@ -226,10 +280,11 @@ export const useAppPreloader = () => {
       preloadAllData();
     }
 
+    // Refresh cache periodically (but not too often)
     const interval = setInterval(() => {
       preloadHomeData();
       preloadLeaderboardData();
-    }, 60 * 1000);
+    }, 2 * 60 * 1000); // Every 2 minutes instead of 1
 
     return () => clearInterval(interval);
   }, []);
@@ -246,7 +301,7 @@ export const useAppPreloader = () => {
 };
 
 // -------------------- EXPORTS --------------------
-export { preloadHomeData, preloadLeaderboardData, preloadNextCategory };
+export { preloadHomeData };
 
 // -------------------- READY CHECK --------------------
 export const isQuizSessionReady = (categoryId: string): boolean => {
