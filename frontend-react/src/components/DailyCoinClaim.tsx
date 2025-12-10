@@ -1,12 +1,9 @@
-// DailyCoinClaim.tsx - OPTIMIZED VERSION
-// Uses cached daily bonus amount from UserContext
-
-import { useState, useEffect, useCallback, useRef } from "react";
+// DailyCoinClaim.tsx - FIXED VERSION - No infinite loops!
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Clock, Sparkles } from "lucide-react";
-import { apiClient } from "@/utils/apiClient";
-import { preloadSounds } from "@/utils/soundCache"; 
+import { preloadSounds } from "@/utils/soundCache";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const DEFAULT_BONUS = 1000;
@@ -17,15 +14,15 @@ interface DailyCoinClaimProps {
   onCoinsEarned: (amount: number) => void;
   isClaimAvailable: boolean;
   updateUserLocally: (updates: { dailyClaimAvailable: boolean; coins?: number }) => void;
-  cachedBonusAmount?: number; // ✅ NEW: Get from UserContext cache
+  cachedBonusAmount?: number;
 }
 
-export default function DailyCoinClaim({ 
-  userToken, 
-  onCoinsEarned, 
-  isClaimAvailable, 
+export default function DailyCoinClaim({
+  userToken,
+  onCoinsEarned,
+  isClaimAvailable,
   updateUserLocally,
-  cachedBonusAmount = DEFAULT_BONUS // ✅ Use cached value
+  cachedBonusAmount = DEFAULT_BONUS,
 }: DailyCoinClaimProps) {
   const [timeRemaining, setTimeRemaining] = useState<number>(
     isClaimAvailable ? 0 : COOLDOWN_DURATION
@@ -33,30 +30,41 @@ export default function DailyCoinClaim({
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
   const [showFlyingCoins, setShowFlyingCoins] = useState<boolean>(false);
   const [coinTokens, setCoinTokens] = useState<Array<{ id: number; delay: number }>>([]);
-  
-  // ✅ Use cached bonus amount from props (already in UserContext)
   const [dailyBonusAmount] = useState<number>(cachedBonusAmount);
-
   const [showDailyOverlay, setShowDailyOverlay] = useState(false);
+
   const earnedCoinsRef = useRef<HTMLDivElement>(null);
   const claimButtonRef = useRef<HTMLButtonElement>(null);
+  
+  // ✅ CRITICAL FIX: Prevent multiple simultaneous fetches
+  const isFetchingTimeRef = useRef(false);
+  const hasInitializedRef = useRef(false);
 
-  // ✅ REMOVED: fetchDailyBonusAmount - now comes from cache
-
+  // ✅ FIX: Only fetch initial time remaining ONCE
   useEffect(() => {
-    // Get initial time remaining if not claimable
+    if (hasInitializedRef.current) return;
+    if (!userToken) return;
+    if (isClaimAvailable) {
+      setTimeRemaining(0);
+      hasInitializedRef.current = true;
+      return;
+    }
+    if (isFetchingTimeRef.current) return;
+
     const getInitialTimeRemaining = async () => {
-      if (isClaimAvailable) {
-        setTimeRemaining(0);
-        return;
-      }
-      
+      isFetchingTimeRef.current = true;
+
       try {
-        const response = await apiClient(`${BASE_URL}/api/getUserDetails`, {
-          method: "GET",
+        const response = await fetch(`${BASE_URL}/api/getUserDetails`, {
+          headers: {
+            Authorization: `Bearer ${userToken}`,
+          },
         });
 
-        if (!response || !response.ok) return;
+        if (!response || !response.ok) {
+          isFetchingTimeRef.current = false;
+          return;
+        }
 
         const userData = await response.json();
 
@@ -68,43 +76,51 @@ export default function DailyCoinClaim({
           if (remaining > 0) {
             setTimeRemaining(remaining);
           } else {
-            updateUserLocally({ dailyClaimAvailable: true }); 
+            updateUserLocally({ dailyClaimAvailable: true });
             setTimeRemaining(0);
           }
         }
       } catch (error) {
         console.error("Error fetching initial time remaining:", error);
+      } finally {
+        isFetchingTimeRef.current = false;
+        hasInitializedRef.current = true;
       }
     };
-    
+
     getInitialTimeRemaining();
+  }, []); // ✅ Empty deps - run once only!
 
-    let interval: ReturnType<typeof setInterval>;
+  // ✅ FIX: Countdown timer - only runs when needed
+  useEffect(() => {
+    if (isClaimAvailable || timeRemaining <= 0) return;
 
-    if (!isClaimAvailable && timeRemaining > 0) {
-      interval = setInterval(() => {
-        setTimeRemaining((prev) => {
-          const newTime = prev - 1000;
-          if (newTime <= 1000) {
-            updateUserLocally({ dailyClaimAvailable: true });
-            return 0;
-          }
-          return newTime;
-        });
-      }, 1000);
-    }
+    const interval = setInterval(() => {
+      setTimeRemaining((prev) => {
+        const newTime = prev - 1000;
+        if (newTime <= 1000) {
+          updateUserLocally({ dailyClaimAvailable: true });
+          return 0;
+        }
+        return newTime;
+      });
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [userToken, isClaimAvailable, timeRemaining, updateUserLocally]);
+  }, [isClaimAvailable, timeRemaining]);
 
   const handleClaimClick = async () => {
-    if (!isClaimAvailable || isClaiming) return; 
+    if (!isClaimAvailable || isClaiming) return;
 
     setIsClaiming(true);
 
     try {
-      const response = await apiClient(`${BASE_URL}/api/claimDailyCoins`, {
+      const response = await fetch(`${BASE_URL}/api/claimDailyCoins`, {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+          "Content-Type": "application/json",
+        },
       });
 
       if (!response) {
@@ -117,21 +133,20 @@ export default function DailyCoinClaim({
       if (response.ok) {
         const coinsEarned = data.coinsEarned || dailyBonusAmount;
 
+        // ✅ CRITICAL FIX: Update state immediately to prevent re-claiming
         updateUserLocally({ dailyClaimAvailable: false });
+        setTimeRemaining(COOLDOWN_DURATION);
 
         setShowDailyOverlay(true);
         setTimeout(() => {
           startCoinAnimation(coinsEarned);
         }, 900);
-
-        setTimeRemaining(COOLDOWN_DURATION);
       } else {
         if (data.timeRemainingMs) {
           setTimeRemaining(data.timeRemainingMs);
-          updateUserLocally({ dailyClaimAvailable: false }); 
-        } else {
-          setIsClaiming(false);
+          updateUserLocally({ dailyClaimAvailable: false });
         }
+        setIsClaiming(false); // ✅ Reset if claim failed
       }
     } catch (error) {
       console.error("Error claiming coins:", error);
@@ -174,9 +189,8 @@ export default function DailyCoinClaim({
     const coinsPerToken = Math.ceil(coinsEarned / tokenCount);
 
     const coinTimer = setInterval(() => {
-      // ✅ Use cached sound system
       preloadSounds("/knowledge-point.mp3", 0.2);
-        
+
       coinsAdded += coinsPerToken;
       if (coinsAdded >= coinsEarned) {
         coinsAdded = coinsEarned;
@@ -190,7 +204,7 @@ export default function DailyCoinClaim({
       }
 
       if (onCoinsEarned && coinsAdded <= coinsEarned) {
-        onCoinsEarned(coinsPerToken);
+        onCoinsEarned(coinsPerToken); // <-- This calls the parent coin updater
       }
     }, 150);
   };
@@ -259,13 +273,16 @@ export default function DailyCoinClaim({
             </div>
 
             <div className="leading-tight min-w-0 -ml-1">
-              <h3 className="text-white font-bold text-lg sm:text-2xl whitespace-nowrap">Daily Reward</h3>
+              <h3 className="text-white font-bold text-lg sm:text-2xl whitespace-nowrap">
+                Daily Reward
+              </h3>
             </div>
           </div>
 
           <Button
             ref={claimButtonRef}
             onClick={handleClaimClick}
+            disabled={!isClaimAvailable || isClaiming}
             className="flex items-center gap-1 sm:gap-2 px-3 py-1.5 sm:px-6 sm:py-3"
             variant={isClaimAvailable ? "warning" : "purple"}
             style={{

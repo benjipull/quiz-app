@@ -1,4 +1,3 @@
-// src/hooks/useAppPreloader.ts - Complete Fixed Version
 import { useEffect, useRef } from 'react';
 // 🔥 NEW: Import sound and avatar preloading utilities
 import { preloadSounds } from '@/utils/soundCache'; 
@@ -30,7 +29,7 @@ const CACHE_DURATION = {
   HOME: 5 * 60 * 1000,
   LEADERBOARD: 10 * 60 * 1000,
   CATEGORY: 2 * 60 * 1000,
-  QUIZ_SESSION: 5 * 60 * 1000, // 5 minutes - shorter to avoid stale sessions
+  QUIZ_SESSION: 5 * 60 * 1000,
 };
 
 // Track ongoing preload operations
@@ -39,209 +38,138 @@ let sessionPreloadPromise: Promise<boolean> | null = null;
 
 const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
   const userToken = localStorage.getItem("token") || "";
-  const headers = {
+  const headers: any = {
     ...options.headers,
     "Authorization": `Bearer ${userToken}`,
-    "Content-Type": "application/json",
   };
   
-  if (!options.body && (options.method === 'GET' || options.method === 'HEAD')) {
-    delete headers["Content-Type"];
-  }
+  if (options.body) headers["Content-Type"] = "application/json";
 
   return fetch(url, { ...options, headers });
 };
 
+// -------------------- HOME --------------------
 const preloadHomeData = async () => {
   const now = Date.now();
-  if (globalCache.homeData && (now - globalCache.lastUpdated.home) < CACHE_DURATION.HOME) {
-    return;
-  }
+  if (globalCache.homeData && (now - globalCache.lastUpdated.home) < CACHE_DURATION.HOME) return;
 
   try {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    // NOTE: This fetch is still necessary for the full UserContext to refresh.
-    // The goal of separation is achieved by having UserContext manage the full details
-    // and ensuring this function updates the cache with the most recent economy data.
-    const userResponse = await authenticatedFetch(`${BASE_URL}/api/getUserDetails`, {
-      method: "GET",
-    });
-
+    const userResponse = await authenticatedFetch(`${BASE_URL}/api/getUserDetails`);
     if (userResponse.ok) {
       const userData = await userResponse.json();
-      globalCache.homeData = {
-        user: userData,
-        timestamp: now,
-      };
+      globalCache.homeData = { user: userData, timestamp: now };
       globalCache.lastUpdated.home = now;
-      console.log("✅ Home data preloaded (includes core details and economy)");
+      console.log("✅ Home data preloaded");
     }
-  } catch (error) {
-    console.error("Error preloading home data:", error);
+  } catch (err) {
+    console.error("Error preloading home:", err);
   }
 };
 
+// -------------------- LEADERBOARD --------------------
 const preloadLeaderboardData = async () => {
   const now = Date.now();
-  if (globalCache.leaderboardData.day.length > 0 && 
-      (now - globalCache.lastUpdated.leaderboard) < CACHE_DURATION.LEADERBOARD) {
-    return;
-  }
+  if (
+    globalCache.leaderboardData.day.length &&
+    (now - globalCache.lastUpdated.leaderboard) < CACHE_DURATION.LEADERBOARD
+  ) return;
 
   try {
     const periods = ['day', 'week', 'month', 'year'] as const;
-    
-    const promises = periods.map(async (period) => {
-      const response = await authenticatedFetch(`${BASE_URL}/api/leaderboard?period=${period}`);
-      if (response.ok) {
-        const data = await response.json();
-        globalCache.leaderboardData[period] = data.leaderboard || [];
-      }
-    });
 
-    await Promise.all(promises);
+    await Promise.allSettled(
+      periods.map(async (period) => {
+        const res = await authenticatedFetch(`${BASE_URL}/api/leaderboard?period=${period}`);
+        if (res.ok) {
+          const data = await res.json();
+          globalCache.leaderboardData[period] = data.leaderboard || [];
+        }
+      })
+    );
+
     globalCache.lastUpdated.leaderboard = now;
-    console.log("✅ Leaderboard data preloaded for all periods");
-  } catch (error) {
-    console.error("Error preloading leaderboard data:", error);
+    console.log("✅ Leaderboard preloaded");
+  } catch (err) {
+    console.error("Leaderboard preload error:", err);
   }
 };
 
+// -------------------- CATEGORY --------------------
 const preloadNextCategory = async () => {
   const now = Date.now();
-  if (globalCache.nextCategory && (now - globalCache.lastUpdated.category) < CACHE_DURATION.CATEGORY) {
-    return;
-  }
+  if (
+    globalCache.nextCategory &&
+    (now - globalCache.lastUpdated.category) < CACHE_DURATION.CATEGORY
+  ) return;
 
   try {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    const response = await authenticatedFetch(`${BASE_URL}/api/getGetegoryToPlay`, {
-      method: "GET",
-    });
-
-    if (response.ok) {
-      const data = await response.json();
+    const res = await authenticatedFetch(`${BASE_URL}/api/getGetegoryToPlay`);
+    if (res.ok) {
+      const data = await res.json();
       if (data.categoryId) {
         globalCache.nextCategory = data;
         globalCache.lastUpdated.category = now;
-        console.log("✅ Next category preloaded:", data.categoryId);
+        console.log("✅ Next category cached:", data.categoryId);
       }
     }
-  } catch (error) {
-    console.error("Error preloading category:", error);
+  } catch (err) {
+    console.error("Category preload error:", err);
   }
 };
 
-// 🔥 FIXED: Enhanced preload quiz session with category name
+// -------------------- SAFE QUIZ SESSION PRELOAD --------------------
+// ✅ SAFE: NO coin deduction, no real session creation
 export const preloadQuizSession = async (categoryId: string): Promise<boolean> => {
   const now = Date.now();
-  
-  // Check if we already have a valid cached session for THIS EXACT category
-  if (globalCache.quizSession && 
-      globalCache.quizSession.categoryId === categoryId &&
-      globalCache.firstQuestion &&
-      (now - globalCache.lastUpdated.quizSession) < CACHE_DURATION.QUIZ_SESSION) {
-    console.log("✅ Using cached quiz session for category:", categoryId);
+
+  // Use cache if still valid
+  if (
+    globalCache.quizSession &&
+    globalCache.quizSession.categoryId === categoryId &&
+    (now - globalCache.lastUpdated.quizSession) < CACHE_DURATION.QUIZ_SESSION
+  ) {
     return true;
   }
 
-  // If already preloading, wait for it
   if (isPreloadingSession && sessionPreloadPromise) {
-    console.log("⏳ Quiz session preload already in progress, waiting...");
     return sessionPreloadPromise;
   }
 
-  // Clear any old session data before starting new preload
-  console.log("🧹 Clearing old session before preloading new one");
+  isPreloadingSession = true;
   clearQuizCache();
 
-  isPreloadingSession = true;
   sessionPreloadPromise = (async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        console.log("❌ No token available for preload");
-        return false;
-      }
-
-      console.log("🎯 Starting full quiz session preload for:", categoryId);
-
-      // 🔥 CRITICAL FIX: Fetch category info FIRST
+      // ✅ Fetch category name safely
       let categoryName = "Quiz";
       try {
-        const categoriesResponse = await authenticatedFetch(`${BASE_URL}/api/categories`);
-        if (categoriesResponse.ok) {
-          const categories = await categoriesResponse.json();
-          const category = categories.find((cat: any) => cat._id === categoryId);
-          if (category) {
-            categoryName = category.name;
-            console.log("✅ Found category name:", categoryName);
-          }
+        const res = await authenticatedFetch(`${BASE_URL}/api/categories`);
+        if (res.ok) {
+          const cats = await res.json();
+          const match = cats.find((c: any) => c._id === categoryId);
+          if (match) categoryName = match.name;
         }
-      } catch (err) {
-        console.warn("⚠️ Could not fetch category name, using default");
-      }
+      } catch {}
 
-      // Start the quiz session
-      const startResponse = await authenticatedFetch(`${BASE_URL}/api/startQuiz`, {
-        method: "POST",
-        body: JSON.stringify({ categoryId, userToken: token }),
-      });
+      // ✅ SAFE: only cache metadata
+      globalCache.quizSession = {
+        categoryId,
+        categoryName,
+        totalQuestions: 10,
+        started: false,
+        timestamp: now
+      };
 
-      if (!startResponse.ok) {
-        console.error("❌ Failed to start quiz session for preload");
-        return false;
-      }
+      globalCache.lastUpdated.quizSession = now;
 
-      const startData = await startResponse.json();
-      console.log("✅ Quiz session started, total questions:", startData.total);
-      
-      // Fetch the first question
-      const questionResponse = await authenticatedFetch(`${BASE_URL}/api/nextQuestion/${token}`);
-
-      if (!questionResponse.ok) {
-        console.error("❌ Failed to fetch first question");
-        return false;
-      }
-
-      const questionData = await questionResponse.json();
-      
-      if (questionData.question) {
-        const questionWithTimer = {
-          ...questionData.question,
-          timerInSeconds: questionData.timerInSeconds,
-        };
-
-        // 🔥 CRITICAL FIX: Store session WITH category name
-        globalCache.quizSession = {
-          categoryId: categoryId,
-          categoryName: categoryName, // ← THIS IS CRITICAL!
-          totalQuestions: startData.total || 10,
-          started: true,
-          timestamp: now,
-        };
-        globalCache.firstQuestion = questionWithTimer;
-        globalCache.lastUpdated.quizSession = now;
-        
-        console.log("✅ FULL quiz session preloaded successfully!");
-        console.log("   - Category ID:", categoryId);
-        console.log("   - Category Name:", categoryName);
-        console.log("   - Total questions:", startData.total);
-        console.log("   - First question loaded:", !!questionWithTimer);
-        
-        return true;
-      } else {
-        console.error("❌ No question data received");
-        return false;
-      }
-    } catch (error) {
-      console.error("❌ Error preloading quiz session:", error);
-      globalCache.quizSession = null;
-      globalCache.firstQuestion = null;
+      console.log("✅ Safe quiz metadata cached:", categoryName);
+      return true;
+    } catch (err) {
+      console.error("Quiz preload failed:", err);
+      clearQuizCache();
       return false;
     } finally {
       isPreloadingSession = false;
@@ -252,7 +180,7 @@ export const preloadQuizSession = async (categoryId: string): Promise<boolean> =
   return sessionPreloadPromise;
 };
 
-// Clear quiz cache
+// -------------------- CACHE CLEAR --------------------
 export const clearQuizCache = () => {
   globalCache.quizSession = null;
   globalCache.firstQuestion = null;
@@ -260,46 +188,35 @@ export const clearQuizCache = () => {
   console.log("🧹 Quiz cache cleared");
 };
 
-// Enhanced: Preload category AND full quiz session together
+// -------------------- COMBINED PRELOAD --------------------
 export const preloadCategoryAndSession = async () => {
-  try {
-    // First get the category
-    await preloadNextCategory();
-    
-    // Then preload the full quiz session if we have a category
-    if (globalCache.nextCategory?.categoryId) {
-      console.log("🚀 Preloading session for next category:", globalCache.nextCategory.categoryId);
-      await preloadQuizSession(globalCache.nextCategory.categoryId);
-    }
-  } catch (error) {
-    console.error("Error in preloadCategoryAndSession:", error);
+  await preloadNextCategory();
+  if (globalCache.nextCategory?.categoryId) {
+    await preloadQuizSession(globalCache.nextCategory.categoryId);
   }
 };
 
-// Main preloader function
+// -------------------- MAIN PRELOADER --------------------
 export const preloadAllData = async () => {
   const token = localStorage.getItem("token");
-  // 🔥 NEW: Proactive asset caching (avatars and sounds)
+
   console.log("🎵 Preloading sounds...");
   preloadSounds();
   console.log("🖼️ Preloading avatars...");
   preloadAvatars();
-  
+
   if (!token) return;
 
-  console.log("🔄 Starting comprehensive preload...");
-
-  // Run all other preloads in parallel
   await Promise.allSettled([
     preloadHomeData(),
     preloadLeaderboardData(),
     preloadCategoryAndSession(),
   ]);
-  
-  console.log("✅ Comprehensive preload complete");
+
+  console.log("✅ Preload done");
 };
 
-// Hook to use in your app
+// -------------------- HOOK --------------------
 export const useAppPreloader = () => {
   const hasPreloaded = useRef(false);
 
@@ -309,13 +226,9 @@ export const useAppPreloader = () => {
       preloadAllData();
     }
 
-    // Set up periodic refresh - but DON'T refresh quiz sessions automatically
     const interval = setInterval(() => {
-      // Only refresh home and leaderboard data, NOT quiz sessions
-      Promise.allSettled([
-        preloadHomeData(),
-        preloadLeaderboardData(),
-      ]);
+      preloadHomeData();
+      preloadLeaderboardData();
     }, 60 * 1000);
 
     return () => clearInterval(interval);
@@ -332,27 +245,14 @@ export const useAppPreloader = () => {
   };
 };
 
-// Export individual preload functions
+// -------------------- EXPORTS --------------------
 export { preloadHomeData, preloadLeaderboardData, preloadNextCategory };
 
-// Utility to check if quiz session is ready
+// -------------------- READY CHECK --------------------
 export const isQuizSessionReady = (categoryId: string): boolean => {
-  const isReady = !!(
-    globalCache.quizSession && 
+  return !!(
+    globalCache.quizSession &&
     globalCache.quizSession.categoryId === categoryId &&
-    globalCache.firstQuestion &&
-    globalCache.quizSession.categoryName // Ensure we have the name too
+    globalCache.quizSession.categoryName
   );
-  
-  if (isReady) {
-    console.log("✅ Quiz session IS ready for:", categoryId, "-", globalCache.quizSession.categoryName);
-  } else {
-    console.log("⚠️ Quiz session NOT ready for:", categoryId);
-    if (globalCache.quizSession) {
-      console.log("   - Cached category:", globalCache.quizSession.categoryId);
-      console.log("   - Has question:", !!globalCache.firstQuestion);
-    }
-  }
-  
-  return isReady;
 };
