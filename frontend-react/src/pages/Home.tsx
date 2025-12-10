@@ -1,4 +1,4 @@
-// Home.tsx - Complete Fixed Version
+// Home.tsx - Complete Fixed Version (Single Source of Truth for Coins)
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
@@ -72,7 +72,7 @@ export default function Home() {
   const [showSplash, setShowSplash] = useState(false);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
-  const [currentCoins, setCurrentCoins] = useState(0);
+  // REMOVED: const [currentCoins, setCurrentCoins] = useState(0);
 
   const [isInterestModalOpen, setIsInterestModalOpen] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
@@ -88,6 +88,11 @@ export default function Home() {
   const navigate = useNavigate();
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
   const { toast } = useToast();
+  
+  // Use context's coin value as the single source of truth
+  const currentCoins = user?.coins ?? 0;
+  const hasDeductedRef = useRef(false);
+
 
   // Check screen size
   useEffect(() => {
@@ -97,7 +102,7 @@ export default function Home() {
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
-  // 🔥 FIXED: Initialization effect - Don't wait for userLoading
+  // Initialization effect - Don't wait for userLoading
   useEffect(() => {
     if (hasInitializedRef.current) {
       console.log("⭐️ Already initialized, skipping");
@@ -139,7 +144,7 @@ export default function Home() {
     }
   }, []); // Empty deps - run once!
 
-  // 🔥 FIXED: User data setup - Better redirect logic
+  // User data setup - Better redirect logic
   useEffect(() => {
     // Check token first
     const hasToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -170,10 +175,8 @@ export default function Home() {
       
       trackHomeScreen(user._id);
 
-      if (user.coins !== undefined) {
-        setCurrentCoins(user.coins);
-      }
-
+      // REMOVED: Redundant setCurrentCoins(user.coins)
+      
       const avatarIndex = user.avatar ? user.avatar - 1 : 0;
       const calculatedAvatar = avatars[avatarIndex] || null;
       setUserAvatar(calculatedAvatar);
@@ -253,7 +256,6 @@ export default function Home() {
   }
 };
 
-// handleQuickQuiz 
 // Home.tsx
 
 const handleQuickQuiz = async () => {
@@ -286,10 +288,14 @@ const handleQuickQuiz = async () => {
       console.log("⚠️ Session not ready for this category, will load on quiz page");
     }
     
+    // ✅ Prevent double-deduction
+    if (hasDeductedRef.current) return;
+    hasDeductedRef.current = true;
+
     // Optimistically update coins
     const optimisticCoins = currentCoins - QUIZ_COST;
-    setCurrentCoins(optimisticCoins);
     updateCoins(optimisticCoins);
+
     
     // 🔥 CRITICAL: Clear refs BEFORE navigation
     preloadedCategoryRef.current = null;
@@ -301,7 +307,6 @@ const handleQuickQuiz = async () => {
     navigate(`/quiz/${categoryId}`);
     
     // ✅ CORRECTED FIX: Clear the used quiz session cache AFTER navigation
-    // ⚠️ IMPORTANT: Removed preloadNextCategoryAndSession() from here.
     setTimeout(() => {
       console.log("🧹 Clearing used quiz session");
       clearQuizCache(); // Clears the consumed session
@@ -317,33 +322,49 @@ const handleQuickQuiz = async () => {
   console.log("⚠️ No cached category, fetching fresh...");
   
   const optimisticCoins = currentCoins - QUIZ_COST;
-  setCurrentCoins(optimisticCoins);
-  updateCoins(currentCoins);
+  // REMOVED: setCurrentCoins(optimisticCoins);
+  updateCoins(optimisticCoins); // Update context
   setPlayButtonLoading(true);
 
   try {
     const response = await authenticatedFetch(`${BASE_URL}/api/getGetegoryToPlay`, {
       method: "GET",
     });
-
-    // ... (rest of the fallback error handling logic remains the same)
+    
+    if (!response.ok) {
+    updateCoins(currentCoins);
+    hasDeductedRef.current = false; // ✅ reset if failed
+    throw new Error("Failed to fetch next category.");
+}
 
     const data: CategoryToPlayResponse = await response.json();
 
     if (data.categoryId) {
       navigate(`/quiz/${data.categoryId}`);
+      hasDeductedRef.current = false;
       
       // ✅ CORRECTED FIX: Start preloading the *next* quiz after a delay, 
-      // but only if the user started from a fresh fetch (not from the cache).
-      // This is less likely to cause a race condition in the fallback path.
       setTimeout(() => {
         preloadNextCategoryAndSession();
       }, 1000);
     } else {
-      // ... (error handling)
+      // Revert coin change if category is not found
+      updateCoins(currentCoins);
+      toast({
+        title: "Error",
+        description: "Could not find a category to play. Please try again later.",
+        variant: "destructive",
+      });
     }
   } catch (error) {
-    // ... (error handling)
+  updateCoins(currentCoins);
+  hasDeductedRef.current = false; // ✅ reset if failed
+  const err = error as Error;
+    toast({
+      title: "Error",
+      description: `Failed to start quiz: ${err.message}`,
+      variant: "destructive",
+    });
   } finally {
     setPlayButtonLoading(false);
   }
@@ -404,21 +425,14 @@ const handleQuickQuiz = async () => {
   };
 
   const handleCoinsEarned = (amount: number) => {
-    setCurrentCoins(prev => {
-      const newTotal = prev + amount;
-      updateCoins(newTotal);
-      return newTotal;
-    });
-    // 🔥 NEW: Assume the DailyCoinClaim component also updates the dailyClaimAvailable status via updateCoins.
-    // If not, a specific function for the claim status is needed, but for now we rely on the backend response 
-    // being handled by refreshUser or a specific update from the DailyCoinClaim component.
+    // Calculate new total based on currentCoins from context
+    const newTotal = currentCoins + amount;
+    updateCoins(newTotal); // Update context
+    
     updateUserLocally({ dailyClaimAvailable: false }); 
   };
 
-  const handleCoinsUpdate = (coins: number) => {
-    setCurrentCoins(coins);
-    updateCoins(coins);
-  };
+  // REMOVED: handleCoinsUpdate, as GameStatsHeader no longer needs to call back
 
   // Show splash screen
   if (showSplash) {
@@ -442,7 +456,7 @@ const handleQuickQuiz = async () => {
     );
   }
 
-  // 🔥 FIXED: Better error handling - don't just return null
+  // Better error handling - don't just return null
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center"
@@ -480,8 +494,11 @@ const handleQuickQuiz = async () => {
           <GameStatsHeader
             userToken={userToken}
             isParentLoading={false}
-            onCoinsUpdate={handleCoinsUpdate}
+            // REMOVED: onCoinsUpdate prop
             currentCoinsFromParent={currentCoins}
+            userXP={user.knowledgePoints ?? 0}
+            userGem1={user.wisdomGems ?? 0}
+            userGem2={user.enlightenmentCrystals ?? 0}
           />
 
           {isGuest && (

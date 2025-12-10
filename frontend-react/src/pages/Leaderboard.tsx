@@ -1,11 +1,11 @@
-// Leaderboard.tsx - Updated with instant cache loading
-import React, { useState, useEffect, useRef } from "react";
+// Leaderboard.tsx - FINAL OPTIMIZED VERSION
+// No duplicate API calls, instant cache loading
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Clock, ArrowLeft } from "lucide-react";
 import { apiClient } from "@/utils/apiClient";
 import { useNavigate } from "react-router-dom";
 import { globalCache } from "@/hooks/useAppPreloader";
 
-// Avatar Imports
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
   import: "default",
@@ -36,7 +36,7 @@ const Leaderboard = () => {
 
   const [currentPeriod, setCurrentPeriod] = useState<"day" | "week" | "month" | "year">("day");
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardPlayer[]>([]);
-  const [loading, setLoading] = useState(false); // Changed to false by default
+  const [loading, setLoading] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [previousLeaderboardData, setPreviousLeaderboardData] = useState<LeaderboardPlayer[]>([]);
@@ -44,24 +44,92 @@ const Leaderboard = () => {
 
   const currentUserRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // ✅ Track which periods have been fetched to prevent duplicates
+  const fetchedPeriodsRef = useRef<Set<string>>(new Set());
+  const isFetchingRef = useRef(false);
 
-  // Load initial data from cache INSTANTLY
-  useEffect(() => {
-    const cachedData = globalCache.leaderboardData[currentPeriod];
-    
-    if (cachedData && cachedData.length > 0) {
-      // Cache is ready - load instantly with no loading state
-      setLeaderboardData(cachedData);
-      setLoading(false);
-      console.log("✅ Leaderboard loaded from cache instantly");
-    } else {
-      // No cache - fetch it
-      setLoading(true);
-      fetchLeaderboard(currentPeriod);
+  // ✅ Memoized fetch function to prevent recreation
+  const fetchLeaderboard = useCallback(async (period: "day" | "week" | "month" | "year") => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) {
+      console.log("⏳ Already fetching, skipping...");
+      return;
     }
-  }, []);
 
-  // Load current user
+    // Check cache first
+    const cached = globalCache.leaderboardData[period];
+    const cacheAge = Date.now() - globalCache.lastUpdated.leaderboard;
+    const CACHE_VALID_DURATION = 10 * 60 * 1000; // 10 minutes
+
+    if (cached && cached.length > 0 && cacheAge < CACHE_VALID_DURATION) {
+      console.log(`✅ Using cached ${period} leaderboard`);
+      setLeaderboardData(cached);
+      setLoading(false);
+      fetchedPeriodsRef.current.add(period);
+      return;
+    }
+
+    // Only fetch if not already fetched
+    if (fetchedPeriodsRef.current.has(period)) {
+      console.log(`⭐️ Already fetched ${period}, using existing data`);
+      return;
+    }
+
+    isFetchingRef.current = true;
+    setLoading(true);
+    
+    if (leaderboardData.length > 0) {
+      setPreviousLeaderboardData(leaderboardData);
+    }
+
+    try {
+      console.log(`🌐 Fetching ${period} leaderboard from API...`);
+      const res = await apiClient(`${BASE_URL}/api/leaderboard?period=${period}`);
+      
+      if (res?.ok) {
+        const data = await res.json();
+        const leaderboard = data.leaderboard || [];
+        
+        setLeaderboardData(leaderboard);
+        
+        // Update global cache
+        globalCache.leaderboardData[period] = leaderboard;
+        globalCache.lastUpdated.leaderboard = Date.now();
+        
+        fetchedPeriodsRef.current.add(period);
+        console.log(`✅ Fetched and cached ${period} leaderboard`);
+      } else {
+        setLeaderboardData([]);
+      }
+    } catch (e) {
+      console.error(`❌ Error fetching ${period} leaderboard:`, e);
+      setLeaderboardData([]);
+    } finally {
+      setLoading(false);
+      isFetchingRef.current = false;
+    }
+  }, [leaderboardData]);
+
+  // ✅ SINGLE initialization effect - load from cache or fetch
+  useEffect(() => {
+    // Load initial period (day) from cache or fetch
+    const cachedDay = globalCache.leaderboardData.day;
+    const cacheAge = Date.now() - globalCache.lastUpdated.leaderboard;
+    const CACHE_VALID_DURATION = 10 * 60 * 1000;
+
+    if (cachedDay && cachedDay.length > 0 && cacheAge < CACHE_VALID_DURATION) {
+      console.log("⚡ Instant load from cache");
+      setLeaderboardData(cachedDay);
+      setLoading(false);
+      fetchedPeriodsRef.current.add("day");
+    } else {
+      console.log("🌐 Initial fetch required");
+      fetchLeaderboard("day");
+    }
+  }, []); // ✅ Empty deps - run once!
+
+  // ✅ Load current user info
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     const storedUserAvatarIndex = localStorage.getItem("userAvatarIndex");
@@ -72,57 +140,45 @@ const Leaderboard = () => {
         setCurrentUserId(parsedUser._id || "");
 
         let avatarIndex = 0;
-        if (storedUserAvatarIndex !== null) avatarIndex = parseInt(storedUserAvatarIndex);
-        else if (parsedUser.avatar) avatarIndex = parsedUser.avatar - 1;
+        if (storedUserAvatarIndex !== null) {
+          avatarIndex = parseInt(storedUserAvatarIndex);
+        } else if (parsedUser.avatar) {
+          avatarIndex = parsedUser.avatar - 1;
+        }
 
         const fallbackAvatar = avatars[avatarIndex % avatars.length] || avatars[0] || null;
         setUserAvatar(fallbackAvatar);
-      } catch (e) {}
+      } catch (e) {
+        console.error("Error parsing user:", e);
+      }
     }
   }, []);
 
-  // Switch between periods using cache
-  useEffect(() => {
-    const cachedData = globalCache.leaderboardData[currentPeriod];
-    
-    if (cachedData && cachedData.length > 0) {
-      // Instant switch with cache
-      if (leaderboardData.length > 0) setPreviousLeaderboardData(leaderboardData);
-      setLeaderboardData(cachedData);
+  // ✅ Handle period changes - use cache or fetch if needed
+  const handlePeriodChange = useCallback((newPeriod: "day" | "week" | "month" | "year") => {
+    if (newPeriod === currentPeriod) return;
+
+    console.log(`🔄 Switching to ${newPeriod}`);
+    setCurrentPeriod(newPeriod);
+
+    // Try cache first
+    const cached = globalCache.leaderboardData[newPeriod];
+    const cacheAge = Date.now() - globalCache.lastUpdated.leaderboard;
+    const CACHE_VALID_DURATION = 10 * 60 * 1000;
+
+    if (cached && cached.length > 0 && cacheAge < CACHE_VALID_DURATION) {
+      console.log(`⚡ Instant switch to ${newPeriod} from cache`);
+      if (leaderboardData.length > 0) {
+        setPreviousLeaderboardData(leaderboardData);
+      }
+      setLeaderboardData(cached);
       setLoading(false);
-      console.log(`✅ Switched to ${currentPeriod} from cache`);
       return;
     }
 
-    // If not in cache, fetch it
-    fetchLeaderboard(currentPeriod);
-  }, [currentPeriod]);
-
-  const fetchLeaderboard = async (period: "day" | "week" | "month" | "year") => {
-    setLoading(true);
-    if (leaderboardData.length > 0) setPreviousLeaderboardData(leaderboardData);
-
-    try {
-      const res = await apiClient(`${BASE_URL}/api/leaderboard?period=${period}`);
-      if (res?.ok) {
-        const data = await res.json();
-        const leaderboard = data.leaderboard || [];
-        setLeaderboardData(leaderboard);
-        
-        // Update global cache
-        globalCache.leaderboardData[period] = leaderboard;
-        globalCache.lastUpdated.leaderboard = Date.now();
-        
-        console.log(`✅ Fetched ${period} leaderboard and cached it`);
-      } else {
-        setLeaderboardData([]);
-      }
-    } catch (e) {
-      setLeaderboardData([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Fetch if not in cache
+    fetchLeaderboard(newPeriod);
+  }, [currentPeriod, leaderboardData, fetchLeaderboard]);
 
   // Auto scroll to current user
   useEffect(() => {
@@ -188,7 +244,6 @@ const Leaderboard = () => {
 
   return (
     <div className="w-full h-[100dvh] max-h-[100dvh] flex flex-col items-center px-3 sm:px-4 bg-[#100321] bg-[url('/leaderboard.jpg')] bg-no-repeat bg-center bg-cover overflow-hidden fixed inset-0">
-      {/* Responsive CSS */}
       <style>{`
         @media (max-width: 420px) {
           .lb-row { gap: 10px !important; padding: 8px 10px !important; }
@@ -219,7 +274,7 @@ const Leaderboard = () => {
           {PERIODS.map((period) => (
             <button
               key={period}
-              onClick={() => setCurrentPeriod(period)}
+              onClick={() => handlePeriodChange(period)}
               className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-full transition-all ${
                 currentPeriod === period
                   ? "bg-purple-500 text-white shadow-lg"
@@ -272,7 +327,9 @@ const Leaderboard = () => {
             if (player.avatar && typeof player.avatar === "number" && player.avatar > 0) {
               const avatarIndex = (player.avatar - 1) % avatars.length;
               avatarSrc = avatars[avatarIndex];
-            } else if (isCurrentUser && userAvatar) avatarSrc = userAvatar;
+            } else if (isCurrentUser && userAvatar) {
+              avatarSrc = userAvatar;
+            }
 
             return (
               <div
@@ -284,19 +341,16 @@ const Leaderboard = () => {
                   index === leaderboardData.length - 1 ? "mb-2" : ""
                 }`}
               >
-                {/* Rank */}
                 <div className="text-lg sm:text-xl font-bold text-purple-200 w-8 sm:w-10 text-center flex items-center justify-center">
                   {rank}
                 </div>
 
-                {/* Avatar */}
                 <img
                   src={avatarSrc}
                   alt={player.username}
                   className="lb-avatar w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-300/50"
                 />
 
-                {/* Name + Level */}
                 <div className="flex-1 flex flex-col">
                   <div className="lb-name text-purple-100 text-base sm:text-lg font-semibold truncate">
                     {player.username}
@@ -306,9 +360,10 @@ const Leaderboard = () => {
                   )}
                 </div>
 
-                {/* Score */}
                 <div className="flex items-center gap-1">
-                  <span className="lb-score text-purple-100 font-bold text-lg sm:text-xl">{player.totalPoints}</span>
+                  <span className="lb-score text-purple-100 font-bold text-lg sm:text-xl">
+                    {player.totalPoints}
+                  </span>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 24 24"
