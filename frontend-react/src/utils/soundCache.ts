@@ -8,10 +8,14 @@ const sounds = [
   "/player-level-up.mp3",
 ];
 
-export const preloadSounds = () => {
-  sounds.forEach((src) => {
-    const audio = new Audio();
-    audio.src = src;
-    audio.load();
-  });
+// Play a specific sound with optional volume
+export const preloadSounds = (src: string, volume: number = 1) => {
+  if (!sounds.includes(src)) {
+    console.warn(`Sound not found: ${src}`);
+    return;
+  }
+
+  const audio = new Audio(src);
+  audio.volume = volume; // volume between 0 and 1
+  audio.play().catch((err) => console.error("Error playing sound:", err));
 };
