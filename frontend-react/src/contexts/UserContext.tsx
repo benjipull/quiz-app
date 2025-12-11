@@ -1,5 +1,5 @@
-// src/contexts/UserContext.tsx - Complete Fixed Version
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+// UserContext.tsx - FIXED VERSION - Minimal API calls
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { globalCache } from '@/hooks/useAppPreloader';
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
@@ -17,7 +17,6 @@ interface UserDetails {
   knowledgePoints?: number;
   wisdomGems?: number;
   enlightenmentCrystals?: number;
-  // 🔥 NEW: Add daily claim status to the cached user details
   dailyClaimAvailable?: boolean;
 }
 
@@ -52,8 +51,10 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserDetails | null>(null);
   const [loading, setLoading] = useState(true);
-
-  console.log("👤 UserProvider render - loading:", loading, "user:", !!user);
+  
+  // ✅ CRITICAL FIX: Prevent multiple simultaneous refreshes
+  const isRefreshingRef = useRef(false);
+  const hasInitializedRef = useRef(false);
 
   const loadUserFromStorage = () => {
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
@@ -71,6 +72,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const refreshUser = async () => {
+    // ✅ CRITICAL FIX: Prevent multiple simultaneous API calls
+    if (isRefreshingRef.current) {
+      console.log("⏳ Already refreshing user, skipping...");
+      return;
+    }
+
     console.log("🔄 refreshUser called");
     const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
     
@@ -80,25 +87,24 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    // 🔥 CRITICAL FIX: Load from localStorage FIRST and set loading to false immediately
+    // Load from localStorage first for instant display
     const cachedUser = loadUserFromStorage();
     if (cachedUser) {
-      console.log("⚡ User loaded from localStorage immediately - loading set to FALSE");
-      setLoading(false); // This prevents blank screen!
+      console.log("⚡ User loaded from localStorage immediately");
+      setLoading(false);
     }
 
-    // Then fetch fresh data in background
-    console.log("🌐 Fetching fresh user data from API in background...");
+    // ✅ Set flag to prevent concurrent refreshes
+    isRefreshingRef.current = true;
+
     try {
-      // NOTE: The backend API /api/getUserDetails should ideally be split or return minimal data 
-      // for economy (coins, dailyClaimAvailable) and more for core (alias, level, avatar).
-      // Since we assume it returns all, we ensure we cache all.
+      console.log("🌐 Fetching fresh user data from API...");
       const response = await authenticatedFetch(`${BASE_URL}/api/getUserDetails`, {
         method: "GET",
       });
 
       if (!response.ok) {
-        console.warn(`⚠️ Failed to fetch user details (Status: ${response.status}). Using cached data.`);
+        console.warn(`⚠️ Failed to fetch user details (Status: ${response.status})`);
         if (!cachedUser) {
           setLoading(false);
         }
@@ -114,7 +120,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         userType: apiUser.userType || 'Registered',
         interests: apiUser.interests || [],
         coins: apiUser.coins || 0,
-        dailyClaimAvailable: apiUser.dailyClaimAvailable ?? false, // 🔥 NEW: Cache daily claim status
+        dailyClaimAvailable: apiUser.dailyClaimAvailable ?? false,
       };
 
       setUser(userToStore);
@@ -125,7 +131,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Update global cache
       globalCache.homeData = {
-        user: userToStore, // Use userToStore which includes defaults/claim
+        user: userToStore,
         timestamp: Date.now(),
       };
       globalCache.lastUpdated.home = Date.now();
@@ -136,32 +142,49 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!cachedUser) {
         setLoading(false);
       }
+      // ✅ Reset flag after completion
+      isRefreshingRef.current = false;
     }
   };
 
   const updateUserLocally = (updates: Partial<UserDetails>) => {
-    setUser(prev => {
-      if (!prev) return null;
-      const updated = { ...prev, ...updates };
-      if (typeof window !== 'undefined') {
-        localStorage.setItem("user", JSON.stringify(updated));
-      }
-      // Update cache too
-      if (globalCache.homeData) {
-        globalCache.homeData.user = updated;
-      }
-      return updated;
-    });
-  };
+  setUser(prev => {
+    if (!prev) return null;
+
+    const updated = { ...prev, ...updates };
+
+    // ✅ Only persist safe fields
+    const safeToPersist = { ...updated };
+    delete safeToPersist.coins;
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem("user", JSON.stringify(safeToPersist));
+    }
+
+    if (globalCache.homeData) {
+      globalCache.homeData.user = updated;
+    }
+
+    return updated;
+  });
+};
+
 
   const updateCoins = (newCoins: number) => {
     updateUserLocally({ coins: newCoins });
   };
 
+  // ✅ CRITICAL FIX: Only initialize once
   useEffect(() => {
+    if (hasInitializedRef.current) {
+      console.log("⭐️ Already initialized, skipping");
+      return;
+    }
+
     console.log("🚀 UserProvider mounted, calling refreshUser");
+    hasInitializedRef.current = true;
     refreshUser();
-  }, []);
+  }, []); // Empty deps!
 
   return (
     <UserContext.Provider value={{ user, loading, refreshUser, updateUserLocally, updateCoins }}>
