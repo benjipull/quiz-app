@@ -339,7 +339,7 @@ export default function DailyCoinClaim({
         </div>
       </Card>
 
-      <style jsx global>{`
+      <style>{`
         .daily-coin-token {
           position: fixed;
           width: 24px;
