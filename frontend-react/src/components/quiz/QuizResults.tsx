@@ -219,7 +219,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     }, 2000); // Wait 2 seconds to let animations settle
 
     return () => clearTimeout(timer);
-  }, [userToken, categoryId]); // Re-run if user or current category changes
+  }, [userToken, categoryId]);
 
   // NEW FUNCTION: Fetch and preload the next category
   const fetchAndPreloadNextCategory = async () => {
@@ -545,14 +545,18 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       } else {
         throw new Error("No category ID returned from server");
       }
-    } catch (error: any) {
-      console.error("Error getting category to play:", error);
-      setRatingMessage(`Error playing next quiz: ${error.message}`);
-    } finally {
-      setPlayButtonLoading(false);
-    }
+    }catch (error: unknown) {
+  if (error instanceof Error) {
+    console.error("Error getting category to play:", error);
+    setRatingMessage(`Error playing next quiz: ${error.message}`);
+  } else {
+    console.error("Unknown error:", error);
+    setRatingMessage("An unknown error occurred while playing the next quiz.");
+  }
+} finally {
+  setPlayButtonLoading(false);
+}
   };
-
 
   const handleRatingSubmit = async (value: number) => {
     if (!userToken) {

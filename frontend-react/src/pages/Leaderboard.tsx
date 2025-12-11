@@ -80,20 +80,20 @@ const Leaderboard = () => {
       setPreviousLeaderboardData(leaderboardData);
     }
 
-    try {
+      try {
       console.log(`🌐 Fetching ${period} leaderboard from API...`);
       const res = await apiClient(`${BASE_URL}/api/leaderboard?period=${period}`);
-      
-      if (res?.ok) {
+
+      if (res instanceof Response && res.ok) {
         const data = await res.json();
         const leaderboard = data.leaderboard || [];
-        
+
         setLeaderboardData(leaderboard);
-        
+
         // Update global cache
         globalCache.leaderboardData[period] = leaderboard;
         globalCache.lastUpdated.leaderboard = Date.now();
-        
+
         fetchedPeriodsRef.current.add(period);
         console.log(`✅ Fetched and cached ${period} leaderboard`);
       } else {
@@ -106,7 +106,8 @@ const Leaderboard = () => {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [leaderboardData]);
+    }, [leaderboardData]);
+
 
   // 🔥 INITIALIZATION - Trigger fetch on mount
   useEffect(() => {
@@ -200,31 +201,44 @@ const Leaderboard = () => {
   }, [leaderboardData, loading]);
 
   // Calculate time left
-  useEffect(() => {
-    const calculateTimeLeft = () => {
-      const now = new Date();
-      let endTime: Date;
+ useEffect(() => {
+  const calculateTimeLeft = () => {
+    const now = new Date();
+    let endTime: Date;
+    let daysUntilSunday: number; 
 
-      switch (currentPeriod) {
-        case "day":
-          endTime = new Date(now);
-          endTime.setHours(23, 59, 59, 999);
-          break;
-        case "week":
-          endTime = new Date(now);
-          const daysUntilSunday = 7 - now.getDay();
-          endTime.setDate(now.getDate() + daysUntilSunday);
-          endTime.setHours(23, 59, 59, 999);
-          break;
-        case "month":
-          endTime = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-          break;
-        case "year":
-          endTime = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
-          break;
-        default:
-          endTime = new Date(now);
-      }
+    switch (currentPeriod) {
+      case "day":
+        endTime = new Date(now);
+        endTime.setHours(23, 59, 59, 999);
+        break;
+
+      case "week":
+        endTime = new Date(now);
+        daysUntilSunday = 7 - now.getDay();
+        endTime.setDate(now.getDate() + daysUntilSunday);
+        endTime.setHours(23, 59, 59, 999);
+        break;
+
+      case "month":
+        endTime = new Date(
+          now.getFullYear(),
+          now.getMonth() + 1,
+          0,
+          23,
+          59,
+          59,
+          999
+        );
+        break;
+
+      case "year":
+        endTime = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+        break;
+
+      default:
+        endTime = new Date(now);
+    }
 
       const diff = endTime.getTime() - now.getTime();
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
