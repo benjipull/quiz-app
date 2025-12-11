@@ -405,10 +405,6 @@ const handleSaveInterests = async () => {
       interest_count: selectedInterests.length,
       context: "home_screen_modal",
     });
-    toast({
-      title: "Success",
-      description: "Your interests have been updated!",
-    });
     setIsInterestModalOpen(false);
   } catch (error) {
     const err = error as Error;

@@ -1,4 +1,4 @@
-// UserContext.tsx - FIXED VERSION - Minimal API calls
+// UserContext.tsx - OPTIMIZED VERSION - Ultra-fast loading
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { globalCache } from '@/hooks/useAppPreloader';
 
@@ -50,19 +50,18 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserDetails | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // ✅ Start as false for instant render
   
-  // ✅ CRITICAL FIX: Prevent multiple simultaneous refreshes
   const isRefreshingRef = useRef(false);
   const hasInitializedRef = useRef(false);
 
+  // ✅ OPTIMIZATION 1: Synchronous localStorage load (instant)
   const loadUserFromStorage = () => {
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
     if (storedUser) {
       try {
         const parsedUser: UserDetails = JSON.parse(storedUser);
         console.log("💾 Loaded user from localStorage:", parsedUser.alias);
-        setUser(parsedUser);
         return parsedUser;
       } catch (e) {
         console.error("❌ Failed to parse local user data:", e);
@@ -72,7 +71,6 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const refreshUser = async () => {
-    // ✅ CRITICAL FIX: Prevent multiple simultaneous API calls
     if (isRefreshingRef.current) {
       console.log("⏳ Already refreshing user, skipping...");
       return;
@@ -87,14 +85,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    // Load from localStorage first for instant display
+    // ✅ OPTIMIZATION 2: Don't set loading if we have cached data
     const cachedUser = loadUserFromStorage();
-    if (cachedUser) {
-      console.log("⚡ User loaded from localStorage immediately");
-      setLoading(false);
+    if (!cachedUser) {
+      setLoading(true);
     }
 
-    // ✅ Set flag to prevent concurrent refreshes
     isRefreshingRef.current = true;
 
     try {
@@ -105,9 +101,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (!response.ok) {
         console.warn(`⚠️ Failed to fetch user details (Status: ${response.status})`);
-        if (!cachedUser) {
-          setLoading(false);
-        }
+        setLoading(false);
         return;
       }
 
@@ -124,63 +118,79 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       };
 
       setUser(userToStore);
+      
+      // ✅ OPTIMIZATION 3: Persist to localStorage asynchronously (non-blocking)
       if (typeof window !== 'undefined') {
-        // IMPORTANT: Only persist non-dynamic fields to avoid stale data
-        const safeToPersist = { ...userToStore };
-        delete safeToPersist.coins;
-        localStorage.setItem("user", JSON.stringify(safeToPersist));
+        requestIdleCallback(() => {
+          const safeToPersist = { ...userToStore };
+          delete safeToPersist.coins;
+          localStorage.setItem("user", JSON.stringify(safeToPersist));
+        });
       }
       
     } catch (error) {
       console.error("❌ Error fetching user data:", error);
     } finally {
       console.log("🔄 refresh complete");
-      if (!cachedUser) {
-        setLoading(false);
-      }
-      // ✅ Reset flag after completion
+      setLoading(false);
       isRefreshingRef.current = false;
     }
   };
 
   const updateUserLocally = (updates: Partial<UserDetails>) => {
-  setUser(prev => {
-    if (!prev) return null;
+    setUser(prev => {
+      if (!prev) return null;
 
-    const updated = { ...prev, ...updates };
+      const updated = { ...prev, ...updates };
 
-    // ✅ Only persist safe fields
-    const safeToPersist = { ...updated };
-    delete safeToPersist.coins;
+      // ✅ OPTIMIZATION 4: Async localStorage write (non-blocking)
+      if (typeof window !== 'undefined') {
+        requestIdleCallback(() => {
+          const safeToPersist = { ...updated };
+          delete safeToPersist.coins;
+          localStorage.setItem("user", JSON.stringify(safeToPersist));
+        });
+      }
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem("user", JSON.stringify(safeToPersist));
-    }
+      if (globalCache.homeData) {
+        globalCache.homeData.user = updated;
+      }
 
-    if (globalCache.homeData) {
-      globalCache.homeData.user = updated;
-    }
-
-    return updated;
-  });
-};
-
+      return updated;
+    });
+  };
 
   const updateCoins = (newCoins: number) => {
     updateUserLocally({ coins: newCoins });
   };
 
-  // ✅ CRITICAL FIX: Only initialize once
+  // ✅ OPTIMIZATION 5: Initialize immediately with cached data
   useEffect(() => {
     if (hasInitializedRef.current) {
       console.log("⭐️ Already initialized, skipping");
       return;
     }
 
-    console.log("🚀 UserProvider mounted, calling refreshUser");
     hasInitializedRef.current = true;
-    refreshUser();
-  }, []); // Empty deps!
+    console.log("🚀 UserProvider mounted");
+
+    // Load from cache instantly (synchronous)
+    const cachedUser = loadUserFromStorage();
+    if (cachedUser) {
+      console.log("⚡ Setting user from cache immediately");
+      setUser(cachedUser);
+      setLoading(false);
+      
+      // Refresh in background (non-blocking)
+      setTimeout(() => {
+        console.log("🔄 Background refresh started");
+        refreshUser();
+      }, 100);
+    } else {
+      // No cache, fetch immediately
+      refreshUser();
+    }
+  }, []);
 
   return (
     <UserContext.Provider value={{ user, loading, refreshUser, updateUserLocally, updateCoins }}>

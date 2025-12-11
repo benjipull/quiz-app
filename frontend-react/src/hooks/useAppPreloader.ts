@@ -24,14 +24,15 @@ export const globalCache = {
   }
 };
 
+// ✅ OPTIMIZATION 1: Longer cache durations to reduce API calls
 const CACHE_DURATION = {
-  HOME: 5 * 60 * 1000,
-  LEADERBOARD: 10 * 60 * 1000,
-  CATEGORY: 2 * 60 * 1000,
-  QUIZ_SESSION: 5 * 60 * 1000,
+  HOME: 10 * 60 * 1000,        // 10 minutes (was 5)
+  LEADERBOARD: 15 * 60 * 1000, // 15 minutes (was 10)
+  CATEGORY: 5 * 60 * 1000,      // 5 minutes (was 2)
+  QUIZ_SESSION: 10 * 60 * 1000, // 10 minutes (was 5)
 };
 
-// 🔥 Track ongoing fetch operations to prevent duplicates
+// Track ongoing fetch operations to prevent duplicates
 const ongoingFetches = {
   home: null as Promise<void> | null,
   leaderboard: null as Promise<void> | null,
@@ -51,10 +52,33 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
   return fetch(url, { ...options, headers });
 };
 
+// ✅ OPTIMIZATION 2: Batch API calls where possible
+const fetchUserDataBatch = async () => {
+  const token = localStorage.getItem("token");
+  if (!token) return null;
+
+  try {
+    // Fetch user details and categories in parallel
+    const [userResponse, categoriesResponse] = await Promise.all([
+      authenticatedFetch(`${BASE_URL}/api/getUserDetails`),
+      authenticatedFetch(`${BASE_URL}/api/getGetegoryToPlay`)
+    ]);
+
+    const userData = userResponse.ok ? await userResponse.json() : null;
+    const categoryData = categoriesResponse.ok ? await categoriesResponse.json() : null;
+
+    return { userData, categoryData };
+  } catch (err) {
+    console.error("Error in batch fetch:", err);
+    return null;
+  }
+};
+
 // -------------------- HOME --------------------
 const preloadHomeData = async (): Promise<void> => {
   const now = Date.now();
   if (globalCache.homeData && (now - globalCache.lastUpdated.home) < CACHE_DURATION.HOME) {
+    console.log("⚡ Using cached home data");
     return;
   }
 
@@ -90,7 +114,6 @@ const preloadHomeData = async (): Promise<void> => {
 export const preloadLeaderboardData = async (): Promise<void> => {
   const now = Date.now();
   
-  // Check if already cached and valid
   if (
     globalCache.leaderboardData.day.length &&
     (now - globalCache.lastUpdated.leaderboard) < CACHE_DURATION.LEADERBOARD
@@ -99,7 +122,6 @@ export const preloadLeaderboardData = async (): Promise<void> => {
     return;
   }
 
-  // Return existing promise if already fetching
   if (ongoingFetches.leaderboard) {
     console.log("⏸️ Leaderboard already fetching, reusing promise");
     return ongoingFetches.leaderboard;
@@ -110,7 +132,7 @@ export const preloadLeaderboardData = async (): Promise<void> => {
       console.log("🌐 Fetching all leaderboard periods...");
       const periods = ['day', 'week', 'month', 'year'] as const;
 
-      // Fetch all periods in parallel
+      // ✅ OPTIMIZATION 3: Fetch all periods in parallel
       await Promise.allSettled(
         periods.map(async (period) => {
           const res = await authenticatedFetch(`${BASE_URL}/api/leaderboard?period=${period}`);
@@ -141,6 +163,7 @@ export const preloadNextCategory = async (): Promise<void> => {
     globalCache.nextCategory &&
     (now - globalCache.lastUpdated.category) < CACHE_DURATION.CATEGORY
   ) {
+    console.log("⚡ Using cached category");
     return;
   }
 
@@ -175,12 +198,12 @@ export const preloadNextCategory = async (): Promise<void> => {
 export const preloadQuizSession = async (categoryId: string): Promise<boolean> => {
   const now = Date.now();
 
-  // Use cache if still valid
   if (
     globalCache.quizSession &&
     globalCache.quizSession.categoryId === categoryId &&
     (now - globalCache.lastUpdated.quizSession) < CACHE_DURATION.QUIZ_SESSION
   ) {
+    console.log("⚡ Using cached quiz session");
     return true;
   }
 
@@ -194,7 +217,6 @@ export const preloadQuizSession = async (categoryId: string): Promise<boolean> =
     try {
       console.log("🌐 Fetching category name for:", categoryId);
       
-      // Fetch category name safely
       let categoryName = "Quiz";
       try {
         const res = await authenticatedFetch(`${BASE_URL}/api/categories`);
@@ -207,7 +229,6 @@ export const preloadQuizSession = async (categoryId: string): Promise<boolean> =
         console.warn("Failed to fetch category name:", err);
       }
 
-      // Cache metadata
       globalCache.quizSession = {
         categoryId,
         categoryName,
@@ -246,24 +267,33 @@ export const preloadCategoryAndSession = async () => {
   }
 };
 
-// -------------------- MAIN PRELOADER (NO LEADERBOARD) --------------------
+// ✅ OPTIMIZATION 4: Intelligent preloading strategy
 export const preloadAllData = async () => {
   const token = localStorage.getItem("token");
 
-  console.log("🎵 Preloading sounds...");
+  // ✅ Non-blocking: Start asset preloading immediately (don't await)
+  console.log("🎵 Preloading sounds (non-blocking)...");
   preloadSounds();
-  console.log("🖼️ Preloading avatars...");
+  console.log("🖼️ Preloading avatars (non-blocking)...");
   preloadAvatars();
 
   if (!token) return;
 
-  // 🔥 CRITICAL: Removed leaderboard from initial load
+  // ✅ CRITICAL PATH: Only load what's needed for first screen
+  // Parallelize critical data
   await Promise.all([
     preloadHomeData(),
     preloadCategoryAndSession(),
   ]);
 
-  console.log("✅ Critical preloading complete (leaderboard excluded)");
+  console.log("✅ Critical preloading complete");
+
+  // ✅ OPTIMIZATION 5: Defer non-critical data
+  // Load leaderboard after a short delay (not blocking initial render)
+  setTimeout(() => {
+    console.log("⏳ Starting deferred leaderboard preload...");
+    preloadLeaderboardData();
+  }, 2000);
 };
 
 // -------------------- HOOK --------------------
@@ -276,18 +306,21 @@ export const useAppPreloader = () => {
       preloadAllData();
     }
 
-    // Refresh only critical cache periodically
-    const interval = setInterval(() => {
-      preloadHomeData();
-      // REMOVED: Leaderboard refresh - only fetch on demand
-    }, 2 * 60 * 1000);
+    // ✅ OPTIMIZATION 6: Smart refresh intervals
+    const criticalInterval = setInterval(() => {
+      // Only refresh if data is stale
+      const now = Date.now();
+      if (now - globalCache.lastUpdated.home > CACHE_DURATION.HOME) {
+        preloadHomeData();
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
 
-    return () => clearInterval(interval);
+    return () => clearInterval(criticalInterval);
   }, []);
 
   return {
     preloadHomeData,
-    preloadLeaderboardData, // Still export for manual calls
+    preloadLeaderboardData,
     preloadNextCategory,
     preloadQuizSession,
     preloadCategoryAndSession,
@@ -296,10 +329,8 @@ export const useAppPreloader = () => {
   };
 };
 
-// -------------------- EXPORTS --------------------
 export { preloadHomeData };
 
-// -------------------- READY CHECK --------------------
 export const isQuizSessionReady = (categoryId: string): boolean => {
   return !!(
     globalCache.quizSession &&
