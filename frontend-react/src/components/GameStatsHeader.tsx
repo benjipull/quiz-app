@@ -137,7 +137,8 @@ return (
 {/* Coins */}
 <div 
 data-coin-header=""
-className="flex items-center justify-end gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5 bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full border-2 border-blue-300 shadow-lg w-full transition-all hover:scale-105"
+className="flex items-center justify-end gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5
+ bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full border-2 border-blue-300 shadow-lg w-full transition-all hover:scale-105"
 >
 <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate">
 {formatNumber(animatedCoins)}
@@ -169,47 +170,36 @@ $
 <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate">
 {formatNumber(userGem1)}
 </div>
-<div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9 flex-shrink-0">
+<div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9 flex-shrink-0 bg-green-400 rounded-full flex items-center justify-center shadow-md">
 <svg
 viewBox="0 0 24 24"
-fill="none"
-stroke="currentColor"
-strokeWidth="2"
-strokeLinecap="round"
-strokeLinejoin="round"
-className="w-full h-full text-pink-500 drop-shadow-lg"
+className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-slate-800"
+fill="currentColor"
 xmlns="http://www.w3.org/2000/svg"
 >
-<path d="M6 3h12l4 6-10 12L2 9l4-6z" fill="currentColor" />
-<path d="m6 3 6 6 6-6" />
-<path d="m2 9 10 12 10-12" />
+<path d="M12 2L5 21l7-3 7 3L12 2z" />
 </svg>
 </div>
 </div>
 </div>
 
-{/* Center Logo */}
-<div className="relative flex-shrink-0 mx-1 sm:mx-2 md:mx-3">
-<div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 rounded-full bg-gradient-to-br from-yellow-400 via-orange-500 to-yellow-600 p-0.5 shadow-2xl shadow-yellow-500/50 transition-transform hover:scale-110 hover:rotate-12">
-<div className="w-full h-full rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center overflow-hidden border-2 border-orange-400">
-<img 
-src="/q.jpg" 
-alt="Logo" 
-className="w-full h-full object-cover"
-onError={(e) => {
-e.currentTarget.style.display = 'none';
-e.currentTarget.parentElement!.innerHTML = '<div class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-yellow-400">Q</div>';
-}}
-/>
-</div>
-</div>
+{/* Middle - User Icon  */}
+<div className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 
+     rounded-full border-4 border-slate-300 shadow-2xl overflow-hidden">
+
+  <img
+    src="/q.jpg"
+    alt="center icon"
+    className="w-full h-full object-cover"
+  />
 </div>
 
 {/* Right Stats - XP & Gem2 */}
 <div className="flex flex-col gap-1.5 sm:gap-2 flex-1">
-{/* XP */}
-<div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5 bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full border-2 shadow-lg w-full transition-all hover:scale-105">
-<div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9 flex-shrink-0 bg-white rounded-full flex items-center justify-center shadow-md">
+{/* XP (Knowledge Points) */}
+<div className="flex items-center justify-start gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5
+ bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full border-2 border-blue-300 shadow-lg w-full transition-all hover:scale-105">
+<div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9 flex-shrink-0 bg-amber-200 rounded-full flex items-center justify-center shadow-md">
 <svg
 viewBox="0 0 24 24"
 fill="currentColor"
@@ -227,17 +217,16 @@ className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-amber-500"
 </div>
 
 {/* Gem 2 (Enlightenment Crystals) */}
-<div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5 bg-gradient-to-r from-emerald-400 to-green-400 rounded-full border-2 border-green-300 shadow-lg w-full transition-all hover:scale-105">
-<div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9 flex-shrink-0">
+<div className="flex items-center justify-start gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5 
+bg-gradient-to-r from-emerald-400 to-green-400 rounded-full border-2 border-green-300 shadow-lg w-full transition-all hover:scale-105">
+<div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9 flex-shrink-0 bg-emerald-500 rounded-full flex items-center justify-center shadow-md">
 <svg
 viewBox="0 0 24 24"
+className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-slate-800"
 fill="currentColor"
-className="w-full h-full text-yellow-400 drop-shadow-lg"
 xmlns="http://www.w3.org/2000/svg"
 >
-<path d="M6 3h12l4 6-10 12L2 9l4-6z" />
-<path d="m6 3 6 6 6-6" fill="#fff" fillOpacity="0.3" />
-<path d="m2 9 10 12 10-12" fill="#fff" fillOpacity="0.2" />
+<path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
 </svg>
 </div>
 <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate">

@@ -19,6 +19,7 @@ import Confetti from "react-confetti";
 
 // NEW IMPORTS: Assuming these are custom hooks/utilities for preloading
 import { preloadQuizSession, isQuizSessionReady } from "@/hooks/useAppPreloader";
+import { useUser } from "@/contexts/UserContext"; // <-- NEW: Import useUser context hook
 
 const KNOWLEDGE_GAIN_SOUND_SRC = "/knowledge-point.mp3"; 
 const LEVEL_UP_SOUND_SRC = "/player-level-up.mp3";
@@ -130,6 +131,7 @@ const CoinIcon = ({ className }: { className: string }) => (
 
 export default function QuizResults({ results, onPlayAgain, onClose }: QuizResultsProps) {
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const { refreshUser } = useUser(); // <-- NEW: Access context hook to refresh stats globally
 
   const {
     correctAnswers,
@@ -277,7 +279,14 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
     return () => clearTimeout(scoreTimer);
   }, [percentage, knowledgeGained]); 
-
+  
+  // NEW FUNCTION: Updates the global user context with the final stats
+  const updateGameStats = () => {
+       console.log("🚀 Refreshing global user stats after quiz completion.");
+       // The refreshUser function will re-fetch the user's latest data from the backend
+       // and update the useUser context, which GameStatsHeader in Home.tsx consumes.
+       refreshUser(); 
+  };
   
   // ----------------------------------------------------
   // REWARD ANIMATION SEQUENCE FUNCTIONS
@@ -481,6 +490,9 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           }
         }, 300);
       }
+      
+      // CALL THE UPDATE FUNCTION HERE TO REFRESH THE USER STATS
+      updateGameStats(); 
   };
   
   // ----------------------------------------------------
@@ -858,7 +870,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               {playButtonLoading ? (
                 <div className="flex items-center text-xl sm:text-2xl justify-center w-full gap-2">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  Loading...
+                  <span>Loading...</span>
                 </div>
               ) : (
                 <>

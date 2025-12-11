@@ -113,7 +113,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const apiUser: UserDetails = await response.json();
       console.log("✅ Fresh user data fetched from API:", apiUser.alias);
-      
+
       const userToStore = {
         ...apiUser,
         level: apiUser.level || 1,
@@ -124,21 +124,17 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       };
 
       setUser(userToStore);
-      
       if (typeof window !== 'undefined') {
-        localStorage.setItem("user", JSON.stringify(userToStore));
+        // IMPORTANT: Only persist non-dynamic fields to avoid stale data
+        const safeToPersist = { ...userToStore };
+        delete safeToPersist.coins;
+        localStorage.setItem("user", JSON.stringify(safeToPersist));
       }
-
-      // Update global cache
-      globalCache.homeData = {
-        user: userToStore,
-        timestamp: Date.now(),
-      };
-      globalCache.lastUpdated.home = Date.now();
+      
     } catch (error) {
-      console.error("❌ Error fetching user details from API:", error);
+      console.error("❌ Error fetching user data:", error);
     } finally {
-      console.log("✓ User refresh complete");
+      console.log("🔄 refresh complete");
       if (!cachedUser) {
         setLoading(false);
       }

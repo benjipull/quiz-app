@@ -31,7 +31,7 @@ const CACHE_DURATION = {
   QUIZ_SESSION: 5 * 60 * 1000,
 };
 
-// 🔥 NEW: Track ongoing fetch operations to prevent duplicates
+// 🔥 Track ongoing fetch operations to prevent duplicates
 const ongoingFetches = {
   home: null as Promise<void> | null,
   leaderboard: null as Promise<void> | null,
@@ -58,9 +58,8 @@ const preloadHomeData = async (): Promise<void> => {
     return;
   }
 
-  // 🔥 Return existing promise if already fetching
   if (ongoingFetches.home) {
-    console.log("⏭️ Home data already fetching, reusing promise");
+    console.log("⏸️ Home data already fetching, reusing promise");
     return ongoingFetches.home;
   }
 
@@ -87,7 +86,7 @@ const preloadHomeData = async (): Promise<void> => {
   return ongoingFetches.home;
 };
 
-// -------------------- LEADERBOARD --------------------
+// -------------------- LEADERBOARD (ON-DEMAND ONLY) --------------------
 export const preloadLeaderboardData = async (): Promise<void> => {
   const now = Date.now();
   
@@ -100,9 +99,9 @@ export const preloadLeaderboardData = async (): Promise<void> => {
     return;
   }
 
-  // 🔥 Return existing promise if already fetching
+  // Return existing promise if already fetching
   if (ongoingFetches.leaderboard) {
-    console.log("⏭️ Leaderboard already fetching, reusing promise");
+    console.log("⏸️ Leaderboard already fetching, reusing promise");
     return ongoingFetches.leaderboard;
   }
 
@@ -112,7 +111,7 @@ export const preloadLeaderboardData = async (): Promise<void> => {
       const periods = ['day', 'week', 'month', 'year'] as const;
 
       // Fetch all periods in parallel
-      const results = await Promise.allSettled(
+      await Promise.allSettled(
         periods.map(async (period) => {
           const res = await authenticatedFetch(`${BASE_URL}/api/leaderboard?period=${period}`);
           if (res.ok) {
@@ -145,9 +144,8 @@ export const preloadNextCategory = async (): Promise<void> => {
     return;
   }
 
-  // 🔥 Return existing promise if already fetching
   if (ongoingFetches.category) {
-    console.log("⏭️ Category already fetching, reusing promise");
+    console.log("⏸️ Category already fetching, reusing promise");
     return ongoingFetches.category;
   }
 
@@ -186,9 +184,8 @@ export const preloadQuizSession = async (categoryId: string): Promise<boolean> =
     return true;
   }
 
-  // 🔥 Return existing promise if already fetching
   if (ongoingFetches.quizSession) {
-    console.log("⏭️ Quiz session already fetching, reusing promise");
+    console.log("⏸️ Quiz session already fetching, reusing promise");
     await ongoingFetches.quizSession;
     return globalCache.quizSession?.categoryId === categoryId;
   }
@@ -249,7 +246,7 @@ export const preloadCategoryAndSession = async () => {
   }
 };
 
-// -------------------- MAIN PRELOADER --------------------
+// -------------------- MAIN PRELOADER (NO LEADERBOARD) --------------------
 export const preloadAllData = async () => {
   const token = localStorage.getItem("token");
 
@@ -260,14 +257,13 @@ export const preloadAllData = async () => {
 
   if (!token) return;
 
-  // 🔥 CRITICAL: Use Promise.all to prevent multiple simultaneous calls
+  // 🔥 CRITICAL: Removed leaderboard from initial load
   await Promise.all([
     preloadHomeData(),
-    preloadLeaderboardData(),
     preloadCategoryAndSession(),
   ]);
 
-  console.log("✅ All preloading complete");
+  console.log("✅ Critical preloading complete (leaderboard excluded)");
 };
 
 // -------------------- HOOK --------------------
@@ -280,18 +276,18 @@ export const useAppPreloader = () => {
       preloadAllData();
     }
 
-    // Refresh cache periodically (but not too often)
+    // Refresh only critical cache periodically
     const interval = setInterval(() => {
       preloadHomeData();
-      preloadLeaderboardData();
-    }, 2 * 60 * 1000); // Every 2 minutes instead of 1
+      // REMOVED: Leaderboard refresh - only fetch on demand
+    }, 2 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, []);
 
   return {
     preloadHomeData,
-    preloadLeaderboardData,
+    preloadLeaderboardData, // Still export for manual calls
     preloadNextCategory,
     preloadQuizSession,
     preloadCategoryAndSession,

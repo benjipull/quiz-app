@@ -1,4 +1,3 @@
-// DailyCoinClaim.tsx - FIXED VERSION - No infinite loops!
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,7 +11,8 @@ const COOLDOWN_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 interface DailyCoinClaimProps {
   userToken: string;
   onCoinsEarned: (amount: number) => void;
-  isClaimAvailable: boolean;
+  // Note: isClaimAvailable prop is no longer needed as the component now derives the state internally
+  isClaimAvailable: boolean; 
   updateUserLocally: (updates: { dailyClaimAvailable: boolean; coins?: number }) => void;
   cachedBonusAmount?: number;
 }
@@ -20,13 +20,11 @@ interface DailyCoinClaimProps {
 export default function DailyCoinClaim({
   userToken,
   onCoinsEarned,
-  isClaimAvailable,
   updateUserLocally,
   cachedBonusAmount = DEFAULT_BONUS,
 }: DailyCoinClaimProps) {
-  const [timeRemaining, setTimeRemaining] = useState<number>(
-    isClaimAvailable ? 0 : COOLDOWN_DURATION
-  );
+  // ✅ FIX 1: Initialize timeRemaining to null to show a loading state initially.
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null); 
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
   const [showFlyingCoins, setShowFlyingCoins] = useState<boolean>(false);
   const [coinTokens, setCoinTokens] = useState<Array<{ id: number; delay: number }>>([]);
@@ -36,19 +34,18 @@ export default function DailyCoinClaim({
   const earnedCoinsRef = useRef<HTMLDivElement>(null);
   const claimButtonRef = useRef<HTMLButtonElement>(null);
   
-  // ✅ CRITICAL FIX: Prevent multiple simultaneous fetches
+  // CRITICAL FIX: Prevent multiple simultaneous fetches
   const isFetchingTimeRef = useRef(false);
   const hasInitializedRef = useRef(false);
 
-  // ✅ FIX: Only fetch initial time remaining ONCE
+  // Derive isClaimAvailable internally from the timeRemaining state
+  const isClaimAvailable = timeRemaining !== null && timeRemaining <= 0;
+
+
+  // ✅ FIX 2: Fetch initial time remaining ONCE to get the precise cooldown time
   useEffect(() => {
     if (hasInitializedRef.current) return;
     if (!userToken) return;
-    if (isClaimAvailable) {
-      setTimeRemaining(0);
-      hasInitializedRef.current = true;
-      return;
-    }
     if (isFetchingTimeRef.current) return;
 
     const getInitialTimeRemaining = async () => {
@@ -61,27 +58,29 @@ export default function DailyCoinClaim({
           },
         });
 
-        if (!response || !response.ok) {
-          isFetchingTimeRef.current = false;
-          return;
-        }
-
         const userData = await response.json();
 
-        if (userData.lastDailyCoinClaim) {
+        if (response.ok && userData.lastDailyCoinClaim) {
           const lastClaim = new Date(userData.lastDailyCoinClaim).getTime();
           const now = Date.now();
           const remaining = COOLDOWN_DURATION - (now - lastClaim);
 
           if (remaining > 0) {
             setTimeRemaining(remaining);
+            updateUserLocally({ dailyClaimAvailable: false });
           } else {
-            updateUserLocally({ dailyClaimAvailable: true });
             setTimeRemaining(0);
+            updateUserLocally({ dailyClaimAvailable: true });
           }
+        } else {
+            // Default to claim available if no last claim timestamp is found (new user/first claim)
+            setTimeRemaining(0);
+            updateUserLocally({ dailyClaimAvailable: true });
         }
       } catch (error) {
         console.error("Error fetching initial time remaining:", error);
+        // Fail safe: If fetch fails, allow claim after a brief delay
+        setTimeout(() => setTimeRemaining(0), 1000); 
       } finally {
         isFetchingTimeRef.current = false;
         hasInitializedRef.current = true;
@@ -89,14 +88,17 @@ export default function DailyCoinClaim({
     };
 
     getInitialTimeRemaining();
-  }, []); // ✅ Empty deps - run once only!
+  }, [userToken]); 
 
-  // ✅ FIX: Countdown timer - only runs when needed
+  // ✅ FIX 3: Countdown timer - only runs when timeRemaining is initialized and > 0
   useEffect(() => {
-    if (isClaimAvailable || timeRemaining <= 0) return;
+    // Wait until timeRemaining is initialized by the fetch (not null) and is greater than 0
+    if (timeRemaining === null || timeRemaining <= 0) return; 
 
     const interval = setInterval(() => {
       setTimeRemaining((prev) => {
+        if (prev === null) return 0; // Should not happen but for safety
+
         const newTime = prev - 1000;
         if (newTime <= 1000) {
           updateUserLocally({ dailyClaimAvailable: true });
@@ -107,7 +109,7 @@ export default function DailyCoinClaim({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isClaimAvailable, timeRemaining]);
+  }, [timeRemaining, updateUserLocally]); 
 
   const handleClaimClick = async () => {
     if (!isClaimAvailable || isClaiming) return;
@@ -134,7 +136,8 @@ export default function DailyCoinClaim({
         const coinsEarned = data.coinsEarned || dailyBonusAmount;
 
         // ✅ CRITICAL FIX: Update state immediately to prevent re-claiming
-        updateUserLocally({ dailyClaimAvailable: false });
+        // Use data.newCoinsTotal if the API sends it for better SSOT consistency
+        updateUserLocally({ dailyClaimAvailable: false, coins: data.newCoinsTotal }); 
         setTimeRemaining(COOLDOWN_DURATION);
 
         setShowDailyOverlay(true);
@@ -142,6 +145,7 @@ export default function DailyCoinClaim({
           startCoinAnimation(coinsEarned);
         }, 900);
       } else {
+        // If server says claim failed but provides remaining time, update state
         if (data.timeRemainingMs) {
           setTimeRemaining(data.timeRemainingMs);
           updateUserLocally({ dailyClaimAvailable: false });
@@ -221,6 +225,13 @@ export default function DailyCoinClaim({
     return `${seconds}s`;
   };
 
+  // ✅ FIX 4: Handle timeRemaining being null (loading state) in the render
+  const renderTimeOrStatus = () => {
+    if (timeRemaining === null) return "Loading...";
+    if (isClaimAvailable) return isClaiming ? "Claiming..." : "Claim Now";
+    return formatTimeRemaining(timeRemaining);
+  }
+
   return (
     <>
       {isClaiming && showDailyOverlay && (
@@ -239,13 +250,39 @@ export default function DailyCoinClaim({
                 <circle cx="14" cy="13" r="3" fill="#f59e0b" opacity="0.4" />
               </svg>
             </div>
-
             <div className="coin-text-aura text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
               +{dailyBonusAmount}
             </div>
           </div>
         </div>
       )}
+
+      {showFlyingCoins && coinTokens.map((token) => (
+        <div
+          key={token.id}
+          className="daily-coin-token"
+          style={{ '--daily-coin-delay': `${token.delay}ms` } as React.CSSProperties}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="w-4 h-4 text-white"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle cx="12" cy="12" r="10" fill="#f59e0b" />
+            <circle cx="12" cy="12" r="8" fill="#fbbf24" />
+            <text
+              x="12"
+              y="16"
+              fontSize="10"
+              fontWeight="bold"
+              fill="#d97706"
+              textAnchor="middle"
+            >
+              $
+            </text>
+          </svg>
+        </div>
+      ))}
 
       <Card className="w-full max-w-8xl rounded-[30px] bg-transparent border-none p-2 sm:p-4">
         <div className="flex items-center justify-between gap-2 sm:gap-4">
@@ -258,121 +295,51 @@ export default function DailyCoinClaim({
                   <circle cx="10" cy="11" r="3.5" fill="#d97706" opacity="0.4" />
                   <circle cx="17" cy="16" r="8" fill="#d97706" />
                   <circle cx="17" cy="16" r="7" fill="#fcd34d" />
-                  <circle cx="17" cy="16" r="4.2" fill="#d97706" opacity="0.4" />
+                  <circle cx="17" cy="16" r="4" fill="#d97706" opacity="0.4" />
                 </svg>
               </div>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute bottom-[-18px] left-2 px-2.5 sm:px-3 py-0.5 font-bold text-white pointer-events-none"
-                disabled
-              >
-                +{dailyBonusAmount}
-              </Button>
             </div>
 
-            <div className="leading-tight min-w-0 -ml-1">
-              <h3 className="text-white font-bold text-lg sm:text-2xl whitespace-nowrap">
-                Daily Reward
-              </h3>
+            <div className="min-w-0">
+              <p className="text-white text-base sm:text-lg font-bold truncate">
+                Daily Bonus
+              </p>
+              <p className="text-yellow-400 text-sm sm:text-base font-semibold">
+                +{dailyBonusAmount} Coins
+              </p>
             </div>
           </div>
 
-          <Button
-            ref={claimButtonRef}
-            onClick={handleClaimClick}
-            disabled={!isClaimAvailable || isClaiming}
-            className="flex items-center gap-1 sm:gap-2 px-3 py-1.5 sm:px-6 sm:py-3"
-            variant={isClaimAvailable ? "warning" : "purple"}
-            style={{
-              ...(isClaimAvailable
-                ? {
-                    border: "3px solid #fcd34d",
-                    boxShadow: "0 0 25px rgba(255,255,0,0.5)",
-                  }
-                : {
-                    border: "1px solid rgba(128,90,213,0.5)",
-                    boxShadow: "0 0 15px rgba(240,171,240,0.4), 0 4px 15px rgba(0,0,0,0.5)",
-                  }),
-            }}
-          >
-            {isClaimAvailable ? (
-              <>
-                <Sparkles
-                  className={`w-4 h-4 sm:w-6 sm:h-6 ${
-                    isClaiming ? "text-gray-400" : "text-yellow-400"
-                  }`}
-                />
-                <span
-                  className={`font-bold text-sm sm:text-lg whitespace-nowrap ${
-                    isClaiming ? "text-gray-400" : "text-yellow-400"
-                  }`}
-                >
-                  {isClaiming ? "Claiming..." : "Claim Now"}
-                </span>
-              </>
-            ) : (
-              <>
-                <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-[#f0abf0] opacity-90" />
-                <span className="text-white font-bold text-sm sm:text-lg whitespace-nowrap">
-                  {formatTimeRemaining(timeRemaining)}
-                </span>
-              </>
-            )}
-          </Button>
+         <Button
+  ref={claimButtonRef}
+  onClick={handleClaimClick}
+  disabled={!isClaimAvailable || isClaiming || timeRemaining === null}
+  variant={isClaimAvailable ? "warning" : "purple"}
+>
+  {timeRemaining === null ? (
+    <div className="flex items-center space-x-2">
+      <div className="animate-spin rounded-full h-4 w-4 border-b-2"></div>
+      <span>Loading...</span>
+    </div>
+  ) : isClaiming ? (
+    <div className="flex items-center space-x-2">
+      <div className="animate-spin rounded-full h-4 w-4 border-b-2"></div>
+      <span>Claiming...</span>
+    </div>
+  ) : isClaimAvailable ? (
+    <span>Claim Now!</span>
+  ) : (
+    <div className="flex items-center space-x-2">
+      <Clock className="w-4 h-4" />
+      <span>{formatTimeRemaining(timeRemaining)}</span>
+    </div>
+  )}
+</Button>
+
         </div>
       </Card>
 
-      {showFlyingCoins &&
-        coinTokens.map((token) => (
-          <div
-            key={token.id}
-            className="daily-coin-token"
-            style={
-              {
-                "--daily-coin-delay": `${token.delay}ms`,
-              } as any
-            }
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-full w-full p-[2px]">
-              <circle cx="8" cy="9" r="5" fill="#f59e0b" />
-              <circle cx="8" cy="9" r="4" fill="#fbbf24" />
-              <circle cx="8" cy="9" r="2.5" fill="#f59e0b" opacity="0.4" />
-              <circle cx="14" cy="13" r="6" fill="#f59e0b" />
-              <circle cx="14" cy="13" r="5" fill="#fbbf24" />
-              <circle cx="14" cy="13" r="3" fill="#f59e0b" opacity="0.4" />
-            </svg>
-          </div>
-        ))}
-
-      <style>{`
-        .coin-text-aura {
-          text-shadow:
-            0 0 10px rgba(255, 193, 7, 0.9),
-            0 0 20px rgba(255, 165, 0, 0.7),
-            0 0 30px rgba(255, 140, 0, 0.5);
-        }
-
-        @keyframes pop-in {
-          0% { transform: scale(0.8); opacity: 0; }
-          50% { transform: scale(1.05); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        .animate-pop-in { animation: pop-in 0.5s ease-out forwards; }
-
-        @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.5); transform: scale(1); }
-          50% { box-shadow: 0 0 40px rgba(251, 191, 36, 0.8); transform: scale(1.05); }
-        }
-        .animate-pulse-glow { animation: pulse-glow 2s infinite; }
-
-        @keyframes number-grow {
-          0% { transform: translateY(10px) scale(0.7); opacity: 0; }
-          100% { transform: translateY(0) scale(1); opacity: 1; }
-        }
-        .animate-number-grow { animation: number-grow 0.7s ease-out forwards; }
-
+      <style jsx global>{`
         .daily-coin-token {
           position: fixed;
           width: 24px;
@@ -402,19 +369,23 @@ export default function DailyCoinClaim({
           }
           10% {
             opacity: 1;
-            transform: translate(-50%, -50%) scale(1.3) rotate(-180deg);
+            transform: translate(-50%, -50%) scale(1.1) rotate(0deg);
           }
-          85% {
+          20% {
             opacity: 1;
+            transform: translate(-50%, -50%) scale(1) rotate(30deg);
+          }
+          90% {
+            opacity: 0.8;
             left: var(--daily-coin-end-x, 50vw);
             top: var(--daily-coin-end-y, 50vh);
-            transform: translate(-50%, -50%) scale(0.8) rotate(-900deg);
+            transform: translate(-50%, -50%) scale(0.5) rotate(360deg);
           }
           100% {
             opacity: 0;
             left: var(--daily-coin-end-x, 50vw);
             top: var(--daily-coin-end-y, 50vh);
-            transform: translate(-50%, -50%) scale(0.1) rotate(-1080deg);
+            transform: translate(-50%, -50%) scale(0) rotate(360deg);
           }
         }
       `}</style>
