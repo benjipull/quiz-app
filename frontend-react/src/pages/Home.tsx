@@ -357,9 +357,9 @@ const handleQuickQuiz = async () => {
       });
     }
   } catch (error) {
-  updateCoins(currentCoins);
-  hasDeductedRef.current = false; // ✅ reset if failed
-  const err = error as Error;
+    updateCoins(currentCoins);
+    hasDeductedRef.current = false; // ✅ reset if failed
+    const err = error as Error;
     toast({
       title: "Error",
       description: `Failed to start quiz: ${err.message}`,
@@ -370,69 +370,64 @@ const handleQuickQuiz = async () => {
   }
 };
 
-  // Interest Modal Handlers
-  const handleInterestChange = (newSelectedIds: string[]) => {
-    setSelectedInterests(newSelectedIds);
-  };
+// Interest Modal Handlers
+const handleInterestChange = (newSelectedIds: string[]) => {
+  setSelectedInterests(newSelectedIds);
+};
 
-  const handleSaveInterests = async () => {
-    if (!user?._id) return;
-    setSavingInterests(true);
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("Authentication token missing.");
+const handleSaveInterests = async () => {
+  if (!user?._id) return;
+  setSavingInterests(true);
 
-      const interestsResponse = await fetch(
-        `${BASE_URL}/api/interests/user/${user._id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          body: JSON.stringify({ interests: selectedInterests }),
-        }
-      );
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("Authentication token missing.");
 
-      if (!interestsResponse.ok) {
-        throw new Error("Failed to update interests.");
+    const interestsResponse = await fetch(
+      `${BASE_URL}/api/interests/user/${user._id}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ interests: selectedInterests }),
       }
+    );
 
-      updateUserLocally({ interests: selectedInterests });
-
-      trackEvent("update_interests", {
-        user_id: user._id,
-        interest_count: selectedInterests.length,
-        context: "home_screen_modal",
-      });
-
-      toast({
-        title: "Success",
-        description: "Your interests have been updated!",
-      });
-
-      setIsInterestModalOpen(false);
-    } catch (error) {
-      const err = error as Error;
-      toast({
-        title: "Error",
-        description: `Failed to save interests: ${err.message}`,
-        variant: "destructive",
-      });
-    } finally {
-      setSavingInterests(false);
+    if (!interestsResponse.ok) {
+      throw new Error("Failed to update interests.");
     }
-  };
 
-  const handleCoinsEarned = (amount: number) => {
-    // Calculate new total based on currentCoins from context
-    const newTotal = currentCoins + amount;
-    updateCoins(newTotal); // Update context
-    
-    updateUserLocally({ dailyClaimAvailable: false }); 
-  };
+    updateUserLocally({ interests: selectedInterests });
+    trackEvent("update_interests", {
+      user_id: user._id,
+      interest_count: selectedInterests.length,
+      context: "home_screen_modal",
+    });
+    toast({
+      title: "Success",
+      description: "Your interests have been updated!",
+    });
+    setIsInterestModalOpen(false);
+  } catch (error) {
+    const err = error as Error;
+    toast({
+      title: "Error",
+      description: `Failed to save interests: ${err.message}`,
+      variant: "destructive",
+    });
+  } finally {
+    setSavingInterests(false);
+  }
+};
 
-  // REMOVED: handleCoinsUpdate, as GameStatsHeader no longer needs to call back
+const handleCoinsEarned = (amount: number) => {
+  // Calculate new total based on currentCoins from context
+  const newTotal = currentCoins + amount;
+  updateCoins(newTotal); // Update context
+  updateUserLocally({ dailyClaimAvailable: false });
+};
 
   // Show splash screen
   if (showSplash) {
@@ -521,8 +516,7 @@ const handleQuickQuiz = async () => {
 
           <DailyCoinClaim
             userToken={userToken}
-            onCoinsEarned={handleCoinsEarned}
-            // Pass the cached value for display
+            onCoinsEarned={refreshUser}
             isClaimAvailable={user.dailyClaimAvailable ?? false} 
             // Pass local updater for claim status
             updateUserLocally={updateUserLocally}
