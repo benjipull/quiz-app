@@ -34,7 +34,7 @@ interface Interest {
 }
 
 const Profile = () => {
-  const { user, loading: userLoading, refreshUser, updateUserLocally } = useUser();
+  const { user, loading: userLoading, refreshUser, updateUserLocally, markUserStale } = useUser();
   const [alias, setAlias] = useState("");
   const [age, setAge] = useState("");
   const [email, setEmail] = useState("");
@@ -108,46 +108,50 @@ const Profile = () => {
   };
 
   const saveInterestsToBackend = async (interestsToSave: string[]) => {
-    if (!user?._id) return;
-    setSavingInterests(true);
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("Authentication token missing.");
+  if (!user?._id) return;
+  setSavingInterests(true);
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("Authentication token missing.");
 
-      const interestsResponse = await fetch(
-        `${BASE_URL}/api/interests/user/${user._id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          body: JSON.stringify({ interests: interestsToSave }),
-        }
-      );
-
-      if (!interestsResponse.ok) {
-        throw new Error("Failed to update interests.");
+    const interestsResponse = await fetch(
+      `${BASE_URL}/api/interests/user/${user._id}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ interests: interestsToSave }),
       }
+    );
 
-      updateUserLocally({ interests: interestsToSave });
-      
-      trackEvent("update_interests", {
-        user_id: user._id,
-        interest_count: interestsToSave.length,
-        context: "profile_page",
-      });
-      
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: `Failed to save interests: ${(error as Error).message}`,
-        variant: "destructive",
-      });
-    } finally {
-      setSavingInterests(false);
+    if (!interestsResponse.ok) {
+      throw new Error("Failed to update interests.");
     }
-  };
+
+    updateUserLocally({ interests: interestsToSave });
+    
+    // ✅ NEW: Mark user as stale for next refresh
+    markUserStale();
+    
+    trackEvent("update_interests", {
+      user_id: user._id,
+      interest_count: interestsToSave.length,
+      context: "profile_page",
+    });
+    
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: `Failed to save interests: ${(error as Error).message}`,
+      variant: "destructive",
+    });
+  } finally {
+    setSavingInterests(false);
+  }
+};
+
 
   const handleSaveInterests = async () => {
     await saveInterestsToBackend(selectedInterests);
@@ -155,64 +159,61 @@ const Profile = () => {
   };
 
   const updateUserDetails = async (isRegistration: boolean) => {
-    setUpdating(true);
-    try {
-      const avatarValue = selectedAvatarIndex + 1;
+  setUpdating(true);
+  try {
+    const avatarValue = selectedAvatarIndex + 1;
 
-      const updateData = {
-        alias,
-        age: parseInt(age),
-        avatar: avatarValue,
-        ...(isRegistration ? { email, password, interests: selectedInterests } : {}),
-      };
-      
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("Authentication token missing.");
-      
-      const response = await fetch(`${BASE_URL}/api/updateUserDetails`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify(updateData),
-      });
+    const updateData = {
+      alias,
+      age: parseInt(age),
+      avatar: avatarValue,
+      ...(isRegistration ? { email, password, interests: selectedInterests } : {}),
+    };
+    
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("Authentication token missing.");
+    
+    const response = await fetch(`${BASE_URL}/api/updateUserDetails`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify(updateData),
+    });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update profile.");
-      }
-
-      const data = await response.json();
-      
-      if (data.token) {
-        localStorage.setItem("token", data.token);
-      }
-
-      // Refresh user from API after successful update
-      await refreshUser();
-
-      const newType = data.user?.userType || "Registered";
-
-      if (newType === "Registered" && isRegistration) {
-        // Successful registration, navigate to home without toast
-        setTimeout(() => navigate("/"), 1500);
-      } else if (newType !== "Guest" && !isRegistration) {
-        // Successful profile update, navigate to home without toast
-        setTimeout(() => navigate("/"), 1500);
-      } else {
-        // Successful profile update for non-guest/non-registration scenario, no toast
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: `Failed to save changes: ${(error as Error).message}`,
-        variant: "destructive",
-      });
-    } finally {
-      setUpdating(false);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to update profile.");
     }
-  };
+
+    const data = await response.json();
+    
+    if (data.token) {
+      localStorage.setItem("token", data.token);
+    }
+
+    // ✅ NEW: Mark user as stale and force refresh
+    markUserStale();
+    await refreshUser();
+
+    const newType = data.user?.userType || "Registered";
+
+    if (newType === "Registered" && isRegistration) {
+      setTimeout(() => navigate("/"), 1500);
+    } else if (newType !== "Guest" && !isRegistration) {
+      setTimeout(() => navigate("/"), 1500);
+    }
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: `Failed to save changes: ${(error as Error).message}`,
+      variant: "destructive",
+    });
+  } finally {
+    setUpdating(false);
+  }
+};
 
   const handleSaveClick = async (e: React.FormEvent) => {
     e.preventDefault();

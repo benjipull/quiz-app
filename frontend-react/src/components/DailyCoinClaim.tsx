@@ -11,7 +11,6 @@ const COOLDOWN_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 interface DailyCoinClaimProps {
   userToken: string;
   onCoinsEarned: (amount: number) => void;
-  // Note: isClaimAvailable prop is no longer needed as the component now derives the state internally
   isClaimAvailable: boolean; 
   updateUserLocally: (updates: { dailyClaimAvailable: boolean; coins?: number }) => void;
   cachedBonusAmount?: number;
@@ -23,7 +22,6 @@ export default function DailyCoinClaim({
   updateUserLocally,
   cachedBonusAmount = DEFAULT_BONUS,
 }: DailyCoinClaimProps) {
-  // ✅ FIX 1: Initialize timeRemaining to null to show a loading state initially.
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null); 
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
   const [showFlyingCoins, setShowFlyingCoins] = useState<boolean>(false);
@@ -34,15 +32,11 @@ export default function DailyCoinClaim({
   const earnedCoinsRef = useRef<HTMLDivElement>(null);
   const claimButtonRef = useRef<HTMLButtonElement>(null);
   
-  // CRITICAL FIX: Prevent multiple simultaneous fetches
   const isFetchingTimeRef = useRef(false);
   const hasInitializedRef = useRef(false);
 
-  // Derive isClaimAvailable internally from the timeRemaining state
   const isClaimAvailable = timeRemaining !== null && timeRemaining <= 0;
 
-
-  // ✅ FIX 2: Fetch initial time remaining ONCE to get the precise cooldown time
   useEffect(() => {
     if (hasInitializedRef.current) return;
     if (!userToken) return;
@@ -73,13 +67,11 @@ export default function DailyCoinClaim({
             updateUserLocally({ dailyClaimAvailable: true });
           }
         } else {
-            // Default to claim available if no last claim timestamp is found (new user/first claim)
             setTimeRemaining(0);
             updateUserLocally({ dailyClaimAvailable: true });
         }
       } catch (error) {
         console.error("Error fetching initial time remaining:", error);
-        // Fail safe: If fetch fails, allow claim after a brief delay
         setTimeout(() => setTimeRemaining(0), 1000); 
       } finally {
         isFetchingTimeRef.current = false;
@@ -90,14 +82,12 @@ export default function DailyCoinClaim({
     getInitialTimeRemaining();
   }, [userToken]); 
 
-  // ✅ FIX 3: Countdown timer - only runs when timeRemaining is initialized and > 0
   useEffect(() => {
-    // Wait until timeRemaining is initialized by the fetch (not null) and is greater than 0
     if (timeRemaining === null || timeRemaining <= 0) return; 
 
     const interval = setInterval(() => {
       setTimeRemaining((prev) => {
-        if (prev === null) return 0; // Should not happen but for safety
+        if (prev === null) return 0;
 
         const newTime = prev - 1000;
         if (newTime <= 1000) {
@@ -135,8 +125,6 @@ export default function DailyCoinClaim({
       if (response.ok) {
         const coinsEarned = data.coinsEarned || dailyBonusAmount;
 
-        // ✅ CRITICAL FIX: Update state immediately to prevent re-claiming
-        // Use data.newCoinsTotal if the API sends it for better SSOT consistency
         updateUserLocally({ dailyClaimAvailable: false, coins: data.newCoinsTotal }); 
         setTimeRemaining(COOLDOWN_DURATION);
 
@@ -145,12 +133,11 @@ export default function DailyCoinClaim({
           startCoinAnimation(coinsEarned);
         }, 900);
       } else {
-        // If server says claim failed but provides remaining time, update state
         if (data.timeRemainingMs) {
           setTimeRemaining(data.timeRemainingMs);
           updateUserLocally({ dailyClaimAvailable: false });
         }
-        setIsClaiming(false); // ✅ Reset if claim failed
+        setIsClaiming(false);
       }
     } catch (error) {
       console.error("Error claiming coins:", error);
@@ -164,6 +151,7 @@ export default function DailyCoinClaim({
     const headerRect = headerCoinElement?.getBoundingClientRect();
 
     if (!overlayRect || !headerRect) {
+      // ✅ FIX: Call once with full amount instead of incrementally
       if (onCoinsEarned) onCoinsEarned(coinsEarned);
       setIsClaiming(false);
       setShowDailyOverlay(false);
@@ -189,28 +177,25 @@ export default function DailyCoinClaim({
     document.documentElement.style.setProperty("--daily-coin-end-x", `${endX}px`);
     document.documentElement.style.setProperty("--daily-coin-end-y", `${endY}px`);
 
-    let coinsAdded = 0;
-    const coinsPerToken = Math.ceil(coinsEarned / tokenCount);
+    // ✅ FIX: Update coins ONCE at the start, let GameStatsHeader animate from old to new
+    if (onCoinsEarned) {
+      onCoinsEarned(coinsEarned);
+    }
 
-    const coinTimer = setInterval(() => {
-      preloadSounds("/knowledge-point.mp3", 0.2);
+    // Play sound effects during animation
+    const finalTokenCount = Math.floor(tokenCount);
+    for (let i = 0; i < finalTokenCount; i++) {
+      setTimeout(() => {
+        preloadSounds("/knowledge-point.mp3", 0.2);
+      }, i * 150);
+    }
 
-      coinsAdded += coinsPerToken;
-      if (coinsAdded >= coinsEarned) {
-        coinsAdded = coinsEarned;
-        clearInterval(coinTimer);
-
-        setTimeout(() => {
-          setShowFlyingCoins(false);
-          setShowDailyOverlay(false);
-          setIsClaiming(false);
-        }, 250);
-      }
-
-      if (onCoinsEarned && coinsAdded <= coinsEarned) {
-        onCoinsEarned(coinsPerToken); // <-- This calls the parent coin updater
-      }
-    }, 150);
+    // Clean up animation after all tokens have flown
+    setTimeout(() => {
+      setShowFlyingCoins(false);
+      setShowDailyOverlay(false);
+      setIsClaiming(false);
+    }, finalTokenCount * 150 + 250);
   };
 
   const formatTimeRemaining = (ms: number) => {
@@ -225,7 +210,6 @@ export default function DailyCoinClaim({
     return `${seconds}s`;
   };
 
-  // ✅ FIX 4: Handle timeRemaining being null (loading state) in the render
   const renderTimeOrStatus = () => {
     if (timeRemaining === null) return "Loading...";
     if (isClaimAvailable) return isClaiming ? "Claiming..." : "Claim Now";

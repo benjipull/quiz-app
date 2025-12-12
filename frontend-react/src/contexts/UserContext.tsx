@@ -1,4 +1,4 @@
-// UserContext.tsx - OPTIMIZED VERSION - Ultra-fast loading
+// UserContext.tsx - OPTIMIZED - Minimal API calls
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { globalCache } from '@/hooks/useAppPreloader';
 
@@ -26,6 +26,7 @@ interface UserContextType {
   refreshUser: () => Promise<void>;
   updateUserLocally: (updates: Partial<UserDetails>) => void;
   updateCoins: (newCoins: number) => void;
+  markUserStale: () => void; // New: Mark user data as needing refresh
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -50,12 +51,16 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserDetails | null>(null);
-  const [loading, setLoading] = useState(false); // ✅ Start as false for instant render
+  const [loading, setLoading] = useState(false);
   
   const isRefreshingRef = useRef(false);
   const hasInitializedRef = useRef(false);
+  const lastFetchTime = useRef<number>(0);
+  const isStaleRef = useRef(false); // Track if user data needs refresh
 
-  // ✅ OPTIMIZATION 1: Synchronous localStorage load (instant)
+  // 🎯 CACHE DURATION: Only refresh if data is older than 10 minutes
+  const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+
   const loadUserFromStorage = () => {
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
     if (storedUser) {
@@ -70,13 +75,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return null;
   };
 
-  const refreshUser = async () => {
+  const refreshUser = async (force: boolean = false) => {
     if (isRefreshingRef.current) {
       console.log("⏳ Already refreshing user, skipping...");
       return;
     }
 
-    console.log("🔄 refreshUser called");
     const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
     
     if (!userToken) {
@@ -85,7 +89,17 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    // ✅ OPTIMIZATION 2: Don't set loading if we have cached data
+    // ✅ Check if cache is still fresh
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime.current;
+    
+    if (!force && !isStaleRef.current && timeSinceLastFetch < CACHE_DURATION) {
+      console.log(`✅ User data is fresh (${Math.round(timeSinceLastFetch / 1000)}s old), skipping refresh`);
+      return;
+    }
+
+    console.log("🔄 refreshUser called", force ? "(forced)" : "(cache expired or stale)");
+
     const cachedUser = loadUserFromStorage();
     if (!cachedUser) {
       setLoading(true);
@@ -118,8 +132,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       };
 
       setUser(userToStore);
+      lastFetchTime.current = now;
+      isStaleRef.current = false; // Mark as fresh
       
-      // ✅ OPTIMIZATION 3: Persist to localStorage asynchronously (non-blocking)
+      // Persist to localStorage asynchronously
       if (typeof window !== 'undefined') {
         requestIdleCallback(() => {
           const safeToPersist = { ...userToStore };
@@ -143,7 +159,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const updated = { ...prev, ...updates };
 
-      // ✅ OPTIMIZATION 4: Async localStorage write (non-blocking)
+      // Async localStorage write
       if (typeof window !== 'undefined') {
         requestIdleCallback(() => {
           const safeToPersist = { ...updated };
@@ -164,7 +180,13 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     updateUserLocally({ coins: newCoins });
   };
 
-  // ✅ OPTIMIZATION 5: Initialize immediately with cached data
+  // ✅ NEW: Mark user data as stale (needs refresh on next check)
+  const markUserStale = () => {
+    console.log("🔄 User data marked as stale");
+    isStaleRef.current = true;
+  };
+
+  // ✅ Initialize immediately with cached data
   useEffect(() => {
     if (hasInitializedRef.current) {
       console.log("⭐️ Already initialized, skipping");
@@ -174,26 +196,41 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     hasInitializedRef.current = true;
     console.log("🚀 UserProvider mounted");
 
-    // Load from cache instantly (synchronous)
+    // Load from cache instantly
     const cachedUser = loadUserFromStorage();
     if (cachedUser) {
       console.log("⚡ Setting user from cache immediately");
       setUser(cachedUser);
       setLoading(false);
       
-      // Refresh in background (non-blocking)
-      setTimeout(() => {
-        console.log("🔄 Background refresh started");
-        refreshUser();
-      }, 100);
+      // Check if cache is stale (older than 10 minutes)
+      const now = Date.now();
+      const shouldRefresh = isStaleRef.current || (now - lastFetchTime.current) > CACHE_DURATION;
+      
+      if (shouldRefresh) {
+        // Refresh in background only if stale
+        setTimeout(() => {
+          console.log("🔄 Background refresh started (cache stale)");
+          refreshUser();
+        }, 500);
+      } else {
+        console.log("✅ Cache is fresh, no background refresh needed");
+      }
     } else {
       // No cache, fetch immediately
-      refreshUser();
+      refreshUser(true);
     }
   }, []);
 
   return (
-    <UserContext.Provider value={{ user, loading, refreshUser, updateUserLocally, updateCoins }}>
+    <UserContext.Provider value={{ 
+      user, 
+      loading, 
+      refreshUser: () => refreshUser(true), // Force refresh when called explicitly
+      updateUserLocally, 
+      updateCoins,
+      markUserStale 
+    }}>
       {children}
     </UserContext.Provider>
   );
