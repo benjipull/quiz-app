@@ -67,7 +67,7 @@ const authenticatedFetch = async (url: string, options: RequestInit) => {
 };
 
 export default function Home() {
-  const { user, loading: userLoading, refreshUser, updateUserLocally, updateCoins } = useUser();
+  const { user, loading: userLoading, refreshUser, updateUserLocally, updateCoins, markUserStale } = useUser();
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
@@ -256,7 +256,6 @@ export default function Home() {
   }
 };
 
-// Home.tsx
 
 const handleQuickQuiz = async () => {
   if (!userToken) {
@@ -278,7 +277,6 @@ const handleQuickQuiz = async () => {
   if (cachedCategory && cachedCategory.categoryId) {
     const categoryId = cachedCategory.categoryId;
     
-    // Check if the full session is ready FOR THIS EXACT CATEGORY
     const sessionReady = isQuizSessionReady(categoryId);
     
     if (sessionReady) {
@@ -288,31 +286,26 @@ const handleQuickQuiz = async () => {
       console.log("⚠️ Session not ready for this category, will load on quiz page");
     }
     
-    // ✅ Prevent double-deduction
     if (hasDeductedRef.current) return;
     hasDeductedRef.current = true;
 
-    // Optimistically update coins
     const optimisticCoins = currentCoins - QUIZ_COST;
     updateCoins(optimisticCoins);
 
+    // ✅ ADD THIS: Mark user as stale since coins were deducted
+    markUserStale();
     
-    // 🔥 CRITICAL: Clear refs BEFORE navigation
+    // Clear refs BEFORE navigation
     preloadedCategoryRef.current = null;
     globalCache.nextCategory = null;
     globalCache.lastUpdated.category = 0;
     
-    // Navigate immediately
     console.log("🎮 Navigating to quiz:", categoryId);
     navigate(`/quiz/${categoryId}`);
     
-    // ✅ CORRECTED FIX: Clear the used quiz session cache AFTER navigation
     setTimeout(() => {
       console.log("🧹 Clearing used quiz session");
-      clearQuizCache(); // Clears the consumed session
-      
-      // We do NOT preload the next quiz here, to prevent race condition.
-      // The home screen's main useEffect or QuizResults.tsx should handle the next preload.
+      clearQuizCache();
     }, 1000);
     
     return;
@@ -322,8 +315,7 @@ const handleQuickQuiz = async () => {
   console.log("⚠️ No cached category, fetching fresh...");
   
   const optimisticCoins = currentCoins - QUIZ_COST;
-  // REMOVED: setCurrentCoins(optimisticCoins);
-  updateCoins(optimisticCoins); // Update context
+  updateCoins(optimisticCoins);
   setPlayButtonLoading(true);
 
   try {
@@ -332,23 +324,24 @@ const handleQuickQuiz = async () => {
     });
     
     if (!response.ok) {
-    updateCoins(currentCoins);
-    hasDeductedRef.current = false; // ✅ reset if failed
-    throw new Error("Failed to fetch next category.");
-}
+      updateCoins(currentCoins);
+      hasDeductedRef.current = false;
+      throw new Error("Failed to fetch next category.");
+    }
 
     const data: CategoryToPlayResponse = await response.json();
 
     if (data.categoryId) {
+      // ✅ ADD THIS: Mark user as stale since coins were deducted
+      markUserStale();
+      
       navigate(`/quiz/${data.categoryId}`);
       hasDeductedRef.current = false;
       
-      // ✅ CORRECTED FIX: Start preloading the *next* quiz after a delay, 
       setTimeout(() => {
         preloadNextCategoryAndSession();
       }, 1000);
     } else {
-      // Revert coin change if category is not found
       updateCoins(currentCoins);
       toast({
         title: "Error",
@@ -358,7 +351,7 @@ const handleQuickQuiz = async () => {
     }
   } catch (error) {
     updateCoins(currentCoins);
-    hasDeductedRef.current = false; // ✅ reset if failed
+    hasDeductedRef.current = false;
     const err = error as Error;
     toast({
       title: "Error",
@@ -400,6 +393,10 @@ const handleSaveInterests = async () => {
     }
 
     updateUserLocally({ interests: selectedInterests });
+    
+    // ✅ ADD THIS LINE
+    markUserStale();
+    
     trackEvent("update_interests", {
       user_id: user._id,
       interest_count: selectedInterests.length,
@@ -419,10 +416,10 @@ const handleSaveInterests = async () => {
 };
 
 const handleCoinsEarned = (amount: number) => {
-  // Calculate new total based on currentCoins from context
   const newTotal = currentCoins + amount;
   updateCoins(newTotal); // Update context
   updateUserLocally({ dailyClaimAvailable: false });
+  markUserStale();
 };
 
   // Show splash screen
