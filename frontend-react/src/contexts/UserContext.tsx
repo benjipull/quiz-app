@@ -1,6 +1,5 @@
-// UserContext.tsx - OPTIMIZED - Minimal API calls
+// UserContext.tsx
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
-import { globalCache } from '@/hooks/useAppPreloader';
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -26,11 +25,12 @@ interface UserContextType {
   refreshUser: () => Promise<void>;
   updateUserLocally: (updates: Partial<UserDetails>) => void;
   updateCoins: (newCoins: number) => void;
-  markUserStale: () => void; // New: Mark user data as needing refresh
+  markUserStale: () => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+// Helper for API calls with Auth
 const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
   const headers = {
@@ -38,36 +38,33 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
     "Authorization": `Bearer ${userToken}`,
     "Content-Type": "application/json",
   };
-  
-  if (!options.body && (options.method === 'GET' || options.method === 'HEAD')) {
-    delete headers["Content-Type"];
+
+  // Prevent Content-Type on GET requests to avoid pre-flight issues in some setups
+  if (options.method === 'GET' || !options.body) {
+    const { "Content-Type": _, ...remainingHeaders } = headers;
+    return fetch(url, { ...options, headers: remainingHeaders });
   }
 
-  return fetch(url, {
-    ...options,
-    headers,
-  });
+  return fetch(url, { ...options, headers });
 };
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserDetails | null>(null);
-  const [loading, setLoading] = useState(false);
-  
-  const isRefreshingRef = useRef(false);
-  const hasInitializedRef = useRef(false);
-  const lastFetchTime = useRef<number>(0);
-  const isStaleRef = useRef(false); // Track if user data needs refresh
+  const [loading, setLoading] = useState(true);
 
-  // 🎯 CACHE DURATION: Only refresh if data is older than 10 minutes
+  const isRefreshingRef = useRef(false);
+  const lastFetchTime = useRef<number>(0);
+  const isStaleRef = useRef(false);
+
+  // Cache settings
   const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
   const loadUserFromStorage = () => {
-    const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
+    if (typeof window === 'undefined') return null;
+    const storedUser = localStorage.getItem("user");
     if (storedUser) {
       try {
-        const parsedUser: UserDetails = JSON.parse(storedUser);
-        console.log("💾 Loaded user from localStorage:", parsedUser.alias);
-        return parsedUser;
+        return JSON.parse(storedUser) as UserDetails;
       } catch (e) {
         console.error("❌ Failed to parse local user data:", e);
       }
@@ -75,79 +72,62 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return null;
   };
 
-  const refreshUser = async (force: boolean = false) => {
-    if (isRefreshingRef.current) {
-      console.log("⏳ Already refreshing user, skipping...");
-      return;
+  const saveUserToStorage = (userData: UserDetails) => {
+    if (typeof window !== 'undefined') {
+      // Use requestIdleCallback to avoid blocking the main UI thread for I/O
+      const persist = () => {
+        // We often don't want to persist highly volatile data like coins 
+        // if the API is the source of truth, but we keep the rest.
+        const { coins, ...rest } = userData;
+        localStorage.setItem("user", JSON.stringify(rest));
+      };
+
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(persist);
+      } else {
+        setTimeout(persist, 0);
+      }
     }
+  };
+
+  const refreshUser = async (force: boolean = false) => {
+    if (isRefreshingRef.current) return;
 
     const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
-    
     if (!userToken) {
-      console.log("⚠️ No token found");
       setLoading(false);
       return;
     }
 
-    // ✅ Check if cache is still fresh
     const now = Date.now();
     const timeSinceLastFetch = now - lastFetchTime.current;
-    
-    if (!force && !isStaleRef.current && timeSinceLastFetch < CACHE_DURATION) {
-      console.log(`✅ User data is fresh (${Math.round(timeSinceLastFetch / 1000)}s old), skipping refresh`);
+
+    // Skip if data is still fresh and not forced
+    if (!force && !isStaleRef.current && timeSinceLastFetch < CACHE_DURATION && user) {
       return;
     }
 
-    console.log("🔄 refreshUser called", force ? "(forced)" : "(cache expired or stale)");
-
-    const cachedUser = loadUserFromStorage();
-    if (!cachedUser) {
-      setLoading(true);
-    }
-
     isRefreshingRef.current = true;
-
     try {
-      console.log("🌐 Fetching fresh user data from API...");
-      const response = await authenticatedFetch(`${BASE_URL}/api/getUserDetails`, {
-        method: "GET",
-      });
+      const response = await authenticatedFetch(`${BASE_URL}/api/getUserDetails`);
 
-      if (!response.ok) {
-        console.warn(`⚠️ Failed to fetch user details (Status: ${response.status})`);
-        setLoading(false);
-        return;
+      if (response.ok) {
+        const apiUser: UserDetails = await response.json();
+        
+        const updatedUser = {
+          ...apiUser,
+          level: apiUser.level || 1,
+          coins: apiUser.coins ?? 0,
+        };
+
+        setUser(updatedUser);
+        saveUserToStorage(updatedUser);
+        lastFetchTime.current = Date.now();
+        isStaleRef.current = false;
       }
-
-      const apiUser: UserDetails = await response.json();
-      console.log("✅ Fresh user data fetched from API:", apiUser.alias);
-
-      const userToStore = {
-        ...apiUser,
-        level: apiUser.level || 1,
-        userType: apiUser.userType || 'Registered',
-        interests: apiUser.interests || [],
-        coins: apiUser.coins || 0,
-        dailyClaimAvailable: apiUser.dailyClaimAvailable ?? false,
-      };
-
-      setUser(userToStore);
-      lastFetchTime.current = now;
-      isStaleRef.current = false; // Mark as fresh
-      
-      // Persist to localStorage asynchronously
-      if (typeof window !== 'undefined') {
-        requestIdleCallback(() => {
-          const safeToPersist = { ...userToStore };
-          delete safeToPersist.coins;
-          localStorage.setItem("user", JSON.stringify(safeToPersist));
-        });
-      }
-      
     } catch (error) {
-      console.error("❌ Error fetching user data:", error);
+      console.error("❌ Error refreshing user:", error);
     } finally {
-      console.log("🔄 refresh complete");
       setLoading(false);
       isRefreshingRef.current = false;
     }
@@ -156,22 +136,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateUserLocally = (updates: Partial<UserDetails>) => {
     setUser(prev => {
       if (!prev) return null;
-
       const updated = { ...prev, ...updates };
-
-      // Async localStorage write
-      if (typeof window !== 'undefined') {
-        requestIdleCallback(() => {
-          const safeToPersist = { ...updated };
-          delete safeToPersist.coins;
-          localStorage.setItem("user", JSON.stringify(safeToPersist));
-        });
-      }
-
-      if (globalCache.homeData) {
-        globalCache.homeData.user = updated;
-      }
-
+      saveUserToStorage(updated);
       return updated;
     });
   };
@@ -180,53 +146,33 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     updateUserLocally({ coins: newCoins });
   };
 
-  // ✅ NEW: Mark user data as stale (needs refresh on next check)
   const markUserStale = () => {
-    console.log("🔄 User data marked as stale");
     isStaleRef.current = true;
   };
 
-  // ✅ Initialize immediately with cached data
+  // Initial Initialization
   useEffect(() => {
-    if (hasInitializedRef.current) {
-      console.log("⭐️ Already initialized, skipping");
-      return;
-    }
-
-    hasInitializedRef.current = true;
-    console.log("🚀 UserProvider mounted");
-
-    // Load from cache instantly
-    const cachedUser = loadUserFromStorage();
-    if (cachedUser) {
-      console.log("⚡ Setting user from cache immediately");
-      setUser(cachedUser);
-      setLoading(false);
-      
-      // Check if cache is stale (older than 10 minutes)
-      const now = Date.now();
-      const shouldRefresh = isStaleRef.current || (now - lastFetchTime.current) > CACHE_DURATION;
-      
-      if (shouldRefresh) {
-        // Refresh in background only if stale
-        setTimeout(() => {
-          console.log("🔄 Background refresh started (cache stale)");
-          refreshUser();
-        }, 500);
+    const init = async () => {
+      const cached = loadUserFromStorage();
+      if (cached) {
+        setUser(cached);
+        setLoading(false);
+        // Background refresh if stale
+        refreshUser();
       } else {
-        console.log("✅ Cache is fresh, no background refresh needed");
+        // No cache, must fetch
+        await refreshUser(true);
       }
-    } else {
-      // No cache, fetch immediately
-      refreshUser(true);
-    }
+    };
+
+    init();
   }, []);
 
   return (
     <UserContext.Provider value={{ 
       user, 
       loading, 
-      refreshUser: () => refreshUser(true), // Force refresh when called explicitly
+      refreshUser: () => refreshUser(true), 
       updateUserLocally, 
       updateCoins,
       markUserStale 

@@ -1,4 +1,4 @@
-// Home.tsx - Complete Fixed Version (Single Source of Truth for Coins)
+// Home.tsx - Direct API calls without preloader
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
@@ -25,7 +25,6 @@ import GameStatsHeader from "../components/GameStatsHeader";
 import { useToast } from "@/hooks/use-toast";
 import DailyCoinClaim from "@/components/DailyCoinClaim";
 import { useUser } from "@/contexts/UserContext";
-import { globalCache, preloadLeaderboardData, preloadQuizSession, isQuizSessionReady, clearQuizCache } from "@/hooks/useAppPreloader"; 
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
@@ -35,6 +34,7 @@ const avatars: string[] = Object.values(avatarImages) as string[];
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const QUIZ_COST = 50;
+const API_TIMEOUT = 15000; // 15 second timeout for API calls
 
 interface CategoryToPlayResponse {
   message: string;
@@ -42,10 +42,6 @@ interface CategoryToPlayResponse {
   name: string;
   averageRating: number;
   questionsCount: number;
-}
-
-interface ErrorResponse {
-  message: string;
 }
 
 const authenticatedFetch = async (url: string, options: RequestInit) => {
@@ -66,33 +62,52 @@ const authenticatedFetch = async (url: string, options: RequestInit) => {
   });
 };
 
+// ✅ Fetch with timeout wrapper
+const fetchWithTimeout = async (url: string, options: RequestInit, timeout = API_TIMEOUT) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await authenticatedFetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout - server took too long to respond');
+    }
+    throw error;
+  }
+};
+
 export default function Home() {
   const { user, loading: userLoading, refreshUser, updateUserLocally, updateCoins, markUserStale } = useUser();
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
-  // REMOVED: const [currentCoins, setCurrentCoins] = useState(0);
 
   const [isInterestModalOpen, setIsInterestModalOpen] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [savingInterests, setSavingInterests] = useState(false);
 
-  // Preloading Refs
-  const preloadedCategoryRef = useRef<CategoryToPlayResponse | null>(null);
-  const isPreloadingRef = useRef(false);
-  const hasPreloadedLeaderboardRef = useRef(false);
+  // Simple component-level cache for next category
+  const categoryCache = useRef<{
+    data: CategoryToPlayResponse | null;
+    timestamp: number;
+  }>({ data: null, timestamp: 0 });
+
   const hasInitializedRef = useRef(false);
-  const preloadingSessionRef = useRef(false);
+  const hasDeductedRef = useRef(false);
 
   const navigate = useNavigate();
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
   const { toast } = useToast();
   
-  // Use context's coin value as the single source of truth
   const currentCoins = user?.coins ?? 0;
-  const hasDeductedRef = useRef(false);
-
 
   // Check screen size
   useEffect(() => {
@@ -102,80 +117,57 @@ export default function Home() {
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
-  // Initialization effect - Don't wait for userLoading
+  // ✅ SINGLE initialization effect - only splash screen
   useEffect(() => {
-    if (hasInitializedRef.current) {
-      console.log("⭐️ Already initialized, skipping");
-      return;
-    }
+    if (hasInitializedRef.current) return;
     
     hasInitializedRef.current = true;
-    console.log("✅ Initializing app (not waiting for user)");
+    console.log("✅ Initializing app");
     
     const hasShownSplash = typeof window !== 'undefined' ? sessionStorage.getItem("splashShown") : null;
     const shouldShowSplash = !hasShownSplash;
 
     if (shouldShowSplash) {
-      console.log("✨ Showing splash screen for first time");
+      console.log("✨ Showing splash screen");
       setShowSplash(true);
       if (typeof window !== 'undefined') {
         sessionStorage.setItem("splashShown", "true");
       }
       
-      const minSplashTime = 2500;
       const timer = setTimeout(() => {
-        console.log("🎬 Hiding splash screen after", minSplashTime, "ms");
+        console.log("🎬 Hiding splash screen");
         setShowSplash(false);
-        setTimeout(() => {
-          console.log("🚀 Starting preload after splash");
-          preloadNextCategoryAndSession();
-          preloadLeaderboardInBackground();
-        }, 300);
-      }, minSplashTime);
+      }, 2500);
       
-      return () => {
-        console.log("🧹 Cleaning up splash timer");
-        clearTimeout(timer);
-      };
-    } else {
-      console.log("⚡ No splash needed, preloading immediately");
-      preloadNextCategoryAndSession();
-      preloadLeaderboardInBackground();
+      return () => clearTimeout(timer);
     }
-  }, []); // Empty deps - run once!
+  }, []);
 
-  // User data setup - Better redirect logic
+  // User data setup
   useEffect(() => {
-    // Check token first
     const hasToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     
-    // No token = definitely not logged in
     if (!hasToken) {
       console.log("🔒 No token, redirecting to auth");
       navigate("/auth");
       return;
     }
 
-    // Still loading - don't redirect, just wait
     if (userLoading) {
       console.log("⏳ User still loading...");
       return;
     }
 
-    // Have token but no user after loading = problem, try refresh
     if (!user && !userLoading && hasToken) {
       console.log("⚠️ Have token but no user, attempting refresh...");
       refreshUser();
       return;
     }
 
-    // User loaded successfully - setup the app
     if (user) {
-      console.log("✅ User loaded, setting up home:", user.alias);
+      console.log("✅ User loaded:", user.alias);
       
       trackHomeScreen(user._id);
-
-      // REMOVED: Redundant setCurrentCoins(user.coins)
       
       const avatarIndex = user.avatar ? user.avatar - 1 : 0;
       const calculatedAvatar = avatars[avatarIndex] || null;
@@ -195,240 +187,186 @@ export default function Home() {
     }
   }, [user, userLoading, navigate, refreshUser]);
 
-  // Preload leaderboard data in background
-  const preloadLeaderboardInBackground = () => {
-    if (hasPreloadedLeaderboardRef.current) return;
+  // ✅ Fetch category on-demand (with component-level cache)
+  const fetchCategoryToPlay = async (): Promise<CategoryToPlayResponse | null> => {
+    const now = Date.now();
+    const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache
     
-    hasPreloadedLeaderboardRef.current = true;
+    // Check cache first
+    if (categoryCache.current.data && (now - categoryCache.current.timestamp) < CACHE_DURATION) {
+      console.log("⚡ Using cached category");
+      return categoryCache.current.data;
+    }
+
+    try {
+      console.log("🌐 Fetching next category from API...");
+      const response = await fetchWithTimeout(
+        `${BASE_URL}/api/getGetegoryToPlay`,
+        { method: "GET" },
+        API_TIMEOUT
+      );
+
+      if (response && response.ok) {
+        const data: CategoryToPlayResponse = await response.json();
+        if (data.categoryId) {
+          // Update cache
+          categoryCache.current = {
+            data: data,
+            timestamp: now
+          };
+          console.log("✅ Category fetched and cached:", data.categoryId);
+          return data;
+        }
+      } else {
+        console.warn("⚠️ Category API returned non-OK status");
+      }
+    } catch (error: any) {
+      console.error("❌ Error fetching category:", error.message);
+      
+      if (error.message.includes('timeout')) {
+        console.warn("⏱️ API timeout");
+        throw new Error('Request timeout - server took too long to respond');
+      }
+      throw error;
+    }
     
-    setTimeout(() => {
-      preloadLeaderboardData().then(() => {
-        console.log("🎯 Leaderboard preloaded in background");
-      });
-    }, 2000);
+    return null;
   };
 
-  // Enhanced: Preload next category AND quiz session together
-  const preloadNextCategoryAndSession = async () => {
-  if (!userToken || isPreloadingRef.current || preloadingSessionRef.current) {
-    console.log("⭐️ Already preloading or no token");
-    return;
-  }
-
-  // Check if we already have valid cached data
-  if (globalCache.nextCategory && isQuizSessionReady(globalCache.nextCategory.categoryId)) {
-    const cacheAge = Date.now() - globalCache.lastUpdated.category;
-    if (cacheAge < 2 * 60 * 1000) {
-      preloadedCategoryRef.current = globalCache.nextCategory;
-      console.log("✅ Using fully cached category + session:", globalCache.nextCategory.categoryId);
+  const handleQuickQuiz = async () => {
+    if (!userToken) {
+      console.log("⚠️ You must be logged in to play.");
       return;
     }
-  }
 
-  isPreloadingRef.current = true;
-  preloadingSessionRef.current = true;
-  
-  try {
-    console.log("🎯 Fetching next category...");
-    const response = await authenticatedFetch(`${BASE_URL}/api/getGetegoryToPlay`, {
-      method: "GET",
-    });
-
-    if (response && response.ok) {
-      const data: CategoryToPlayResponse = await response.json();
-      if (data.categoryId) {
-        preloadedCategoryRef.current = data;
-        globalCache.nextCategory = data;
-        globalCache.lastUpdated.category = Date.now();
-        console.log("✅ Category fetched:", data.categoryId);
-        
-        // Use the imported function which now includes category name fetching
-        console.log("🚀 Starting full quiz session preload...");
-        await preloadQuizSession(data.categoryId);
-        console.log("✅ Full quiz session preloaded!");
-      }
+    if (currentCoins < QUIZ_COST) {
+      toast({
+        title: "Insufficient Coins",
+        description: `You need ${QUIZ_COST} coins to start a quiz.`,
+        variant: "destructive",
+      });
+      return;
     }
-  } catch (error) {
-    console.error("❌ Error preloading category:", error);
-  } finally {
-    isPreloadingRef.current = false;
-    preloadingSessionRef.current = false;
-  }
-};
 
-
-const handleQuickQuiz = async () => {
-  if (!userToken) {
-    console.log("⚠️ You must be logged in to play.");
-    return;
-  }
-
-  if (currentCoins < QUIZ_COST) {
-    toast({
-      title: "Insufficient Coins",
-      description: `You need ${QUIZ_COST} coins to start a quiz.`,
-      variant: "destructive",
-    });
-    return;
-  }
-
-  const cachedCategory = preloadedCategoryRef.current || globalCache.nextCategory;
-  
-  if (cachedCategory && cachedCategory.categoryId) {
-    const categoryId = cachedCategory.categoryId;
-    
-    const sessionReady = isQuizSessionReady(categoryId);
-    
-    if (sessionReady) {
-      console.log("🚀 INSTANT START - Full session ready for:", categoryId);
-      console.log("   - Category name:", globalCache.quizSession?.categoryName);
-    } else {
-      console.log("⚠️ Session not ready for this category, will load on quiz page");
-    }
-    
     if (hasDeductedRef.current) return;
     hasDeductedRef.current = true;
 
+    // Optimistically deduct coins
     const optimisticCoins = currentCoins - QUIZ_COST;
     updateCoins(optimisticCoins);
+    setPlayButtonLoading(true);
 
-    // ✅ ADD THIS: Mark user as stale since coins were deducted
-    markUserStale();
-    
-    // Clear refs BEFORE navigation
-    preloadedCategoryRef.current = null;
-    globalCache.nextCategory = null;
-    globalCache.lastUpdated.category = 0;
-    
-    console.log("🎮 Navigating to quiz:", categoryId);
-    navigate(`/quiz/${categoryId}`);
-    
-    setTimeout(() => {
-      console.log("🧹 Clearing used quiz session");
-      clearQuizCache();
-    }, 1000);
-    
-    return;
-  }
+    try {
+      // Fetch category when needed
+      const category = await fetchCategoryToPlay();
+      
+      if (!category || !category.categoryId) {
+        // Restore coins on failure
+        updateCoins(currentCoins);
+        hasDeductedRef.current = false;
+        toast({
+          title: "Error",
+          description: "Could not find a category to play. Please try again later.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-  // --- Fallback Path (No cached category) ---
-  console.log("⚠️ No cached category, fetching fresh...");
-  
-  const optimisticCoins = currentCoins - QUIZ_COST;
-  updateCoins(optimisticCoins);
-  setPlayButtonLoading(true);
-
-  try {
-    const response = await authenticatedFetch(`${BASE_URL}/api/getGetegoryToPlay`, {
-      method: "GET",
-    });
-    
-    if (!response.ok) {
-      updateCoins(currentCoins);
-      hasDeductedRef.current = false;
-      throw new Error("Failed to fetch next category.");
-    }
-
-    const data: CategoryToPlayResponse = await response.json();
-
-    if (data.categoryId) {
-      // ✅ ADD THIS: Mark user as stale since coins were deducted
+      // Mark user as stale for next refresh
       markUserStale();
       
-      navigate(`/quiz/${data.categoryId}`);
+      // Clear cache before navigation
+      categoryCache.current = { data: null, timestamp: 0 };
+      
+      console.log("🎮 Navigating to quiz:", category.categoryId);
+      navigate(`/quiz/${category.categoryId}`);
+      
+      // Reset deducted flag after navigation
+      setTimeout(() => {
+        hasDeductedRef.current = false;
+      }, 1000);
+
+    } catch (error: any) {
+      // Restore coins on error
+      updateCoins(currentCoins);
       hasDeductedRef.current = false;
       
-      setTimeout(() => {
-        preloadNextCategoryAndSession();
-      }, 1000);
-    } else {
-      updateCoins(currentCoins);
+      // User-friendly error messages
+      const errorMessage = error.message.includes('timeout')
+        ? 'Server is taking too long to respond. Please check your connection and try again.'
+        : `Failed to start quiz: ${error.message}`;
+      
       toast({
-        title: "Error",
-        description: "Could not find a category to play. Please try again later.",
+        title: error.message.includes('timeout') ? "Request Timeout" : "Error",
+        description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setPlayButtonLoading(false);
     }
-  } catch (error) {
-    updateCoins(currentCoins);
-    hasDeductedRef.current = false;
-    const err = error as Error;
-    toast({
-      title: "Error",
-      description: `Failed to start quiz: ${err.message}`,
-      variant: "destructive",
-    });
-  } finally {
-    setPlayButtonLoading(false);
-  }
-};
+  };
 
-// Interest Modal Handlers
-const handleInterestChange = (newSelectedIds: string[]) => {
-  setSelectedInterests(newSelectedIds);
-};
+  // Interest Modal Handlers
+  const handleInterestChange = (newSelectedIds: string[]) => {
+    setSelectedInterests(newSelectedIds);
+  };
 
-const handleSaveInterests = async () => {
-  if (!user?._id) return;
-  setSavingInterests(true);
+  const handleSaveInterests = async () => {
+    if (!user?._id) return;
+    setSavingInterests(true);
 
-  try {
-    const token = localStorage.getItem("token");
-    if (!token) throw new Error("Authentication token missing.");
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Authentication token missing.");
 
-    const interestsResponse = await fetch(
-      `${BASE_URL}/api/interests/user/${user._id}`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ interests: selectedInterests }),
+      const interestsResponse = await fetch(
+        `${BASE_URL}/api/interests/user/${user._id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({ interests: selectedInterests }),
+        }
+      );
+
+      if (!interestsResponse.ok) {
+        throw new Error("Failed to update interests.");
       }
-    );
 
-    if (!interestsResponse.ok) {
-      throw new Error("Failed to update interests.");
+      updateUserLocally({ interests: selectedInterests });
+      markUserStale();
+      
+      trackEvent("update_interests", {
+        user_id: user._id,
+        interest_count: selectedInterests.length,
+        context: "home_screen_modal",
+      });
+      setIsInterestModalOpen(false);
+    } catch (error) {
+      const err = error as Error;
+      toast({
+        title: "Error",
+        description: `Failed to save interests: ${err.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingInterests(false);
     }
+  };
 
-    updateUserLocally({ interests: selectedInterests });
-    
-    // ✅ ADD THIS LINE
+  const handleCoinsEarned = (amount: number) => {
+    const newTotal = currentCoins + amount;
+    updateCoins(newTotal);
+    updateUserLocally({ dailyClaimAvailable: false });
     markUserStale();
-    
-    trackEvent("update_interests", {
-      user_id: user._id,
-      interest_count: selectedInterests.length,
-      context: "home_screen_modal",
-    });
-    setIsInterestModalOpen(false);
-  } catch (error) {
-    const err = error as Error;
-    toast({
-      title: "Error",
-      description: `Failed to save interests: ${err.message}`,
-      variant: "destructive",
-    });
-  } finally {
-    setSavingInterests(false);
-  }
-};
+  };
 
-const handleCoinsEarned = (amount: number) => {
-  const newTotal = currentCoins + amount;
-  updateCoins(newTotal); // Update context
-  updateUserLocally({ dailyClaimAvailable: false });
-  markUserStale();
-};
-
-  // Show splash screen
   if (showSplash) {
-    console.log("🎬 Rendering splash screen");
     return <SplashScreen dataLoaded={!userLoading} />;
   }
 
-  // Show loading state
   if (userLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center"
@@ -444,7 +382,6 @@ const handleCoinsEarned = (amount: number) => {
     );
   }
 
-  // Better error handling - don't just return null
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center"
@@ -482,7 +419,6 @@ const handleCoinsEarned = (amount: number) => {
           <GameStatsHeader
             userToken={userToken}
             isParentLoading={false}
-            // REMOVED: onCoinsUpdate prop
             currentCoinsFromParent={currentCoins}
             userXP={user.knowledgePoints ?? 0}
             userGem1={user.wisdomGems ?? 0}
@@ -511,7 +447,6 @@ const handleCoinsEarned = (amount: number) => {
             userToken={userToken}
             onCoinsEarned={refreshUser}
             isClaimAvailable={user.dailyClaimAvailable ?? false} 
-            // Pass local updater for claim status
             updateUserLocally={updateUserLocally}
           />
         </div>
@@ -557,19 +492,18 @@ const handleCoinsEarned = (amount: number) => {
 
         <div className={`space-y-2 flex-shrink-0 w-full ${isSmallScreen ? 'pb-36 pt-10' : 'pb-24 pt-16'}`}>
           <Button
-          variant="default"
-          onClick={handleQuickQuiz}
-          disabled={playButtonLoading || currentCoins < QUIZ_COST}
-          className={`w-full flex items-center justify-between px-6 ${isSmallScreen ? 'h-20' : 'h-24 sm:h-24'}`}
-        >
-          {playButtonLoading ? (
-            <div className="flex items-center justify-center w-full gap-2 text-xl sm:text-2xl">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              Starting Quiz...
-            </div>
-          ) : (
+            variant="default"
+            onClick={handleQuickQuiz}
+            disabled={playButtonLoading || currentCoins < QUIZ_COST}
+            className={`w-full flex items-center justify-between px-6 ${isSmallScreen ? 'h-20' : 'h-24 sm:h-24'}`}
+          >
+            {playButtonLoading ? (
+              <div className="flex items-center justify-center w-full gap-2 text-xl sm:text-2xl">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                Starting Quiz...
+              </div>
+            ) : (
               <>
-                {/* Left side: Play + coins */}
                 <div className="flex items-center justify-center gap-3 sm:gap-4 h-full">
                   <span className="text-4xl sm:text-5xl font-bold text-white leading-none flex items-center -translate-y-[1px]">
                     Play
@@ -589,18 +523,17 @@ const handleCoinsEarned = (amount: number) => {
                   </span>
                 </div>
 
-              <div className="bg-white rounded-full w-14 h-14 sm:w-[72px] sm:h-[72px] flex flex-col items-center justify-center shadow-md border-2 border-green-500">
-                <span className="text-green-600 text-2xl sm:text-3xl font-bold leading-none">
-                  {userLevel}
-                </span>
-                <span className="text-green-600 text-[10px] sm:text-xs font-semibold uppercase leading-none tracking-wide mt-0.5">
-                  Level
-                </span>
-              </div>
-            </>
-          )}
-        </Button>
-
+                <div className="bg-white rounded-full w-14 h-14 sm:w-[72px] sm:h-[72px] flex flex-col items-center justify-center shadow-md border-2 border-green-500">
+                  <span className="text-green-600 text-2xl sm:text-3xl font-bold leading-none">
+                    {userLevel}
+                  </span>
+                  <span className="text-green-600 text-[10px] sm:text-xs font-semibold uppercase leading-none tracking-wide mt-0.5">
+                    Level
+                  </span>
+                </div>
+              </>
+            )}
+          </Button>
 
           {currentCoins < QUIZ_COST && (
             <p className="text-red-400 text-sm text-center font-medium">
