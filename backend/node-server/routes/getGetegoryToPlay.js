@@ -30,39 +30,79 @@ router.get("/", authenticateToken, async (req, res) => {
 
         console.log(`User level: ${userLevel}, difficulties ${minDifficulty}-${maxDifficulty}`);
 
-        // ✅ OPTIMIZED: Only select needed fields, no deep population
+        // ✅ OPTIMIZED: Use MongoDB aggregation to count questions at DB level
         console.time("⏱️ DB Query Time");
         
-        let categories = await Category.find({ disabled: false })
-            .select('_id name interests averageRating ratings questions')
-            .populate('interests', 'name')
-            .lean();
-
-        console.timeEnd("⏱️ DB Query Time");
-        
-        console.log(`📊 Loaded ${categories.length} active categories`);
-
-        // ✅ Filter categories by question count (optimized with early exit)
-        categories = categories.filter(cat => {
-            if (!cat.questions || !Array.isArray(cat.questions)) {
-                return false;
-            }
+        const categories = await Category.aggregate([
+            // 1️⃣ Match active categories only
+            {
+                $match: { disabled: false }
+            },
             
-            // Count eligible questions
-            let eligibleCount = 0;
-            for (const q of cat.questions) {
-                if (!q.disabled && 
-                    q.difficulty_level >= minDifficulty && 
-                    q.difficulty_level <= maxDifficulty) {
-                    eligibleCount++;
-                    // Early exit: stop counting after 20
-                    if (eligibleCount >= 20) {
-                        return true;
-                    }
+            // 2️⃣ Project only what we need + filter questions in projection
+            {
+                $project: {
+                    name: 1,
+                    interests: 1,
+                    averageRating: 1,
+                    ratings: 1,
+                    // Filter questions and count them in one step
+                    eligibleQuestions: {
+                        $filter: {
+                            input: "$questions",
+                            as: "q",
+                            cond: {
+                                $and: [
+                                    { $eq: ["$$q.disabled", false] },
+                                    { $gte: ["$$q.difficulty_level", minDifficulty] },
+                                    { $lte: ["$$q.difficulty_level", maxDifficulty] }
+                                ]
+                            }
+                        }
+                    },
+                    totalQuestions: { $size: "$questions" }
+                }
+            },
+            
+            // 3️⃣ Add count field
+            {
+                $addFields: {
+                    eligibleCount: { $size: "$eligibleQuestions" }
+                }
+            },
+            
+            // 4️⃣ Filter categories with >= 20 eligible questions
+            {
+                $match: {
+                    eligibleCount: { $gte: 20 }
+                }
+            },
+            
+            // 5️⃣ Lookup interests
+            {
+                $lookup: {
+                    from: "interests",
+                    localField: "interests",
+                    foreignField: "_id",
+                    as: "interests"
+                }
+            },
+            
+            // 6️⃣ Project final shape (remove eligibleQuestions array to save memory)
+            {
+                $project: {
+                    name: 1,
+                    interests: { _id: 1, name: 1 },
+                    averageRating: 1,
+                    ratings: 1,
+                    eligibleCount: 1,
+                    totalQuestions: 1
                 }
             }
-            return false;
-        });
+        ]);
+
+        console.timeEnd("⏱️ DB Query Time");
+        console.log(`📊 Found ${categories.length} categories with 20+ eligible questions`);
 
         if (!categories.length) {
             return res.status(404).json({
@@ -70,9 +110,7 @@ router.get("/", authenticateToken, async (req, res) => {
             });
         }
 
-        console.log(`✅ Found ${categories.length} eligible categories`);
-
-        // 2️⃣ Filter by user interests (AFTER getting filtered categories)
+        // 2️⃣ Filter by user interests
         let interestMatched = categories.filter(cat =>
             Array.isArray(cat.interests) &&
             cat.interests.length > 0 &&
@@ -116,21 +154,14 @@ router.get("/", authenticateToken, async (req, res) => {
         const randomIndex = Math.floor(Math.random() * weightedPool.length);
         const chosenCategory = weightedPool[randomIndex];
 
-        // Count filtered questions for response
-        const filteredCount = chosenCategory.questions.filter(q =>
-            !q.disabled &&
-            q.difficulty_level >= minDifficulty && 
-            q.difficulty_level <= maxDifficulty
-        ).length;
-
         res.status(200).json({
             message: "🎮 Category selected for play",
             categoryId: chosenCategory._id,
             name: chosenCategory.name,
             interests: chosenCategory.interests.map(i => i.name),
             averageRating: chosenCategory.averageRating || 0,
-            totalQuestions: chosenCategory.questions.length,
-            filteredQuestions: filteredCount,
+            totalQuestions: chosenCategory.totalQuestions,
+            filteredQuestions: chosenCategory.eligibleCount,
             difficultyRange: [minDifficulty, maxDifficulty],
         });
 
