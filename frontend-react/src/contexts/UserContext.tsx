@@ -1,4 +1,4 @@
-// UserContext.tsx - FIXED VERSION - Minimal API calls
+// UserContext.tsx - OPTIMIZED - Minimal API calls
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { globalCache } from '@/hooks/useAppPreloader';
 
@@ -26,6 +26,7 @@ interface UserContextType {
   refreshUser: () => Promise<void>;
   updateUserLocally: (updates: Partial<UserDetails>) => void;
   updateCoins: (newCoins: number) => void;
+  markUserStale: () => void; // New: Mark user data as needing refresh
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -50,11 +51,15 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserDetails | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   
-  // ✅ CRITICAL FIX: Prevent multiple simultaneous refreshes
   const isRefreshingRef = useRef(false);
   const hasInitializedRef = useRef(false);
+  const lastFetchTime = useRef<number>(0);
+  const isStaleRef = useRef(false); // Track if user data needs refresh
+
+  // 🎯 CACHE DURATION: Only refresh if data is older than 10 minutes
+  const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
   const loadUserFromStorage = () => {
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem("user") : null;
@@ -62,7 +67,6 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       try {
         const parsedUser: UserDetails = JSON.parse(storedUser);
         console.log("💾 Loaded user from localStorage:", parsedUser.alias);
-        setUser(parsedUser);
         return parsedUser;
       } catch (e) {
         console.error("❌ Failed to parse local user data:", e);
@@ -71,14 +75,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return null;
   };
 
-  const refreshUser = async () => {
-    // ✅ CRITICAL FIX: Prevent multiple simultaneous API calls
+  const refreshUser = async (force: boolean = false) => {
     if (isRefreshingRef.current) {
       console.log("⏳ Already refreshing user, skipping...");
       return;
     }
 
-    console.log("🔄 refreshUser called");
     const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
     
     if (!userToken) {
@@ -87,14 +89,22 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    // Load from localStorage first for instant display
-    const cachedUser = loadUserFromStorage();
-    if (cachedUser) {
-      console.log("⚡ User loaded from localStorage immediately");
-      setLoading(false);
+    // ✅ Check if cache is still fresh
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime.current;
+    
+    if (!force && !isStaleRef.current && timeSinceLastFetch < CACHE_DURATION) {
+      console.log(`✅ User data is fresh (${Math.round(timeSinceLastFetch / 1000)}s old), skipping refresh`);
+      return;
     }
 
-    // ✅ Set flag to prevent concurrent refreshes
+    console.log("🔄 refreshUser called", force ? "(forced)" : "(cache expired or stale)");
+
+    const cachedUser = loadUserFromStorage();
+    if (!cachedUser) {
+      setLoading(true);
+    }
+
     isRefreshingRef.current = true;
 
     try {
@@ -105,15 +115,13 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (!response.ok) {
         console.warn(`⚠️ Failed to fetch user details (Status: ${response.status})`);
-        if (!cachedUser) {
-          setLoading(false);
-        }
+        setLoading(false);
         return;
       }
 
       const apiUser: UserDetails = await response.json();
       console.log("✅ Fresh user data fetched from API:", apiUser.alias);
-      
+
       const userToStore = {
         ...apiUser,
         level: apiUser.level || 1,
@@ -124,70 +132,105 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       };
 
       setUser(userToStore);
+      lastFetchTime.current = now;
+      isStaleRef.current = false; // Mark as fresh
       
+      // Persist to localStorage asynchronously
       if (typeof window !== 'undefined') {
-        localStorage.setItem("user", JSON.stringify(userToStore));
+        requestIdleCallback(() => {
+          const safeToPersist = { ...userToStore };
+          delete safeToPersist.coins;
+          localStorage.setItem("user", JSON.stringify(safeToPersist));
+        });
       }
-
-      // Update global cache
-      globalCache.homeData = {
-        user: userToStore,
-        timestamp: Date.now(),
-      };
-      globalCache.lastUpdated.home = Date.now();
+      
     } catch (error) {
-      console.error("❌ Error fetching user details from API:", error);
+      console.error("❌ Error fetching user data:", error);
     } finally {
-      console.log("✓ User refresh complete");
-      if (!cachedUser) {
-        setLoading(false);
-      }
-      // ✅ Reset flag after completion
+      console.log("🔄 refresh complete");
+      setLoading(false);
       isRefreshingRef.current = false;
     }
   };
 
   const updateUserLocally = (updates: Partial<UserDetails>) => {
-  setUser(prev => {
-    if (!prev) return null;
+    setUser(prev => {
+      if (!prev) return null;
 
-    const updated = { ...prev, ...updates };
+      const updated = { ...prev, ...updates };
 
-    // ✅ Only persist safe fields
-    const safeToPersist = { ...updated };
-    delete safeToPersist.coins;
+      // Async localStorage write
+      if (typeof window !== 'undefined') {
+        requestIdleCallback(() => {
+          const safeToPersist = { ...updated };
+          delete safeToPersist.coins;
+          localStorage.setItem("user", JSON.stringify(safeToPersist));
+        });
+      }
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem("user", JSON.stringify(safeToPersist));
-    }
+      if (globalCache.homeData) {
+        globalCache.homeData.user = updated;
+      }
 
-    if (globalCache.homeData) {
-      globalCache.homeData.user = updated;
-    }
-
-    return updated;
-  });
-};
-
+      return updated;
+    });
+  };
 
   const updateCoins = (newCoins: number) => {
     updateUserLocally({ coins: newCoins });
   };
 
-  // ✅ CRITICAL FIX: Only initialize once
+  // ✅ NEW: Mark user data as stale (needs refresh on next check)
+  const markUserStale = () => {
+    console.log("🔄 User data marked as stale");
+    isStaleRef.current = true;
+  };
+
+  // ✅ Initialize immediately with cached data
   useEffect(() => {
     if (hasInitializedRef.current) {
       console.log("⭐️ Already initialized, skipping");
       return;
     }
 
-    console.log("🚀 UserProvider mounted, calling refreshUser");
     hasInitializedRef.current = true;
-    refreshUser();
-  }, []); // Empty deps!
+    console.log("🚀 UserProvider mounted");
+
+    // Load from cache instantly
+    const cachedUser = loadUserFromStorage();
+    if (cachedUser) {
+      console.log("⚡ Setting user from cache immediately");
+      setUser(cachedUser);
+      setLoading(false);
+      
+      // Check if cache is stale (older than 10 minutes)
+      const now = Date.now();
+      const shouldRefresh = isStaleRef.current || (now - lastFetchTime.current) > CACHE_DURATION;
+      
+      if (shouldRefresh) {
+        // Refresh in background only if stale
+        setTimeout(() => {
+          console.log("🔄 Background refresh started (cache stale)");
+          refreshUser();
+        }, 500);
+      } else {
+        console.log("✅ Cache is fresh, no background refresh needed");
+      }
+    } else {
+      // No cache, fetch immediately
+      refreshUser(true);
+    }
+  }, []);
 
   return (
-    <UserContext.Provider value={{ user, loading, refreshUser, updateUserLocally, updateCoins }}>
+    <UserContext.Provider value={{ 
+      user, 
+      loading, 
+      refreshUser: () => refreshUser(true), // Force refresh when called explicitly
+      updateUserLocally, 
+      updateCoins,
+      markUserStale 
+    }}>
       {children}
     </UserContext.Provider>
   );

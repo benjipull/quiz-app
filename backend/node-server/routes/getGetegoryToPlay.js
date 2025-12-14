@@ -5,13 +5,13 @@ const authenticateToken = require("../middleware/auth");
 
 const router = express.Router();
 
-// @route   GET /api/play
+// @route   GET /api/getGetegoryToPlay
 // @desc    Get a random playable category (based on difficulty + user interests)
 // @access  Private
 router.get("/", authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
-        const user = await User.findById(userId).lean();
+        const user = await User.findById(userId).select('level interests').lean();
 
         if (!user) {
             return res.status(404).json({ message: "❌ User not found" });
@@ -28,18 +28,84 @@ router.get("/", authenticateToken, async (req, res) => {
             maxDifficulty = 10;
         }
 
-        console.log(
-            `User level: ${userLevel}, selecting difficulties ${minDifficulty}-${maxDifficulty}`
-        );
-        console.log(`User interests: ${userInterests.join(", ")}`);
+        console.log(`User level: ${userLevel}, difficulties ${minDifficulty}-${maxDifficulty}`);
 
-        // 1️⃣ Load all active categories
+        // ✅ STEP 1: Load only category metadata (NO questions)
+        console.time("⏱️ Load Categories");
+        
         let categories = await Category.find({ disabled: false })
-            .lean()
-            .populate("interests", "name");
+            .select('_id name interests averageRating ratings')
+            .populate('interests', 'name')
+            .lean();
 
-        // 2️⃣ Filter by user interests — FIRST PASS (safe version)
-        let interestMatched = categories.filter(cat =>
+        console.timeEnd("⏱️ Load Categories");
+        console.log(`📊 Loaded ${categories.length} active categories`);
+
+        // ✅ STEP 2: For each category, count eligible questions using aggregation
+        console.time("⏱️ Count Questions");
+        
+        const categoryIds = categories.map(c => c._id);
+        
+        const questionCounts = await Category.aggregate([
+            // Match our specific categories
+            {
+                $match: {
+                    _id: { $in: categoryIds },
+                    disabled: false
+                }
+            },
+            // Unwind questions array
+            {
+                $unwind: "$questions"
+            },
+            // Filter questions by criteria
+            {
+                $match: {
+                    "questions.disabled": false,
+                    "questions.difficulty_level": { 
+                        $gte: minDifficulty, 
+                        $lte: maxDifficulty 
+                    }
+                }
+            },
+            // Group and count
+            {
+                $group: {
+                    _id: "$_id",
+                    eligibleCount: { $sum: 1 },
+                    totalCount: { $sum: 1 }
+                }
+            },
+            // Only categories with 20+
+            {
+                $match: {
+                    eligibleCount: { $gte: 20 }
+                }
+            }
+        ]);
+
+        console.timeEnd("⏱️ Count Questions");
+        console.log(`✅ Found ${questionCounts.length} categories with 20+ eligible questions`);
+
+        // Create a map of counts
+        const countMap = new Map();
+        questionCounts.forEach(item => {
+            countMap.set(item._id.toString(), item.eligibleCount);
+        });
+
+        // ✅ STEP 3: Filter categories that have enough questions
+        categories = categories.filter(cat => 
+            countMap.has(cat._id.toString())
+        );
+
+        if (!categories.length) {
+            return res.status(404).json({
+                message: "❌ No categories with 20+ questions in your difficulty range.",
+            });
+        }
+
+        // ✅ STEP 4: Filter by user interests
+        const interestMatched = categories.filter(cat =>
             Array.isArray(cat.interests) &&
             cat.interests.length > 0 &&
             cat.interests.some(intObj =>
@@ -49,34 +115,19 @@ router.get("/", authenticateToken, async (req, res) => {
             )
         );
 
+        // Use matched categories if found, otherwise keep all
+        const finalCategories = interestMatched.length > 0 ? interestMatched : categories;
+        
         if (interestMatched.length > 0) {
-            console.log(`🎯 Found ${interestMatched.length} interest-matching categories`);
-            categories = interestMatched;
+            console.log(`🎯 ${interestMatched.length} categories match interests`);
         } else {
-            console.log("⚠️ No category matched user interests → Falling back to ALL categories");
+            console.log("⚠️ No interest matches, using all eligible categories");
         }
 
-        // 3️⃣ Filter categories by question count (same logic as before)
-        categories = categories.filter(cat => {
-            const filtered = cat.questions.filter(q =>
-                !q.disabled &&
-                q.difficulty_level >= minDifficulty &&
-                q.difficulty_level <= maxDifficulty
-            );
-            return filtered.length >= 20;
-        });
-
-        if (!categories.length) {
-            return res.status(404).json({
-                message:
-                    "❌ No categories available with 20+ questions in your difficulty range.",
-            });
-        }
-
-        // 4️⃣ Build weighted pool (unchanged)
+        // ✅ STEP 5: Build weighted pool
         let weightedPool = [];
 
-        for (const cat of categories) {
+        for (const cat of finalCategories) {
             let weight = 1;
 
             if (cat.ratings && cat.ratings.length > 5) {
@@ -95,28 +146,35 @@ router.get("/", authenticateToken, async (req, res) => {
             }
         }
 
-        // 5️⃣ Pick random category
+        // ✅ STEP 6: Pick random category
         const randomIndex = Math.floor(Math.random() * weightedPool.length);
         const chosenCategory = weightedPool[randomIndex];
 
-        const filteredCount = chosenCategory.questions.filter(q =>
-            q.difficulty_level >= minDifficulty && q.difficulty_level <= maxDifficulty
-        ).length;
+        const eligibleCount = countMap.get(chosenCategory._id.toString()) || 0;
+
+        // Get total question count for this category
+        const fullCategory = await Category.findById(chosenCategory._id)
+            .select('questions')
+            .lean();
 
         res.status(200).json({
             message: "🎮 Category selected for play",
             categoryId: chosenCategory._id,
             name: chosenCategory.name,
             interests: chosenCategory.interests.map(i => i.name),
-            averageRating: chosenCategory.averageRating,
-            totalQuestions: chosenCategory.questions.length,
-            filteredQuestions: filteredCount,
+            averageRating: chosenCategory.averageRating || 0,
+            totalQuestions: fullCategory?.questions?.length || 0,
+            filteredQuestions: eligibleCount,
             difficultyRange: [minDifficulty, maxDifficulty],
         });
 
     } catch (error) {
         console.error("❌ Server Error:", error);
-        res.status(500).json({ message: "⚠️ Server error", error: error.message });
+        console.error("Stack:", error.stack);
+        res.status(500).json({ 
+            message: "⚠️ Server error", 
+            error: error.message 
+        });
     }
 });
 

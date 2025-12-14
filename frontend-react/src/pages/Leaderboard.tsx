@@ -1,10 +1,9 @@
-// Leaderboard.tsx - FINAL OPTIMIZED VERSION
-// No duplicate API calls, instant cache loading
+// Leaderboard.tsx - ON-DEMAND LOADING VERSION
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Clock, ArrowLeft } from "lucide-react";
 import { apiClient } from "@/utils/apiClient";
 import { useNavigate } from "react-router-dom";
-import { globalCache } from "@/hooks/useAppPreloader";
+import { globalCache, preloadLeaderboardData } from "@/hooks/useAppPreloader";
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
@@ -36,7 +35,7 @@ const Leaderboard = () => {
 
   const [currentPeriod, setCurrentPeriod] = useState<"day" | "week" | "month" | "year">("day");
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardPlayer[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading true
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [previousLeaderboardData, setPreviousLeaderboardData] = useState<LeaderboardPlayer[]>([]);
@@ -45,13 +44,12 @@ const Leaderboard = () => {
   const currentUserRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // ✅ Track which periods have been fetched to prevent duplicates
   const fetchedPeriodsRef = useRef<Set<string>>(new Set());
   const isFetchingRef = useRef(false);
+  const hasInitialized = useRef(false);
 
-  // ✅ Memoized fetch function to prevent recreation
+  // Memoized fetch function
   const fetchLeaderboard = useCallback(async (period: "day" | "week" | "month" | "year") => {
-    // Prevent concurrent fetches
     if (isFetchingRef.current) {
       console.log("⏳ Already fetching, skipping...");
       return;
@@ -60,7 +58,7 @@ const Leaderboard = () => {
     // Check cache first
     const cached = globalCache.leaderboardData[period];
     const cacheAge = Date.now() - globalCache.lastUpdated.leaderboard;
-    const CACHE_VALID_DURATION = 10 * 60 * 1000; // 10 minutes
+    const CACHE_VALID_DURATION = 10 * 60 * 1000;
 
     if (cached && cached.length > 0 && cacheAge < CACHE_VALID_DURATION) {
       console.log(`✅ Using cached ${period} leaderboard`);
@@ -70,9 +68,8 @@ const Leaderboard = () => {
       return;
     }
 
-    // Only fetch if not already fetched
     if (fetchedPeriodsRef.current.has(period)) {
-      console.log(`⭐️ Already fetched ${period}, using existing data`);
+      console.log(`⏸️ Already fetched ${period}, using existing data`);
       return;
     }
 
@@ -83,20 +80,20 @@ const Leaderboard = () => {
       setPreviousLeaderboardData(leaderboardData);
     }
 
-    try {
+      try {
       console.log(`🌐 Fetching ${period} leaderboard from API...`);
       const res = await apiClient(`${BASE_URL}/api/leaderboard?period=${period}`);
-      
-      if (res?.ok) {
+
+      if (res instanceof Response && res.ok) {
         const data = await res.json();
         const leaderboard = data.leaderboard || [];
-        
+
         setLeaderboardData(leaderboard);
-        
+
         // Update global cache
         globalCache.leaderboardData[period] = leaderboard;
         globalCache.lastUpdated.leaderboard = Date.now();
-        
+
         fetchedPeriodsRef.current.add(period);
         console.log(`✅ Fetched and cached ${period} leaderboard`);
       } else {
@@ -109,27 +106,41 @@ const Leaderboard = () => {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [leaderboardData]);
+    }, [leaderboardData]);
 
-  // ✅ SINGLE initialization effect - load from cache or fetch
+
+  // 🔥 INITIALIZATION - Trigger fetch on mount
   useEffect(() => {
-    // Load initial period (day) from cache or fetch
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    console.log("🎯 Leaderboard mounted - starting on-demand fetch");
+    
+    // Check cache first for instant display
     const cachedDay = globalCache.leaderboardData.day;
     const cacheAge = Date.now() - globalCache.lastUpdated.leaderboard;
     const CACHE_VALID_DURATION = 10 * 60 * 1000;
 
     if (cachedDay && cachedDay.length > 0 && cacheAge < CACHE_VALID_DURATION) {
-      console.log("⚡ Instant load from cache");
+      console.log("⚡ Instant load from existing cache");
       setLeaderboardData(cachedDay);
       setLoading(false);
       fetchedPeriodsRef.current.add("day");
     } else {
-      console.log("🌐 Initial fetch required");
-      fetchLeaderboard("day");
+      // Trigger full leaderboard preload
+      console.log("🚀 No cache - fetching all leaderboard data");
+      preloadLeaderboardData().then(() => {
+        const dayData = globalCache.leaderboardData.day;
+        if (dayData && dayData.length > 0) {
+          setLeaderboardData(dayData);
+          fetchedPeriodsRef.current.add("day");
+        }
+        setLoading(false);
+      });
     }
-  }, []); // ✅ Empty deps - run once!
+  }, []);
 
-  // ✅ Load current user info
+  // Load current user info
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     const storedUserAvatarIndex = localStorage.getItem("userAvatarIndex");
@@ -154,7 +165,7 @@ const Leaderboard = () => {
     }
   }, []);
 
-  // ✅ Handle period changes - use cache or fetch if needed
+  // Handle period changes
   const handlePeriodChange = useCallback((newPeriod: "day" | "week" | "month" | "year") => {
     if (newPeriod === currentPeriod) return;
 
@@ -189,32 +200,45 @@ const Leaderboard = () => {
     }
   }, [leaderboardData, loading]);
 
-  // Calculate time left for current period
-  useEffect(() => {
-    const calculateTimeLeft = () => {
-      const now = new Date();
-      let endTime: Date;
+  // Calculate time left
+ useEffect(() => {
+  const calculateTimeLeft = () => {
+    const now = new Date();
+    let endTime: Date;
+    let daysUntilSunday: number; 
 
-      switch (currentPeriod) {
-        case "day":
-          endTime = new Date(now);
-          endTime.setHours(23, 59, 59, 999);
-          break;
-        case "week":
-          endTime = new Date(now);
-          const daysUntilSunday = 7 - now.getDay();
-          endTime.setDate(now.getDate() + daysUntilSunday);
-          endTime.setHours(23, 59, 59, 999);
-          break;
-        case "month":
-          endTime = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-          break;
-        case "year":
-          endTime = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
-          break;
-        default:
-          endTime = new Date(now);
-      }
+    switch (currentPeriod) {
+      case "day":
+        endTime = new Date(now);
+        endTime.setHours(23, 59, 59, 999);
+        break;
+
+      case "week":
+        endTime = new Date(now);
+        daysUntilSunday = 7 - now.getDay();
+        endTime.setDate(now.getDate() + daysUntilSunday);
+        endTime.setHours(23, 59, 59, 999);
+        break;
+
+      case "month":
+        endTime = new Date(
+          now.getFullYear(),
+          now.getMonth() + 1,
+          0,
+          23,
+          59,
+          59,
+          999
+        );
+        break;
+
+      case "year":
+        endTime = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+        break;
+
+      default:
+        endTime = new Date(now);
+    }
 
       const diff = endTime.getTime() - now.getTime();
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
