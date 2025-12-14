@@ -1,31 +1,5 @@
-// Add this instruction at the top of the file:
-
-/*
- * IMPORTANT: Update CategoryCard.tsx to accept onMouseEnter prop:
- * 
- * interface CategoryCardProps {
- *   // ... existing props
- *   onMouseEnter?: () => void;  // ADD THIS
- * }
- * 
- * export const CategoryCard = ({
- *   // ... existing props
- *   onMouseEnter,  // ADD THIS
- * }: CategoryCardProps) => {
- *   return (
- *     <Card
- *       onClick={() => onPlay(id)}
- *       onMouseEnter={onMouseEnter}  // ADD THIS
- *       className={...}
- *     >
- *       ...
- *     </Card>
- *   );
- * };
- */
-
-// Categories.tsx - With hover preloading for instant quiz starts
-import { useState, useEffect } from "react";
+// Categories.tsx - OPTIMIZED - Cache categories data
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { CategoryCard } from "@/components/quiz/CategoryCard";
@@ -68,6 +42,17 @@ interface User {
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 
+// 🎯 CACHE MANAGEMENT
+const categoriesCache = {
+  allCategories: [] as Category[],
+  userCategories: [] as Category[],
+  lastFetchTime: {
+    all: 0,
+    user: 0,
+  },
+  CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+};
+
 export default function Categories() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -77,26 +62,48 @@ export default function Categories() {
   const [filteredAllCategories, setFilteredAllCategories] = useState<Category[]>([]);
   const [filteredUserCategories, setFilteredUserCategories] = useState<Category[]>([]);
   
-  const [loading, setLoading] = useState(true);
-  const [userCategoriesLoading, setUserCategoriesLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [userCategoriesLoading, setUserCategoriesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isGuest, setIsGuest] = useState(false);
   const [activeTab, setActiveTab] = useState("your");
   
-  // Hover preloading state
   const [preloadedCategories, setPreloadedCategories] = useState<Set<string>>(new Set());
   const [currentlyPreloading, setCurrentlyPreloading] = useState<string | null>(null);
   
   const { toast, dismiss } = useToast();
   const userToken = localStorage.getItem("token");
-
   const searchQueryFromParams = searchParams.get("search") || "";
+  
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
     loadUserType();
-    fetchAllCategories();
-    fetchUserCategories();
+    
+    // ✅ Load from cache first for instant display
+    const now = Date.now();
+    
+    if (categoriesCache.allCategories.length > 0 && 
+        (now - categoriesCache.lastFetchTime.all) < categoriesCache.CACHE_DURATION) {
+      console.log("⚡ Using cached all categories");
+      setAllCategories(categoriesCache.allCategories);
+      setFilteredAllCategories(categoriesCache.allCategories);
+    } else {
+      fetchAllCategories();
+    }
+
+    if (categoriesCache.userCategories.length > 0 && 
+        (now - categoriesCache.lastFetchTime.user) < categoriesCache.CACHE_DURATION) {
+      console.log("⚡ Using cached user categories");
+      setUserCategories(categoriesCache.userCategories);
+      setFilteredUserCategories(categoriesCache.userCategories);
+    } else {
+      fetchUserCategories();
+    }
   }, []);
 
   useEffect(() => {
@@ -107,46 +114,30 @@ export default function Categories() {
   }, [searchQueryFromParams, allCategories, userCategories]);
 
   const loadUserType = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) {
-        const parsed: User = JSON.parse(storedUser);
-        setIsGuest(parsed.userType === "Guest");
-      } else {
-        setIsGuest(true);
-      }
-      return;
-    }
-
-    try {
-      const response = await apiClient(`${BASE_URL}/api/getUserDetails`, {
-        method: "GET",
-      });
-
-      if (!response) return;
-      
-      if (!response.ok) throw new Error("Failed to load user info");
-      
-      const data: User = await response.json();
-      setIsGuest(data.userType === "Guest");
-      localStorage.setItem("user", JSON.stringify(data));
-      
-    } catch (error) {
-      console.warn("⚠️ Failed to fetch user type, fallback to local storage:", error);
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) {
-        const parsed: User = JSON.parse(storedUser);
-        setIsGuest(parsed.userType === "Guest");
-      }
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      const parsed: User = JSON.parse(storedUser);
+      setIsGuest(parsed.userType === "Guest");
     }
   };
 
   const fetchAllCategories = async () => {
+    const now = Date.now();
+    
+    // ✅ Check cache freshness
+    if (categoriesCache.allCategories.length > 0 && 
+        (now - categoriesCache.lastFetchTime.all) < categoriesCache.CACHE_DURATION) {
+      console.log("✅ All categories cache is fresh, skipping API call");
+      setAllCategories(categoriesCache.allCategories);
+      setFilteredAllCategories(categoriesCache.allCategories);
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
     try {
+      console.log("🌐 Fetching all categories from API...");
       const response = await apiClient(`${BASE_URL}/api/categories`, {
         method: "GET",
       });
@@ -179,6 +170,10 @@ export default function Categories() {
         timeEstimate: `${Math.ceil((category.questionCount || 10) * 0.6)} min`,
       }));
 
+      // ✅ Update cache
+      categoriesCache.allCategories = transformed;
+      categoriesCache.lastFetchTime.all = now;
+
       setAllCategories(transformed);
       setFilteredAllCategories(transformed);
     } catch (error) {
@@ -190,10 +185,22 @@ export default function Categories() {
   };
 
   const fetchUserCategories = async () => {
+    const now = Date.now();
+    
+    // ✅ Check cache freshness
+    if (categoriesCache.userCategories.length > 0 && 
+        (now - categoriesCache.lastFetchTime.user) < categoriesCache.CACHE_DURATION) {
+      console.log("✅ User categories cache is fresh, skipping API call");
+      setUserCategories(categoriesCache.userCategories);
+      setFilteredUserCategories(categoriesCache.userCategories);
+      return;
+    }
+
     setUserCategoriesLoading(true);
     setError(null);
     
     try {
+      console.log("🌐 Fetching user categories from API...");
       const response = await apiClient(`${BASE_URL}/api/getUserCategories`, {
         method: "GET",
       });
@@ -224,6 +231,10 @@ export default function Categories() {
         timeEstimate: `${Math.ceil((c.questionCount || 10) * 0.6)} min`,
       }));
       
+      // ✅ Update cache
+      categoriesCache.userCategories = transformed;
+      categoriesCache.lastFetchTime.user = now;
+
       setUserCategories(transformed);
       setFilteredUserCategories(transformed);
     } catch (e) {
@@ -252,13 +263,7 @@ export default function Categories() {
     }
   };
 
-  // NEW: Handle hover preloading
   const handleCategoryHover = async (categoryId: string) => {
-    // Only preload if:
-    // 1. User is logged in
-    // 2. Not already preloaded
-    // 3. Not currently preloading this category
-    // 4. Not already ready
     if (!userToken || 
         preloadedCategories.has(categoryId) || 
         currentlyPreloading === categoryId ||
@@ -274,8 +279,6 @@ export default function Categories() {
       if (success) {
         setPreloadedCategories(prev => new Set([...prev, categoryId]));
         console.log("✅ Hover preload completed for:", categoryId);
-      } else {
-        console.log("⚠️ Hover preload failed for:", categoryId);
       }
     } catch (error) {
       console.error("❌ Error during hover preload:", error);
@@ -294,8 +297,6 @@ export default function Categories() {
     const sessionReady = isQuizSessionReady(categoryId);
     if (sessionReady) {
       console.log("🚀 Quiz session ready - Instant navigation!");
-    } else {
-      console.log("⚠️ Quiz session not ready - Will load on quiz page");
     }
     
     navigate(`/quiz/${categoryId}`);
@@ -333,6 +334,15 @@ export default function Categories() {
     }
   };
 
+  // ✅ NEW: Force refresh when category is added
+  const handleCategoryAdded = () => {
+    console.log("🔄 New category added, invalidating cache");
+    categoriesCache.lastFetchTime.all = 0;
+    categoriesCache.lastFetchTime.user = 0;
+    fetchAllCategories();
+    fetchUserCategories();
+  };
+
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] flex items-center justify-center">
@@ -340,6 +350,8 @@ export default function Categories() {
           <h2 className="text-2xl font-bold text-red-500">Error Loading Categories</h2>
           <p className="text-gray-400">{error}</p>
           <Button onClick={() => {
+            categoriesCache.lastFetchTime.all = 0;
+            categoriesCache.lastFetchTime.user = 0;
             fetchAllCategories();
             fetchUserCategories();
           }}>Try Again</Button>
@@ -353,7 +365,6 @@ export default function Categories() {
       <Header title="Quizzes" showSearch />
 
       <div className="px-4 lg:px-8 space-y-6 max-w-full mx-auto">
-        {/* Search Bar */}
         <div className="pt-4 space-y-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -366,16 +377,12 @@ export default function Categories() {
           </div>
 
           <AddCategory
-            fetchCategories={() => {
-              fetchAllCategories();
-              fetchUserCategories();
-            }}
+            fetchCategories={handleCategoryAdded}
             isGuest={isGuest}
             onRegistrationRequired={handleCreateCategoryAttempt}
           />
         </div>
 
-        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="your" className="flex items-center gap-2">
@@ -388,7 +395,6 @@ export default function Categories() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Your Quizzes Tab */}
           <TabsContent value="your" className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-foreground">
@@ -448,7 +454,6 @@ export default function Categories() {
             )}
           </TabsContent>
 
-          {/* All Quizzes Tab */}
           <TabsContent value="all" className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-foreground">
