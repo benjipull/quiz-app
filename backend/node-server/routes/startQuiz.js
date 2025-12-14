@@ -5,7 +5,7 @@ const User = require("../models/user");
 const authenticateToken = require("../middleware/auth");
 const { userQuestions } = require("../index"); // Import shared store
 
-const QUIZ_COST = 50; 
+const QUIZ_COST = 50;
 
 const difficultyNames = {
     1: "Basic",
@@ -24,7 +24,7 @@ router.post("/", authenticateToken, async (req, res) => {
     const { categoryId, numQuestions } = req.body;
 
     const questionsCount = numQuestions || 5;
-    
+
     const authHeader = req.headers["authorization"];
     const userToken = authHeader && authHeader.startsWith("Bearer ")
         ? authHeader.split(" ")[1]
@@ -43,7 +43,13 @@ router.post("/", authenticateToken, async (req, res) => {
 
     console.log("✅ Extracted User ID:", userId);
     try {
-        const category = await Category.findById(categoryId).lean();
+        
+        const category = await Category.findById(categoryId)
+            .select({
+                questions: 1
+            })
+            .lean();
+
         if (!category) {
             return res.status(404).json({ message: "Category not found." });
         }
@@ -52,19 +58,19 @@ router.post("/", authenticateToken, async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: "❌ User not found" });
         }
-        
+
         // ----------------------------------------------------------------
         // 💰 1. QUIZ COST DEDUCTION
         // Ledger tracking for this coin transaction is REMOVED.
         // ----------------------------------------------------------------
-        user.coins -= QUIZ_COST; 
+        user.coins -= QUIZ_COST;
         await user.save();
-        
+
         console.log(`💸 Deducted ${QUIZ_COST} coins to start quiz for user ${userId}. New Balance: ${user.coins}`);
-        
+
         // Ledger logic for quiz-cost deduction removed
         // ----------------------------------------------------------------
-        
+
         const userLevel = user.level || 1;
 
         // Sliding difficulty window
@@ -90,7 +96,7 @@ router.post("/", authenticateToken, async (req, res) => {
                 return b.popularity - a.popularity;
             })
             // Use the corrected questionsCount variable here
-            .slice(0, questionsCount); 
+            .slice(0, questionsCount);
 
         if (selectedQuestions.length < questionsCount) {
             // ----------------------------------------------------------------
@@ -98,9 +104,9 @@ router.post("/", authenticateToken, async (req, res) => {
             // ----------------------------------------------------------------
             user.coins += QUIZ_COST; // Refund the coins
             await user.save();
-            
+
             // Ledger logic for quiz-refund grant removed
-            
+
             console.error(
                 `Cannot start Quiz, only ${selectedQuestions.length} questions found in difficulty window. Coins have been refunded.`
             );
