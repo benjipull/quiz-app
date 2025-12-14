@@ -50,7 +50,8 @@ router.get("/", authenticateToken, async (req, res) => {
             {
                 $match: {
                     _id: { $in: categoryIds },
-                    disabled: false
+                    disabled: false,
+                    "questions.disabled": false // early elimination
                 }
             },
             {
@@ -60,13 +61,7 @@ router.get("/", authenticateToken, async (req, res) => {
                             $filter: {
                                 input: "$questions",
                                 as: "q",
-                                cond: {
-                                    $and: [
-                                        { $eq: ["$$q.disabled", false] },
-                                        { $gte: ["$$q.difficulty_level", minDifficulty] },
-                                        { $lte: ["$$q.difficulty_level", maxDifficulty] }
-                                    ]
-                                }
+                                cond: { $eq: ["$$q.disabled", false] }
                             }
                         }
                     }
@@ -78,6 +73,7 @@ router.get("/", authenticateToken, async (req, res) => {
                 }
             }
         ]);
+
 
 
         console.timeEnd("⏱️ Count Questions");
