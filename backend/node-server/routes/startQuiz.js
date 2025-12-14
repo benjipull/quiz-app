@@ -1,151 +1,148 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const router = express.Router();
 const Category = require("../models/categoryModel");
 const User = require("../models/user");
 const authenticateToken = require("../middleware/auth");
-const { userQuestions } = require("../index"); // Import shared store
+const { userQuestions } = require("../index");
 
 const QUIZ_COST = 50;
 
 const difficultyNames = {
-    1: "Basic",
-    2: "Easy",
-    3: "Casual",
-    4: "Moderate",
-    5: "Challenging",
-    6: "Hard",
-    7: "Tough",
-    8: "Expert",
-    9: "Master",
-    10: "Legendary"
+  1: "Basic",
+  2: "Easy",
+  3: "Casual",
+  4: "Moderate",
+  5: "Challenging",
+  6: "Hard",
+  7: "Tough",
+  8: "Expert",
+  9: "Master",
+  10: "Legendary"
 };
 
 router.post("/", authenticateToken, async (req, res) => {
-    const { categoryId, numQuestions } = req.body;
+  const { categoryId, numQuestions = 5 } = req.body;
+  const userId = req.user.id;
 
-    const questionsCount = numQuestions || 5;
+  if (!categoryId) {
+    return res.status(400).json({ message: "Missing categoryId." });
+  }
 
-    const authHeader = req.headers["authorization"];
-    const userToken = authHeader && authHeader.startsWith("Bearer ")
-        ? authHeader.split(" ")[1]
-        : null;
+  const authHeader = req.headers.authorization;
+  const userToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.split(" ")[1]
+    : null;
 
-    if (!userToken) {
-        return res.status(401).json({ message: "Missing or invalid Authorization header." });
+  if (!userToken) {
+    return res.status(401).json({ message: "Missing or invalid Authorization header." });
+  }
+
+  try {
+    // ----------------------------------------------------
+    // 1️⃣ Deduct quiz cost atomically
+    // ----------------------------------------------------
+    const user = await User.findOneAndUpdate(
+      { _id: userId, coins: { $gte: QUIZ_COST } },
+      { $inc: { coins: -QUIZ_COST } },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(400).json({ message: "Not enough coins to start quiz." });
     }
 
-    // Use the corrected variable in the validation check
-    if (!categoryId || !questionsCount) {
-        return res.status(400).json({ message: "Missing required fields: categoryId, questionsCount." });
+    const userLevel = user.level || 1;
+    const minDifficulty = Math.max(1, userLevel - 1);
+    const maxDifficulty = Math.min(10, userLevel + 1);
+
+    // ----------------------------------------------------
+    // 2️⃣ Fetch questions directly from DB (FAST PATH)
+    // ----------------------------------------------------
+    const questions = await Category.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(categoryId),
+          disabled: false
+        }
+      },
+      { $unwind: "$questions" },
+      {
+        $match: {
+          "questions.disabled": false,
+          "questions.difficulty_level": {
+            $gte: minDifficulty,
+            $lte: maxDifficulty
+          }
+        }
+      },
+      {
+        $sort: {
+          "questions.timesLoaded": 1,
+          "questions.popularity": -1
+        }
+      },
+      { $limit: numQuestions },
+      {
+        $project: {
+          _id: "$questions._id",
+          question: "$questions.text",
+          answers: "$questions.answers.text",
+          correct_answer: "$questions.correct_answer",
+          explanation: "$questions.explanation",
+          timesAnsweredCorrectly: "$questions.timesAnsweredCorrectly",
+          timesAnsweredIncorrectly: "$questions.timesAnsweredIncorrectly",
+          difficultyLevel: "$questions.difficulty_level"
+        }
+      }
+    ]);
+
+    // ----------------------------------------------------
+    // 3️⃣ Not enough questions → refund & exit
+    // ----------------------------------------------------
+    if (questions.length < numQuestions) {
+      await User.updateOne(
+        { _id: userId },
+        { $inc: { coins: QUIZ_COST } }
+      );
+
+      return res.status(404).json({
+        message: "Not enough available questions in this difficulty range. Coins refunded."
+      });
     }
 
-    const userId = req.user.id;
+    // ----------------------------------------------------
+    // 4️⃣ Store quiz in memory
+    // ----------------------------------------------------
+    userQuestions[userToken] = {
+      queue: questions.map(q => ({
+        ...q,
+        difficultyName: difficultyNames[q.difficultyLevel] || "Unknown"
+      })),
+      current: null
+    };
 
-    console.log("✅ Extracted User ID:", userId);
-    try {
-        
-        const category = await Category.findById(categoryId)
-            .select({
-                questions: 1
-            })
-            .lean();
+    // ----------------------------------------------------
+    // 5️⃣ Respond
+    // ----------------------------------------------------
+    res.json({
+      message: "Questions preloaded. Quiz cost deducted.",
+      total: questions.length,
+      difficultyRange: [minDifficulty, maxDifficulty],
+      userCoins: user.coins
+    });
 
-        if (!category) {
-            return res.status(404).json({ message: "Category not found." });
-        }
+  } catch (err) {
+    console.error("❌ Quiz preload error:", err);
 
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ message: "❌ User not found" });
-        }
+    // Safety refund if something unexpected happened
+    await User.updateOne(
+      { _id: userId },
+      { $inc: { coins: QUIZ_COST } }
+    );
 
-        // ----------------------------------------------------------------
-        // 💰 1. QUIZ COST DEDUCTION
-        // Ledger tracking for this coin transaction is REMOVED.
-        // ----------------------------------------------------------------
-        user.coins -= QUIZ_COST;
-        await user.save();
-
-        console.log(`💸 Deducted ${QUIZ_COST} coins to start quiz for user ${userId}. New Balance: ${user.coins}`);
-
-        // Ledger logic for quiz-cost deduction removed
-        // ----------------------------------------------------------------
-
-        const userLevel = user.level || 1;
-
-        // Sliding difficulty window
-        let minDifficulty = Math.max(1, userLevel - 1);
-        let maxDifficulty = Math.min(10, userLevel + 1);
-
-        console.log(`User level: ${userLevel}, selecting difficulties ${minDifficulty}-${maxDifficulty}`);
-
-        // Filter enabled questions by difficulty window
-        const filtered = category.questions.filter(q =>
-            !q.disabled &&
-            q.difficulty_level >= minDifficulty &&
-            q.difficulty_level <= maxDifficulty
-        );
-
-        const selectedQuestions = filtered
-            .sort((a, b) => {
-                if (a.timesLoaded !== b.timesLoaded) {
-                    // 🟢 First priority: lower timesLoaded ranks higher
-                    return a.timesLoaded - b.timesLoaded;
-                }
-                // 🟡 Second priority: higher popularity ranks higher
-                return b.popularity - a.popularity;
-            })
-            // Use the corrected questionsCount variable here
-            .slice(0, questionsCount);
-
-        if (selectedQuestions.length < questionsCount) {
-            // ----------------------------------------------------------------
-            // 💰 2. COIN REFUND IF QUIZ FAILS TO START (Not enough questions)
-            // ----------------------------------------------------------------
-            user.coins += QUIZ_COST; // Refund the coins
-            await user.save();
-
-            // Ledger logic for quiz-refund grant removed
-
-            console.error(
-                `Cannot start Quiz, only ${selectedQuestions.length} questions found in difficulty window. Coins have been refunded.`
-            );
-            // ----------------------------------------------------------------
-
-            return res.status(404).json({
-                message: "Not enough available questions in this difficulty range (minimum 5 required). Coins have been refunded."
-            });
-        }
-
-        // Store questions for user in memory
-        userQuestions[userToken] = {
-            queue: selectedQuestions.map(q => ({
-                _id: q._id,
-                question: q.text,
-                answers: q.answers.map(a => a.text),
-                correct_answer: q.correct_answer,
-                explanation: q.explanation,
-                timesAnsweredCorrectly: q.timesAnsweredCorrectly,
-                timesAnsweredIncorrectly: q.timesAnsweredIncorrectly,
-                difficultyLevel: q.difficulty_level,
-                difficultyName: difficultyNames[q.difficulty_level] || "Unknown"
-            })),
-            current: null
-        };
-
-        console.log(`Loaded ${selectedQuestions.length} questions for user ${userToken}`);
-
-        res.json({
-            message: "Questions preloaded. Quiz cost deducted.",
-            total: selectedQuestions.length,
-            difficultyRange: [minDifficulty, maxDifficulty],
-            userCoins: user.coins // Return the new coin balance
-        });
-
-    } catch (error) {
-        console.error("❌ Error loading questions from database:", error.message);
-        res.status(500).json({ message: "❌ Server error.", error: error.message });
-    }
+    res.status(500).json({ message: "Server error." });
+  }
 });
 
 module.exports = router;
