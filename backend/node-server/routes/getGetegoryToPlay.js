@@ -32,7 +32,7 @@ router.get("/", authenticateToken, async (req, res) => {
 
         // ✅ STEP 1: Load only category metadata (NO questions)
         console.time("⏱️ Load Categories");
-        
+
         let categories = await Category.find({ disabled: false })
             .select('_id name interests averageRating ratings')
             .populate('interests', 'name')
@@ -43,46 +43,38 @@ router.get("/", authenticateToken, async (req, res) => {
 
         // ✅ STEP 2: For each category, count eligible questions using aggregation
         console.time("⏱️ Count Questions");
-        
+
         const categoryIds = categories.map(c => c._id);
-        
+
         const questionCounts = await Category.aggregate([
-            // Match our specific categories
             {
                 $match: {
                     _id: { $in: categoryIds },
-                    disabled: false
+                    disabled: false,
+                    "questions.disabled": false // early elimination
                 }
             },
-            // Unwind questions array
             {
-                $unwind: "$questions"
-            },
-            // Filter questions by criteria
-            {
-                $match: {
-                    "questions.disabled": false,
-                    "questions.difficulty_level": { 
-                        $gte: minDifficulty, 
-                        $lte: maxDifficulty 
+                $project: {
+                    eligibleCount: {
+                        $size: {
+                            $filter: {
+                                input: "$questions",
+                                as: "q",
+                                cond: { $eq: ["$$q.disabled", false] }
+                            }
+                        }
                     }
                 }
             },
-            // Group and count
-            {
-                $group: {
-                    _id: "$_id",
-                    eligibleCount: { $sum: 1 },
-                    totalCount: { $sum: 1 }
-                }
-            },
-            // Only categories with 20+
             {
                 $match: {
                     eligibleCount: { $gte: 20 }
                 }
             }
         ]);
+
+
 
         console.timeEnd("⏱️ Count Questions");
         console.log(`✅ Found ${questionCounts.length} categories with 20+ eligible questions`);
@@ -94,7 +86,7 @@ router.get("/", authenticateToken, async (req, res) => {
         });
 
         // ✅ STEP 3: Filter categories that have enough questions
-        categories = categories.filter(cat => 
+        categories = categories.filter(cat =>
             countMap.has(cat._id.toString())
         );
 
@@ -117,7 +109,7 @@ router.get("/", authenticateToken, async (req, res) => {
 
         // Use matched categories if found, otherwise keep all
         const finalCategories = interestMatched.length > 0 ? interestMatched : categories;
-        
+
         if (interestMatched.length > 0) {
             console.log(`🎯 ${interestMatched.length} categories match interests`);
         } else {
@@ -171,9 +163,9 @@ router.get("/", authenticateToken, async (req, res) => {
     } catch (error) {
         console.error("❌ Server Error:", error);
         console.error("Stack:", error.stack);
-        res.status(500).json({ 
-            message: "⚠️ Server error", 
-            error: error.message 
+        res.status(500).json({
+            message: "⚠️ Server error",
+            error: error.message
         });
     }
 });
