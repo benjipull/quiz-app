@@ -19,10 +19,7 @@ import {
   trackNextQuiz
 } from "@/utils/analytics";
 import Confetti from "react-confetti";
-
-// NEW IMPORTS: Assuming these are custom hooks/utilities for preloading
-import { preloadQuizSession, isQuizSessionReady } from "@/hooks/useAppPreloader";
-import { useUser } from "@/contexts/UserContext"; // <-- NEW: Import useUser context hook
+import { useUser } from "@/contexts/UserContext"; 
 
 const KNOWLEDGE_GAIN_SOUND_SRC = "/knowledge-point.mp3"; 
 const LEVEL_UP_SOUND_SRC = "/player-level-up.mp3";
@@ -136,7 +133,8 @@ const CoinIcon = ({ className }: { className: string }) => (
 
 export default function QuizResults({ results, onPlayAgain, onClose }: QuizResultsProps) {
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  const { refreshUser } = useUser(); // <-- NEW: Access context hook to refresh stats globally
+  // Access context hook to refresh stats globally
+  const { refreshUser } = useUser(); 
 
   const {
     correctAnswers,
@@ -157,9 +155,11 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     currentLevel,
   } = completionData;
 
-  // NEW STATE FOR PRELOADING
+  // 📝 NEW STATE: Next category ID (replaces preloader dependency)
   const [nextCategoryId, setNextCategoryId] = useState<string | null>(null);
-  const [hasPreloadedNext, setHasPreloadedNext] = useState(false);
+  // 📝 NEW STATE: Loading state for the next category ID
+  const [isNextCategoryFetching, setIsNextCategoryFetching] = useState(false);
+  // ❌ Removed: [hasPreloadedNext, setHasPreloadedNext]
 
   const percentage = Math.min(Math.max(percentageCorrect, 0), 100);
   const hasLeveledUp = currentLevel > previousLevel;
@@ -171,7 +171,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   // XP STATE
   const [animatedKnowledge, setAnimatedKnowledge] = useState(0);
   const [animatedTotalXP, setAnimatedTotalXP] = useState(totalKnowledge - knowledgeGained);
-  const [showXPOverlay, setShowXPOverlay] = useState(false); // Changed to false by default
+  const [showXPOverlay, setShowXPOverlay] = useState(false); 
   const [showFlyingTokens, setShowFlyingTokens] = useState(false);
   const [tokens, setTokens] = useState<Array<{id: number; delay: number}>>([]);
   
@@ -216,22 +216,25 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     return () => window.removeEventListener('resize', updateSize);
   }, []);
   
-  // NEW EFFECT: Start preloading the next quiz after a delay
+  // 📝 MODIFIED EFFECT: Start fetching the next category ID early/in background
   useEffect(() => {
-    // Start preloading the next quiz after a short delay
+    // Start fetching the next quiz ID after a short delay
     const timer = setTimeout(() => {
-      fetchAndPreloadNextCategory();
-    }, 2000); // Wait 2 seconds to let animations settle
+      // Only fetch the ID here. The quiz session content will be loaded on click.
+      fetchNextCategoryId();
+    }, 2000); 
 
     return () => clearTimeout(timer);
   }, [userToken, categoryId]);
 
-  // NEW FUNCTION: Fetch and preload the next category
-  const fetchAndPreloadNextCategory = async () => {
-    if (!userToken || hasPreloadedNext) return;
+  // 📝 NEW FUNCTION: Fetch the ID of the next category (No preloading logic)
+  const fetchNextCategoryId = async () => {
+    if (!userToken || isNextCategoryFetching || nextCategoryId) return;
+    
+    setIsNextCategoryFetching(true);
     
     try {
-      console.log("🎯 Fetching next category for preload...");
+      console.log("🎯 Fetching next category ID...");
       const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay?exclude=${categoryId}`, {
         method: "GET",
         headers: {
@@ -244,18 +247,15 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         const data = await response.json();
         if (data.categoryId) {
           setNextCategoryId(data.categoryId);
-          console.log("✅ Next category ID:", data.categoryId);
-          
-          // Preload the quiz session
-          const success = await preloadQuizSession(data.categoryId);
-          if (success) {
-            setHasPreloadedNext(true);
-            console.log("✅ Next quiz preloaded successfully!");
-          }
+          console.log("✅ Next category ID fetched:", data.categoryId);
+        } else {
+          console.log("⚠️ API returned no next category ID.");
         }
       }
     } catch (error) {
-      console.error("❌ Error preloading next quiz:", error);
+      console.error("❌ Error fetching next category ID:", error);
+    } finally {
+        setIsNextCategoryFetching(false);
     }
   };
 
@@ -288,13 +288,12 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   // NEW FUNCTION: Updates the global user context with the final stats
   const updateGameStats = () => {
        console.log("🚀 Refreshing global user stats after quiz completion.");
-       // The refreshUser function will re-fetch the user's latest data from the backend
-       // and update the useUser context, which GameStatsHeader in Home.tsx consumes.
+       // This call refreshes the UserContext data from the backend.
        refreshUser(); 
   };
   
   // ----------------------------------------------------
-  // REWARD ANIMATION SEQUENCE FUNCTIONS
+  // REWARD ANIMATION SEQUENCE FUNCTIONS (UNCHANGED)
   // ----------------------------------------------------
 
   const startXPAnimation = () => {
@@ -511,7 +510,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [ratingMessage, setRatingMessage] = useState<string | null>(null);
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
 
-  // REPLACED handleNextQuiz function with the one supporting preloading logic
+  // 📝 MODIFIED: handleNextQuiz function uses nextCategoryId state or fetches it directly.
   const handleNextQuiz = async () => {
     if (!userToken) {
       console.error("User must be logged in to play the next quiz.");
@@ -519,50 +518,50 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       return;
     }
 
-    trackNextQuiz(nextCategoryId, userId);
-    
-    // If we have a preloaded category, use it immediately
-    if (nextCategoryId && isQuizSessionReady(nextCategoryId)) {
-      console.log("🚀 Using preloaded next quiz - Instant navigation!");
-      window.location.href = `/quiz/${nextCategoryId}`;
-      return;
-    }
-
-    // Fallback: Fetch and navigate normally
-    console.log("⚠️ No preloaded quiz, fetching...");
     setPlayButtonLoading(true);
 
-    try {
-      const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay?exclude=${categoryId}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userToken}`,
-        },
-      });
+    let nextId = nextCategoryId;
 
-      if (!response.ok) {
-        throw new Error(`Failed to get category to play: ${response.status}`);
+    // If nextCategoryId hasn't been fetched yet, fetch it now
+    if (!nextId) {
+      console.log("⚠️ Next category ID not pre-fetched, fetching now...");
+      try {
+        const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay?exclude=${categoryId}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${userToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to get category to play: ${response.status}`);
+        }
+
+        const data = await response.json();
+        nextId = data.categoryId;
+
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          console.error("Error getting category to play:", error);
+          setRatingMessage(`Error playing next quiz: ${error.message}`);
+        } else {
+          console.error("Unknown error:", error);
+          setRatingMessage("An unknown error occurred while playing the next quiz.");
+        }
+        setPlayButtonLoading(false);
+        return;
       }
-
-      const data = await response.json();
-
-      if (data.categoryId) {
-        window.location.href = `/quiz/${data.categoryId}`;
-      } else {
-        throw new Error("No category ID returned from server");
-      }
-    }catch (error: unknown) {
-  if (error instanceof Error) {
-    console.error("Error getting category to play:", error);
-    setRatingMessage(`Error playing next quiz: ${error.message}`);
-  } else {
-    console.error("Unknown error:", error);
-    setRatingMessage("An unknown error occurred while playing the next quiz.");
-  }
-} finally {
-  setPlayButtonLoading(false);
-}
+    }
+    
+    // Now we have the nextId (either pre-fetched or just-fetched)
+    if (nextId) {
+        console.log(`🚀 Navigating to next quiz: /quiz/${nextId}`);
+        window.location.href = `/quiz/${nextId}`;
+    } else {
+        setRatingMessage("Could not find a new category to play.");
+        setPlayButtonLoading(false);
+    }
   };
 
   const handleRatingSubmit = async (value: number) => {
@@ -871,17 +870,17 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 )}
               </Card>
 
-              {/* Next Quiz Button - UPDATED for preloading */}
+              {/* Next Quiz Button - UPDATED for no preloading */}
             <Button
               onClick={handleNextQuiz}
-              onMouseEnter={fetchAndPreloadNextCategory} // ADDED: Trigger preload on hover
-              disabled={playButtonLoading}
+              onMouseEnter={fetchNextCategoryId} // ADDED: Trigger ID fetch on hover
+              disabled={playButtonLoading || isNextCategoryFetching}
               className="w-full flex items-center justify-between px-6 h-16 sm:h-20 text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
             >
-              {playButtonLoading ? (
+              {(playButtonLoading || isNextCategoryFetching) ? (
                 <div className="flex items-center text-xl sm:text-2xl justify-center w-full gap-2">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span>Loading...</span>
+                  <span>Loading Next Quiz...</span>
                 </div>
               ) : (
                 <>

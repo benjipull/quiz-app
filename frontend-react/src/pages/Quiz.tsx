@@ -10,9 +10,6 @@ import {
   trackQuestionAnswered,
   trackQuizComplete,
 } from "@/utils/analytics";
-import { globalCache, clearQuizCache, preloadQuizSession } from "@/hooks/useAppPreloader";
-import { preloadSounds } from "@/utils/soundCache"; 
-
 
 const StarfieldBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -86,7 +83,7 @@ const ConfirmationDialog = ({ title, description, onConfirm, onCancel, confirmTe
       <p className="text-sm text-white">{description}</p>
       <div className="flex justify-end gap-3">
         <Button variant="default" onClick={onCancel} className="border-green-600 text-white">{cancelText}</Button>
-        <Button variant="outline" className="text-white border-red-600 bg-red-700" onClick={onConfirm}>{confirmText}</Button>
+        <Button variant="destructive" className="text-white" onClick={onConfirm}>{confirmText}</Button>
       </div>
     </Card>
   </div>
@@ -265,6 +262,7 @@ export default function Quiz() {
   const location = useLocation();
   const explanationRef = useRef<HTMLDivElement>(null);
   const timerInSecondsRef = useRef<NodeJS.Timeout | null>(null);
+  // FIX: hasStartedRef is the key to prevent double execution in React Strict Mode
   const hasStartedRef = useRef(false);
   
   const nextQuestionRef = useRef<Question | null>(null);
@@ -308,11 +306,9 @@ export default function Quiz() {
 
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
 
- // Instead of creating Audio objects
-const startSound = () => preloadSounds("/intro-sound.mp3", 0.5); // NOTE: Changed to .m4a based on soundCache.ts
-const correctSound = () => preloadSounds("/victory-beat.mp3", 0.7);
-const incorrectSound = () => preloadSounds("/incorrect.mp3", 0.7);
-
+  const startSound = new Audio("/intro-sound.mp3");
+  const correctSound = new Audio("/victory-beat.mp3");
+  const incorrectSound = new Audio("/incorrect.mp3");
 
   const handleBackNavigation = () => {
     setShowExitDialog(true);
@@ -404,34 +400,38 @@ const incorrectSound = () => preloadSounds("/incorrect.mp3", 0.7);
   };
 
   useEffect(() => {
-    let isSubscribed = true;
-    let isMounted = true;
-    
-    const initQuiz = async () => {
-      if (!isSubscribed || !isMounted) return;
-      if (hasStartedRef.current) return;
-      if (!categoryId || !userToken) {
-        if (!userToken) {
-          console.log("You must be logged in to play.");
-          navigate("/categories");
-        }
-        return;
+  let isSubscribed = true;
+  let isMounted = true;
+  
+  const initQuiz = async () => {
+    // Triple protection against double calls
+    if (!isSubscribed || !isMounted) return;
+    if (hasStartedRef.current) return;
+    if (!categoryId || !userToken) {
+      if (!userToken) {
+        console.log("You must be logged in to play.");
+        navigate("/categories");
       }
-      
-      hasStartedRef.current = true;
-      
-      if (isSubscribed && isMounted) {
-        await startQuiz(categoryId);
-      }
-    };
+      return;
+    }
     
-    initQuiz();
+    // Set the ref IMMEDIATELY before any async operations
+    hasStartedRef.current = true;
     
-    return () => {
-      isSubscribed = false;
-      isMounted = false;
-    };
-  }, [categoryId, userToken]); 
+    // Check one more time after setting the ref
+    if (isSubscribed && isMounted) {
+      await startQuiz(categoryId);
+    }
+  };
+  
+  initQuiz();
+  
+  // Cleanup function
+  return () => {
+    isSubscribed = false;
+    isMounted = false;
+  };
+}, [categoryId, userToken]); 
 
   useEffect(() => {
     if (timerInSecondsRef.current) {
@@ -500,98 +500,24 @@ const incorrectSound = () => preloadSounds("/incorrect.mp3", 0.7);
     }
   }, [quizState.currentQuestionIndex]);
 
-  // Quiz.tsx - Replace the startQuiz function with this fixed version
-
-const startQuiz = async (categoryId: string) => {
+  const startQuiz = async (categoryId: string) => {
   if (!userToken) {
     console.log("You must be logged in to play.");
     return;
   }
 
+  // FRONTEND CHECK: If already loading or started, don't proceed
   if (loading || quizState.started) {
     console.log("Quiz already starting or in progress");
     return;
   }
 
-  // PRIORITY: Check if we have preloaded session for THIS category
-  const hasPreloadedSession = 
-    globalCache.quizSession?.categoryId === categoryId && 
-    globalCache.firstQuestion;
-  
-  if (hasPreloadedSession) {
-    console.log("🚀🚀🚀 INSTANT START - Using preloaded session for category:", categoryId);
-    
-    // CRITICAL FIX: Get the category info from the preloaded session
-    const categoryName = globalCache.quizSession?.categoryName || categoryTitle;
-    const totalQs = globalCache.quizSession?.totalQuestions || 10;
-    
-    // Set loading to false immediately
-    setLoading(false);
-    
-    // Immediately set quiz state with preloaded data
-    setQuizState({
-      started: true,
-      completed: false,
-      selectedCategory: { id: categoryId, name: categoryName },
-      question: globalCache.firstQuestion,
-      currentQuestionIndex: 1,
-      correctAnswers: 0,
-      incorrectAnswers: 0,
-      results: null,
-      isAnswerSelected: false,
-      userAnswers: [],
-    });
-    
-    setCategoryTitle(categoryName);
-    setTotalQuestions(totalQs);
-    
-    // Try to get category image in background
-    const fetchCategoryInfo = async () => {
-      try {
-        const categoryResponse = await fetch(`${BASE_URL}/api/categories`, {
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${userToken}`,
-          },
-        });
-        if (categoryResponse.ok) {
-          const categories = await categoryResponse.json();
-          const category = categories.find((cat: any) => cat._id === categoryId);
-          if (category) {
-            setCategoryImage(category.imageUrl || category.image);
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching category info:", err);
-      }
-    };
-    
-    // Fire and forget category info fetch
-    fetchCategoryInfo();
-    
-    // Play sound (FIXED: Call the function instead of trying to access .play())
-    startSound();
-    
-    // Clear the used cache
-    globalCache.firstQuestion = null;
-    
-    // Preload next question in background
-    setTimeout(() => {
-      preloadNextQuestion();
-    }, 500);
-    
-    return;
-  }
-
-  // Fallback: No preloaded session - start fresh
-  console.log("⚠️⚠️⚠️ NO PRELOADED SESSION - Starting fresh");
-  
   setLoading(true);
   setError(null);
   setIsCompletingQuiz(false);
 
   setQuizState({
-    started: true,
+    started: true, // Set this IMMEDIATELY
     completed: false,
     selectedCategory: null,
     question: null,
@@ -607,7 +533,6 @@ const startQuiz = async (categoryId: string) => {
   nextQuestionRef.current = null;
 
   try {
-    // Fetch category info first
     const categoryResponse = await fetch(`${BASE_URL}/api/categories`, {
       headers: {
         "Content-Type": "application/json",
@@ -627,7 +552,6 @@ const startQuiz = async (categoryId: string) => {
       }
     }
 
-    // Start the quiz session
     const startResponse = await fetch(`${BASE_URL}/api/startQuiz`, {
       method: "POST",
       headers: {
@@ -638,9 +562,13 @@ const startQuiz = async (categoryId: string) => {
     });
 
     if (!startResponse.ok) {
+      // If the start fails, we must allow a retry, so we reset the ref.
+      // This is only safe because the server side also handles refunding the coins.
       hasStartedRef.current = false;
+      
       const errorData = await startResponse.json();
       
+      // If it's a "quiz already starting" error, don't show error
       if (startResponse.status === 400 || startResponse.status === 429) {
         console.log("Quiz already in progress or starting");
         setLoading(false);
@@ -663,10 +591,9 @@ const startQuiz = async (categoryId: string) => {
   } catch (error: any) {
     setError(error.message);
     setLoading(false);
-    hasStartedRef.current = false;
+    hasStartedRef.current = false; // Reset on error
   }
 };
-
   const fetchNextQuestion = async () => {
     if (!userToken || quizState.completed || isCompletingQuiz) return;
 
@@ -679,8 +606,7 @@ const startQuiz = async (categoryId: string) => {
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1;
           if (newIndex === 1) {
-            // FIXED: Call the function
-            startSound(); 
+            startSound.play().catch(() => { });
           }
           return {
             ...prev,
@@ -710,8 +636,7 @@ const startQuiz = async (categoryId: string) => {
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1;
           if (newIndex === 1) {
-            // FIXED: Call the function
-            startSound(); 
+            startSound.play().catch(() => { });
           }
           return {
             ...prev,
@@ -779,6 +704,7 @@ const startQuiz = async (categoryId: string) => {
     if (quizState.completed || isCompletingQuiz || !userToken || !quizState.selectedCategory) return;
 
     setIsCompletingQuiz(true);
+    setLoading(true);
 
     try {
       const { correctAnswers, userAnswers } = quizState;
@@ -807,10 +733,6 @@ const startQuiz = async (categoryId: string) => {
       if (response.ok) {
         const completionData = await response.json();
         trackQuizComplete(quizState.selectedCategory.id, quizState.correctAnswers, userId);
-        
-        // Clear quiz cache
-        clearQuizCache();
-        
         setQuizState((prev) => ({
           ...prev,
           completed: true,
@@ -825,19 +747,19 @@ const startQuiz = async (categoryId: string) => {
             completionData: completionData.results,
           },
         }));
-        
-        // Immediately hide loading after setting results
-        setIsCompletingQuiz(false);
       }
       else {
         console.error("Failed to complete quiz");
         setError("Failed to complete quiz. Please try again.");
-        setIsCompletingQuiz(false);
       }
     } catch (error) {
       console.error("Error completing quiz:", error);
       setError("Error completing quiz. Please try again.");
-      setIsCompletingQuiz(false);
+    } finally {
+      setLoading(false);
+      if (!quizState.completed) { 
+        setIsCompletingQuiz(false); 
+      }
     }
   };
 
@@ -899,11 +821,9 @@ const startQuiz = async (categoryId: string) => {
         }));
 
         if (isCorrect) {
-          // FIXED: Call the function
-          correctSound();
+          correctSound.play().catch(() => { });
         } else {
-          // FIXED: Call the function
-          incorrectSound();
+          incorrectSound.play().catch(() => { });
         }
 
         trackQuestionAnswered(quizState.question?._id || "", isCorrect, userId);
@@ -938,6 +858,7 @@ const startQuiz = async (categoryId: string) => {
   };
 
   const handlePlayAgain = () => {
+    // Reset hasStartedRef to allow quiz to start again
     hasStartedRef.current = false;
     if (categoryId) {
       startQuiz(categoryId);
@@ -1070,14 +991,14 @@ const startQuiz = async (categoryId: string) => {
     );
   }
 
-  if (loading && !quizState.completed) {
+  if (loading || (!quizState.question && !quizState.completed)) {
     return (
       <QuizBase>
-        <div className="min-h-[100dvh] flex-1 flex items-center justify-center px-4">
+        <div className=" min-h-[100dvh] flex-1 flex items-center justify-center px-4">
           <div className="text-center space-y-4">
             <div className="animate-spin rounded-full h-8 w-8 md:h-12 md:w-12 border-b-2 border-purple-400 mx-auto"></div>
             <p className="text-sm md:text-base text-purple-200">
-              Loading quiz questions...
+              {isCompletingQuiz ? "Completing quiz..." : "Loading quiz questions..."}
             </p>
           </div>
         </div>
@@ -1224,7 +1145,7 @@ const startQuiz = async (categoryId: string) => {
               <div ref={explanationRef}>
                 <Card className="p-6 md:p-8 bg-gradient-to-r from-red-600/30 to-red-500/30 animate-slide-up border-2 border-red-400 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
                   <div className="text-center space-y-3">
-                    <p className="font-semibold text-red-300 text-base md:text-lg">⏰ Time's Up!</p>
+                    <p className="font-semibold text-red-300 text-base md:text-lg">â° Time's Up!</p>
                     <p className="text-sm md:text-base text-red-100">
                       You didn't answer in time. This question is marked as incorrect.
                     </p>
@@ -1260,46 +1181,63 @@ const startQuiz = async (categoryId: string) => {
                   </div>
                 </Card>
 
-               <div className="mt-6 flex flex-col items-center space-y-3">
-                <div className="flex items-center gap-4">
-                  <p className="text-md font-medium text-white">Did you like?</p>
+               <div className="mt-6 space-y-3 animate-fade-in px-1">
+                <Card className="p-3 backdrop-blur-sm" style={{ borderRadius: '1.5rem' }}>
+                  <div className="space-y-2.5">
+                    <p className="text-xs font-medium text-center text-white">Did you like this question?</p>
 
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => handleFeedback("up")}
-                      disabled={feedbackGiven}
-                      className="p-1 text-white hover:text-green-500 transition-colors"
-                    >
-                      <ThumbsUp className="h-5 w-5" />
-                    </button>
+                    <div className="flex gap-1.5 justify-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleFeedback("up")}
+                        disabled={feedbackGiven}
+                        className={`text-xs flex-1 max-w-[95px] h-10 px-2 transition-colors ${feedbackType === "up"
+                            ? "bg-green-100 border-green-500 text-green-600"
+                            : feedbackGiven
+                              ? "opacity-50 cursor-not-allowed"
+                              : "border-green-500 text-green-600 hover:bg-green-500 hover:text-white"
+                          }`}
+                      >
+                        <ThumbsUp className="h-3.5 w-3.5" />
+                        <span className="ml-1">Yes</span>
+                      </Button>
 
-                    <button
-                      onClick={() => handleFeedback("down")}
-                      disabled={feedbackGiven}
-                      className="p-1 text-white hover:text-red-500 transition-colors"
-                    >
-                      <ThumbsDown className="h-5 w-5" />
-                    </button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleFeedback("down")}
+                        disabled={feedbackGiven}
+                        className={`text-xs flex-1 max-w-[95px] h-10 px-2 transition-colors ${feedbackType === "down"
+                            ? "bg-red-100 border-red-600 text-red-600"
+                            : feedbackGiven
+                              ? "opacity-50 cursor-not-allowed"
+                              : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                          }`}
+                      >
+                        <ThumbsDown className="h-3.5 w-3.5" />
+                        <span className="ml-1">No</span>
+                      </Button>
 
-                    <button
-                      onClick={() => setShowReportDialog(true)}
-                      className="p-1 text-white hover:text-blue-500 transition-colors"
-                    >
-                      <Flag className="h-5 w-5" />
-                    </button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowReportDialog(true)}
+                        className="text-xs flex-1 max-w-[95px] h-10 px-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
+                      >
+                        <Flag className="h-3.5 w-3.5" />
+                        <span className="ml-1">Report</span>
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                </Card>
 
                 <Button
                   className="w-full h-12 text-sm text-white font-bold"
                   onClick={handleNextQuestion}
                   disabled={isCompletingQuiz}
                 >
-                  {isCompletingQuiz
-                    ? "Completing..."
-                    : isLastQuestion
-                    ? "Finish Quiz"
-                    : "Next Question"}
+                  {isCompletingQuiz ? "Completing..." : isLastQuestion ? "Finish Quiz" : "Next Question"}
                 </Button>
               </div>
               </div>
