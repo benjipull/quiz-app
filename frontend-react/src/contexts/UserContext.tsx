@@ -113,7 +113,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (response.ok) {
         const apiUser: UserDetails = await response.json();
-        
+
         const updatedUser = {
           ...apiUser,
           level: apiUser.level || 1,
@@ -150,17 +150,21 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     isStaleRef.current = true;
   };
 
-  // Initial Initialization
+  let hasInitializedUserFetch = false;
+
   useEffect(() => {
+    if (hasInitializedUserFetch) {
+      return;
+    }
+    hasInitializedUserFetch = true;
+
     const init = async () => {
       const cached = loadUserFromStorage();
       if (cached) {
         setUser(cached);
         setLoading(false);
-        // Background refresh if stale
-        refreshUser();
+        refreshUser(); // background refresh
       } else {
-        // No cache, must fetch
         await refreshUser(true);
       }
     };
@@ -168,14 +172,15 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     init();
   }, []);
 
+
   return (
-    <UserContext.Provider value={{ 
-      user, 
-      loading, 
-      refreshUser: () => refreshUser(true), 
-      updateUserLocally, 
+    <UserContext.Provider value={{
+      user,
+      loading,
+      refreshUser: () => refreshUser(true),
+      updateUserLocally,
       updateCoins,
-      markUserStale 
+      markUserStale
     }}>
       {children}
     </UserContext.Provider>
