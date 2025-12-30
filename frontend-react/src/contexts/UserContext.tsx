@@ -48,6 +48,8 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
   return fetch(url, { ...options, headers });
 };
 
+let hasInitializedUserFetch = false;
+
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -150,7 +152,6 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     isStaleRef.current = true;
   };
 
-  let hasInitializedUserFetch = false;
 
   useEffect(() => {
     if (hasInitializedUserFetch) {
