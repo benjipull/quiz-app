@@ -17,6 +17,7 @@ interface UserDetails {
   wisdomGems?: number;
   enlightenmentCrystals?: number;
   dailyClaimAvailable?: boolean;
+  lastDailyCoinClaim?: string | null; // ✅ NEW: Add this field
 }
 
 interface UserContextType {
@@ -118,6 +119,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           ...apiUser,
           level: apiUser.level || 1,
           coins: apiUser.coins ?? 0,
+          lastDailyCoinClaim: apiUser.lastDailyCoinClaim || null, // ✅ Include this
         };
 
         setUser(updatedUser);
