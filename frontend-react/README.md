@@ -1,69 +1,29 @@
-🧠 Quizicle – Spark Your Knowledge Quizicle is a fun, interactive, and community-powered quiz platform built to challenge your mind, enhance learning, and spark curiosity. With AI-powered question generation and competitive leaderboards, it brings learning to life in a gamified way.
+# Quizicle Frontend
 
-🌐 Live URL http://localhost:8080/ (for development — update with production URL when hosted)
+React + Vite frontend for Quizicle.
 
-🚀 Features 🧠 Challenge Your Mind: Discover and complete thousands of quizzes across diverse topics.
+## Android / Google Play Packaging
+This project is configured with Capacitor and an Android wrapper.
 
-📊 Leaderboard: Compete with players globally and view top scorers.
+### Included in repo
+- Capacitor config: `capacitor.config.ts`
+- Android project: `android/`
+- App ID: `com.quizicle.app`
+- App name: `Quizicle`
 
-🧑‍🤝‍🧑 User Accounts: Personalized experience with avatars and saved progress.
+### After frontend changes
+1. Build + sync web assets into Android:
+   - `npm run cap:sync`
+2. Open Android Studio:
+   - `npm run android:open`
 
-🗂️ Quiz Categories: Browse quizzes by difficulty, popularity, and freshness.
+### Create Play Store bundle (.aab)
+1. Open Android Studio (`npm run android:open`).
+2. Go to `Build > Generate Signed Bundle / APK`.
+3. Choose `Android App Bundle`.
+4. Use your release keystore.
+5. Build and upload the generated `.aab` to Google Play Console.
 
-✍️ Create Your Own Quizzes: Let users generate and share quizzes in a few clicks.
-
-📈 Quiz Stats: View ratings, creator, difficulty, and question count for each quiz.
-
-🧩 AI-Powered Learning: Smart explanations and adaptive difficulty coming soon.
-
-📸 UI Overview Search bar to find specific quizzes
-
-Category filters (All, Popular, Top Rated, New, Trending)
-
-Hero section with stats like:
-
-✅ 247 Quizzes Completed
-
-✅ 51 Categories Available
-
-✅ 3.6 Avg. Rating
-
-Card Layouts for each quiz:
-
-Title, Description
-
-Difficulty level
-
-Number of questions
-
-Created by info
-
-Star rating + attempts
-
-User dashboard (Avatar + Create Category functionality)
-
-📦 Tech Stack Frontend: React + Tailwind CSS
-
-Backend: Node.js + Express
-
-Auth: Token-based local storage login
-
-UI Icons: Lucide React
-
-State Management: React Hooks
-
-🛠️ How to Run Locally Clone the repository
-
-bash Copy Edit git clone https://github.com/benjipull/quiz-app.git cd q\backend\node-server\frontend\frontend-react
-
-Install dependencies npm install
-
-Start frontend
-
-npm run dev
-
-Start backend ()
-
-cd backend\node-server npm install node index.js
-
-Access at http://localhost:8080
+### Important
+- If you change package name, update `appId` in `capacitor.config.ts` before first Play Store release.
+- Use production HTTPS API URLs in `.env` for release builds.
