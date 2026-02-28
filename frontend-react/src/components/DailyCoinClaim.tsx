@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Clock, Sparkles } from "lucide-react";
+import { Clock } from "lucide-react";
 import { preloadSounds } from "@/utils/soundCache";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
@@ -14,6 +14,7 @@ interface DailyCoinClaimProps {
   isClaimAvailable: boolean; 
   updateUserLocally: (updates: { dailyClaimAvailable: boolean; coins?: number }) => void;
   cachedBonusAmount?: number;
+  lastDailyCoinClaim?: string | null; // ✅ NEW: Pass this from user data
 }
 
 export default function DailyCoinClaim({
@@ -21,6 +22,7 @@ export default function DailyCoinClaim({
   onCoinsEarned,
   updateUserLocally,
   cachedBonusAmount = DEFAULT_BONUS,
+  lastDailyCoinClaim, // ✅ NEW: Receive from parent
 }: DailyCoinClaimProps) {
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null); 
   const [isClaiming, setIsClaiming] = useState<boolean>(false);
@@ -32,55 +34,36 @@ export default function DailyCoinClaim({
   const earnedCoinsRef = useRef<HTMLDivElement>(null);
   const claimButtonRef = useRef<HTMLButtonElement>(null);
   
-  const isFetchingTimeRef = useRef(false);
   const hasInitializedRef = useRef(false);
 
   const isClaimAvailable = timeRemaining !== null && timeRemaining <= 0;
 
+  // ✅ FIXED: Calculate time remaining from user data (no API call!)
   useEffect(() => {
     if (hasInitializedRef.current) return;
     if (!userToken) return;
-    if (isFetchingTimeRef.current) return;
 
-    const getInitialTimeRemaining = async () => {
-      isFetchingTimeRef.current = true;
+    hasInitializedRef.current = true;
 
-      try {
-        const response = await fetch(`${BASE_URL}/api/getUserDetails`, {
-          headers: {
-            Authorization: `Bearer ${userToken}`,
-          },
-        });
+    // Calculate remaining time from lastDailyCoinClaim
+    if (lastDailyCoinClaim) {
+      const lastClaim = new Date(lastDailyCoinClaim).getTime();
+      const now = Date.now();
+      const remaining = COOLDOWN_DURATION - (now - lastClaim);
 
-        const userData = await response.json();
-
-        if (response.ok && userData.lastDailyCoinClaim) {
-          const lastClaim = new Date(userData.lastDailyCoinClaim).getTime();
-          const now = Date.now();
-          const remaining = COOLDOWN_DURATION - (now - lastClaim);
-
-          if (remaining > 0) {
-            setTimeRemaining(remaining);
-            updateUserLocally({ dailyClaimAvailable: false });
-          } else {
-            setTimeRemaining(0);
-            updateUserLocally({ dailyClaimAvailable: true });
-          }
-        } else {
-            setTimeRemaining(0);
-            updateUserLocally({ dailyClaimAvailable: true });
-        }
-      } catch (error) {
-        console.error("Error fetching initial time remaining:", error);
-        setTimeout(() => setTimeRemaining(0), 1000); 
-      } finally {
-        isFetchingTimeRef.current = false;
-        hasInitializedRef.current = true;
+      if (remaining > 0) {
+        setTimeRemaining(remaining);
+        updateUserLocally({ dailyClaimAvailable: false });
+      } else {
+        setTimeRemaining(0);
+        updateUserLocally({ dailyClaimAvailable: true });
       }
-    };
-
-    getInitialTimeRemaining();
-  }, [userToken]); 
+    } else {
+      // No claim history - available immediately
+      setTimeRemaining(0);
+      updateUserLocally({ dailyClaimAvailable: true });
+    }
+  }, [userToken, lastDailyCoinClaim, updateUserLocally]); 
 
   useEffect(() => {
     if (timeRemaining === null || timeRemaining <= 0) return; 
@@ -151,7 +134,6 @@ export default function DailyCoinClaim({
     const headerRect = headerCoinElement?.getBoundingClientRect();
 
     if (!overlayRect || !headerRect) {
-      // ✅ FIX: Call once with full amount instead of incrementally
       if (onCoinsEarned) onCoinsEarned(coinsEarned);
       setIsClaiming(false);
       setShowDailyOverlay(false);
@@ -177,12 +159,10 @@ export default function DailyCoinClaim({
     document.documentElement.style.setProperty("--daily-coin-end-x", `${endX}px`);
     document.documentElement.style.setProperty("--daily-coin-end-y", `${endY}px`);
 
-    // ✅ FIX: Update coins ONCE at the start, let GameStatsHeader animate from old to new
     if (onCoinsEarned) {
       onCoinsEarned(coinsEarned);
     }
 
-    // Play sound effects during animation
     const finalTokenCount = Math.floor(tokenCount);
     for (let i = 0; i < finalTokenCount; i++) {
       setTimeout(() => {
@@ -190,7 +170,6 @@ export default function DailyCoinClaim({
       }, i * 150);
     }
 
-    // Clean up animation after all tokens have flown
     setTimeout(() => {
       setShowFlyingCoins(false);
       setShowDailyOverlay(false);
@@ -294,32 +273,31 @@ export default function DailyCoinClaim({
             </div>
           </div>
 
-         <Button
-  ref={claimButtonRef}
-  onClick={handleClaimClick}
-  disabled={!isClaimAvailable || isClaiming || timeRemaining === null}
-  variant={isClaimAvailable ? "warning" : "purple"}
->
-  {timeRemaining === null ? (
-    <div className="flex items-center space-x-2">
-      <div className="animate-spin rounded-full h-4 w-4 border-b-2"></div>
-      <span>Loading...</span>
-    </div>
-  ) : isClaiming ? (
-    <div className="flex items-center space-x-2">
-      <div className="animate-spin rounded-full h-4 w-4 border-b-2"></div>
-      <span>Claiming...</span>
-    </div>
-  ) : isClaimAvailable ? (
-    <span>Claim Now!</span>
-  ) : (
-    <div className="flex items-center space-x-2">
-      <Clock className="w-4 h-4" />
-      <span>{formatTimeRemaining(timeRemaining)}</span>
-    </div>
-  )}
-</Button>
-
+          <Button
+            ref={claimButtonRef}
+            onClick={handleClaimClick}
+            disabled={!isClaimAvailable || isClaiming || timeRemaining === null}
+            variant={isClaimAvailable ? "warning" : "purple"}
+          >
+            {timeRemaining === null ? (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2"></div>
+                <span>Loading...</span>
+              </div>
+            ) : isClaiming ? (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2"></div>
+                <span>Claiming...</span>
+              </div>
+            ) : isClaimAvailable ? (
+              <span>Claim Now!</span>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Clock className="w-4 h-4" />
+                <span>{formatTimeRemaining(timeRemaining)}</span>
+              </div>
+            )}
+          </Button>
         </div>
       </Card>
 

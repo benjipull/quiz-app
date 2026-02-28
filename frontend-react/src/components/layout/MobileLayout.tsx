@@ -1,7 +1,10 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { BottomTabs } from "./BottomTabs";
 
 export const MobileLayout = () => {
+  const location = useLocation();
+  const isHomeRoute = location.pathname === "/";
+
   return (
     <div className="min-h-[100dvh] flex flex-col bg-gradient-to-br from-background to-quiz-background">
       
@@ -10,7 +13,7 @@ export const MobileLayout = () => {
         <Outlet />
 
         {/* space so content doesn't touch fixed tabs */}
-        <div className="h-16 md:hidden" />
+        {!isHomeRoute && <div className="h-16 md:hidden" />}
       </div>
 
       {/* FIXED BOTTOM TABS */}
