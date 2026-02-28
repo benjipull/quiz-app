@@ -26,8 +26,7 @@ router.post("/", async (req, res) => {
         // Generate JWT Token
         const token = jwt.sign(
             { id: newUser._id.toString(), alias: newUser.alias, userType: newUser.userType }, // Ensure userType is in the token
-            process.env.JWT_SECRET,
-            { expiresIn: "30d" }
+            process.env.JWT_SECRET
         );
 
         // Update last login

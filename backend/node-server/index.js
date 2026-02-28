@@ -2,6 +2,7 @@ const express = require("express");
 const connectDB = require("./config/db");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
 
 require("dotenv").config();
 
@@ -27,6 +28,16 @@ app.use(express.json());
 
 // Serve static files from "frontend" directory
 app.use("/admin", express.static(path.join(__dirname, "frontend-admin")));
+
+const frontendPath = path.join(__dirname, "frontend");
+const frontendIndexPath = path.join(frontendPath, "index.html");
+const hasFrontendBuild = fs.existsSync(frontendIndexPath);
+
+if (hasFrontendBuild) {
+    app.use(express.static(frontendPath));
+} else {
+    console.warn(`[frontend] Missing build at ${frontendIndexPath}`);
+}
 
 // ==Routes== //
 
@@ -79,16 +90,25 @@ app.use("/api/admin/questions", require("./routes/admin/updateQuestion"));
 app.use("/api/admin/reports", require("./routes/admin/adminReports"));
 app.use("/api/admin/questions", require("./routes/admin/getDifficultyStats"));
 
-
-// Default route (serves index.html for all other routes)
-app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "frontend", "index.html"));
-});
-
 // Protected Route (Requires Authentication)
 const authenticateToken = require("./middleware/auth");
 app.get("/api/users/protected", authenticateToken, (req, res) => {
     res.json({ message: "Protected route accessed", user: req.user });
+});
+
+// SPA fallback for frontend routes
+app.get("*", (req, res) => {
+    if (req.path.startsWith("/api")) {
+        return res.status(404).json({ message: "API route not found" });
+    }
+
+    if (hasFrontendBuild) {
+        return res.sendFile(frontendIndexPath);
+    }
+
+    return res.status(503).json({
+        message: "Frontend build not found. Rebuild the container so frontend assets are copied.",
+    });
 });
 
 // Start Server
