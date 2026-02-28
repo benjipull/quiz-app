@@ -406,13 +406,17 @@ export default function Home() {
                   ? "w-[clamp(185px,min(52vw,34vh),265px)] h-[clamp(185px,min(52vw,34vh),265px)]"
                   : "w-[clamp(247px,min(73vw,47vh),377px)] h-[clamp(247px,min(73vw,47vh),377px)]"
               } sm:w-[clamp(250px,min(40vw,36vh),360px)] sm:h-[clamp(250px,min(40vw,36vh),360px)] md:w-[clamp(280px,38vw,400px)] md:h-[clamp(280px,38vw,400px)]`}
-              style={{
-                backgroundImage: `url('/image.png')`,
-                backgroundSize: "cover",
-                backgroundPosition: "center 42%",
-                backgroundRepeat: "no-repeat",
-              }}
             >
+              <div
+                className="absolute inset-0 z-0"
+                style={{
+                  backgroundImage: `url('/image.png')`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                  transform: "translateY(-14%)",
+                }}
+              />
               <Link to="/profile" className="no-underline relative z-10">
                 <Avatar className={`rounded-full overflow-visible relative ${
                   isShortPhone

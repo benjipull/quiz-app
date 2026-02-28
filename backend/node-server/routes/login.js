@@ -39,8 +39,7 @@ router.post("/", async (req, res) => {
                 alias: user.alias,
                 userType: user.userType
             },
-            process.env.JWT_SECRET,
-            { expiresIn: "30d" }
+            process.env.JWT_SECRET
         );
 
         console.log("Generated Token:", token); // ✅ Log token for debugging

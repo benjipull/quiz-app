@@ -73,8 +73,7 @@ router.post("/", authenticateToken, async (req, res) => {
         alias: user.alias,
         userType: user.userType,
       },
-      process.env.JWT_SECRET,
-      { expiresIn: "30d" }
+      process.env.JWT_SECRET
     );
 
     // Choose message
