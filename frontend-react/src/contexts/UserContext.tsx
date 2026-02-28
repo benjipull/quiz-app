@@ -93,6 +93,16 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const logoutUser = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+    }
+    setUser(null);
+    isStaleRef.current = false;
+    lastFetchTime.current = 0;
+  };
+
   const refreshUser = async (force: boolean = false) => {
     if (isRefreshingRef.current) return;
 
@@ -128,6 +138,19 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         saveUserToStorage(updatedUser);
         lastFetchTime.current = Date.now();
         isStaleRef.current = false;
+      } else if (response.status === 401) {
+        let errorMessage = "";
+        try {
+          const payload = await response.json();
+          errorMessage = payload?.error || payload?.message || "";
+        } catch {
+          // Ignore non-JSON response body
+        }
+
+        if (errorMessage.toLowerCase().includes("token expired")) {
+          console.warn("Token expired from getUserDetails. Logging out user.");
+          logoutUser();
+        }
       }
     } catch (error) {
       console.error("❌ Error refreshing user:", error);
