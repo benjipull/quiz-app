@@ -6,18 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { trackHomeScreen } from "@/utils/analytics";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import InterestSelector from "@/components/InterestSelector";
 import { trackEvent } from "@/utils/analytics";
 import {
   AlertTriangle,
-  Heart,
 } from "lucide-react";
 import logo from "../assets/images/QuizicleLogo.png";
 import SplashScreen from "../components/SplashScreen";
@@ -89,10 +80,7 @@ export default function Home() {
   const [showSplash, setShowSplash] = useState(false);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
-
-  const [isInterestModalOpen, setIsInterestModalOpen] = useState(false);
-  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
-  const [savingInterests, setSavingInterests] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 800);
 
   // Simple component-level cache for next category
   const categoryCache = useRef<{
@@ -102,6 +90,7 @@ export default function Home() {
 
   const hasInitializedRef = useRef(false);
   const hasDeductedRef = useRef(false);
+  const hasTrackedHomeRef = useRef(false);
 
   const navigate = useNavigate();
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
@@ -111,7 +100,10 @@ export default function Home() {
 
   // Check screen size
   useEffect(() => {
-    const checkScreenSize = () => setIsSmallScreen(window.innerWidth < 768);
+    const checkScreenSize = () => {
+      setIsSmallScreen(window.innerWidth < 768);
+      setViewportHeight(window.innerHeight);
+    };
     checkScreenSize();
     window.addEventListener("resize", checkScreenSize);
     return () => window.removeEventListener("resize", checkScreenSize);
@@ -166,26 +158,19 @@ export default function Home() {
 
     if (user) {
       console.log("✅ User loaded:", user.alias);
-      
-      trackHomeScreen(user._id);
-      
+
       const avatarIndex = user.avatar ? user.avatar - 1 : 0;
       const calculatedAvatar = avatars[avatarIndex] || null;
       setUserAvatar(calculatedAvatar);
 
-      setSelectedInterests(user.interests || []);
-
-      if (!user.interests || user.interests.length === 0) {
-        setTimeout(() => {
-          setIsInterestModalOpen(true);
-          trackEvent("view_interests", {
-            user_id: user._id,
-            context: "first_login_prompt",
-          });
-        }, 500);
-      }
     }
   }, [user, userLoading, navigate, refreshUser]);
+
+  useEffect(() => {
+    if (!user?._id || hasTrackedHomeRef.current) return;
+    hasTrackedHomeRef.current = true;
+    trackHomeScreen(user._id);
+  }, [user?._id]);
 
   // ✅ Fetch category on-demand (with component-level cache)
   const fetchCategoryToPlay = async (): Promise<CategoryToPlayResponse | null> => {
@@ -234,6 +219,8 @@ export default function Home() {
   };
 
   const handleQuickQuiz = async () => {
+    trackEvent("home_cta_click", { user_id: user?._id, cta: "play_quiz" });
+
     if (!userToken) {
       console.log("⚠️ You must be logged in to play.");
       return;
@@ -306,54 +293,9 @@ export default function Home() {
     }
   };
 
-  // Interest Modal Handlers
-  const handleInterestChange = (newSelectedIds: string[]) => {
-    setSelectedInterests(newSelectedIds);
-  };
-
-  const handleSaveInterests = async () => {
-    if (!user?._id) return;
-    setSavingInterests(true);
-
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("Authentication token missing.");
-
-      const interestsResponse = await fetch(
-        `${BASE_URL}/api/interests/user/${user._id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          body: JSON.stringify({ interests: selectedInterests }),
-        }
-      );
-
-      if (!interestsResponse.ok) {
-        throw new Error("Failed to update interests.");
-      }
-
-      updateUserLocally({ interests: selectedInterests });
-      markUserStale();
-      
-      trackEvent("update_interests", {
-        user_id: user._id,
-        interest_count: selectedInterests.length,
-        context: "home_screen_modal",
-      });
-      setIsInterestModalOpen(false);
-    } catch (error) {
-      const err = error as Error;
-      toast({
-        title: "Error",
-        description: `Failed to save interests: ${err.message}`,
-        variant: "destructive",
-      });
-    } finally {
-      setSavingInterests(false);
-    }
+  const handleRegisterNow = () => {
+    trackEvent("home_cta_click", { user_id: user?._id, cta: "register_now" });
+    navigate("/profile");
   };
 
   const handleCoinsEarned = (amount: number) => {
@@ -402,20 +344,25 @@ export default function Home() {
   const avatarImage = userAvatar || undefined;
   const isGuest = user.userType === 'Guest';
   const userLevel = user.level || 1;
+  const isShortPhone = isSmallScreen && viewportHeight < 780;
 
   const backgroundStyle = {
-    background: `radial-gradient(circle at center, #2a0a3b 0%, #180524 55%, #0e0316 100%)`,
+    backgroundColor: "#0e0316",
+    backgroundImage: "url('/homebg1.jpg')",
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
   };
 
   return (
     <div
-      className="fixed inset-0 flex flex-col overflow-y-auto"
+      className="min-h-[100dvh] flex flex-col overflow-y-auto"
       style={backgroundStyle}
     >     
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
-      <div className="flex-1 flex flex-col px-4 lg:px-8 w-full max-w-4xl mx-auto">
-        <div className={`space-y-3 flex-shrink-0 ${isSmallScreen ? 'pt-2' : 'pt-3'} w-full`}>
+      <div className={`flex-1 flex flex-col px-4 lg:px-8 w-full max-w-4xl mx-auto ${isSmallScreen ? "min-h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] pt-2" : "min-h-0 pt-3 pb-4"}`}>
+        <div className={`space-y-2 flex-shrink-0 ${isSmallScreen ? 'pt-1' : 'pt-2'} w-full`}>
           <GameStatsHeader
             userToken={userToken}
             isParentLoading={false}
@@ -436,7 +383,7 @@ export default function Home() {
               <Button
                 variant="blue"
                 size="sm"
-                onClick={() => navigate("/profile")}
+                onClick={handleRegisterNow}
               >
                 Register Now
               </Button>
@@ -451,19 +398,27 @@ export default function Home() {
           />
         </div>
 
-        <div className="flex items-center justify-center flex-1 min-h-0 pt-6">
+        <div className={`${isSmallScreen ? "flex-1 min-h-0 flex items-center justify-center py-2" : "flex items-center justify-center flex-1 py-4"}`}>
           <div className="relative flex flex-col items-center justify-center">
             <div
-              className="relative rounded-full flex items-center justify-center overflow-visible mx-auto w-[260px] h-[260px] sm:w-[450px] sm:h-[450px] md:w-[400px] md:h-[400px] lg:w-[260px] lg:h-[260px] xl:w-[280px] xl:h-[280px]"
+              className={`relative rounded-full flex items-center justify-center overflow-visible mx-auto ${
+                isShortPhone
+                  ? "w-[clamp(185px,min(52vw,34vh),265px)] h-[clamp(185px,min(52vw,34vh),265px)]"
+                  : "w-[clamp(247px,min(73vw,47vh),377px)] h-[clamp(247px,min(73vw,47vh),377px)]"
+              } sm:w-[clamp(250px,min(40vw,36vh),360px)] sm:h-[clamp(250px,min(40vw,36vh),360px)] md:w-[clamp(280px,38vw,400px)] md:h-[clamp(280px,38vw,400px)]`}
               style={{
                 backgroundImage: `url('/image.png')`,
                 backgroundSize: "cover",
-                backgroundPosition: "center",
+                backgroundPosition: "center 42%",
                 backgroundRepeat: "no-repeat",
               }}
             >
               <Link to="/profile" className="no-underline relative z-10">
-                <Avatar className="rounded-full overflow-visible relative w-[200px] h-[200px] sm:w-[240px] sm:h-[240px] md:w-[280px] md:h-[280px] lg:w-[200px] lg:h-[200px] xl:w-[220px] xl:h-[220px]">
+                <Avatar className={`rounded-full overflow-visible relative ${
+                  isShortPhone
+                    ? "w-[clamp(140px,min(39vw,25vh),205px)] h-[clamp(140px,min(39vw,25vh),205px)]"
+                    : "w-[clamp(192px,min(55vw,36vh),286px)] h-[clamp(192px,min(55vw,36vh),286px)]"
+                } sm:w-[clamp(200px,min(34vw,30vh),280px)] sm:h-[clamp(200px,min(34vw,30vh),280px)]`}>
                   <AvatarImage
                     src={avatarImage}
                     alt={alias}
@@ -476,7 +431,7 @@ export default function Home() {
               </Link>
 
               <h2
-                className="absolute left-1/2 -translate-x-1/2 text-white font-extrabold text-center whitespace-nowrap -bottom-6 text-xl sm:text-2xl md:text-3xl lg:text-4xl max-w-[220px] sm:max-w-[260px] md:max-w-[300px]"
+                className="absolute left-1/2 -translate-x-1/2 text-white font-extrabold text-center whitespace-nowrap -bottom-5 text-lg sm:text-2xl md:text-3xl max-w-[190px] sm:max-w-[260px] md:max-w-[300px]"
                 style={{
                   textShadow: '0 0 8px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.4)',
                 }}
@@ -490,29 +445,29 @@ export default function Home() {
           </div>
         </div>
 
-        <div className={`space-y-2 flex-shrink-0 w-full ${isSmallScreen ? 'pb-36 pt-10' : 'pb-24 pt-16'}`}>
+        <div className={`space-y-2 flex-shrink-0 w-full mt-auto ${isSmallScreen ? 'pt-1 pb-[calc(7.1rem+env(safe-area-inset-bottom))]' : 'pt-6'}`}>
           <Button
             variant="default"
             onClick={handleQuickQuiz}
             disabled={playButtonLoading || currentCoins < QUIZ_COST}
-            className={`w-full flex items-center justify-between px-6 ${isSmallScreen ? 'h-20' : 'h-24 sm:h-24'}`}
+            className={`w-full flex items-center justify-between px-4 sm:px-6 ${isSmallScreen ? 'h-16' : 'h-24 sm:h-24'}`}
           >
             {playButtonLoading ? (
-              <div className="flex items-center justify-center w-full gap-2 text-xl sm:text-2xl">
+              <div className="flex items-center justify-center w-full gap-2 text-lg sm:text-2xl">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                 Starting Quiz...
               </div>
             ) : (
               <>
                 <div className="flex items-center justify-center gap-3 sm:gap-4 h-full">
-                  <span className="text-4xl sm:text-5xl font-bold text-white leading-none flex items-center -translate-y-[1px]">
+                  <span className="text-3xl sm:text-5xl font-bold text-white leading-none flex items-center -translate-y-[1px]">
                     Play
                   </span>
 
-                  <span className="text-base sm:text-lg font-semibold text-yellow-300 flex items-center gap-1.5 bg-gray-700/70 px-3 py-1.5 rounded-full">
+                  <span className="text-sm sm:text-lg font-semibold text-yellow-300 flex items-center gap-1.5 bg-gray-700/70 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full">
                     <svg
                       viewBox="0 0 24 24"
-                      className="h-5 w-5 sm:h-6 sm:w-6"
+                      className="h-4 w-4 sm:h-6 sm:w-6"
                       xmlns="http://www.w3.org/2000/svg"
                     >
                       <circle cx="12" cy="12" r="8" fill="#f59e0b" />
@@ -523,11 +478,11 @@ export default function Home() {
                   </span>
                 </div>
 
-                <div className="bg-white rounded-full w-14 h-14 sm:w-[72px] sm:h-[72px] flex flex-col items-center justify-center shadow-md border-2 border-green-500">
-                  <span className="text-green-600 text-2xl sm:text-3xl font-bold leading-none">
+                <div className="bg-white rounded-full w-12 h-12 sm:w-[72px] sm:h-[72px] flex flex-col items-center justify-center shadow-md border-2 border-green-500">
+                  <span className="text-green-600 text-xl sm:text-3xl font-bold leading-none">
                     {userLevel}
                   </span>
-                  <span className="text-green-600 text-[10px] sm:text-xs font-semibold uppercase leading-none tracking-wide mt-0.5">
+                  <span className="text-green-600 text-[9px] sm:text-xs font-semibold uppercase leading-none tracking-wide mt-0.5">
                     Level
                   </span>
                 </div>
@@ -542,54 +497,6 @@ export default function Home() {
           )}
         </div>
       </div>
-      
-      <Dialog open={isInterestModalOpen} onOpenChange={setIsInterestModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Heart className="w-5 h-5" />
-              <span>Select Your Interests</span>
-            </DialogTitle>
-            <DialogDescription>
-              Help us personalize your experience by selecting topics you're interested in.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-4">
-            {user._id && (
-              <InterestSelector
-                userId={user._id}
-                initialSelectedIds={selectedInterests}
-                onSelectionChange={handleInterestChange}
-              />
-            )}
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={() => setIsInterestModalOpen(false)}
-              className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
-              disabled={savingInterests}
-            >
-              Skip for Now
-            </Button>
-            <Button
-              onClick={handleSaveInterests}
-              disabled={savingInterests || selectedInterests.length === 0}
-            >
-              {savingInterests ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                  <span>Saving...</span>
-                </div>
-              ) : (
-                `Save Interests (${selectedInterests.length})`
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

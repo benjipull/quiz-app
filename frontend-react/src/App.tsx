@@ -1,13 +1,12 @@
-import React, { useLayoutEffect } from "react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"; 
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { MobileLayout } from "@/components/layout/MobileLayout";
 import Home from "./pages/Home";
 import Quiz from "./pages/Quiz";
-import AuthSection from "./pages/AuthSection";
 import { usePageTracking } from "./hooks/usePageTracking";
 import Leaderboard from "./pages/Leaderboard";
 import Categories from "./pages/Categories";
@@ -15,72 +14,115 @@ import Profile from "./pages/Profile";
 import Notifications from "./pages/Notification";
 import Store from "./pages/Store";
 import Menu from "./pages/Menu";
+import Interests from "./pages/Interests";
 import NotFound from "./pages/NotFound";
 import About from "./pages/About";
 import Claim from "./components/dummy";
 
 const queryClient = new QueryClient();
+const BASE_URL = import.meta.env.VITE_BASE_URL || window.location.origin;
 
-// ProtectedRoute component to guard routes
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-    const userToken = localStorage.getItem("token");
-    if (!userToken) {
-        // Redirect to the login page if not authenticated
-        return <Navigate to="/auth" replace />;
-    }
-    return children;
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [guestLoginFailed, setGuestLoginFailed] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const ensureSession = async () => {
+      const existingToken = localStorage.getItem("token");
+      if (existingToken) {
+        if (isMounted) {
+          setIsCheckingAuth(false);
+        }
+        return;
+      }
+
+      try {
+        const response = await fetch(`${BASE_URL}/api/users/guestLogin`, {
+          method: "POST",
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data?.token || !data?.user) {
+          throw new Error("Guest login failed");
+        }
+
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+
+        if (isMounted) {
+          setIsCheckingAuth(false);
+        }
+      } catch (error) {
+        console.error("Auto guest login failed:", error);
+        if (isMounted) {
+          setGuestLoginFailed(true);
+          setIsCheckingAuth(false);
+        }
+      }
+    };
+
+    ensureSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  if (isCheckingAuth) {
+    return <div className="min-h-screen grid place-items-center text-sm text-muted-foreground">Signing you in...</div>;
+  }
+
+  if (guestLoginFailed) {
+    return <div className="min-h-screen grid place-items-center text-sm text-destructive">Unable to start guest session. Please refresh.</div>;
+  }
+
+  return children;
 };
 
 const App = () => (
-    <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-                {/* 💡 Call the hook here to start page view tracking and include scroll to top logic */}
-                <AppContent /> 
-            </BrowserRouter>
-        </TooltipProvider>
-    </QueryClientProvider>
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
 );
 
-// Extract content to a new component to correctly use the hook and location
 const AppContent = () => {
-    usePageTracking();
-    const location = useLocation(); // 💡 Get the current location object
+  usePageTracking();
+  const location = useLocation();
 
-    // 💡 NEW: Scroll to the top of the page on route change
-    useLayoutEffect(() => {
-        // window.scrollTo(0, 0) scrolls the window to the top left corner (x=0, y=0)
-        window.scrollTo(0, 0); 
-    }, [location.pathname]); // Re-run effect whenever the pathname changes
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
-    return (
-        <Routes>
-            {/* Public route for authentication */}
-            <Route path="/auth" element={<AuthSection />} />
+  return (
+    <Routes>
+      <Route path="/auth" element={<Navigate to="/" replace />} />
+      <Route path="/reset-password" element={<Navigate to="/" replace />} />
 
-            {/* 💡 NEW: Add route for password reset link from email to ensure AuthSection loads */}
-            <Route path="/reset-password" element={<AuthSection />} />
+      <Route path="/" element={<ProtectedRoute><MobileLayout /></ProtectedRoute>}>
+        <Route index element={<Home />} />
+        <Route path="all-quizzes" element={<Categories />} />
+        <Route path="quiz/:categoryId?" element={<Quiz />} />
+        <Route path="leaderboard" element={<Leaderboard />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="interests" element={<Interests />} />
+        <Route path="notifications" element={<Notifications />} />
+        <Route path="store" element={<Store />} />
+        <Route path="about-us" element={<About />} />
+        <Route path="menu" element={<Menu />} />
+        <Route path="claim" element={<Claim />} />
+      </Route>
 
-            {/* Protected routes wrapped by ProtectedRoute */}
-            <Route path="/" element={<ProtectedRoute><MobileLayout /></ProtectedRoute>}>
-                <Route index element={<Home />} />
-                <Route path="all-quizzes" element={<Categories />} />
-                <Route path="quiz/:categoryId?" element={<Quiz />} />
-                <Route path="leaderboard" element={<Leaderboard />} />
-                <Route path="profile" element={<Profile />} />
-                <Route path="notifications" element={<Notifications />} />
-                <Route path="store" element={<Store />} />
-                <Route path="about-us" element={<About />} />
-                <Route path="menu" element={<Menu />} />
-                <Route path="claim" element={<Claim />} />
-            </Route>
-
-            {/* Catch-all route for any undefined paths */}
-            <Route path="*" element={<NotFound />} />
-        </Routes>
-    );
-}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
 
 export default App;
