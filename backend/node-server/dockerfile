@@ -1,21 +1,24 @@
-# Use Node.js base image
-FROM node:18
+# Build frontend assets
+FROM node:18 AS frontend-builder
+WORKDIR /frontend
+COPY frontend-react/package*.json ./
+RUN npm ci
+COPY frontend-react/ ./
+RUN npm run build
 
-# Set working directory inside the container
+# Build backend runtime image
+FROM node:18
 WORKDIR /app
 
-# Copy package.json and package-lock.json first (to leverage Docker caching)
-COPY package*.json ./
+# Install backend dependencies
+COPY backend/node-server/package*.json ./
+RUN npm ci && npm install resend dotenv @sendgrid/mail express-rate-limit
 
-# Install dependencies
-RUN npm install && npm install resend dotenv @sendgrid/mail express-rate-limit
+# Copy backend source
+COPY backend/node-server/ ./
 
+# Copy built frontend into path expected by Express (`/app/frontend`)
+COPY --from=frontend-builder /frontend/dist ./frontend
 
-# Copy application source code
-COPY . .
-
-# Expose the port your app listens on
 EXPOSE 3000
-
-# Start the application
 CMD ["node", "index.js"]

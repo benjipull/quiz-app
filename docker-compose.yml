@@ -22,9 +22,7 @@ services:
   node-container:
     build:
       context: .
-      dockerfile: backend/node-server/dockerfile
-      args:
-        VITE_BASE_URL: http://localhost:3000
+      dockerfile: ./backend/node-server/dockerfile
     container_name: node-container
     command: node --inspect=0.0.0.0:9229 index.js
     ports:
