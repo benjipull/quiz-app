@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { trackHomeScreen } from "@/utils/analytics";
 import { trackEvent } from "@/utils/analytics";
+import { setGAUser } from "@/utils/gaClient";
 import {
   AlertTriangle,
 } from "lucide-react";
@@ -94,6 +95,17 @@ export default function Home() {
 
   const navigate = useNavigate();
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+  const storedUserId = (() => {
+    if (typeof window === "undefined") return undefined;
+    try {
+      const raw = localStorage.getItem("user");
+      if (!raw) return undefined;
+      const parsed = JSON.parse(raw);
+      return parsed?._id as string | undefined;
+    } catch {
+      return undefined;
+    }
+  })();
   const { toast } = useToast();
   
   const currentCoins = user?.coins ?? 0;
@@ -167,10 +179,13 @@ export default function Home() {
   }, [user, userLoading, navigate, refreshUser]);
 
   useEffect(() => {
-    if (!user?._id || hasTrackedHomeRef.current) return;
+    const resolvedUserId = user?._id || storedUserId;
+    if (hasTrackedHomeRef.current || userLoading || !resolvedUserId) return;
+
+    setGAUser(resolvedUserId);
     hasTrackedHomeRef.current = true;
-    trackHomeScreen(user._id);
-  }, [user?._id]);
+    trackHomeScreen(resolvedUserId);
+  }, [userLoading, user?._id, storedUserId]);
 
   // ✅ Fetch category on-demand (with component-level cache)
   const fetchCategoryToPlay = async (): Promise<CategoryToPlayResponse | null> => {
@@ -305,23 +320,8 @@ export default function Home() {
     markUserStale();
   };
 
-  if (showSplash) {
+  if (showSplash || userLoading) {
     return <SplashScreen dataLoaded={!userLoading} />;
-  }
-
-  if (userLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center"
-        style={{
-          background: `radial-gradient(circle at center, #2a0a3b 0%, #180524 55%, #0e0316 100%)`,
-        }}
-      >
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white"></div>
-          <p className="text-white text-sm">Loading your profile...</p>
-        </div>
-      </div>
-    );
   }
 
   if (!user) {

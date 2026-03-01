@@ -188,8 +188,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const cached = loadUserFromStorage();
       if (cached) {
         setUser(cached);
-        setLoading(false);
-        refreshUser(); // background refresh
+        // Keep splash/loading active until initial getUserDetails resolves.
+        await refreshUser(true);
       } else {
         await refreshUser(true);
       }
