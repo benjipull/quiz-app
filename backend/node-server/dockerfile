@@ -1,24 +1,13 @@
-# Build frontend assets
-FROM node:18 AS frontend-builder
-WORKDIR /frontend
-COPY frontend-react/package*.json ./
-RUN npm ci
-COPY frontend-react/ ./
-RUN npm run build
-
-# Build backend runtime image
 FROM node:18
 WORKDIR /app
 
 # Install backend dependencies
-COPY backend/node-server/package*.json ./
+# This Dockerfile is intended to be built with context: backend/node-server
+COPY package*.json ./
 RUN npm ci && npm install resend dotenv @sendgrid/mail express-rate-limit
 
 # Copy backend source
-COPY backend/node-server/ ./
-
-# Copy built frontend into path expected by Express (`/app/frontend`)
-COPY --from=frontend-builder /frontend/dist ./frontend
+COPY . ./
 
 EXPOSE 3000
 CMD ["node", "index.js"]

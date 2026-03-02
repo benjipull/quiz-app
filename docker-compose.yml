@@ -21,8 +21,8 @@ services:
 
   node-container:
     build:
-      context: .
-      dockerfile: ./backend/node-server/dockerfile
+      context: ./backend/node-server
+      dockerfile: dockerfile
     container_name: node-container
     command: node --inspect=0.0.0.0:9229 index.js
     ports:
