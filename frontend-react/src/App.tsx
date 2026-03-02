@@ -1,4 +1,6 @@
 import React, { useEffect, useLayoutEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { StatusBar } from "@capacitor/status-bar";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +20,7 @@ import Interests from "./pages/Interests";
 import NotFound from "./pages/NotFound";
 import About from "./pages/About";
 import Claim from "./components/dummy";
+import SplashScreen from "./components/SplashScreen";
 
 const queryClient = new QueryClient();
 const BASE_URL = import.meta.env.VITE_BASE_URL || window.location.origin;
@@ -71,7 +74,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   if (isCheckingAuth) {
-    return <div className="min-h-screen grid place-items-center text-sm text-muted-foreground">Signing you in...</div>;
+    return <SplashScreen dataLoaded={false} />;
   }
 
   if (guestLoginFailed) {
@@ -96,6 +99,16 @@ const App = () => (
 const AppContent = () => {
   usePageTracking();
   const location = useLocation();
+
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== "android") {
+      return;
+    }
+
+    void StatusBar.hide().catch((error) => {
+      console.error("Failed to hide Android status bar:", error);
+    });
+  }, []);
 
   useLayoutEffect(() => {
     window.scrollTo(0, 0);
