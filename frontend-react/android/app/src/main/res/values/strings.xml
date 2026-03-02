@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Quizicle</string>
+    <string name="title_activity_main">Quizicle</string>
+    <string name="package_name">com.quizicle.app</string>
+    <string name="custom_url_scheme">com.quizicle.app</string>
+</resources>

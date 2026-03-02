@@ -29,14 +29,21 @@ app.use(express.json());
 // Serve static files from "frontend" directory
 app.use("/admin", express.static(path.join(__dirname, "frontend-admin")));
 
-const frontendPath = path.join(__dirname, "frontend");
-const frontendIndexPath = path.join(frontendPath, "index.html");
-const hasFrontendBuild = fs.existsSync(frontendIndexPath);
+const frontendCandidates = [
+    path.join(__dirname, "frontend"), // container copy target
+    path.join(__dirname, "..", "..", "frontend-react", "dist"), // local dev build output
+];
+
+const frontendPath = frontendCandidates.find((candidate) =>
+    fs.existsSync(path.join(candidate, "index.html"))
+);
+const frontendIndexPath = frontendPath ? path.join(frontendPath, "index.html") : "";
+const hasFrontendBuild = Boolean(frontendPath);
 
 if (hasFrontendBuild) {
     app.use(express.static(frontendPath));
 } else {
-    console.warn(`[frontend] Missing build at ${frontendIndexPath}`);
+    console.warn(`[frontend] Missing build. Checked: ${frontendCandidates.join(", ")}`);
 }
 
 // ==Routes== //
@@ -107,7 +114,7 @@ app.get("*", (req, res) => {
     }
 
     return res.status(503).json({
-        message: "Frontend build not found. Rebuild the container so frontend assets are copied.",
+        message: "Frontend build not found. Run frontend build or copy assets into backend/node-server/frontend.",
     });
 });
 

@@ -1,21 +1,13 @@
-# Use Node.js base image
 FROM node:18
-
-# Set working directory inside the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json first (to leverage Docker caching)
+# Install backend dependencies
+# This Dockerfile is intended to be built with context: backend/node-server
 COPY package*.json ./
+RUN npm ci && npm install resend dotenv @sendgrid/mail express-rate-limit
 
-# Install dependencies
-RUN npm install && npm install resend dotenv @sendgrid/mail express-rate-limit
+# Copy backend source
+COPY . ./
 
-
-# Copy application source code
-COPY . .
-
-# Expose the port your app listens on
 EXPOSE 3000
-
-# Start the application
 CMD ["node", "index.js"]
