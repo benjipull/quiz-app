@@ -1,7 +1,6 @@
-version: '3.8'
-
 services:
   ollama-llama3:
+    profiles: ["ollama"]
     build: "./backend/ollama-llama3"
     container_name: ollama-llama3
     deploy:
@@ -21,15 +20,13 @@ services:
 
   node-container:
     build:
-      context: ./backend/node-server
-      dockerfile: dockerfile
+      context: .
+      dockerfile: ./backend/node-server/dockerfile
     container_name: node-container
     command: node --inspect=0.0.0.0:9229 index.js
     ports:
       - "3000:3000"
       - "9229:9229"
-    depends_on:
-      - ollama-llama3
     networks:
       - quiz-app-network
     environment:
