@@ -1,6 +1,17 @@
 steps:
+  - id: Verify Context
+    name: "gcr.io/cloud-builders/docker"
+    entrypoint: "bash"
+    dir: "."
+    args:
+      [
+        "-c",
+        "pwd && ls -la && test -f backend/node-server/package.json && test -f frontend-react/package.json"
+      ]
+
   - id: Build
     name: "gcr.io/cloud-builders/docker"
+    dir: "."
     args:
       [
         "build",
