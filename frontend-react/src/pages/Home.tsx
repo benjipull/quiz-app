@@ -34,6 +34,7 @@ const avatars: string[] = Object.values(avatarImages) as string[];
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const QUIZ_COST = 50;
 const API_TIMEOUT = 15000; // 15 second timeout for API calls
+const KNOWLEDGE_POINTS_PER_LEVEL = 1000;
 
 interface CategoryToPlayResponse {
   message: string;
@@ -416,8 +417,18 @@ export default function Home() {
 
   const alias = user.alias || "Guest";
   const avatarImage = userAvatar || undefined;
-  const userLevel = user.level || 1;
+  const knowledgePoints = Math.max(0, user.knowledgePoints ?? 0);
+  const userLevel = Math.floor(knowledgePoints / KNOWLEDGE_POINTS_PER_LEVEL) + 1;
+  const levelProgressPoints = knowledgePoints % KNOWLEDGE_POINTS_PER_LEVEL;
+  const levelProgressPercent = (levelProgressPoints / KNOWLEDGE_POINTS_PER_LEVEL) * 100;
   const isShortPhone = isSmallScreen && viewportHeight < 780;
+  const avatarSizeClass = `${
+    isShortPhone
+      ? "w-[clamp(140px,min(39vw,25vh),205px)] h-[clamp(140px,min(39vw,25vh),205px)]"
+      : "w-[clamp(192px,min(55vw,36vh),286px)] h-[clamp(192px,min(55vw,36vh),286px)]"
+  } sm:w-[clamp(200px,min(34vw,30vh),280px)] sm:h-[clamp(200px,min(34vw,30vh),280px)]`;
+  const moonOffsetY = -34;
+  const moonScale = 1.32;
 
   const backgroundStyle = {
     backgroundColor: "#0e0316",
@@ -455,68 +466,89 @@ export default function Home() {
 
         <div className={`${isSmallScreen ? "flex-1 min-h-0 flex items-center justify-center py-2" : "flex items-center justify-center flex-1 py-4"}`}>
           <div className="relative flex flex-col items-center justify-center">
-            <div
-              className={`relative rounded-full flex items-center justify-center overflow-visible mx-auto ${
-                isShortPhone
-                  ? "w-[clamp(185px,min(52vw,34vh),265px)] h-[clamp(185px,min(52vw,34vh),265px)]"
-                  : "w-[clamp(247px,min(73vw,47vh),377px)] h-[clamp(247px,min(73vw,47vh),377px)]"
-              } sm:w-[clamp(250px,min(40vw,36vh),360px)] sm:h-[clamp(250px,min(40vw,36vh),360px)] md:w-[clamp(280px,38vw,400px)] md:h-[clamp(280px,38vw,400px)]`}
-            >
-              <div
-                className="absolute inset-0 z-0"
-                style={{
-                  backgroundImage: `url('/image.png')`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                  backgroundRepeat: "no-repeat",
-                  transform: "translateY(-14%)",
-                }}
-              />
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={openEditDialog}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    openEditDialog();
-                  }
-                }}
-                aria-label="Edit avatar and alias"
-                className="relative z-10 cursor-pointer flex flex-col items-center"
-              >
-                <Avatar className={`rounded-full overflow-visible relative ${
-                  isShortPhone
-                    ? "w-[clamp(140px,min(39vw,25vh),205px)] h-[clamp(140px,min(39vw,25vh),205px)]"
-                    : "w-[clamp(192px,min(55vw,36vh),286px)] h-[clamp(192px,min(55vw,36vh),286px)]"
-                } sm:w-[clamp(200px,min(34vw,30vh),280px)] sm:h-[clamp(200px,min(34vw,30vh),280px)]`}>
-                  <AvatarImage
-                    src={avatarImage}
-                    alt={alias}
-                    className="object-contain scale-[1.12] relative z-10"
-                  />
-                  <AvatarFallback className="bg-transparent border-none text-white font-bold text-3xl md:text-4xl">
-                    {alias.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="z-20 pointer-events-none mt-3 flex items-center gap-2 sm:gap-2.5">
-                  <h2
-                    className="text-white font-extrabold text-center whitespace-nowrap text-2xl sm:text-3xl md:text-4xl max-w-[220px] sm:max-w-[300px] md:max-w-[360px]"
-                    style={{
-                      textShadow: '0 0 8px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.4)',
-                    }}
-                  >
-                    {alias
-                      .split(/[\s-_]+/)
-                      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                      .join(" ")}
-                  </h2>
-                  <img
-                    src="/assets/images/icons/edit-icon-cropped.png"
-                    alt=""
-                    aria-hidden="true"
-                    className="text-2xl sm:text-3xl md:text-4xl w-[2em] h-[2em] mb-[0.02em] opacity-100 drop-shadow-[0_0_6px_rgba(255,255,255,0.55)] shrink-0"
-                  />
+            <div className="relative rounded-full flex items-center justify-center overflow-visible mx-auto">
+              <div className="relative z-10 flex flex-col items-center">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={openEditDialog}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openEditDialog();
+                    }
+                  }}
+                  aria-label="Edit avatar and alias"
+                  className="cursor-pointer flex flex-col items-center"
+                >
+                  <div className={`relative ${avatarSizeClass}`}>
+                    <div
+                      className="pointer-events-none absolute left-1/2 top-1/2 z-0"
+                      style={{
+                        width: `${moonScale * 100}%`,
+                        height: `${moonScale * 100}%`,
+                        backgroundImage: `url('/image.png')`,
+                        backgroundSize: "contain",
+                        backgroundPosition: "center",
+                        backgroundRepeat: "no-repeat",
+                        transform: `translate(-50%, calc(-50% + ${moonOffsetY}px))`,
+                      }}
+                    />
+                  <Avatar className="rounded-full overflow-visible relative z-10 w-full h-full">
+                    <AvatarImage
+                      src={avatarImage}
+                      alt={alias}
+                      className="object-contain scale-[1.12] relative z-10"
+                    />
+                    <AvatarFallback className="bg-transparent border-none text-white font-bold text-3xl md:text-4xl">
+                      {alias.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  </div>
+                  <div className="z-20 pointer-events-none mt-7 sm:mt-8 flex justify-center">
+                    <div className="relative w-fit">
+                      <h2
+                        className="text-white font-extrabold text-center whitespace-nowrap text-2xl sm:text-3xl md:text-4xl max-w-[220px] sm:max-w-[300px] md:max-w-[360px]"
+                        style={{
+                          textShadow: '0 0 8px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.4)',
+                        }}
+                      >
+                        {alias
+                          .split(/[\s-_]+/)
+                          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                          .join(" ")}
+                      </h2>
+                      <img
+                        src="/assets/images/icons/edit-icon-cropped.png"
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute left-full top-1/2 -translate-y-1/2 ml-2 sm:ml-2.5 text-2xl sm:text-3xl md:text-4xl w-[2em] h-[2em] opacity-100 drop-shadow-[0_0_6px_rgba(255,255,255,0.55)] shrink-0"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className="z-20 mt-7 sm:mt-8 w-[min(92vw,380px)] sm:w-[min(70vw,430px)]"
+                >
+                  <div className="relative h-[35px] sm:h-[39px] w-full rounded-full bg-white/20 overflow-hidden border border-white/25">
+                    <div
+                      className="h-full rounded-full transition-[width] duration-500 ease-out"
+                      style={{
+                        width: `${levelProgressPercent}%`,
+                        background: "linear-gradient(90deg, #22D3EE 0%, #06B6D4 55%, #67E8F9 100%)",
+                        boxShadow: "0 0 14px rgba(34,211,238,0.55)",
+                      }}
+                    />
+                    <span className="absolute left-2 sm:left-2.5 top-1/2 -translate-y-1/2 z-10 text-[10px] sm:text-xs font-extrabold uppercase tracking-[0.08em] text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                      Level {userLevel}
+                    </span>
+                    <span className="absolute right-2 sm:right-2.5 top-1/2 -translate-y-1/2 z-10 text-[10px] sm:text-xs font-extrabold uppercase tracking-[0.08em] text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                      Level {userLevel + 1}
+                    </span>
+                    <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] sm:text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                      {levelProgressPoints}/{KNOWLEDGE_POINTS_PER_LEVEL} KP
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -563,10 +595,10 @@ export default function Home() {
                 <div className="relative z-10 grid h-full w-full grid-cols-[1fr_auto] items-center gap-2 sm:gap-3">
                   <div className="pl-3 sm:pl-4 flex items-center gap-2.5 sm:gap-3">
                     <span
-                      className="text-3xl sm:text-5xl font-bold text-white leading-none flex items-center drop-shadow-[0_2px_0_rgba(0,0,0,0.35)]"
+                      className="text-lg sm:text-2xl md:text-3xl font-bold text-white leading-none whitespace-nowrap flex items-center drop-shadow-[0_2px_0_rgba(0,0,0,0.35)]"
                       style={{ transform: "translateY(-0.06em)" }}
                     >
-                        Play
+                        Play Quick Quiz
                     </span>
 
                     <span
