@@ -1,13 +1,31 @@
+FROM node:18 AS backend-deps
+WORKDIR /app/backend
+
+# Install backend dependencies first for better layer caching
+COPY backend/node-server/package.json ./
+COPY backend/node-server/package-lock.json ./
+RUN npm ci --omit=dev
+
+FROM node:18 AS frontend-build
+WORKDIR /app/frontend-react
+
+# Build the React app so backend can serve static files from /app/frontend
+COPY frontend-react/package.json ./
+COPY frontend-react/package-lock.json ./
+RUN npm ci
+COPY frontend-react/. ./
+RUN npm run build
+
 FROM node:18
 WORKDIR /app
+ENV NODE_ENV=production
 
-# Install backend dependencies
-# This Dockerfile is intended to be built with context: backend/node-server
-COPY package*.json ./
-RUN npm ci && npm install resend dotenv @sendgrid/mail express-rate-limit
+# Backend runtime files
+COPY --from=backend-deps /app/backend/node_modules ./node_modules
+COPY backend/node-server/. ./
 
-# Copy backend source
-COPY . ./
+# Frontend static bundle expected by backend/index.js
+COPY --from=frontend-build /app/frontend-react/dist ./frontend
 
 EXPOSE 3000
 CMD ["node", "index.js"]
