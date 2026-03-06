@@ -1,10 +1,17 @@
 // Home.tsx - Direct API calls without preloader
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { trackHomeScreen } from "@/utils/analytics";
 import { trackEvent } from "@/utils/analytics";
 import { setGAUser } from "@/utils/gaClient";
@@ -27,6 +34,7 @@ const avatars: string[] = Object.values(avatarImages) as string[];
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const QUIZ_COST = 50;
 const API_TIMEOUT = 15000; // 15 second timeout for API calls
+const KNOWLEDGE_POINTS_PER_LEVEL = 1000;
 
 interface CategoryToPlayResponse {
   message: string;
@@ -80,6 +88,10 @@ export default function Home() {
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [editAlias, setEditAlias] = useState("");
+  const [editAvatarIndex, setEditAvatarIndex] = useState(0);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 800);
 
@@ -174,6 +186,8 @@ export default function Home() {
       const avatarIndex = user.avatar ? user.avatar - 1 : 0;
       const calculatedAvatar = avatars[avatarIndex] || null;
       setUserAvatar(calculatedAvatar);
+      setEditAvatarIndex(avatarIndex >= 0 ? avatarIndex : 0);
+      setEditAlias(user.alias || "");
 
     }
   }, [user, userLoading, navigate, refreshUser]);
@@ -308,16 +322,77 @@ export default function Home() {
     }
   };
 
-  const handleRegisterNow = () => {
-    trackEvent("home_cta_click", { user_id: user?._id, cta: "register_now" });
-    navigate("/profile");
-  };
-
   const handleCoinsEarned = (amount: number) => {
     const newTotal = currentCoins + amount;
     updateCoins(newTotal);
     updateUserLocally({ dailyClaimAvailable: false });
     markUserStale();
+  };
+
+  const openEditDialog = () => {
+    const avatarIndex = user?.avatar ? user.avatar - 1 : 0;
+    setEditAvatarIndex(avatarIndex >= 0 ? avatarIndex : 0);
+    setEditAlias(user?.alias || "");
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveAliasAvatar = async () => {
+    const trimmedAlias = editAlias.trim();
+    if (!trimmedAlias) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid alias.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!userToken) {
+      toast({
+        title: "Authentication Error",
+        description: "Please log in again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingProfile(true);
+    try {
+      const selectedAvatar = editAvatarIndex + 1;
+      const response = await fetch(`${BASE_URL}/api/updateUserDetails`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({
+          alias: trimmedAlias,
+          avatar: selectedAvatar,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData?.error || "Failed to update profile.");
+      }
+
+      updateUserLocally({
+        alias: trimmedAlias,
+        avatar: selectedAvatar,
+      });
+      setUserAvatar(avatars[editAvatarIndex] || null);
+      markUserStale();
+      await refreshUser();
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to update profile: ${(error as Error).message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   if (showSplash || userLoading) {
@@ -342,9 +417,18 @@ export default function Home() {
 
   const alias = user.alias || "Guest";
   const avatarImage = userAvatar || undefined;
-  const isGuest = user.userType === 'Guest';
-  const userLevel = user.level || 1;
+  const knowledgePoints = Math.max(0, user.knowledgePoints ?? 0);
+  const userLevel = Math.floor(knowledgePoints / KNOWLEDGE_POINTS_PER_LEVEL) + 1;
+  const levelProgressPoints = knowledgePoints % KNOWLEDGE_POINTS_PER_LEVEL;
+  const levelProgressPercent = (levelProgressPoints / KNOWLEDGE_POINTS_PER_LEVEL) * 100;
   const isShortPhone = isSmallScreen && viewportHeight < 780;
+  const avatarSizeClass = `${
+    isShortPhone
+      ? "w-[clamp(140px,min(39vw,25vh),205px)] h-[clamp(140px,min(39vw,25vh),205px)]"
+      : "w-[clamp(192px,min(55vw,36vh),286px)] h-[clamp(192px,min(55vw,36vh),286px)]"
+  } sm:w-[clamp(200px,min(34vw,30vh),280px)] sm:h-[clamp(200px,min(34vw,30vh),280px)]`;
+  const moonOffsetY = -34;
+  const moonScale = 1.32;
 
   const backgroundStyle = {
     backgroundColor: "#0e0316",
@@ -372,24 +456,6 @@ export default function Home() {
             userGem2={user.enlightenmentCrystals ?? 0}
           />
 
-          {isGuest && (
-            <Card className="bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] border-gray-200 dark:border-gray-700 dark:text-white p-3 shadow-lg flex items-center justify-between space-x-3">
-              <div className="flex items-center space-x-3 flex-shrink-0">
-                <AlertTriangle className="w-5 h-5 text-amber-500 dark:text-purple-400" />
-              </div>
-              <p className="text-sm text-white font-semibold leading-snug flex-grow">
-                Unlock more features
-              </p>
-              <Button
-                variant="blue"
-                size="sm"
-                onClick={handleRegisterNow}
-              >
-                Register Now
-              </Button>
-            </Card>
-          )}
-
           <DailyCoinClaim
             userToken={userToken}
             onCoinsEarned={refreshUser}
@@ -400,51 +466,91 @@ export default function Home() {
 
         <div className={`${isSmallScreen ? "flex-1 min-h-0 flex items-center justify-center py-2" : "flex items-center justify-center flex-1 py-4"}`}>
           <div className="relative flex flex-col items-center justify-center">
-            <div
-              className={`relative rounded-full flex items-center justify-center overflow-visible mx-auto ${
-                isShortPhone
-                  ? "w-[clamp(185px,min(52vw,34vh),265px)] h-[clamp(185px,min(52vw,34vh),265px)]"
-                  : "w-[clamp(247px,min(73vw,47vh),377px)] h-[clamp(247px,min(73vw,47vh),377px)]"
-              } sm:w-[clamp(250px,min(40vw,36vh),360px)] sm:h-[clamp(250px,min(40vw,36vh),360px)] md:w-[clamp(280px,38vw,400px)] md:h-[clamp(280px,38vw,400px)]`}
-            >
-              <div
-                className="absolute inset-0 z-0"
-                style={{
-                  backgroundImage: `url('/image.png')`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                  backgroundRepeat: "no-repeat",
-                  transform: "translateY(-14%)",
-                }}
-              />
-              <Link to="/profile" className="no-underline relative z-10">
-                <Avatar className={`rounded-full overflow-visible relative ${
-                  isShortPhone
-                    ? "w-[clamp(140px,min(39vw,25vh),205px)] h-[clamp(140px,min(39vw,25vh),205px)]"
-                    : "w-[clamp(192px,min(55vw,36vh),286px)] h-[clamp(192px,min(55vw,36vh),286px)]"
-                } sm:w-[clamp(200px,min(34vw,30vh),280px)] sm:h-[clamp(200px,min(34vw,30vh),280px)]`}>
-                  <AvatarImage
-                    src={avatarImage}
-                    alt={alias}
-                    className="object-contain scale-[1.12] relative z-10"
-                  />
-                  <AvatarFallback className="bg-transparent border-none text-white font-bold text-3xl md:text-4xl">
-                    {alias.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              </Link>
-
-              <h2
-                className="absolute left-1/2 -translate-x-1/2 text-white font-extrabold text-center whitespace-nowrap -bottom-5 text-lg sm:text-2xl md:text-3xl max-w-[190px] sm:max-w-[260px] md:max-w-[300px]"
-                style={{
-                  textShadow: '0 0 8px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.4)',
-                }}
-              >
-                {alias
-                  .split(/[\s-_]+/)
-                  .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                  .join(" ")}
-              </h2>
+            <div className="relative rounded-full flex items-center justify-center overflow-visible mx-auto">
+              <div className="relative z-10 flex flex-col items-center">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={openEditDialog}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openEditDialog();
+                    }
+                  }}
+                  aria-label="Edit avatar and alias"
+                  className="cursor-pointer flex flex-col items-center"
+                >
+                  <div className={`relative ${avatarSizeClass}`}>
+                    <div
+                      className="pointer-events-none absolute left-1/2 top-1/2 z-0"
+                      style={{
+                        width: `${moonScale * 100}%`,
+                        height: `${moonScale * 100}%`,
+                        backgroundImage: `url('/image.png')`,
+                        backgroundSize: "contain",
+                        backgroundPosition: "center",
+                        backgroundRepeat: "no-repeat",
+                        transform: `translate(-50%, calc(-50% + ${moonOffsetY}px))`,
+                      }}
+                    />
+                  <Avatar className="rounded-full overflow-visible relative z-10 w-full h-full">
+                    <AvatarImage
+                      src={avatarImage}
+                      alt={alias}
+                      className="object-contain scale-[1.12] relative z-10"
+                    />
+                    <AvatarFallback className="bg-transparent border-none text-white font-bold text-3xl md:text-4xl">
+                      {alias.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  </div>
+                  <div className="z-20 pointer-events-none mt-7 sm:mt-8 flex justify-center">
+                    <div className="relative w-fit">
+                      <h2
+                        className="text-white font-extrabold text-center whitespace-nowrap text-2xl sm:text-3xl md:text-4xl max-w-[220px] sm:max-w-[300px] md:max-w-[360px]"
+                        style={{
+                          textShadow: '0 0 8px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.4)',
+                        }}
+                      >
+                        {alias
+                          .split(/[\s-_]+/)
+                          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                          .join(" ")}
+                      </h2>
+                      <img
+                        src="/assets/images/icons/edit-icon-cropped.png"
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute left-full top-1/2 -translate-y-1/2 ml-2 sm:ml-2.5 text-2xl sm:text-3xl md:text-4xl w-[2em] h-[2em] opacity-100 drop-shadow-[0_0_6px_rgba(255,255,255,0.55)] shrink-0"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className="z-20 mt-7 sm:mt-8 w-[min(92vw,380px)] sm:w-[min(70vw,430px)]"
+                >
+                  <div className="relative h-[35px] sm:h-[39px] w-full rounded-full bg-white/20 overflow-hidden border border-white/25">
+                    <div
+                      className="h-full rounded-full transition-[width] duration-500 ease-out"
+                      style={{
+                        width: `${levelProgressPercent}%`,
+                        background: "linear-gradient(90deg, #22D3EE 0%, #06B6D4 55%, #67E8F9 100%)",
+                        boxShadow: "0 0 14px rgba(34,211,238,0.55)",
+                      }}
+                    />
+                    <span className="absolute left-2 sm:left-2.5 top-1/2 -translate-y-1/2 z-10 text-[10px] sm:text-xs font-extrabold uppercase tracking-[0.08em] text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                      Level {userLevel}
+                    </span>
+                    <span className="absolute right-2 sm:right-2.5 top-1/2 -translate-y-1/2 z-10 text-[10px] sm:text-xs font-extrabold uppercase tracking-[0.08em] text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                      Level {userLevel + 1}
+                    </span>
+                    <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] sm:text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                      {levelProgressPoints}/{KNOWLEDGE_POINTS_PER_LEVEL} KP
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -454,7 +560,13 @@ export default function Home() {
             variant="default"
             onClick={handleQuickQuiz}
             disabled={playButtonLoading || currentCoins < QUIZ_COST}
-            className={`w-full flex items-center justify-between px-4 sm:px-6 ${isSmallScreen ? 'h-16' : 'h-24 sm:h-24'}`}
+            className={`relative w-full overflow-hidden px-3 sm:px-4 py-0 ${isSmallScreen ? 'h-[4.5rem]' : 'h-[5.4rem] sm:h-[5.4rem]'}`}
+            style={{
+              borderRadius: isSmallScreen ? "22px" : "28px",
+              border: "2px solid #B2F574",
+              background: "linear-gradient(180deg, rgba(103,217,63,0.58) 0%, rgba(63,188,55,0.5) 38%, rgba(28,157,42,0.45) 70%, rgba(18,132,32,0.4) 100%)",
+              boxShadow: "0 10px 20px rgba(15,102,28,0.22)",
+            }}
           >
             {playButtonLoading ? (
               <div className="flex items-center justify-center w-full gap-2 text-lg sm:text-2xl">
@@ -463,32 +575,82 @@ export default function Home() {
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-center gap-3 sm:gap-4 h-full">
-                  <span className="text-3xl sm:text-5xl font-bold text-white leading-none flex items-center -translate-y-[1px]">
-                    Play
-                  </span>
+                <span
+                  className="pointer-events-none absolute left-0 right-0 top-0 h-[42%] opacity-95"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.08) 60%, rgba(255,255,255,0) 100%)",
+                    borderRadius: isSmallScreen ? "22px" : "28px",
+                  }}
+                />
+                <span
+                  className="pointer-events-none absolute inset-0 opacity-80"
+                  style={{
+                    background:
+                      "radial-gradient(circle at 16% 28%, rgba(255,255,120,0.2) 0%, rgba(255,255,120,0) 32%), radial-gradient(circle at 85% 70%, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0) 36%)",
+                    borderRadius: isSmallScreen ? "22px" : "28px",
+                  }}
+                />
 
-                  <span className="text-sm sm:text-lg font-semibold text-yellow-300 flex items-center gap-1.5 bg-gray-700/70 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full">
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="h-4 w-4 sm:h-6 sm:w-6"
-                      xmlns="http://www.w3.org/2000/svg"
+                <div className="relative z-10 grid h-full w-full grid-cols-[1fr_auto] items-center gap-2 sm:gap-3">
+                  <div className="pl-3 sm:pl-4 flex items-center gap-2.5 sm:gap-3">
+                    <span
+                      className="text-lg sm:text-2xl md:text-3xl font-bold text-white leading-none whitespace-nowrap flex items-center drop-shadow-[0_2px_0_rgba(0,0,0,0.35)]"
+                      style={{ transform: "translateY(-0.06em)" }}
                     >
-                      <circle cx="12" cy="12" r="8" fill="#f59e0b" />
-                      <circle cx="12" cy="12" r="7" fill="#fbbf24" />
-                      <circle cx="12" cy="12" r="4" fill="#f59e0b" opacity="0.4" />
-                    </svg>
-                    {QUIZ_COST}
-                  </span>
-                </div>
+                        Play Quick Quiz
+                    </span>
 
-                <div className="bg-white rounded-full w-12 h-12 sm:w-[72px] sm:h-[72px] flex flex-col items-center justify-center shadow-md border-2 border-green-500">
-                  <span className="text-green-600 text-xl sm:text-3xl font-bold leading-none">
-                    {userLevel}
-                  </span>
-                  <span className="text-green-600 text-[9px] sm:text-xs font-semibold uppercase leading-none tracking-wide mt-0.5">
-                    Level
-                  </span>
+                    <span
+                      className="relative h-8 sm:h-10 min-w-[74px] sm:min-w-[90px] text-sm sm:text-lg font-bold text-[#F6DE6C] flex items-center justify-center gap-1.5 px-2.5 sm:px-3 rounded-full"
+                      style={{
+                        border: "1px solid rgba(158, 228, 120, 0.62)",
+                        background: "linear-gradient(180deg, rgba(34,118,52,0.75) 0%, rgba(24,88,39,0.84) 48%, rgba(18,68,30,0.9) 100%)",
+                        boxShadow: "inset 0 3px 6px rgba(5,35,11,0.74), inset 0 -2px 2px rgba(255,255,255,0.08), inset 0 0 0 1px rgba(10,52,20,0.62)",
+                      }}
+                    >
+                      <span
+                        className="inline-flex items-center justify-center rounded-full h-4 w-4 sm:h-5 sm:w-5"
+                        style={{
+                          color: "#2D5E19",
+                          background: "linear-gradient(180deg, #FFE98F 0%, #F2C63A 60%, #DAAB1D 100%)",
+                          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.62), inset 0 -1px 0 rgba(125,92,0,0.28), 0 1px 2px rgba(0,0,0,0.25)",
+                        }}
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-2.5 w-2.5 sm:h-3 sm:w-3"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                        >
+                          <path
+                            d="M5.5 12.5L10 17L18.5 8.5"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
+                      {QUIZ_COST}
+                    </span>
+                  </div>
+
+                  <div
+                    className="rounded-full w-12 h-12 sm:w-[72px] sm:h-[72px] flex flex-col items-center justify-center"
+                    style={{
+                      border: "2px solid #7BD651",
+                      background: "radial-gradient(circle at 34% 22%, #FFFFFF 0%, #F5FFF0 65%, #E8F8DF 100%)",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.28), inset 0 2px 5px rgba(255,255,255,0.78), inset 0 -2px 4px rgba(132,181,94,0.25)",
+                    }}
+                  >
+                    <span className="text-[#41B646] text-xl sm:text-3xl font-bold leading-none">
+                      {userLevel}
+                    </span>
+                    <span className="text-[#41B646] text-[9px] sm:text-xs font-semibold uppercase leading-none tracking-wide">
+                      Level
+                    </span>
+                  </div>
                 </div>
               </>
             )}
@@ -501,6 +663,69 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-md bg-card/95 backdrop-blur-sm border-border/70">
+          <DialogHeader>
+            <DialogTitle>Edit Avatar and Alias</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Avatar</Label>
+              <div className="grid grid-cols-5 gap-2 p-2 border border-border rounded-lg bg-card/60">
+                {avatars.map((avatarImg, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => setEditAvatarIndex(index)}
+                    className={`rounded-full border-2 transition-all ${
+                      editAvatarIndex === index
+                        ? "border-primary ring-2 ring-primary/40 scale-105"
+                        : "border-transparent hover:border-primary/50"
+                    }`}
+                    aria-label={`Select avatar ${index + 1}`}
+                  >
+                    <Avatar className="w-12 h-12">
+                      <AvatarImage src={avatarImg} alt={`Avatar ${index + 1}`} />
+                      <AvatarFallback>AV</AvatarFallback>
+                    </Avatar>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="alias-edit">Alias</Label>
+              <Input
+                id="alias-edit"
+                value={editAlias}
+                onChange={(e) => setEditAlias(e.target.value)}
+                placeholder="Enter alias"
+                maxLength={30}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditDialogOpen(false)}
+                disabled={isSavingProfile}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSaveAliasAvatar}
+                disabled={isSavingProfile}
+              >
+                {isSavingProfile ? "Saving..." : "OK"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
