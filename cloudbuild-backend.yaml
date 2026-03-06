@@ -1,0 +1,44 @@
+steps:
+  - id: Build
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-f",
+        "backend/node-server/dockerfile",
+        "-t",
+        "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$SHORT_SHA",
+        "."
+      ]
+
+  - id: Push
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "push",
+        "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$SHORT_SHA"
+      ]
+
+  - id: Deploy
+    name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    waitFor: ["Push"]
+    args:
+      [
+        "run",
+        "deploy",
+        "$_SERVICE_NAME",
+        "--image",
+        "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$SHORT_SHA",
+        "--region",
+        "$_REGION",
+        "--platform",
+        "managed",
+        "--allow-unauthenticated"
+      ]
+
+images:
+  - "gcr.io/$PROJECT_ID/$_SERVICE_NAME:$SHORT_SHA"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
