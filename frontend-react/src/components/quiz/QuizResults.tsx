@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Confetti from "react-confetti";
 import { useUser } from "@/contexts/UserContext"; 
+import { trackEvent } from "@/utils/analytics";
 
 const KNOWLEDGE_GAIN_SOUND_SRC = "/knowledge-point.mp3"; 
 const LEVEL_UP_SOUND_SRC = "/player-level-up.mp3";
@@ -127,6 +128,7 @@ const CoinIcon = ({ className }: { className: string }) => (
 
 
 export default function QuizResults({ results, onPlayAgain, onClose }: QuizResultsProps) {
+  const navigate = useNavigate();
   const userToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   // Access context hook to refresh stats globally
   const { refreshUser } = useUser(); 
@@ -552,7 +554,9 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     // Now we have the nextId (either pre-fetched or just-fetched)
     if (nextId) {
         console.log(`🚀 Navigating to next quiz: /quiz/${nextId}`);
-        window.location.href = `/quiz/${nextId}`;
+        trackEvent("next_quiz");
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        navigate(`/quiz/${nextId}`);
     } else {
         setRatingMessage("Could not find a new category to play.");
         setPlayButtonLoading(false);

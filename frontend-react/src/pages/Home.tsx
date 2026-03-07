@@ -593,12 +593,17 @@ export default function Home() {
                 />
 
                 <div className="relative z-10 grid h-full w-full grid-cols-[1fr_auto] items-center gap-2 sm:gap-3">
-                  <div className="pl-3 sm:pl-4 flex items-center gap-2.5 sm:gap-3">
-                    <span
-                      className="text-lg sm:text-2xl md:text-3xl font-bold text-white leading-none whitespace-nowrap flex items-center drop-shadow-[0_2px_0_rgba(0,0,0,0.35)]"
-                      style={{ transform: "translateY(-0.06em)" }}
-                    >
-                        Play Quick Quiz
+                  <span className="pointer-events-none absolute left-[-23px] inset-y-0 inline-flex items-center justify-start w-7 sm:w-8 md:w-9 shrink-0">
+                    <img
+                      src="/assets/images/icons/Play Icon.png"
+                      alt=""
+                      aria-hidden="true"
+                      className="h-7 sm:h-8 md:h-9 w-auto object-contain scale-[4.8] origin-left translate-y-[6px]"
+                    />
+                  </span>
+                  <div className="pl-16 sm:pl-20 md:pl-24 flex items-center gap-2.5 sm:gap-3">
+                    <span className="text-lg sm:text-2xl md:text-3xl font-bold text-white leading-none whitespace-nowrap flex items-center gap-1.5 sm:gap-2 drop-shadow-[0_2px_0_rgba(0,0,0,0.35)]">
+                      Start Quiz
                     </span>
 
                     <span
