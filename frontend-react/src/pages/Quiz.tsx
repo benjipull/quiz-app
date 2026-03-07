@@ -264,6 +264,7 @@ export default function Quiz() {
   const timerInSecondsRef = useRef<NodeJS.Timeout | null>(null);
   // FIX: hasStartedRef is the key to prevent double execution in React Strict Mode
   const hasStartedRef = useRef(false);
+  const startedCategoryRef = useRef<string | null>(null);
   
   const nextQuestionRef = useRef<Question | null>(null);
   const isPreloadingRef = useRef(false);
@@ -406,7 +407,7 @@ export default function Quiz() {
   const initQuiz = async () => {
     // Triple protection against double calls
     if (!isSubscribed || !isMounted) return;
-    if (hasStartedRef.current) return;
+    if (hasStartedRef.current && startedCategoryRef.current === categoryId) return;
     if (!categoryId || !userToken) {
       if (!userToken) {
         console.log("You must be logged in to play.");
@@ -417,6 +418,7 @@ export default function Quiz() {
     
     // Set the ref IMMEDIATELY before any async operations
     hasStartedRef.current = true;
+    startedCategoryRef.current = categoryId;
     
     // Check one more time after setting the ref
     if (isSubscribed && isMounted) {
@@ -565,6 +567,7 @@ export default function Quiz() {
       // If the start fails, we must allow a retry, so we reset the ref.
       // This is only safe because the server side also handles refunding the coins.
       hasStartedRef.current = false;
+      startedCategoryRef.current = null;
       
       const errorData = await startResponse.json();
       
@@ -585,17 +588,20 @@ export default function Quiz() {
       }
       
       trackQuizStart(categoryId, userId);
-      await fetchNextQuestion();
+      await fetchNextQuestion({ force: true });
     }
 
   } catch (error: any) {
     setError(error.message);
     setLoading(false);
     hasStartedRef.current = false; // Reset on error
+    startedCategoryRef.current = null;
   }
 };
-  const fetchNextQuestion = async () => {
-    if (!userToken || quizState.completed || isCompletingQuiz) return;
+  const fetchNextQuestion = async (options?: { force?: boolean }) => {
+    const shouldBypassCompletionGuard = options?.force === true;
+    if (!userToken) return;
+    if (!shouldBypassCompletionGuard && (quizState.completed || isCompletingQuiz)) return;
 
     setLoading(true);
     try {
@@ -860,6 +866,7 @@ export default function Quiz() {
   const handlePlayAgain = () => {
     // Reset hasStartedRef to allow quiz to start again
     hasStartedRef.current = false;
+    startedCategoryRef.current = null;
     if (categoryId) {
       startQuiz(categoryId);
     }
