@@ -40,7 +40,6 @@
       text-shadow: 0 0 6px rgba(255,255,255,0.2);
     }
 
-    /* ==== GRID LAYOUT ==== */
     .menu {
       display: grid;
       grid-template-columns: repeat(2, 260px);
@@ -56,7 +55,6 @@
       }
     }
 
-    /* ==== CARD STYLES ==== */
     .card {
       background: linear-gradient(145deg, #1a1a1a, #0f0f0f);
       border: 1px solid #222;
@@ -85,7 +83,6 @@
       font-size: 0.9rem;
     }
 
-    /* Disabled / Coming Soon cards */
     .card.disabled {
       opacity: 0.5;
       cursor: not-allowed;
@@ -127,37 +124,35 @@
 
   <div class="menu">
     <a href="/admin/pages/admin-content-management.html" class="card">
-      <h2>📚 Content Management</h2>
+      <h2>Content Management</h2>
       <p>Manage categories, questions, and validation</p>
     </a>
 
     <a href="/admin/pages/admin-category-chart.html" class="card">
-      <h2>📊 Charts & Insights</h2>
+      <h2>Charts and Insights</h2>
       <p>View category statistics and question counts</p>
     </a>
 
-    <div class="card disabled">
-      <h2>👥 CMS (Customer Management)</h2>
+    <a href="/admin/pages/admin-cms.html" class="card">
+      <h2>CMS (Customer Management)</h2>
       <p>Track and manage quiz players</p>
-    </div>
+    </a>
 
     <div class="card disabled">
-      <h2>⚙️ Game Settings</h2>
-      <p>Administer Gameplay</p>
+      <h2>Game Settings</h2>
+      <p>Administer gameplay</p>
     </div>
   </div>
 
-  <footer>© 2025 Quizicle Admin Portal</footer>
+  <footer>&copy; 2025 Quizicle Admin Portal</footer>
 
   <script>
-    // ✅ Security check
     const token = localStorage.getItem("token");
     const userType = (localStorage.getItem("userType") || "").toLowerCase();
     if (!token || userType !== "admin") {
       window.location.href = "/admin/pages/admin-login.html";
     }
 
-    // ✅ Personalized greeting
     const name = localStorage.getItem("alias") || "there";
     const hour = new Date().getHours();
     let greeting = "Hello";
