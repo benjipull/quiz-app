@@ -86,6 +86,7 @@ router.post("/:categoryId/completion", authenticateToken, async (req, res) => {
         // --- APPLY REWARDS ---
         user.knowledgePoints += knowledgePointsEarned;
         user.coins += coinsEarned;
+        user.quizzesCompleted = Number(user.quizzesCompleted || 0) + 1;
         
         // 🧠 RECORDING KNOWLEDGE POINTS TO LEDGER
         if (knowledgePointsEarned > 0) {
@@ -123,6 +124,7 @@ router.post("/:categoryId/completion", authenticateToken, async (req, res) => {
                 coinsEarned: coinsEarned,
                 totalCoins: user.coins,
                 totalKnowledge: user.knowledgePoints,
+                totalQuizzesCompleted: user.quizzesCompleted,
                 previousLevel,
                 currentLevel: user.level
             }

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Player Management</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: radial-gradient(circle at top left, #111 0%, #000 100%);
+      color: #eee;
+      margin: 0;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1rem;
+      color: #5ea6ff;
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin: 0 0 1rem 0;
+      color: #5ea6ff;
+    }
+
+    .filters {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin: 0 0 0.9rem 0;
+      padding: 0.7rem 0.9rem;
+      border: 1px solid #2f2f2f;
+      border-radius: 10px;
+      background: #121212;
+      width: fit-content;
+    }
+
+    .filters h2 {
+      margin: 0 0.4rem 0 0;
+      font-size: 0.95rem;
+      color: #bcd8ff;
+      font-weight: 600;
+    }
+
+    .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.9rem;
+      color: #ddd;
+    }
+
+    .filter-item input {
+      accent-color: #5ea6ff;
+      cursor: pointer;
+    }
+
+    .filter-item label {
+      cursor: pointer;
+    }
+
+    #playersStatus {
+      margin: 0 0 0.9rem 0;
+      color: #c8c8c8;
+      font-size: 0.95rem;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid #2f2f2f;
+      border-radius: 10px;
+      background: #111;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1020px;
+    }
+
+    thead {
+      background: #202020;
+    }
+
+    th,
+    td {
+      padding: 0.8rem 0.9rem;
+      text-align: left;
+      border-bottom: 1px solid #262626;
+      font-size: 0.92rem;
+      white-space: nowrap;
+    }
+
+    th {
+      color: #bcd8ff;
+      letter-spacing: 0.01em;
+    }
+
+    tbody tr:hover {
+      background: #181818;
+    }
+
+    .num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .muted {
+      color: #9a9a9a;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/admin/pages/admin-cms.html" class="back-link">&larr; Back to CMS</a>
+    <h1>Player Management</h1>
+
+    <section class="filters">
+      <h2>Filters</h2>
+      <div class="filter-item">
+        <input type="checkbox" id="hideZeroKnowledge" checked />
+        <label for="hideZeroKnowledge">Hide players with 0 knowledge points</label>
+      </div>
+    </section>
+
+    <p id="playersStatus">Loading players...</p>
+
+    <div class="table-wrap">
+      <table id="playersTable" style="display: none;">
+        <thead>
+          <tr>
+            <th>Alias</th>
+            <th class="num">Knowledge Points</th>
+            <th class="num">Quizzes Completed</th>
+            <th class="num">Coins</th>
+            <th>Last Login</th>
+            <th>Created At</th>
+            <th class="num">Days Old</th>
+          </tr>
+        </thead>
+        <tbody id="playersTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const token = localStorage.getItem("token");
+    const userType = (localStorage.getItem("userType") || "").toLowerCase();
+
+    if (!token || userType !== "admin") {
+      window.location.href = "/admin/pages/admin-login.html";
+    }
+
+    const playersStatus = document.getElementById("playersStatus");
+    const playersTable = document.getElementById("playersTable");
+    const playersTableBody = document.getElementById("playersTableBody");
+    const hideZeroKnowledgeCheckbox = document.getElementById("hideZeroKnowledge");
+    let allPlayers = [];
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function formatLastLogin(value) {
+      if (!value) return '<span class="muted">Never</span>';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '<span class="muted">Unknown</span>';
+      return escapeHtml(date.toLocaleString());
+    }
+
+    function formatCreatedAt(value) {
+      if (!value) return '<span class="muted">Unknown</span>';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '<span class="muted">Unknown</span>';
+      return escapeHtml(date.toLocaleString());
+    }
+
+    function toSortableTime(value) {
+      if (!value) return 0;
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+    }
+
+    function calculateDaysOld(value) {
+      if (!value) return '<span class="muted">-</span>';
+      const createdDate = new Date(value);
+      if (Number.isNaN(createdDate.getTime())) return '<span class="muted">-</span>';
+
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const days = Math.floor((Date.now() - createdDate.getTime()) / msPerDay);
+      const clampedDays = Math.max(0, days);
+      return clampedDays.toLocaleString();
+    }
+
+    function renderPlayers() {
+      if (!Array.isArray(allPlayers) || allPlayers.length === 0) {
+        playersStatus.textContent = "No players found.";
+        playersTable.style.display = "none";
+        return;
+      }
+
+      const hideZeroKnowledge = Boolean(hideZeroKnowledgeCheckbox?.checked);
+      const filteredPlayers = allPlayers.filter((player) => {
+        if (!hideZeroKnowledge) return true;
+        return Number(player.knowledgePoints ?? 0) > 0;
+      });
+
+      if (filteredPlayers.length === 0) {
+        playersStatus.textContent = "No players match the current filters.";
+        playersTable.style.display = "none";
+        return;
+      }
+
+      playersTableBody.innerHTML = filteredPlayers
+        .map((player) => {
+          const aliasValue = player.alias ? escapeHtml(player.alias) : '<span class="muted">Unknown</span>';
+          const knowledgePoints = Number(player.knowledgePoints ?? 0);
+          const quizzesCompleted = Number(player.quizzesCompleted ?? 0);
+          const coins = Number(player.coins ?? 0);
+          return `
+            <tr>
+              <td>${aliasValue}</td>
+              <td class="num">${knowledgePoints.toLocaleString()}</td>
+              <td class="num">${quizzesCompleted.toLocaleString()}</td>
+              <td class="num">${coins.toLocaleString()}</td>
+              <td>${formatLastLogin(player.lastlogin_at)}</td>
+              <td>${formatCreatedAt(player.created_at)}</td>
+              <td class="num">${calculateDaysOld(player.created_at)}</td>
+            </tr>
+          `;
+        })
+        .join("");
+
+      playersStatus.textContent = `${filteredPlayers.length} of ${allPlayers.length} player(s) shown.`;
+      playersTable.style.display = "table";
+    }
+
+    async function loadPlayers() {
+      try {
+        const response = await fetch("/api/admin/players", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("alias");
+          localStorage.removeItem("userType");
+          window.location.href = "/admin/pages/admin-login.html";
+          return;
+        }
+
+        const players = await response.json();
+
+        if (!response.ok) {
+          throw new Error(players?.error || players?.message || "Failed to load players");
+        }
+
+        allPlayers = [...players].sort(
+          (a, b) => toSortableTime(b.lastlogin_at) - toSortableTime(a.lastlogin_at)
+        );
+        renderPlayers();
+      } catch (error) {
+        playersStatus.textContent = `Error loading players: ${error.message}`;
+        playersTable.style.display = "none";
+      }
+    }
+
+    hideZeroKnowledgeCheckbox.addEventListener("change", renderPlayers);
+    loadPlayers();
+  </script>
+</body>
+</html>

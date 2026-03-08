@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Content Management</title>
+  <title>CMS (Customer Management)</title>
   <style>
     body {
       font-family: system-ui, sans-serif;
@@ -100,21 +100,14 @@
 
 <body>
   <a href="/admin/pages/admin-landing.html" class="back-link">&larr; Back to Admin Home</a>
-  <h1>Content Management</h1>
+  <h1>CMS (Customer Management)</h1>
 
   <div class="dashboard">
-    <div class="card" onclick="navigateTo('admin-categories.html')">
-      <h2>Manage Categories and Questions</h2>
-      <p>View, edit, and validate quiz categories and their questions. You can enable or disable questions and verify AI-generated content.</p>
-      <button>Go to Categories</button>
+    <div class="card" onclick="navigateTo('admin-user-management.html')">
+      <h2>Player Management</h2>
+      <p>Review player accounts, moderation notes, and admin-only workflows in one place.</p>
+      <button>Open Player Management</button>
     </div>
-
-    <div class="card" onclick="navigateTo('admin-reports.html')">
-      <h2>Player Reports</h2>
-      <p>Review reports submitted by players for incorrect, ambiguous, or inappropriate questions. Mark issues as resolved once addressed.</p>
-      <button>View Reports</button>
-    </div>
-
   </div>
 
   <footer>Quizicle Admin Portal &copy; 2025</footer>
