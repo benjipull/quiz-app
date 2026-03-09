@@ -48,6 +48,8 @@ export const trackSignup = (userId?: string) => {
 
 export const trackHomeScreen = (userId?: string) => {
   const params = { user_id: userId };
+  ReactGA.event("home_page", params);
+  logEventDebug("home_page", params);
   ReactGA.event("home_screen", params);
   logEventDebug("home_screen", params);
 };
