@@ -97,6 +97,7 @@ app.use("/api/admin/questions", require("./routes/admin/updateQuestion"));
 app.use("/api/admin/reports", require("./routes/admin/adminReports"));
 app.use("/api/admin/questions", require("./routes/admin/getDifficultyStats"));
 app.use("/api/admin/players", require("./routes/admin/getAllPlayers"));
+app.use("/api/admin/interests", require("./routes/admin/interests"));
 
 // Protected Route (Requires Authentication)
 const authenticateToken = require("./middleware/auth");

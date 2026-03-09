@@ -24,6 +24,21 @@ const LEVEL_UP_SOUND_SRC = "/player-level-up.mp3";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const QUIZ_COST = 50;
+const KNOWLEDGE_POINTS_PER_LEVEL = 1000;
+const REWARD_ANIMATION_SPEED_FACTOR = 0.49; // another 30% faster (0.7 * 0.7)
+
+const fasterMs = (ms: number) =>
+  Math.max(1, Math.round(ms * REWARD_ANIMATION_SPEED_FACTOR));
+
+const TOKEN_DELAY_STEP_MS = fasterMs(80);
+const TOKEN_TICK_INTERVAL_MS = fasterMs(150);
+const REWARD_COUNT_INTERVAL_MS = fasterMs(60);
+const XP_OVERLAY_START_DELAY_MS = fasterMs(500);
+const COIN_OVERLAY_START_DELAY_MS = fasterMs(300);
+const NEXT_STAGE_DELAY_MS = fasterMs(800);
+const OVERLAY_CLOSE_DELAY_MS = fasterMs(200);
+const TOKEN_FLIGHT_DURATION_MS = fasterMs(1200);
+const NUMBER_GROW_ANIMATION_MS = fasterMs(800);
 
 
 interface QuizResultsProps {
@@ -308,12 +323,12 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           
           setTimeout(() => {
             startXPTokenAnimation(); // <-- CALL XP TOKEN ANIMATION
-          }, 800);
+          }, NEXT_STAGE_DELAY_MS);
         }
         setAnimatedKnowledge(count);
-      }, 60);
+      }, REWARD_COUNT_INTERVAL_MS);
       return () => clearInterval(interval);
-    }, 500);
+    }, XP_OVERLAY_START_DELAY_MS);
 
     return () => clearTimeout(earnedTimer);
   }
@@ -337,7 +352,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     const tokenCount = Math.min(15, Math.max(8, knowledgeGained / 8));
     const newTokens = Array.from({ length: Math.floor(tokenCount) }, (_, i) => ({
       id: i,
-      delay: i * 80,
+      delay: i * TOKEN_DELAY_STEP_MS,
     }));
 
     setTokens(newTokens);
@@ -361,7 +376,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             setShowFlyingTokens(false);
             setShowXPOverlay(false); // Hide XP overlay permanently
             startCoinAnimation(); // <-- TRIGGER COIN ANIMATION
-        }, 200); 
+        }, OVERLAY_CLOSE_DELAY_MS); 
 
       }
 
@@ -372,7 +387,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         audioClone.volume = 0.2;
         audioClone.play().catch(e => console.log("Audio play failed:", e));
       }
-    }, 150);
+    }, TOKEN_TICK_INTERVAL_MS);
 
     // Set CSS variables for XP token animation
     document.documentElement.style.setProperty('--xp-token-start-x', `${startX}px`);
@@ -403,12 +418,12 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 
                 setTimeout(() => {
                     startCoinTokenAnimation(); // <-- TRIGGER COIN TOKEN ANIMATION
-                }, 800);
+                }, NEXT_STAGE_DELAY_MS);
             }
             setAnimatedCoins(count);
-        }, 60);
+        }, REWARD_COUNT_INTERVAL_MS);
         return () => clearInterval(interval);
-    }, 300); // Wait a short time to start coin count
+    }, COIN_OVERLAY_START_DELAY_MS); // Wait a short time to start coin count
 
     return () => clearTimeout(earnedTimer);
   };
@@ -434,7 +449,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     const tokenCount = Math.min(15, Math.max(8, coinsEarned / 8));
     const newTokens = Array.from({ length: Math.floor(tokenCount) }, (_, i) => ({
       id: i,
-      delay: i * 80,
+      delay: i * TOKEN_DELAY_STEP_MS,
     }));
 
     setCoinTokens(newTokens);
@@ -458,7 +473,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             setShowFlyingCoins(false);
             setShowCoinOverlay(false); // Hide coin overlay permanently
             finishRewardSequence(); // <-- FINAL STEP
-        }, 200); 
+        }, OVERLAY_CLOSE_DELAY_MS); 
 
       }
 
@@ -470,7 +485,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         audioClone.volume = 0.2;
         audioClone.play().catch(e => console.log("Audio play failed:", e));
       }
-    }, 150);
+    }, TOKEN_TICK_INTERVAL_MS);
 
     // Set CSS variables for Coin token animation
     document.documentElement.style.setProperty('--coin-token-start-x', `${startX}px`);
@@ -605,13 +620,19 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   };
 
   const performanceData = useMemo(() => getPerformanceData(percentage), [percentage]);
+  const displayedTotalXP = Math.max(0, animatedTotalXP);
+  const levelProgressPoints = displayedTotalXP % KNOWLEDGE_POINTS_PER_LEVEL;
+  const levelProgressPercent = Math.min(
+    100,
+    (levelProgressPoints / KNOWLEDGE_POINTS_PER_LEVEL) * 100
+  );
   
   if (!mounted) {
     return null;
   }
 
   return (
-    <div className="h-screen w-full z-50 flex flex-col items-center p-2 sm:p-4 font-sans bg-gradient-to-br from-[#100221] via-[#4f187a] to-[#380d67] overflow-hidden">
+    <div className="h-[100dvh] max-h-[100dvh] w-full z-50 flex flex-col items-center p-2 sm:p-3 font-sans bg-gradient-to-br from-[#100221] via-[#4f187a] to-[#380d67] overflow-hidden">
       
       {/* Header with Stats (The XP target) */}
       <div className="w-full max-w-lg flex-shrink-0 animate-fade-in-down">
@@ -722,7 +743,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       )}
 
       {/* Main Results Card Container - Takes remaining space */}
-      <div className="relative z-10 w-full max-w-lg mx-auto flex-1 flex flex-col min-h-0 mt-3">
+      <div className="relative z-10 w-full max-w-lg mx-auto flex-1 flex flex-col min-h-0 mt-2 sm:mt-3">
         <Card className="relative overflow-hidden bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in flex-1 flex flex-col">
           
           {/* Close Button */}
@@ -735,10 +756,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           </Link>
           
           {/* Content Wrapper - Scrollable */}
-          <div className="relative z-10 p-4 sm:p-6 space-y-4 sm:space-y-5 flex-1 overflow-y-auto">
+          <div className="relative z-10 p-3 sm:p-4 flex-1 flex flex-col gap-3 sm:gap-4 overflow-hidden">
             
             {/* Header */}
-            <div className="text-center space-y-2 sm:space-y-3 animate-fade-in-up">
+            <div className="text-center space-y-1.5 sm:space-y-2 animate-fade-in-up">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-700/40 border border-slate-600/30 mb-1">
                 <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                 <span className="text-xs sm:text-sm font-bold text-slate-300">{categoryName}</span>
@@ -749,11 +770,11 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             </div>
 
             {/* Results Content */}
-            <div className="space-y-3 sm:space-y-4 animate-fade-in pt-8">
+            <div className="space-y-2.5 sm:space-y-3 animate-fade-in pt-1 sm:pt-2 flex-1 flex flex-col">
               {/* Results Grid */}
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 {/* Correct/Incorrect */}
-                <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4">
+                <Card className="bg-slate-800/40 border border-slate-700/50 p-2.5 sm:p-3">
                   <div className="text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-2">Result</div>
                   <div className="space-y-2 sm:space-y-2">
                     <div className="flex items-center gap-1 sm:gap-2">
@@ -774,10 +795,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 </Card>
 
                 {/* Accuracy Circle */}
-                <Card className="bg-slate-800/40 border border-slate-700/50 p-3 sm:p-4 flex items-center justify-center">
+                <Card className="bg-slate-800/40 border border-slate-700/50 p-2.5 sm:p-3 flex items-center justify-center">
                   <div className="text-center">
                     <div className="relative inline-block mb-2">
-                      <svg className="w-14 h-14 sm:w-18 sm:h-18 transform -rotate-90">
+                      <svg className="w-14 h-14 sm:w-16 sm:h-16 transform -rotate-90">
                         <circle
                           cx="28"
                           cy="28"
@@ -830,8 +851,31 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 )}
               </div>
 
+              {/* KP Progress Bar */}
+              <Card className="bg-slate-800/40 border border-slate-700/50 p-2.5 sm:p-3">
+                <div className="relative h-9 sm:h-10 w-full rounded-full bg-white/10 overflow-hidden border border-white/15">
+                  <div
+                    className="h-full rounded-full transition-[width] duration-500 ease-out"
+                    style={{
+                      width: `${levelProgressPercent}%`,
+                      background: "linear-gradient(90deg, #22D3EE 0%, #06B6D4 55%, #67E8F9 100%)",
+                      boxShadow: "0 0 14px rgba(34,211,238,0.5)",
+                    }}
+                  />
+                  <span className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-10 text-[10px] sm:text-xs font-extrabold uppercase tracking-[0.08em] text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                    Level {currentLevel}
+                  </span>
+                  <span className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-10 text-[10px] sm:text-xs font-extrabold uppercase tracking-[0.08em] text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                    Level {currentLevel + 1}
+                  </span>
+                  <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] sm:text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                    {levelProgressPoints}/{KNOWLEDGE_POINTS_PER_LEVEL} KP
+                  </span>
+                </div>
+              </Card>
+
               {/* Rating */}
-              <Card className="bg-slate-800/40 border border-slate-700/50 p-2 sm:p-3">
+              <Card className="bg-slate-800/40 border border-slate-700/50 p-2">
                 <div className="flex items-center justify-between mb-1">
                   <div className="text-xs font-bold text-slate-500 uppercase">
                     Rate This Quiz
@@ -874,21 +918,21 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               onClick={handleNextQuiz}
               onMouseEnter={fetchNextCategoryId} // ADDED: Trigger ID fetch on hover
               disabled={playButtonLoading || isNextCategoryFetching}
-              className="w-full flex items-center justify-between px-6 h-16 sm:h-20 text-white shadow-lg transition-all duration-300 hover:scale-[1.02]"
+              className="w-full flex items-center justify-between px-4 sm:px-5 h-14 sm:h-16 text-white shadow-lg transition-all duration-300 hover:scale-[1.01] mt-auto"
             >
               {(playButtonLoading || isNextCategoryFetching) ? (
-                <div className="flex items-center text-xl sm:text-2xl justify-center w-full gap-2">
+                <div className="flex items-center text-lg sm:text-xl justify-center w-full gap-2">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                   <span>Loading Next Quiz...</span>
                 </div>
               ) : (
                 <>
                   <div className="flex items-center gap-3 sm:gap-4">
-                    <span className="text-2xl sm:text-3xl font-extrabold text-white leading-none">
+                    <span className="text-xl sm:text-2xl font-extrabold text-white leading-none">
                       Next Quiz
                     </span>
-                    <span className="text-base sm:text-lg font-semibold text-yellow-300 flex items-center gap-1.5 bg-gray-700/70 px-3 py-1.5 rounded-full">
-                      <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6" xmlns="http://www.w3.org/2000/svg">
+                    <span className="text-sm sm:text-base font-semibold text-yellow-300 flex items-center gap-1.5 bg-gray-700/70 px-2.5 py-1 rounded-full">
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 sm:h-5 sm:w-5" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="8" fill="#f59e0b" />
                         <circle cx="12" cy="12" r="7" fill="#fbbf24" />
                         <circle cx="12" cy="12" r="4" fill="#f59e0b" opacity="0.4" />
@@ -899,7 +943,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                   
                   <div className="flex items-center">
                     <svg
-                      className="w-6 h-6 sm:w-8 sm:h-8 text-white"
+                      className="w-5 h-5 sm:w-6 sm:h-6 text-white"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -1091,7 +1135,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         }
         
         .animate-number-grow {
-          animation: number-grow 0.8s ease-out forwards;
+          animation: number-grow ${NUMBER_GROW_ANIMATION_MS}ms ease-out forwards;
         }
         
         /* XP Text Aura (Yellow/Orange Glow) - IMPROVED READABILITY */
@@ -1132,7 +1176,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           z-index: 60;
           opacity: 0;
           pointer-events: none;
-          animation: fly-token-xp 1200ms cubic-bezier(0.25, 0.46, 0.45, 0.94) var(--xp-token-delay, 0ms) forwards; 
+          animation: fly-token-xp ${TOKEN_FLIGHT_DURATION_MS}ms cubic-bezier(0.25, 0.46, 0.45, 0.94) var(--xp-token-delay, 0ms) forwards; 
         }
         
        @keyframes fly-token-xp { 
@@ -1201,7 +1245,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           align-items: center; 
           justify-content: center; 
           
-          animation: fly-token-coin 1200ms cubic-bezier(0.25, 0.46, 0.45, 0.94) var(--coin-token-delay, 0ms) forwards; 
+          animation: fly-token-coin ${TOKEN_FLIGHT_DURATION_MS}ms cubic-bezier(0.25, 0.46, 0.45, 0.94) var(--coin-token-delay, 0ms) forwards; 
         }
         
         @keyframes fly-token-coin { 
