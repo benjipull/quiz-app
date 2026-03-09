@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Interests</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #111;
+      color: #eee;
+      margin: 0;
+      padding: 2rem;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1rem;
+      color: #66aaff;
+      text-decoration: none;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    #status {
+      text-align: center;
+      margin-bottom: 1rem;
+      color: #aaa;
+      min-height: 1.2rem;
+    }
+
+    .table-container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #1e1e1e;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: #2b2b2b;
+    }
+
+    th,
+    td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #222;
+      vertical-align: middle;
+    }
+
+    tr:hover {
+      background: #292929;
+    }
+
+    .id-cell {
+      color: #999;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.8rem;
+    }
+
+    .name-input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      background: #161616;
+      color: #f0f0f0;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      font-size: 0.95rem;
+    }
+
+    .name-input:focus {
+      outline: none;
+      border-color: #66aaff;
+      box-shadow: 0 0 0 2px rgba(102, 170, 255, 0.15);
+    }
+
+    .save-btn {
+      background: #2f8f4e;
+      color: #fff;
+      border: 1px solid #3aa05a;
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .save-btn:hover {
+      background: #2a7f45;
+    }
+
+    .save-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #aaa;
+      padding: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <a href="/admin/pages/admin-content-management.html" class="back-link">&larr; Back to Content Management</a>
+  <h1>Interests Management</h1>
+  <div id="status">Loading interests...</div>
+
+  <div class="table-container">
+    <table id="interestTable" style="display: none;">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Interest ID</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="interestTableBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const token = localStorage.getItem("token");
+    const userType = (localStorage.getItem("userType") || "").toLowerCase();
+    if (!token || userType !== "admin") {
+      window.location.href = "/admin/pages/admin-login.html";
+    }
+
+    let interests = [];
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function normalizeName(value) {
+      return String(value || "").trim().replace(/\s+/g, " ");
+    }
+
+    async function fetchInterests() {
+      const statusEl = document.getElementById("status");
+      const tableEl = document.getElementById("interestTable");
+
+      try {
+        const res = await fetch("/api/admin/interests", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
+
+        interests = await res.json();
+        interests.sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: "base" }));
+        renderTable();
+
+        statusEl.style.display = "none";
+        tableEl.style.display = "table";
+      } catch (err) {
+        statusEl.style.display = "block";
+        statusEl.textContent = "Error loading interests: " + err.message;
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("interestTableBody");
+      if (!Array.isArray(interests) || interests.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" class="empty-state">No interests found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = interests
+        .map((interest) => `
+          <tr>
+            <td>
+              <input
+                type="text"
+                class="name-input"
+                data-id="${interest._id}"
+                value="${escapeHtml(interest.name)}"
+                maxlength="100"
+              />
+            </td>
+            <td class="id-cell">${escapeHtml(interest._id)}</td>
+            <td>
+              <button class="save-btn" data-id="${interest._id}" type="button">Save</button>
+            </td>
+          </tr>
+        `)
+        .join("");
+
+      document.querySelectorAll(".save-btn").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const id = button.dataset.id;
+          const input = document.querySelector(`.name-input[data-id="${id}"]`);
+          const newName = normalizeName(input?.value);
+          const current = interests.find((item) => item._id === id);
+
+          if (!id || !input || !current) return;
+
+          if (!newName) {
+            setStatus("Interest name cannot be empty.", true);
+            return;
+          }
+
+          if (newName === current.name) {
+            setStatus("No changes to save.", false);
+            return;
+          }
+
+          button.disabled = true;
+          try {
+            await updateInterest(id, newName);
+            setStatus("Interest updated successfully.", false);
+          } catch (err) {
+            setStatus("Error updating interest: " + err.message, true);
+          } finally {
+            button.disabled = false;
+          }
+        });
+      });
+
+      document.querySelectorAll(".name-input").forEach((input) => {
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            const id = input.dataset.id;
+            const button = document.querySelector(`.save-btn[data-id="${id}"]`);
+            button?.click();
+          }
+        });
+      });
+    }
+
+    async function updateInterest(id, name) {
+      const res = await fetch(`/api/admin/interests/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name }),
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.message || `Error ${res.status}: ${res.statusText}`);
+      }
+
+      const updated = payload.interest;
+      interests = interests.map((item) => (item._id === id ? updated : item));
+      interests.sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: "base" }));
+      renderTable();
+    }
+
+    function setStatus(message, isError) {
+      const statusEl = document.getElementById("status");
+      statusEl.style.display = "block";
+      statusEl.textContent = message;
+      statusEl.style.color = isError ? "#ff7a7a" : "#84d9a4";
+      setTimeout(() => {
+        statusEl.style.display = "none";
+        statusEl.textContent = "";
+      }, 2000);
+    }
+
+    document.addEventListener("DOMContentLoaded", fetchInterests);
+  </script>
+</body>
+</html>
