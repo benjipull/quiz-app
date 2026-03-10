@@ -4,6 +4,7 @@ import { BottomTabs } from "./BottomTabs";
 export const MobileLayout = () => {
   const location = useLocation();
   const isHomeRoute = location.pathname === "/";
+  const isQuizRoute = location.pathname.startsWith("/quiz");
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-gradient-to-br from-background to-quiz-background">
@@ -13,7 +14,7 @@ export const MobileLayout = () => {
         <Outlet />
 
         {/* space so content doesn't touch fixed tabs */}
-        {!isHomeRoute && <div className="h-16 md:hidden" />}
+        {!isHomeRoute && !isQuizRoute && <div className="h-16 md:hidden" />}
       </div>
 
       {/* FIXED BOTTOM TABS */}

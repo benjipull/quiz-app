@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/user");
 
 function logWarning(message, req) {
   console.log(JSON.stringify({
@@ -18,6 +19,19 @@ function logError(message, err, req) {
   }));
 }
 
+async function touchLastLogin(userId, req) {
+  if (!userId) return;
+
+  try {
+    await User.updateOne(
+      { _id: userId },
+      { $set: { lastlogin_at: new Date() } }
+    );
+  } catch (err) {
+    logError("Failed to update lastlogin_at", err, req);
+  }
+}
+
 module.exports = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
@@ -28,7 +42,7 @@ module.exports = (req, res, next) => {
 
   const token = authHeader.split(" ")[1];
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
     if (err) {
       if (err.name === "TokenExpiredError") {
         logWarning("Token expired", req);
@@ -46,6 +60,7 @@ module.exports = (req, res, next) => {
 
     // ✅ Token is valid — attach user payload to request
     req.user = decoded;
+    await touchLastLogin(decoded.id, req);
     next();
   });
 };

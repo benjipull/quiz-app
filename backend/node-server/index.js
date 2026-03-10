@@ -56,7 +56,6 @@ app.use("/api/resetPassword", require("./routes/resetPassword"));
 app.use("/api/updatePassword", require("./routes/updatePassword"));
 app.use("/api/getUserDetails", require("./routes/getUserDetails"));
 app.use("/api/updateUserDetails", require("./routes/updateUserDetails"));
-app.use("/api/users", require("./routes/users"));
 app.use("/api/interests", require("./routes/interestRoutes")); 
 
 //Quiz
@@ -88,6 +87,7 @@ app.use("/api/leaderboard", require("./routes/leaderboard"));
 app.use("/api/claimDailyCoins", require("./routes/claimDailyCoins"))
 
 // Admin APIs
+app.use("/api/admin/login", require("./routes/admin/adminLogin"));
 app.use("/api/admin/categories", require("./routes/admin/getAllCategories"));
 app.use("/api/admin/categories", require("./routes/admin/getCategoryQuestions"));
 app.use("/api/admin/duplicates", require("./routes/admin/getDuplicateGroupQuestions"));
@@ -96,6 +96,8 @@ app.use("/api/admin/questions", require("./routes/admin/unmarkDuplicateGroup"));
 app.use("/api/admin/questions", require("./routes/admin/updateQuestion"));
 app.use("/api/admin/reports", require("./routes/admin/adminReports"));
 app.use("/api/admin/questions", require("./routes/admin/getDifficultyStats"));
+app.use("/api/admin/players", require("./routes/admin/getAllPlayers"));
+app.use("/api/admin/interests", require("./routes/admin/interests"));
 
 // Protected Route (Requires Authentication)
 const authenticateToken = require("./middleware/auth");
