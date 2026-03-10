@@ -10,6 +10,7 @@ const UserSchema = new mongoose.Schema({
 
   // 🧠 Player stats
   knowledgePoints: { type: Number, required: true, default: 0 },
+  quizzesCompleted: { type: Number, required: true, default: 0 },
   wisdomGems: { type: Number, required: true, default: 0 },
   enlightenmentCrystals: { type: Number, required: true, default: 0 },
   // Default coins for a new player is 1000

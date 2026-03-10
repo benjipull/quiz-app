@@ -122,6 +122,15 @@ export default function Home() {
   
   const currentCoins = user?.coins ?? 0;
 
+  const trackHomeScreenIfNeeded = (resolvedUserId?: string) => {
+    if (hasTrackedHomeRef.current) return;
+    if (resolvedUserId) {
+      setGAUser(resolvedUserId);
+    }
+    hasTrackedHomeRef.current = true;
+    trackHomeScreen(resolvedUserId);
+  };
+
   // Check screen size
   useEffect(() => {
     const checkScreenSize = () => {
@@ -193,13 +202,12 @@ export default function Home() {
   }, [user, userLoading, navigate, refreshUser]);
 
   useEffect(() => {
-    const resolvedUserId = user?._id || storedUserId;
-    if (hasTrackedHomeRef.current || userLoading || !resolvedUserId) return;
+    trackHomeScreenIfNeeded(storedUserId);
+  }, [storedUserId]);
 
-    setGAUser(resolvedUserId);
-    hasTrackedHomeRef.current = true;
-    trackHomeScreen(resolvedUserId);
-  }, [userLoading, user?._id, storedUserId]);
+  useEffect(() => {
+    trackHomeScreenIfNeeded(user?._id || storedUserId);
+  }, [user?._id, storedUserId]);
 
   // ✅ Fetch category on-demand (with component-level cache)
   const fetchCategoryToPlay = async (): Promise<CategoryToPlayResponse | null> => {
@@ -248,7 +256,9 @@ export default function Home() {
   };
 
   const handleQuickQuiz = async () => {
-    trackEvent("home_cta_click", { user_id: user?._id, cta: "play_quiz" });
+    const resolvedUserId = user?._id || storedUserId;
+    trackHomeScreenIfNeeded(resolvedUserId);
+    trackEvent("home_cta_click", { user_id: resolvedUserId, cta: "play_quiz" });
 
     if (!userToken) {
       console.log("⚠️ You must be logged in to play.");

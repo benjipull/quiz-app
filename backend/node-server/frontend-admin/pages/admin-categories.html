@@ -66,6 +66,7 @@
 
     .enabled {
       color: #66ff88;
+      font-weight: bold;
     }
 
     .duplicate-yes {
@@ -75,6 +76,7 @@
 
     .duplicate-no {
       color: #66ff88;
+      font-weight: bold;
     }
 
     .category-row {
@@ -100,27 +102,58 @@
       text-align: center;
       margin-bottom: 1rem;
       color: #aaa;
+      min-height: 1.2rem;
+    }
+
+    .actions-cell {
+      white-space: nowrap;
+    }
+
+    .delete-btn {
+      background: #a61b1b;
+      color: #fff;
+      border: 1px solid #d13b3b;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.1s ease;
+    }
+
+    .delete-btn:hover {
+      background: #c62828;
+    }
+
+    .delete-btn:active {
+      transform: translateY(1px);
+    }
+
+    .delete-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
   </style>
 </head>
 
 <body>
-  <a href="/admin/pages/admin-landing.html" class="back-link">← Back to Admin Home</a>
-  <h1>📋 Category Overview</h1>
-  <div id="status" class="loading">Loading categories...</div>
+  <a href="/admin/pages/admin-landing.html" class="back-link">&larr; Back to Admin Home</a>
+  <h1>Category Overview</h1>
+  <div id="status">Loading categories...</div>
 
   <div class="table-container">
     <table id="categoryTable" style="display: none;">
       <thead>
         <tr>
-          <th data-key="name">Name ⬍</th>
-          <th data-key="questionCount"># Questions ⬍</th>
-          <th data-key="createdBy">Created By ⬍</th>
-          <th data-key="disabled">Disabled ⬍</th>
-          <th data-key="averageRating">Average Rating ⬍</th>
-          <th data-key="completionCount"># Completions ⬍</th>
-          <th data-key="hasDuplicate">Duplicates ⬍</th>
-          <th data-key="createdAt">Created ⬍</th>
+          <th data-key="name">Name &#8597;</th>
+          <th data-key="questionCount"># Questions &#8597;</th>
+          <th data-key="createdBy">Created By &#8597;</th>
+          <th data-key="disabled">Disabled &#8597;</th>
+          <th data-key="averageRating">Average Rating &#8597;</th>
+          <th data-key="completionCount"># Completions &#8597;</th>
+          <th data-key="hasDuplicate">Duplicates &#8597;</th>
+          <th data-key="createdAt">Created &#8597;</th>
+          <th>Actions</th>
         </tr>
       </thead>
 
@@ -138,6 +171,15 @@
     let categories = [];
     let sortState = { key: "name", asc: true };
 
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
     async function fetchCategories() {
       const statusEl = document.getElementById("status");
       const table = document.getElementById("categoryTable");
@@ -153,6 +195,7 @@
         table.style.display = "table";
         renderTable();
       } catch (err) {
+        statusEl.style.display = "block";
         statusEl.textContent = "Error loading categories: " + err.message;
       }
     }
@@ -165,34 +208,92 @@
 
       tbody.innerHTML = sorted
         .map((cat) => {
-          // ✅ Safely handle both `hasDuplicate` and `hasDuplicates` (future-proof)
-          const hasDup = cat.hasDuplicate ?? cat.hasDuplicates ?? false;
+          const hasDup = Boolean(cat.hasDuplicate ?? cat.hasDuplicates ?? false);
+          const safeName = escapeHtml(cat.name ?? "Unnamed Category");
+          const safeCreator = escapeHtml(cat.createdBy?.alias || cat.createdBy?.email || "-");
 
           return `
           <tr class="category-row" data-id="${cat._id}">
-            <td>${cat.name}</td>
+            <td>${safeName}</td>
             <td>${cat.questionCount ?? 0}</td>
-            <td>${cat.createdBy?.alias || cat.createdBy?.email || "—"}</td>
+            <td>${safeCreator}</td>
             <td class="${cat.disabled ? "disabled" : "enabled"}">
-              ${cat.disabled ? "❌" : "✅"}
+              ${cat.disabled ? "Yes" : "No"}
             </td>
-            <td>${cat.averageRating?.toFixed?.(1) ?? "—"}</td>
+            <td>${cat.averageRating?.toFixed?.(1) ?? "-"}</td>
             <td>${cat.completionCount ?? 0}</td>
             <td class="${hasDup ? "duplicate-yes" : "duplicate-no"}">
-              ${hasDup ? "⚠️ Yes" : "✅ No"}
+              ${hasDup ? "Yes" : "No"}
             </td>
             <td>${new Date(cat.createdAt).toLocaleDateString()}</td>
+            <td class="actions-cell">
+              <button
+                class="delete-btn"
+                type="button"
+                data-id="${cat._id}"
+                data-name="${safeName}"
+              >
+                Delete
+              </button>
+            </td>
           </tr>`;
         })
         .join("");
 
-      // row click navigation
       document.querySelectorAll(".category-row").forEach((row) => {
         row.addEventListener("click", () => {
           const id = row.getAttribute("data-id");
           window.location.href = `/admin/pages/admin-category-questions.html?id=${id}`;
         });
       });
+
+      document.querySelectorAll(".delete-btn").forEach((button) => {
+        button.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          const id = button.getAttribute("data-id");
+          const name = button.getAttribute("data-name") || "this category";
+          if (!id) return;
+
+          const confirmed = window.confirm(`Delete category "${name}"? This cannot be undone.`);
+          if (!confirmed) return;
+
+          button.disabled = true;
+          try {
+            await deleteCategory(id);
+          } finally {
+            button.disabled = false;
+          }
+        });
+      });
+    }
+
+    async function deleteCategory(categoryId) {
+      const statusEl = document.getElementById("status");
+      statusEl.style.display = "block";
+      statusEl.textContent = "Deleting category...";
+
+      try {
+        const res = await fetch(`/api/admin/categories/${categoryId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(payload.message || `Error ${res.status}: ${res.statusText}`);
+        }
+
+        categories = categories.filter((cat) => cat._id !== categoryId);
+        renderTable();
+
+        statusEl.textContent = payload.message || "Category deleted.";
+        setTimeout(() => {
+          statusEl.style.display = "none";
+          statusEl.textContent = "";
+        }, 1500);
+      } catch (err) {
+        statusEl.textContent = "Error deleting category: " + err.message;
+      }
     }
 
     function compareValues(a, b, key, asc) {
@@ -209,7 +310,11 @@
         valB = new Date(valB).getTime();
       }
 
-      // boolean sorting (true > false)
+      if (key === "hasDuplicate") {
+        valA = Number(Boolean(a.hasDuplicate ?? a.hasDuplicates));
+        valB = Number(Boolean(b.hasDuplicate ?? b.hasDuplicates));
+      }
+
       if (typeof valA === "boolean" && typeof valB === "boolean") {
         return asc ? valA - valB : valB - valA;
       }
