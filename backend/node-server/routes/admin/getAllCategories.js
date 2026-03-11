@@ -27,6 +27,55 @@ router.get("/", auth, adminAuth, async (req, res) => {
               },
             },
           },
+          difficultyBreakdown: {
+            $let: {
+              vars: {
+                enabledQuestions: {
+                  $filter: {
+                    input: "$questions",
+                    as: "q",
+                    cond: { $eq: ["$$q.disabled", false] },
+                  },
+                },
+              },
+              in: {
+                $arrayToObject: {
+                  $map: {
+                    input: {
+                      $setUnion: [
+                        [],
+                        {
+                          $map: {
+                            input: "$$enabledQuestions",
+                            as: "q",
+                            in: { $toString: { $ifNull: ["$$q.difficulty_level", "unknown"] } },
+                          },
+                        },
+                      ],
+                    },
+                    as: "difficultyKey",
+                    in: {
+                      k: "$$difficultyKey",
+                      v: {
+                        $size: {
+                          $filter: {
+                            input: "$$enabledQuestions",
+                            as: "q",
+                            cond: {
+                              $eq: [
+                                { $toString: { $ifNull: ["$$q.difficulty_level", "unknown"] } },
+                                "$$difficultyKey",
+                              ],
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
 
           hasDuplicates: {
             $gt: [

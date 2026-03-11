@@ -75,57 +75,198 @@
 
         const sorted = [...data].sort((a, b) => (b.questionCount || 0) - (a.questionCount || 0));
         const labels = sorted.map(c => c.name);
-        const values = sorted.map(c => c.questionCount || 0);
+        const difficultyLevels = Array.from(
+          new Set(sorted.flatMap(c => Object.keys(c.difficultyBreakdown || {})))
+        ).sort((a, b) => {
+          const aNum = Number(a);
+          const bNum = Number(b);
+          const aNumeric = Number.isFinite(aNum);
+          const bNumeric = Number.isFinite(bNum);
+          if (aNumeric && bNumeric) return aNum - bNum;
+          if (aNumeric) return -1;
+          if (bNumeric) return 1;
+          return a.localeCompare(b);
+        });
+
+        const difficultyLabel = (level) => {
+          if (level === "unknown") return "Unknown";
+          const asNumber = Number(level);
+          if (!Number.isFinite(asNumber)) return `Level ${level}`;
+          if (asNumber === 1) return "Easy (1)";
+          if (asNumber === 2) return "Medium (2)";
+          if (asNumber === 3) return "Hard (3)";
+          return `Level ${asNumber}`;
+        };
+
+        const difficultyColor = (level, index) => {
+          if (level === "unknown") return "#6b7280";
+          const asNumber = Number(level);
+          if (!Number.isFinite(asNumber)) {
+            const fallback = ["#4f46e5", "#0891b2", "#c2410c", "#0d9488", "#9333ea"];
+            return fallback[index % fallback.length];
+          }
+          const bounded = Math.max(1, Math.min(10, Math.round(asNumber)));
+          const strongScale = {
+            1: "#16a34a",  // green
+            2: "#65a30d",  // lime green
+            3: "#84cc16",  // yellow-green
+            4: "#eab308",  // amber/yellow
+            5: "#f97316",  // strong orange
+            6: "#ea580c",  // deep orange
+            7: "#f43f5e",  // orange-red
+            8: "#ef4444",  // strong red
+            9: "#dc2626",  // deeper red
+            10: "#b91c1c"  // deep/strong red
+          };
+          return strongScale[bounded];
+        };
+
+        const categoryDatasets = difficultyLevels.length
+          ? difficultyLevels.map((level, index) => ({
+              label: difficultyLabel(level),
+              data: sorted.map(c => (c.difficultyBreakdown && c.difficultyBreakdown[level]) || 0),
+              backgroundColor: difficultyColor(level, index),
+              borderRadius: 6,
+              stack: "difficulty"
+            }))
+          : [
+              {
+                label: "Number of Questions",
+                data: sorted.map(c => c.questionCount || 0),
+                backgroundColor: "#5ea6ff",
+                borderRadius: 6,
+                stack: "difficulty"
+              }
+            ];
 
         const categoryCanvas = document.getElementById("categoryChart");
         const barHeight = 25;
         categoryCanvas.height = Math.max(400, sorted.length * barHeight);
         const ctx = categoryCanvas.getContext("2d");
+        const categoryTooltipEl = document.createElement("div");
+        categoryTooltipEl.style.position = "fixed";
+        categoryTooltipEl.style.pointerEvents = "none";
+        categoryTooltipEl.style.zIndex = "9999";
+        categoryTooltipEl.style.backgroundColor = "#222";
+        categoryTooltipEl.style.border = "1px solid #5ea6ff";
+        categoryTooltipEl.style.borderRadius = "8px";
+        categoryTooltipEl.style.padding = "8px 10px";
+        categoryTooltipEl.style.color = "#ccc";
+        categoryTooltipEl.style.font = "12px system-ui, sans-serif";
+        categoryTooltipEl.style.whiteSpace = "nowrap";
+        categoryTooltipEl.style.display = "none";
+        document.body.appendChild(categoryTooltipEl);
 
-        new Chart(ctx, {
+        const categoryChart = new Chart(ctx, {
           type: "bar",
           data: {
             labels,
-            datasets: [
-              {
-                label: "Number of Questions",
-                data: values,
-                backgroundColor: "#5ea6ff",
-                borderRadius: 6
-              }
-            ]
+            datasets: categoryDatasets
           },
           options: {
             indexAxis: "y",
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+              mode: "index",
+              intersect: false
+            },
             plugins: {
-              legend: { display: false },
+              legend: {
+                display: difficultyLevels.length > 0,
+                labels: { color: "#ccc" }
+              },
               title: {
                 display: true,
-                text: "Number of Questions per Category",
+                text: "Questions per Category by Difficulty",
                 color: "#eee",
                 font: { size: 18 }
               },
               tooltip: {
+                enabled: false,
                 backgroundColor: "#222",
                 borderColor: "#5ea6ff",
                 borderWidth: 1,
                 titleColor: "#fff",
-                bodyColor: "#ccc"
+                bodyColor: "#ccc",
+                callbacks: {
+                  footer: (items) => {
+                    const total = items.reduce((sum, item) => sum + (item.raw || 0), 0);
+                    return `Total: ${total}`;
+                  }
+                }
               }
             },
             scales: {
               x: {
                 ticks: { color: "#aaa", precision: 0 },
-                grid: { color: "#333" }
+                grid: { color: "#333" },
+                stacked: true
               },
               y: {
                 ticks: { color: "#ccc", autoSkip: false },
-                grid: { color: "#222" }
+                grid: { color: "#222" },
+                stacked: true
               }
             }
           }
+        });
+
+        const getCategoryTooltipHtml = (rowIndex) => {
+          const name = labels[rowIndex];
+          const rows = categoryDatasets
+            .map((dataset) => {
+              const value = Number(dataset.data[rowIndex] || 0);
+              return {
+                label: dataset.label,
+                value,
+                color: dataset.backgroundColor,
+              };
+            })
+            .filter((item) => item.value > 0);
+
+          const total = rows.reduce((sum, item) => sum + item.value, 0);
+          const lines = rows.map((item) =>
+            `<div><span style="display:inline-block;width:8px;height:8px;background:${item.color};border-radius:2px;margin-right:6px;"></span>${item.label}: ${item.value}</div>`
+          );
+
+          return `<div style="font-weight:700;color:#fff;margin-bottom:4px;">${name}</div>${lines.join("")}<div style="margin-top:4px;border-top:1px solid #444;padding-top:4px;">Total: ${total}</div>`;
+        };
+
+        categoryCanvas.addEventListener("mousemove", (event) => {
+          const rect = categoryCanvas.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+          const yScale = categoryChart.scales.y;
+          const chartArea = categoryChart.chartArea;
+          if (!yScale || !chartArea) return;
+
+          const withinCategoryBand = y >= yScale.top && y <= yScale.bottom;
+          const overBars = x >= chartArea.left && x <= chartArea.right && withinCategoryBand;
+          const overCategoryLabels = x >= 0 && x < chartArea.left && withinCategoryBand;
+          if (!overBars && !overCategoryLabels) {
+            categoryTooltipEl.style.display = "none";
+            return;
+          }
+
+          const yValue = yScale.getValueForPixel(y);
+          const dataIndex =
+            typeof yValue === "number"
+              ? Math.round(yValue)
+              : labels.indexOf(yValue);
+          if (dataIndex < 0 || dataIndex >= labels.length) {
+            categoryTooltipEl.style.display = "none";
+            return;
+          }
+
+          categoryTooltipEl.innerHTML = getCategoryTooltipHtml(dataIndex);
+          categoryTooltipEl.style.left = `${event.clientX + 14}px`;
+          categoryTooltipEl.style.top = `${event.clientY + 14}px`;
+          categoryTooltipEl.style.display = "block";
+        });
+
+        categoryCanvas.addEventListener("mouseleave", () => {
+          categoryTooltipEl.style.display = "none";
         });
 
         // --- DIFFICULTY CHART ---
