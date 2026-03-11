@@ -51,6 +51,36 @@ function normalizeQuestion(raw) {
   };
 }
 
+function validateQuestionShape(question) {
+  if (!question || typeof question !== "object") {
+    return { isValid: false, reason: "empty question payload" };
+  }
+
+  const correctAnswer = String(question.correct_answer ?? "").trim();
+  if (!correctAnswer) {
+    return { isValid: false, reason: "missing correct_answer" };
+  }
+
+  if (!Array.isArray(question.answers) || question.answers.length === 0) {
+    return { isValid: false, reason: "missing answers array" };
+  }
+
+  const normalizedAnswers = question.answers
+    .map((answer) => String(answer ?? "").trim().toLowerCase())
+    .filter(Boolean);
+
+  if (normalizedAnswers.length === 0) {
+    return { isValid: false, reason: "answers are empty" };
+  }
+
+  const hasMatchingCorrectAnswer = normalizedAnswers.includes(correctAnswer.toLowerCase());
+  if (!hasMatchingCorrectAnswer) {
+    return { isValid: false, reason: "correct_answer not found in answers" };
+  }
+
+  return { isValid: true };
+}
+
 function parseOllamaResponse(rawResponse) {
   try {
     return JSON.parse(rawResponse);
@@ -184,6 +214,12 @@ async function addQuestionsToCategory(category, questions) {
   let added = 0;
 
   for (const q of questions) {
+    const validation = validateQuestionShape(q);
+    if (!validation.isValid) {
+      console.log(`âš ï¸ Discarded generated question "${q?.question || "(no text)"}": ${validation.reason}`);
+      continue;
+    }
+
     const hash = generateQuestionHash(q.question);
     avoidedQuestions.push(q.question);
 
