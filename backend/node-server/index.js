@@ -52,6 +52,7 @@ if (hasFrontendBuild) {
 app.use("/api/users/register", require("./routes/register"));
 app.use("/api/users/login", require("./routes/login"));
 app.use("/api/users/guestLogin", require("./routes/guestLogin"));
+app.use("/api/users", require("./routes/deleteAccount"));
 app.use("/api/resetPassword", require("./routes/resetPassword"));
 app.use("/api/updatePassword", require("./routes/updatePassword"));
 app.use("/api/getUserDetails", require("./routes/getUserDetails"));

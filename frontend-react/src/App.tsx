@@ -13,6 +13,7 @@ import { usePageTracking } from "./hooks/usePageTracking";
 import Leaderboard from "./pages/Leaderboard";
 import Categories from "./pages/Categories";
 import Profile from "./pages/Profile";
+import DeleteAccount from "./pages/DeleteAccount";
 import Notifications from "./pages/Notification";
 import Store from "./pages/Store";
 import Menu from "./pages/Menu";
@@ -125,6 +126,7 @@ const AppContent = () => {
         <Route path="quiz/:categoryId?" element={<Quiz />} />
         <Route path="leaderboard" element={<Leaderboard />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="delete-account" element={<DeleteAccount />} />
         <Route path="interests" element={<Interests />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="store" element={<Store />} />

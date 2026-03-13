@@ -16,7 +16,8 @@ if (!OLLAMA_URL) {
 async function callOllama(prompt) {
   const res = await axios.post(OLLAMA_URL, {
     model: "qwen3:8b",
-    prompt,
+    prompt: `${prompt}\n\nSTRICT FORMAT: Respond with exactly one JSON object only. Do not output <think> tags, markdown, or any prose before/after JSON.`,
+    format: "json",
     options: {
       temperature: 0.0,
       top_p: 0.85,
@@ -34,35 +35,62 @@ function extractJson(text) {
   if (!text) return null;
 
   let clean = text
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/^<think>[\s\S]*?(?=\{)/i, "")
     .replace(/```json/gi, "")
     .replace(/```/g, "")
     .replace(/^Here.*?:/i, "")
     .trim();
 
-  const match = clean.match(/\{[\s\S]*\}/);
-  if (!match) return null;
-
-  try {
-    return JSON.parse(match[0]);
-  } catch {
-    return null;
+  const firstBrace = clean.indexOf("{");
+  if (firstBrace > 0) {
+    clean = clean.slice(firstBrace);
   }
+
+  // Fast path: response is already a pure JSON object.
+  try {
+    const parsed = JSON.parse(clean);
+    if (parsed && typeof parsed === "object") return parsed;
+  } catch {
+    // Fall through to object extraction.
+  }
+
+  const starts = [];
+  for (let i = 0; i < clean.length; i += 1) {
+    if (clean[i] === "{") starts.push(i);
+  }
+
+  for (const start of starts) {
+    let depth = 0;
+    for (let end = start; end < clean.length; end += 1) {
+      const ch = clean[end];
+      if (ch === "{") depth += 1;
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          const candidate = clean.slice(start, end + 1);
+          try {
+            const parsed = JSON.parse(candidate);
+            if (parsed && typeof parsed === "object") return parsed;
+          } catch {
+            // keep scanning
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 async function runPrompt(prompt, label, questionId) {
   try {
-    let raw = await callOllama(prompt);
-    let parsed = extractJson(raw);
+    const raw = await callOllama(prompt);
+    const parsed = extractJson(raw);
 
     if (!parsed) {
-      console.warn(`⚠️ [${label}] Invalid JSON, retrying for question ${questionId}...`);
-      await new Promise((r) => setTimeout(r, 800));
-      raw = await callOllama(prompt);
-      parsed = extractJson(raw);
-    }
-
-    if (!parsed) {
-      console.error(`❌ [${label}] Still invalid JSON for question ${questionId}. Raw snippet:`, raw.slice(0, 300));
+      console.error(`❌ [${label}] Invalid JSON for question ${questionId}. Raw snippet:`, raw.slice(0, 300));
       return null;
     }
 

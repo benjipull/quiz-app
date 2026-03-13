@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { X, User, LogIn, Eye, EyeOff, Heart } from "lucide-react";
+import { X, User, LogIn, Eye, EyeOff, Heart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -511,6 +511,18 @@ const Profile = () => {
                 "Save Changes"
               )}
             </Button>
+
+            {!isGuest && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-red-500 text-red-400 hover:bg-red-600 hover:text-white"
+                onClick={() => navigate("/delete-account")}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Account
+              </Button>
+            )}
           </form>
         </CardContent>
       </Card>
