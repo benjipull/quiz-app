@@ -8,6 +8,14 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        privacypolicy: path.resolve(__dirname, "privacypolicy.html"),
+      },
+    },
+  },
   plugins: [
     react(),
     mode === 'development' &&

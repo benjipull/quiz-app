@@ -8,14 +8,14 @@ PID=$!
 # Give server time to boot
 sleep 5
 
-# Pull Llama3 model if not already present
-if ! ollama list | grep -q "llama3"; then
-  echo ">>> Pulling llama3 model..."
+# Pull Qwen3 8B model if not already present
+if ! ollama list | grep -q "qwen3:8b"; then
+  echo ">>> Pulling qwen3:8b model..."
   curl -s -X POST http://127.0.0.1:11434/api/pull \
     -H "Content-Type: application/json" \
-    -d '{"name":"llama3"}'
+    -d '{"name":"qwen3:8b"}'
 else
-  echo ">>> llama3 already present, skipping pull."
+  echo ">>> qwen3:8b already present, skipping pull."
 fi
 
 # Bring ollama server back to foreground

@@ -84,12 +84,21 @@ function validateQuestionShape(question) {
 function parseOllamaResponse(rawResponse) {
   try {
     return JSON.parse(rawResponse);
-  } catch {
+  } catch (rawParseError) {
     const cleaned = rawResponse
       .replace(/```(\w+)?/g, "")
       .replace(/\u201C|\u201D/g, '"')
       .replace(/\u2019/g, "'");
-    return JSON.parse(cleaned);
+    try {
+      return JSON.parse(cleaned);
+    } catch (cleanedParseError) {
+      const parseError = new Error(
+        `Failed to parse Ollama JSON. Raw parse error: ${rawParseError.message}. Cleaned parse error: ${cleanedParseError.message}`
+      );
+      parseError.rawResponse = rawResponse;
+      parseError.cleanedResponse = cleaned;
+      throw parseError;
+    }
   }
 }
 
@@ -100,18 +109,18 @@ async function queryOllama(prompt) {
     const res = await axios.post(
       OLLAMA_URL,
       {
-        model: "llama3",
+        model: "qwen3:8b",
         format: "json",
         prompt,
         stream: false,
         options: {
           num_ctx: 4096,
           num_keep: 200,
-          temperature: 0.2,
-          top_p: 0.7,
-          top_k: 5,
+          temperature: 0.25,
+          top_p: 0.9,
+          top_k: 40,
           min_p: 0.1,
-          repeat_penalty: 1.15,
+          repeat_penalty: 1.1,
           repeat_last_n: 128,
           num_predict: 512
         }
@@ -127,9 +136,14 @@ async function queryOllama(prompt) {
     return normalizeQuestion(parsed);
 
   } catch (error) {
-    logOllamaError(error);
+    logOllamaErrorVerbose(error);
     return null;
   }
+}
+
+function formatPayloadForLog(payload) {
+  if (payload === undefined || payload === null) return "(empty)";
+  return typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
 }
 
 function logOllamaError(error) {
@@ -140,6 +154,25 @@ function logOllamaError(error) {
     console.error("❌ No response from Ollama.");
   } else {
     console.error("❌ Request error:", error.message);
+  }
+}
+
+function logOllamaErrorVerbose(error) {
+  logOllamaError(error);
+
+  if (error.rawResponse !== undefined) {
+    console.error("Raw Ollama JSON/text payload that failed to parse:");
+    console.error(formatPayloadForLog(error.rawResponse));
+  }
+
+  if (error.cleanedResponse !== undefined) {
+    console.error("Cleaned payload attempted for parse:");
+    console.error(formatPayloadForLog(error.cleanedResponse));
+  }
+
+  if (error.response && error.response.data !== undefined) {
+    console.error("HTTP response payload:");
+    console.error(formatPayloadForLog(error.response.data));
   }
 }
 
@@ -245,7 +278,7 @@ async function addQuestionsToCategory(category, questions) {
       timesAnsweredCorrectly: 0,
       timesAnsweredIncorrectly: 0,
       hash,
-      version: 1.07
+      version: 2.00
     });
 
     added++;
