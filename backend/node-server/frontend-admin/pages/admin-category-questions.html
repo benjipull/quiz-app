@@ -414,6 +414,7 @@
     <thead>
       <tr>
         <th data-key="text">Question</th>
+        <th data-key="version">Version</th>
         <th data-key="difficulty_level">Difficulty</th>
         <th data-key="disabled">Disabled</th>
         <th data-key="new_question">New</th>
@@ -466,6 +467,7 @@
         return `
       <tr class="question-row ${q.needs_validation ? 'needs-validation' : ''}" data-id="${q._id}">
         <td>${escapeHtml(q.text)}</td>
+        <td>${q.version ?? 1}</td>
         <td>${q.difficulty_level ?? "—"}</td>
         <td><input type="checkbox" ${q.disabled ? "checked" : ""} /></td>
         <td><input type="checkbox" ${q.new_question ? "checked" : ""} /></td>
@@ -476,7 +478,7 @@
         <td><button class="edit-btn">✏️ Edit</button></td>
       </tr>
       <tr class="answers-row" id="answers-${q._id}">
-        <td colspan="9">
+        <td colspan="10">
           <div class="answers-content">
             ${renderAnswers(q.answers, q.correct_answer, q.explanation, q)}
             ${duplicatesHTML}

@@ -3,6 +3,12 @@ import React from 'react'
 import Menu  from './Menu'
 
 const About = () => {
+  const privacyPolicyUrl = import.meta.env.VITE_PRIVACY_POLICY_URL || "/privacypolicy.html";
+
+  const openPrivacyPolicy = () => {
+    window.open(privacyPolicyUrl, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <div className='min-h-screen '>
       <Header title="About Us" showSearch />
@@ -21,6 +27,17 @@ const About = () => {
             >
              info@quizicle.app
             </a>
+          </div>
+
+          <div className='bg-background rounded-lg shadow-sm px-8 py-6 border border-gray-200'>
+            <p className='text-gray-600 text-sm mb-3'>Read how we handle your data</p>
+            <button
+              type="button"
+              onClick={openPrivacyPolicy}
+              className='text-lg font-medium text-blue-600 hover:text-blue-700 transition-colors'
+            >
+              Privacy Policy
+            </button>
           </div>
         </div>
       </div>

@@ -26,6 +26,7 @@ router.get("/:id/questions", auth, adminAuth, async (req, res) => {
     const questions = filteredQuestions.map(q => ({
       _id: q._id,
       text: q.text,
+      version: q.version ?? 1,
       difficulty_level: q.difficulty_level,
       disabled: q.disabled,
       correct_answer: q.correct_answer,
