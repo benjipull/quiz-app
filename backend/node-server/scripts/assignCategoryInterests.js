@@ -54,7 +54,7 @@ Respond ONLY in strict JSON:
       const response = await axios.post(
         OLLAMA_URL,
         {
-          model: "llama3",
+          model: "qwen3:8b",
           prompt,
           stream: false,
           options: {

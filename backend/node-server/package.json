@@ -4,7 +4,10 @@
   "description": "A Node.js API that calls Ollama inside Docker",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "populate:difficulty": "node populateAllDifficulty.js",
+    "populate:difficulty:all": "node populateAllDifficulty.js --all --limit=0",
+    "populate:difficulty:one": "node scripts/populateDifficulty.js"
   },
   "dependencies": {
     "@sendgrid/mail": "^7.7.0",

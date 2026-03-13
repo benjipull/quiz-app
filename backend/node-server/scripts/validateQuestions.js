@@ -15,7 +15,7 @@ if (!OLLAMA_URL) {
 // ----- Low-level helper -----
 async function callOllama(prompt) {
   const res = await axios.post(OLLAMA_URL, {
-    model: "llama3",
+    model: "qwen3:8b",
     prompt,
     options: {
       temperature: 0.0,
