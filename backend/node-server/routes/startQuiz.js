@@ -18,12 +18,16 @@ const difficultyNames = {
   7: "Tough",
   8: "Expert",
   9: "Master",
-  10: "Legendary"
+  10: "Legendary",
 };
 
 router.post("/", authenticateToken, async (req, res) => {
   const { categoryId, numQuestions = 5 } = req.body;
   const userId = req.user.id;
+  const requestedQuestions = Number.parseInt(String(numQuestions), 10);
+  const safeNumQuestions = Number.isNaN(requestedQuestions)
+    ? 5
+    : Math.min(20, Math.max(1, requestedQuestions));
 
   if (!categoryId) {
     return res.status(400).json({ message: "Missing categoryId." });
@@ -39,9 +43,7 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 
   try {
-    // ----------------------------------------------------
-    // 1️⃣ Deduct quiz cost atomically
-    // ----------------------------------------------------
+    // 1) Deduct quiz cost atomically
     const user = await User.findOneAndUpdate(
       { _id: userId, coins: { $gte: QUIZ_COST } },
       { $inc: { coins: -QUIZ_COST } },
@@ -54,17 +56,15 @@ router.post("/", authenticateToken, async (req, res) => {
 
     const userLevel = user.level || 1;
     const minDifficulty = Math.max(1, userLevel - 1);
-    const maxDifficulty = Math.min(10, userLevel + 1);
+    const maxDifficulty = Math.min(10, userLevel + 2);
 
-    // ----------------------------------------------------
-    // 2️⃣ Fetch questions directly from DB (FAST PATH)
-    // ----------------------------------------------------
-    const questions = await Category.aggregate([
+    // 2) Strict fetch in the level window first
+    const strictQuestions = await Category.aggregate([
       {
         $match: {
           _id: new mongoose.Types.ObjectId(categoryId),
-          disabled: false
-        }
+          disabled: false,
+        },
       },
       { $unwind: "$questions" },
       {
@@ -72,17 +72,17 @@ router.post("/", authenticateToken, async (req, res) => {
           "questions.disabled": false,
           "questions.difficulty_level": {
             $gte: minDifficulty,
-            $lte: maxDifficulty
-          }
-        }
+            $lte: maxDifficulty,
+          },
+        },
       },
       {
         $sort: {
           "questions.timesLoaded": 1,
-          "questions.popularity": -1
-        }
+          "questions.popularity": -1,
+        },
       },
-      { $limit: numQuestions },
+      { $limit: safeNumQuestions },
       {
         $project: {
           _id: "$questions._id",
@@ -92,54 +92,99 @@ router.post("/", authenticateToken, async (req, res) => {
           explanation: "$questions.explanation",
           timesAnsweredCorrectly: "$questions.timesAnsweredCorrectly",
           timesAnsweredIncorrectly: "$questions.timesAnsweredIncorrectly",
-          difficultyLevel: "$questions.difficulty_level"
-        }
-      }
+          difficultyLevel: "$questions.difficulty_level",
+        },
+      },
     ]);
 
-    // ----------------------------------------------------
-    // 3️⃣ Not enough questions → refund & exit
-    // ----------------------------------------------------
-    if (questions.length < numQuestions) {
-      await User.updateOne(
-        { _id: userId },
-        { $inc: { coins: QUIZ_COST } }
-      );
+    let questions = strictQuestions;
+    let fallbackUsed = false;
 
-      return res.status(404).json({
-        message: "Not enough available questions in this difficulty range. Coins refunded."
-      });
+    // 3) Fallback: use closest available difficulties in the same category
+    if (questions.length < safeNumQuestions) {
+      const expandedQuestions = await Category.aggregate([
+        {
+          $match: {
+            _id: new mongoose.Types.ObjectId(categoryId),
+            disabled: false,
+          },
+        },
+        { $unwind: "$questions" },
+        {
+          $match: {
+            "questions.disabled": false,
+          },
+        },
+        {
+          $addFields: {
+            difficultyDistance: {
+              $abs: {
+                $subtract: [
+                  { $ifNull: ["$questions.difficulty_level", 0] },
+                  userLevel,
+                ],
+              },
+            },
+          },
+        },
+        {
+          $sort: {
+            difficultyDistance: 1,
+            "questions.timesLoaded": 1,
+            "questions.popularity": -1,
+          },
+        },
+        { $limit: safeNumQuestions },
+        {
+          $project: {
+            _id: "$questions._id",
+            question: "$questions.text",
+            answers: "$questions.answers.text",
+            correct_answer: "$questions.correct_answer",
+            explanation: "$questions.explanation",
+            timesAnsweredCorrectly: "$questions.timesAnsweredCorrectly",
+            timesAnsweredIncorrectly: "$questions.timesAnsweredIncorrectly",
+            difficultyLevel: "$questions.difficulty_level",
+          },
+        },
+      ]);
+
+      if (expandedQuestions.length < safeNumQuestions) {
+        await User.updateOne({ _id: userId }, { $inc: { coins: QUIZ_COST } });
+
+        return res.status(404).json({
+          message: "Not enough available questions in this category. Coins refunded.",
+          requested: safeNumQuestions,
+          available: expandedQuestions.length,
+        });
+      }
+
+      questions = expandedQuestions;
+      fallbackUsed = true;
     }
 
-    // ----------------------------------------------------
-    // 4️⃣ Store quiz in memory
-    // ----------------------------------------------------
+    // 4) Store quiz in memory
     userQuestions[userToken] = {
-      queue: questions.map(q => ({
+      queue: questions.map((q) => ({
         ...q,
-        difficultyName: difficultyNames[q.difficultyLevel] || "Unknown"
+        difficultyName: difficultyNames[q.difficultyLevel] || "Unknown",
       })),
-      current: null
+      current: null,
     };
 
-    // ----------------------------------------------------
-    // 5️⃣ Respond
-    // ----------------------------------------------------
+    // 5) Respond
     res.json({
       message: "Questions preloaded. Quiz cost deducted.",
       total: questions.length,
       difficultyRange: [minDifficulty, maxDifficulty],
-      userCoins: user.coins
+      fallbackUsed,
+      userCoins: user.coins,
     });
-
   } catch (err) {
-    console.error("❌ Quiz preload error:", err);
+    console.error("Quiz preload error:", err);
 
     // Safety refund if something unexpected happened
-    await User.updateOne(
-      { _id: userId },
-      { $inc: { coins: QUIZ_COST } }
-    );
+    await User.updateOne({ _id: userId }, { $inc: { coins: QUIZ_COST } });
 
     res.status(500).json({ message: "Server error." });
   }
