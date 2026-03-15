@@ -5,12 +5,33 @@ function logEventDebug(eventName: string, params: Record<string, any>) {
   console.log(`[GA] Event: ${eventName}`, { userId, ...params });
 }
 
+const FIRST_INTERACTION_SESSION_KEY = "ga_first_interaction_tracked";
+
 // === NEW GENERIC TRACKING FUNCTION ===
 export const trackEvent = (eventName: string, params: Record<string, any> = {}) => {
   ReactGA.event(eventName, params);
   logEventDebug(eventName, params);
 };
 // ======================================
+
+export const trackFirstSessionInteraction = (params: Record<string, any> = {}) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    if (sessionStorage.getItem(FIRST_INTERACTION_SESSION_KEY) === "1") return;
+    sessionStorage.setItem(FIRST_INTERACTION_SESSION_KEY, "1");
+  } catch {
+    // If sessionStorage is unavailable, still emit the event.
+  }
+
+  const payload = {
+    event_category: "engagement",
+    ...params,
+  };
+
+  ReactGA.event("first_session_interaction", payload);
+  logEventDebug("first_session_interaction", payload);
+};
 
 export const trackQuizStart = (categoryId: string, userId?: string) => {
   const params = { quiz_category_id: categoryId, user_id: userId };

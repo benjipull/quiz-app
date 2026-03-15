@@ -3,6 +3,7 @@ import { Clock, ArrowLeft } from "lucide-react";
 import { apiClient } from "@/utils/apiClient";
 import { useNavigate } from "react-router-dom";
 import { globalLeaderboardCache, waitForCache } from "@/hooks/useLeaderboardPreloader";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
 // Avatar Imports
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
@@ -11,7 +12,7 @@ const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
 });
 const avatars: string[] = Object.values(avatarImages) as string[];
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = getApiBaseUrl();
 
 interface LeaderboardPlayer {
   userId: string;

@@ -11,6 +11,7 @@ import AddCategory from "@/components/AddCategory";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/utils/apiClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
 interface Category {
   _id: string;
@@ -39,7 +40,7 @@ interface User {
   level?: number;
 }
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = getApiBaseUrl();
 
 export default function Categories() {
   const navigate = useNavigate();

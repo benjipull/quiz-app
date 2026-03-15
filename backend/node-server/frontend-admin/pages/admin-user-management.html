@@ -89,7 +89,7 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 1020px;
+      min-width: 1220px;
     }
 
     thead {
@@ -122,6 +122,30 @@
     .muted {
       color: #9a9a9a;
     }
+
+    .action-btn {
+      background: #6f3ff5;
+      color: #fff;
+      border: 1px solid #835cff;
+      border-radius: 6px;
+      padding: 0.4rem 0.6rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.1s ease;
+    }
+
+    .action-btn:hover {
+      background: #7f56ff;
+    }
+
+    .action-btn:active {
+      transform: translateY(1px);
+    }
+
+    .action-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -144,12 +168,15 @@
         <thead>
           <tr>
             <th>Alias</th>
+            <th>Player Type</th>
+            <th class="num">Level</th>
             <th class="num">Knowledge Points</th>
             <th class="num">Quizzes Completed</th>
             <th class="num">Coins</th>
             <th>Last Login</th>
             <th>Created At</th>
             <th class="num">Days Old</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody id="playersTableBody"></tbody>
@@ -233,18 +260,37 @@
       playersTableBody.innerHTML = filteredPlayers
         .map((player) => {
           const aliasValue = player.alias ? escapeHtml(player.alias) : '<span class="muted">Unknown</span>';
+          const aliasPlain = player.alias ? String(player.alias) : "Unknown";
+          const aliasForAttr = encodeURIComponent(aliasPlain);
+          const playerType = player.userType ? escapeHtml(player.userType) : '<span class="muted">Registered</span>';
           const knowledgePoints = Number(player.knowledgePoints ?? 0);
+          const parsedLevel = Number(player.level);
+          const levelDisplay = Number.isFinite(parsedLevel)
+            ? parsedLevel.toLocaleString()
+            : '<span class="muted">Unknown</span>';
           const quizzesCompleted = Number(player.quizzesCompleted ?? 0);
           const coins = Number(player.coins ?? 0);
           return `
             <tr>
               <td>${aliasValue}</td>
+              <td>${playerType}</td>
+              <td class="num">${levelDisplay}</td>
               <td class="num">${knowledgePoints.toLocaleString()}</td>
               <td class="num">${quizzesCompleted.toLocaleString()}</td>
               <td class="num">${coins.toLocaleString()}</td>
               <td>${formatLastLogin(player.lastlogin_at)}</td>
               <td>${formatCreatedAt(player.created_at)}</td>
               <td class="num">${calculateDaysOld(player.created_at)}</td>
+              <td>
+                <button
+                  type="button"
+                  class="action-btn reset-progress-btn"
+                  data-player-id="${player._id}"
+                  data-player-alias="${aliasForAttr}"
+                >
+                  Reset Progress
+                </button>
+              </td>
             </tr>
           `;
         })
@@ -252,6 +298,45 @@
 
       playersStatus.textContent = `${filteredPlayers.length} of ${allPlayers.length} player(s) shown.`;
       playersTable.style.display = "table";
+    }
+
+    async function resetPlayerProgress(playerId, alias) {
+      if (!playerId) return;
+
+      const playerAlias = alias || "this player";
+      const confirmed = window.confirm(
+        `Reset progress for ${playerAlias}? This will set level to 1 and knowledge points to 0.`
+      );
+
+      if (!confirmed) return;
+
+      try {
+        const response = await fetch(`/api/admin/players/${encodeURIComponent(playerId)}/reset-progress`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("alias");
+          localStorage.removeItem("userType");
+          window.location.href = "/admin/pages/admin-login.html";
+          return;
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload?.error || payload?.message || "Failed to reset player progress");
+        }
+
+        await loadPlayers();
+        alert(`Progress reset for ${playerAlias}.`);
+      } catch (error) {
+        alert(`Error resetting progress: ${error.message}`);
+      }
     }
 
     async function loadPlayers() {
@@ -287,6 +372,16 @@
     }
 
     hideZeroKnowledgeCheckbox.addEventListener("change", renderPlayers);
+    playersTableBody.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const resetButton = target ? target.closest(".reset-progress-btn") : null;
+      if (!resetButton) return;
+
+      const playerId = resetButton.getAttribute("data-player-id");
+      const playerAliasRaw = resetButton.getAttribute("data-player-alias");
+      const playerAlias = playerAliasRaw ? decodeURIComponent(playerAliasRaw) : "this player";
+      resetPlayerProgress(playerId, playerAlias);
+    });
     loadPlayers();
   </script>
 </body>

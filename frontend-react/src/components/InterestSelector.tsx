@@ -3,8 +3,9 @@
 
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = getApiBaseUrl();
 
 interface Interest {
   _id: string;
