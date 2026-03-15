@@ -266,28 +266,28 @@ export default function DailyCoinClaim({
         </div>
       ))}
 
-      <div className="relative inline-block overflow-visible" style={{ width: "300px", maxWidth: "100%" }}>
-        <div className="pointer-events-none absolute left-[-31px] top-1/2 z-20 -translate-y-1/2">
+      <div className="daily-reward-shell relative inline-block overflow-visible w-[300px] sm:w-[420px] lg:w-[520px] max-w-full">
+        <div className="daily-reward-gift pointer-events-none absolute left-[-31px] top-1/2 z-20 -translate-y-1/2">
           <img
             src={COIN_GIFT_IMAGE_SRC}
             alt="Coin gift"
-            className="w-36 h-36 sm:w-40 sm:h-40 object-contain"
+            className="daily-reward-gift-image w-36 h-36 sm:w-40 sm:h-40 object-contain"
           />
         </div>
 
-        <Card className="h-[74px] sm:h-[78px] overflow-hidden rounded-[14px] border-2 border-amber-300 bg-orange-500/15 px-0 py-0 shadow-[0_0_22px_rgba(251,191,36,0.35),inset_0_0_0_1px_rgba(253,230,138,0.5)]">
+        <Card className="daily-reward-card h-[74px] sm:h-[78px] overflow-hidden rounded-[14px] border-2 border-amber-300 bg-orange-500/15 px-0 py-0 shadow-[0_0_22px_rgba(251,191,36,0.35),inset_0_0_0_1px_rgba(253,230,138,0.5)]">
           <div className="relative h-full">
-          <p className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 text-xl sm:text-2xl font-bold whitespace-nowrap leading-none bg-gradient-to-b from-orange-200 via-orange-400 to-orange-600 bg-clip-text text-transparent">
+          <p className="daily-reward-title pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 text-xl sm:text-2xl font-bold whitespace-nowrap leading-none bg-gradient-to-b from-orange-200 via-orange-400 to-orange-600 bg-clip-text text-transparent">
             Daily Reward
           </p>
 
-          <div className="flex h-full items-end justify-between gap-2 pl-20 pr-0 pb-0 sm:pl-24">
-            <p className="text-yellow-400 text-xs sm:text-sm font-semibold leading-none">
+          <div className="daily-reward-content flex h-full items-end justify-between gap-2 pl-20 pr-0 pb-0 sm:pl-24">
+            <p className="daily-reward-coins text-yellow-400 text-xs sm:text-sm font-semibold leading-none">
               {dailyBonusAmount} Coins
             </p>
 
             <Button
-              className="mr-[10px] mb-[10px] h-8 sm:h-9 px-4 sm:px-5 text-sm rounded-[8px]"
+              className="daily-reward-button mr-[10px] mb-[10px] h-8 sm:h-9 px-4 sm:px-5 text-sm rounded-[8px]"
               ref={claimButtonRef}
               onClick={handleClaimClick}
               disabled={!isClaimAvailable || isClaiming || timeRemaining === null}
@@ -364,6 +364,48 @@ export default function DailyCoinClaim({
             left: var(--daily-coin-end-x, 50vw);
             top: var(--daily-coin-end-y, 50vh);
             transform: translate(-50%, -50%) scale(0) rotate(360deg);
+          }
+        }
+
+        @media (max-height: 520px) {
+          .daily-reward-shell {
+            width: 250px !important;
+          }
+
+          .daily-reward-gift {
+            left: -22px !important;
+          }
+
+          .daily-reward-gift-image {
+            width: 6rem !important;
+            height: 6rem !important;
+          }
+
+          .daily-reward-card {
+            height: 54px !important;
+          }
+
+          .daily-reward-title {
+            font-size: 0.9rem !important;
+            line-height: 1 !important;
+          }
+
+          .daily-reward-content {
+            padding-left: 3.5rem !important;
+          }
+
+          .daily-reward-coins {
+            font-size: 0.64rem !important;
+          }
+
+          .daily-reward-button {
+            margin-right: 8px !important;
+            margin-bottom: 8px !important;
+            height: 1.5rem !important;
+            padding-left: 0.625rem !important;
+            padding-right: 0.625rem !important;
+            font-size: 0.72rem !important;
+            border-radius: 7px !important;
           }
         }
       `}</style>

@@ -1,0 +1,14 @@
+{
+  "levels": [
+    { "level": 1, "kpRequired": 0 },
+    { "level": 2, "kpRequired": 500 },
+    { "level": 3, "kpRequired": 1000 },
+    { "level": 4, "kpRequired": 2000 },
+    { "level": 5, "kpRequired": 3000 },
+    { "level": 6, "kpRequired": 5000 },
+    { "level": 7, "kpRequired": 8000 },
+    { "level": 8, "kpRequired": 10000 },
+    { "level": 9, "kpRequired": 14000 },
+    { "level": 10, "kpRequired": 20000 }
+  ]
+}

@@ -14,7 +14,7 @@ export const MobileLayout = () => {
         <Outlet />
 
         {/* space so content doesn't touch fixed tabs */}
-        {!isHomeRoute && !isQuizRoute && <div className="h-16 md:hidden" />}
+        {!isHomeRoute && !isQuizRoute && <div className="h-16 lg:hidden" />}
       </div>
 
       {/* FIXED BOTTOM TABS */}
