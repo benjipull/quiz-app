@@ -86,7 +86,10 @@ export default function DailyCoinClaim({
     return () => clearInterval(interval);
   }, [timeRemaining, updateUserLocally]); 
 
-  const handleClaimClick = async () => {
+  const handleClaimClick = async (event?: React.MouseEvent<HTMLButtonElement>) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+
     if (!isClaimAvailable || isClaiming) return;
 
     const resolvedUserId = (() => {
@@ -129,8 +132,9 @@ export default function DailyCoinClaim({
 
       if (response.ok) {
         const coinsEarned = data.coinsEarned || dailyBonusAmount;
+        const updatedCoinTotal = data.totalCoins ?? data.newCoinsTotal;
 
-        updateUserLocally({ dailyClaimAvailable: false, coins: data.newCoinsTotal }); 
+        updateUserLocally({ dailyClaimAvailable: false, coins: updatedCoinTotal }); 
         setTimeRemaining(COOLDOWN_DURATION);
 
         setShowDailyOverlay(true);
@@ -289,7 +293,13 @@ export default function DailyCoinClaim({
             <Button
               className="daily-reward-button mr-[10px] mb-[10px] h-8 sm:h-9 px-4 sm:px-5 text-sm rounded-[8px]"
               ref={claimButtonRef}
-              onClick={handleClaimClick}
+              type="button"
+              onClick={(event) => {
+                void handleClaimClick(event);
+              }}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+              }}
               disabled={!isClaimAvailable || isClaiming || timeRemaining === null}
               variant={isClaimAvailable ? "warning" : "purple"}
             >
