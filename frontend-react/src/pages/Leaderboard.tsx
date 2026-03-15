@@ -4,13 +4,9 @@ import { apiClient } from "@/utils/apiClient";
 import { useNavigate } from "react-router-dom";
 import { globalLeaderboardCache, waitForCache } from "@/hooks/useLeaderboardPreloader";
 import { getApiBaseUrl } from "@/utils/baseUrl";
+import { avatarUrls } from "@/utils/avatarPaths";
 
-// Avatar Imports
-const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
-  eager: true,
-  import: "default",
-});
-const avatars: string[] = Object.values(avatarImages) as string[];
+const avatars = avatarUrls;
 
 const BASE_URL = getApiBaseUrl();
 
