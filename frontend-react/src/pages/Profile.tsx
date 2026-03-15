@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import InterestSelector from "@/components/InterestSelector";
 import { trackEvent } from "@/utils/analytics";
 import { useUser } from "@/contexts/UserContext";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = getApiBaseUrl();
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,

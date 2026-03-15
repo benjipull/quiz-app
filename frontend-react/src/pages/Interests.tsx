@@ -7,8 +7,9 @@ import InterestSelector from "@/components/InterestSelector";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/contexts/UserContext";
 import { trackEvent } from "@/utils/analytics";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = getApiBaseUrl();
 
 export default function Interests() {
   const { user, loading, updateUserLocally, markUserStale } = useUser();

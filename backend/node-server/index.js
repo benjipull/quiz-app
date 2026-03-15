@@ -62,6 +62,7 @@ app.use("/api/interests", require("./routes/interestRoutes"));
 //Quiz
 app.use("/api/startQuiz", require("./routes/startQuiz")); 
 app.use("/api/getGetegoryToPlay", require("./routes/getGetegoryToPlay")); 
+app.use("/api/getCategoryToPlay", require("./routes/getGetegoryToPlay")); 
 
 //Categories
 app.use("/api/categories", require("./routes/createCategory"));
@@ -79,6 +80,9 @@ app.use("/api/reportQuestion", require("./routes/reportQuestion"));
 
 //Images
 app.use("/api/getImageUrl", require("./routes/getImageUrl")); 
+
+//Config
+app.use("/api/level-config", require("./routes/getLevelConfig"));
 
 
 //Sources

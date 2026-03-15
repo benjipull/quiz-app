@@ -3,10 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Clock } from "lucide-react";
 import { preloadSounds } from "@/utils/soundCache";
+import { getApiBaseUrl } from "@/utils/baseUrl";
+import { trackEvent, trackFirstSessionInteraction } from "@/utils/analytics";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
-const DEFAULT_BONUS = 1000;
+const BASE_URL = getApiBaseUrl();
+const DEFAULT_BONUS = 100;
 const COOLDOWN_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const COIN_GIFT_IMAGE_SRC = "/assets/images/icons/coin%20gift.png";
 
 interface DailyCoinClaimProps {
   userToken: string;
@@ -33,17 +36,16 @@ export default function DailyCoinClaim({
 
   const earnedCoinsRef = useRef<HTMLDivElement>(null);
   const claimButtonRef = useRef<HTMLButtonElement>(null);
-  
-  const hasInitializedRef = useRef(false);
+  const lastInitKeyRef = useRef<string | null>(null);
 
   const isClaimAvailable = timeRemaining !== null && timeRemaining <= 0;
 
   // ✅ FIXED: Calculate time remaining from user data (no API call!)
   useEffect(() => {
-    if (hasInitializedRef.current) return;
     if (!userToken) return;
-
-    hasInitializedRef.current = true;
+    const initKey = `${userToken}:${lastDailyCoinClaim ?? "none"}`;
+    if (lastInitKeyRef.current === initKey) return;
+    lastInitKeyRef.current = initKey;
 
     // Calculate remaining time from lastDailyCoinClaim
     if (lastDailyCoinClaim) {
@@ -86,6 +88,26 @@ export default function DailyCoinClaim({
 
   const handleClaimClick = async () => {
     if (!isClaimAvailable || isClaiming) return;
+
+    const resolvedUserId = (() => {
+      if (typeof window === "undefined") return undefined;
+      try {
+        const rawUser = localStorage.getItem("user");
+        if (!rawUser) return undefined;
+        const parsedUser = JSON.parse(rawUser);
+        return parsedUser?._id as string | undefined;
+      } catch {
+        return undefined;
+      }
+    })();
+
+    trackFirstSessionInteraction({
+      user_id: resolvedUserId,
+      event_label: "Claim",
+      location: "home",
+      cta: "daily_reward_claim",
+    });
+    trackEvent("home_cta_click", { user_id: resolvedUserId, cta: "daily_reward_claim" });
 
     setIsClaiming(true);
 
@@ -204,17 +226,14 @@ export default function DailyCoinClaim({
             className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
           >
             <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 shadow-lg shadow-amber-500/50 animate-pulse-glow">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-12 w-12">
-                <circle cx="8" cy="9" r="5" fill="#f59e0b" />
-                <circle cx="8" cy="9" r="4" fill="#fbbf24" />
-                <circle cx="8" cy="9" r="2.5" fill="#f59e0b" opacity="0.4" />
-                <circle cx="14" cy="13" r="6" fill="#f59e0b" />
-                <circle cx="14" cy="13" r="5" fill="#fbbf24" />
-                <circle cx="14" cy="13" r="3" fill="#f59e0b" opacity="0.4" />
-              </svg>
+              <img
+                src={COIN_GIFT_IMAGE_SRC}
+                alt="Coin gift"
+                className="h-12 w-12 object-contain"
+              />
             </div>
             <div className="coin-text-aura text-5xl sm:text-6xl font-black bg-gradient-to-b from-yellow-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tabular-nums animate-number-grow">
-              +{dailyBonusAmount}
+              {dailyBonusAmount}
             </div>
           </div>
         </div>
@@ -247,59 +266,56 @@ export default function DailyCoinClaim({
         </div>
       ))}
 
-      <Card className="w-full max-w-8xl rounded-[30px] bg-transparent border-none p-2 sm:p-4">
-        <div className="flex items-center justify-between gap-2 sm:gap-4">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <div className="relative flex-shrink-0">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" className="w-full h-full">
-                  <circle cx="10" cy="11" r="7" fill="#d97706" />
-                  <circle cx="10" cy="11" r="6" fill="#fcd34d" />
-                  <circle cx="10" cy="11" r="3.5" fill="#d97706" opacity="0.4" />
-                  <circle cx="17" cy="16" r="8" fill="#d97706" />
-                  <circle cx="17" cy="16" r="7" fill="#fcd34d" />
-                  <circle cx="17" cy="16" r="4" fill="#d97706" opacity="0.4" />
-                </svg>
-              </div>
-            </div>
-
-            <div className="min-w-0">
-              <p className="text-white text-base sm:text-lg font-bold truncate">
-                Daily Bonus
-              </p>
-              <p className="text-yellow-400 text-sm sm:text-base font-semibold">
-                +{dailyBonusAmount} Coins
-              </p>
-            </div>
-          </div>
-
-          <Button
-            ref={claimButtonRef}
-            onClick={handleClaimClick}
-            disabled={!isClaimAvailable || isClaiming || timeRemaining === null}
-            variant={isClaimAvailable ? "warning" : "purple"}
-          >
-            {timeRemaining === null ? (
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2"></div>
-                <span>Loading...</span>
-              </div>
-            ) : isClaiming ? (
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2"></div>
-                <span>Claiming...</span>
-              </div>
-            ) : isClaimAvailable ? (
-              <span>Claim Now!</span>
-            ) : (
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4" />
-                <span>{formatTimeRemaining(timeRemaining)}</span>
-              </div>
-            )}
-          </Button>
+      <div className="daily-reward-shell relative inline-block overflow-visible w-[300px] sm:w-[420px] lg:w-[520px] max-w-full">
+        <div className="daily-reward-gift pointer-events-none absolute left-[-31px] top-1/2 z-20 -translate-y-1/2">
+          <img
+            src={COIN_GIFT_IMAGE_SRC}
+            alt="Coin gift"
+            className="daily-reward-gift-image w-36 h-36 sm:w-40 sm:h-40 object-contain"
+          />
         </div>
-      </Card>
+
+        <Card className="daily-reward-card h-[74px] sm:h-[78px] overflow-hidden rounded-[14px] border-2 border-amber-300 bg-orange-500/15 px-0 py-0 shadow-[0_0_22px_rgba(251,191,36,0.35),inset_0_0_0_1px_rgba(253,230,138,0.5)]">
+          <div className="relative h-full">
+          <p className="daily-reward-title pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 text-xl sm:text-2xl font-bold whitespace-nowrap leading-none bg-gradient-to-b from-orange-200 via-orange-400 to-orange-600 bg-clip-text text-transparent">
+            Daily Reward
+          </p>
+
+          <div className="daily-reward-content flex h-full items-end justify-between gap-2 pl-20 pr-0 pb-0 sm:pl-24">
+            <p className="daily-reward-coins text-yellow-400 text-xs sm:text-sm font-semibold leading-none">
+              {dailyBonusAmount} Coins
+            </p>
+
+            <Button
+              className="daily-reward-button mr-[10px] mb-[10px] h-8 sm:h-9 px-4 sm:px-5 text-sm rounded-[8px]"
+              ref={claimButtonRef}
+              onClick={handleClaimClick}
+              disabled={!isClaimAvailable || isClaiming || timeRemaining === null}
+              variant={isClaimAvailable ? "warning" : "purple"}
+            >
+              {timeRemaining === null ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2"></div>
+                  <span>Loading...</span>
+                </div>
+              ) : isClaiming ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2"></div>
+                  <span>Claiming...</span>
+                </div>
+              ) : isClaimAvailable ? (
+                <span>Claim</span>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <Clock className="w-4 h-4" />
+                  <span>{formatTimeRemaining(timeRemaining)}</span>
+                </div>
+              )}
+            </Button>
+          </div>
+          </div>
+        </Card>
+      </div>
 
       <style>{`
         .daily-coin-token {
@@ -348,6 +364,48 @@ export default function DailyCoinClaim({
             left: var(--daily-coin-end-x, 50vw);
             top: var(--daily-coin-end-y, 50vh);
             transform: translate(-50%, -50%) scale(0) rotate(360deg);
+          }
+        }
+
+        @media (max-height: 520px) {
+          .daily-reward-shell {
+            width: 250px !important;
+          }
+
+          .daily-reward-gift {
+            left: -22px !important;
+          }
+
+          .daily-reward-gift-image {
+            width: 6rem !important;
+            height: 6rem !important;
+          }
+
+          .daily-reward-card {
+            height: 54px !important;
+          }
+
+          .daily-reward-title {
+            font-size: 0.9rem !important;
+            line-height: 1 !important;
+          }
+
+          .daily-reward-content {
+            padding-left: 3.5rem !important;
+          }
+
+          .daily-reward-coins {
+            font-size: 0.64rem !important;
+          }
+
+          .daily-reward-button {
+            margin-right: 8px !important;
+            margin-bottom: 8px !important;
+            height: 1.5rem !important;
+            padding-left: 0.625rem !important;
+            padding-right: 0.625rem !important;
+            font-size: 0.72rem !important;
+            border-radius: 7px !important;
           }
         }
       `}</style>

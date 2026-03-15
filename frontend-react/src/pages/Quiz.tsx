@@ -10,6 +10,7 @@ import {
   trackQuestionAnswered,
   trackQuizComplete,
 } from "@/utils/analytics";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
 const StarfieldBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -209,12 +210,19 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
   );
 };
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = getApiBaseUrl();
+const ANSWER_BAR_REVEAL_DELAY_MS = 300;
+const ANSWER_BAR_ANIMATION_DURATION_MS = 400;
+const SCROLL_AFTER_BARS_DELAY_MS = ANSWER_BAR_REVEAL_DELAY_MS + ANSWER_BAR_ANIMATION_DURATION_MS + 50;
 
 interface Question {
   _id: string;
   question: string;
   answers: string[];
+  answerCounts?: Array<{
+    text: string;
+    count: number;
+  }>;
   correct_answer: string;
   explanation: string;
   difficulty?: "Easy" | "Medium" | "Hard";
@@ -268,6 +276,7 @@ export default function Quiz() {
   
   const nextQuestionRef = useRef<Question | null>(null);
   const isPreloadingRef = useRef(false);
+  const answerSyncPromiseRef = useRef<Promise<void> | null>(null);
 
   const [quizState, setQuizState] = useState<QuizState>({
     started: false,
@@ -475,7 +484,7 @@ export default function Quiz() {
             inline: 'nearest'
           });
         }
-      }, 300);
+      }, SCROLL_AFTER_BARS_DELAY_MS);
     }
   }, [showExplanation]);
 
@@ -661,49 +670,119 @@ export default function Quiz() {
     }
   };
 
+  const buildAnswerStats = (question: Question, selectedAnswer: string) => {
+    const countsByAnswer = new Map<string, number>();
+
+    question.answers.forEach((answerText) => {
+      countsByAnswer.set(answerText, 0);
+    });
+
+    question.answerCounts?.forEach(({ text, count }) => {
+      countsByAnswer.set(text, count);
+    });
+
+    if (selectedAnswer && countsByAnswer.has(selectedAnswer)) {
+      countsByAnswer.set(selectedAnswer, (countsByAnswer.get(selectedAnswer) || 0) + 1);
+    }
+
+    const totalSelections = Array.from(countsByAnswer.values()).reduce((sum, value) => sum + value, 0);
+
+    return question.answers.map((answerText) => {
+      const count = countsByAnswer.get(answerText) || 0;
+      return {
+        text: answerText,
+        percentage: totalSelections > 0 ? Math.round((count / totalSelections) * 100) : 0,
+      };
+    });
+  };
+
+  const buildImmediateAnswerResponse = (question: Question, selectedAnswer: string): AnswerResponse => {
+    const isCorrect = question.correct_answer === selectedAnswer;
+
+    return {
+      question: question.question,
+      correctAnswer: question.correct_answer,
+      explanation: question.explanation,
+      isCorrect,
+      answerStats: buildAnswerStats(question, selectedAnswer),
+      earnedItems: isCorrect ? ["⭐ Knowledge Point"] : [],
+      remaining: Math.max(totalQuestions - quizState.currentQuestionIndex, 0),
+    };
+  };
+
+  const submitAnswerInBackground = (answer: string) => {
+    if (!userToken) {
+      return Promise.resolve();
+    }
+
+    const request = fetch(`${BASE_URL}/api/answerQuestion/${userToken}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${userToken}`,
+      },
+      body: JSON.stringify({ answer }),
+    }).then(async (response) => {
+      if (!response.ok) {
+        let errorMessage = "Failed to submit answer.";
+        try {
+          const errorData = await response.json();
+          if (errorData?.message) {
+            errorMessage = String(errorData.message);
+          }
+        } catch {
+          // Ignore JSON parsing errors and keep the fallback message.
+        }
+        throw new Error(errorMessage);
+      }
+    });
+
+    const trackedRequest = request.finally(() => {
+      if (answerSyncPromiseRef.current === trackedRequest) {
+        answerSyncPromiseRef.current = null;
+      }
+    });
+
+    answerSyncPromiseRef.current = trackedRequest;
+    return trackedRequest;
+  };
+
   const handleTimeUp = async () => {
     if (!userToken || !quizState.question) return;
 
-    try {
-      const response = await fetch(`${BASE_URL}/api/answerQuestion/${userToken}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({ answer: "" }),
-      });
+    const currentQuestion = quizState.question;
+    const localAnswerData = buildImmediateAnswerResponse(currentQuestion, "");
+    setAnswerResponse(localAnswerData);
 
-      if (response.ok) {
-        const answerData: AnswerResponse = await response.json();
-        setAnswerResponse(answerData);
-
-        setQuizState((prevState) => ({
-          ...prevState,
-          incorrectAnswers: prevState.incorrectAnswers + 1,
-          isAnswerSelected: true,
-          userAnswers: [
-            ...prevState.userAnswers,
-            {
-              questionId: prevState.question?._id || "",
-              selectedAnswer: "",
-              correctAnswer: answerData.correctAnswer,
-              isCorrect: false,
-            }
-          ]
-        }));
-        
-        setTimeout(() => {
-          setShowBars(true);
-        }, 300);
-
-        if (!isLastQuestion) {
-          preloadNextQuestion();
+    setQuizState((prevState) => ({
+      ...prevState,
+      incorrectAnswers: prevState.incorrectAnswers + 1,
+      isAnswerSelected: true,
+      userAnswers: [
+        ...prevState.userAnswers,
+        {
+          questionId: prevState.question?._id || "",
+          selectedAnswer: "",
+          correctAnswer: localAnswerData.correctAnswer,
+          isCorrect: false,
         }
-      }
-    } catch (error) {
-      console.error("Error handling timeout:", error);
-    }
+      ]
+    }));
+    
+    setTimeout(() => {
+      setShowBars(true);
+    }, ANSWER_BAR_REVEAL_DELAY_MS);
+
+    submitAnswerInBackground("")
+      .then(() => {
+        if (!isLastQuestion) {
+          return preloadNextQuestion();
+        }
+      })
+      .catch((error) => {
+        console.error("Error handling timeout submission:", error);
+        setError("Failed to submit answer. Please try again.");
+      });
   };
   
   const completeQuiz = async () => {
@@ -779,87 +858,81 @@ export default function Quiz() {
     }
   };
 
-  const handleAnswerSelection = async (answer: string) => {
+  const handleAnswerSelection = (answer: string) => {
     if (selectedAnswer !== null || timeUp || !userToken) return;
+    if (!quizState.question) return;
 
     if (timerInSecondsRef.current) {
       clearInterval(timerInSecondsRef.current);
       timerInSecondsRef.current = null;
     }
 
+    const currentQuestion = quizState.question;
+    const localAnswerData = buildImmediateAnswerResponse(currentQuestion, answer);
+    const isCorrect = localAnswerData.isCorrect;
+
     setSelectedAnswer(answer);
+    setAnswerResponse(localAnswerData);
     setQuizState((prev) => ({
       ...prev,
+      correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
+      incorrectAnswers: prev.incorrectAnswers + (isCorrect ? 0 : 1),
       isAnswerSelected: true,
+      userAnswers: [
+        ...prev.userAnswers,
+        {
+          questionId: prev.question?._id || "",
+          selectedAnswer: answer,
+          correctAnswer: localAnswerData.correctAnswer,
+          isCorrect,
+        }
+      ]
     }));
 
-    try {
-      const response = await fetch(`${BASE_URL}/api/answerQuestion/${userToken}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({ answer }),
-      });
+    handleVibration(isCorrect);
 
-      if (response.ok) {
-        const answerData: AnswerResponse = await response.json();
-        setAnswerResponse(answerData);
-
-        const isCorrect = answerData.isCorrect;
-
-        handleVibration(isCorrect);
-
-        setQuizState((prev) => ({
-          ...prev,
-          correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
-          incorrectAnswers: prev.incorrectAnswers + (isCorrect ? 0 : 1),
-          userAnswers: [
-            ...prev.userAnswers,
-            {
-              questionId: prev.question?._id || "",
-              selectedAnswer: answer,
-              correctAnswer: answerData.correctAnswer,
-              isCorrect,
-            }
-          ]
-        }));
-
-        if (isCorrect) {
-          correctSound.play().catch(() => { });
-        } else {
-          incorrectSound.play().catch(() => { });
-        }
-
-        trackQuestionAnswered(quizState.question?._id || "", isCorrect, userId);
-
-        setTimeout(() => {
-          setShowBars(true);
-        }, 300);
-
-        setTimeout(() => {
-          setShowExplanation(true);
-        }, 1200);
-
-        if (!isLastQuestion) {
-          preloadNextQuestion();
-        }
-
-      } else {
-        setError("Failed to submit answer. Please try again.");
-      }
-    } catch (error) {
-      console.error("Error submitting answer:", error);
-      setError("Error submitting answer. Please try again.");
+    if (isCorrect) {
+      correctSound.play().catch(() => { });
+    } else {
+      incorrectSound.play().catch(() => { });
     }
+
+    trackQuestionAnswered(currentQuestion._id, isCorrect, userId);
+
+    setTimeout(() => {
+      setShowBars(true);
+    }, ANSWER_BAR_REVEAL_DELAY_MS);
+
+    setShowExplanation(true);
+
+    submitAnswerInBackground(answer)
+      .then(() => {
+        if (!isLastQuestion) {
+          return preloadNextQuestion();
+        }
+      })
+      .catch((error) => {
+        console.error("Error submitting answer:", error);
+        setError("Failed to submit answer. Please try again.");
+      });
   };
 
-  const handleNextQuestion = () => {
+  const handleNextQuestion = async () => {
     if (isLastQuestion) {
       completeQuiz();
       return;
     }
+
+    if (answerSyncPromiseRef.current) {
+      try {
+        await answerSyncPromiseRef.current;
+      } catch (error) {
+        console.error("Error waiting for answer sync:", error);
+        setError("Failed to submit answer. Please try again.");
+        return;
+      }
+    }
+
     fetchNextQuestion();
   };
 
@@ -1130,8 +1203,8 @@ export default function Quiz() {
                           }`}
                         style={{
                           '--target-width': `${getAnswerPercentage(answer)}%`,
-                          animationDelay: `${index * 150}ms`,
-                          animationDuration: '0.8s'
+                          animationDelay: '0ms',
+                          animationDuration: `${ANSWER_BAR_ANIMATION_DURATION_MS / 1000}s`
                         } as React.CSSProperties}
                       />
                     )}

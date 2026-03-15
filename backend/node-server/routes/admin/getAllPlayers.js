@@ -4,13 +4,14 @@ const User = require("../../models/user");
 const Category = require("../../models/categoryModel");
 const auth = require("../../middleware/auth");
 const adminAuth = require("../../middleware/adminauth");
+const { getLevelForKnowledgePoints } = require("../../config/levelConfig");
 
 // GET /api/admin/players
 router.get("/", auth, adminAuth, async (req, res) => {
   try {
     const players = await User.find(
       {},
-      "alias knowledgePoints quizzesCompleted coins lastlogin_at created_at"
+      "alias userType level knowledgePoints quizzesCompleted coins lastlogin_at created_at"
     ).sort({ lastlogin_at: -1, alias: 1 });
 
     const completionCounts = await Category.aggregate([
@@ -58,6 +59,47 @@ router.get("/", auth, adminAuth, async (req, res) => {
     res
       .status(500)
       .json({ error: "Server error. Failed to fetch players." });
+  }
+});
+
+// PATCH /api/admin/players/:playerId/reset-progress
+router.patch("/:playerId/reset-progress", auth, adminAuth, async (req, res) => {
+  try {
+    const { playerId } = req.params;
+    const updatedPlayer = await User.findByIdAndUpdate(
+      playerId,
+      {
+        $set: {
+          knowledgePoints: 0,
+          level: getLevelForKnowledgePoints(0),
+          lastupdated_at: new Date(),
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+        select: "alias userType level knowledgePoints",
+      }
+    );
+
+    if (!updatedPlayer) {
+      return res.status(404).json({ error: "Player not found." });
+    }
+
+    return res.status(200).json({
+      message: "Player progress reset successfully.",
+      player: updatedPlayer,
+    });
+  } catch (error) {
+    const isCastError = error?.name === "CastError";
+    if (isCastError) {
+      return res.status(400).json({ error: "Invalid player id." });
+    }
+
+    console.error("Error resetting player progress:", error.message);
+    return res
+      .status(500)
+      .json({ error: "Server error. Failed to reset player progress." });
   }
 });
 
