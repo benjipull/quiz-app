@@ -28,6 +28,7 @@ import DailyCoinClaim from "@/components/DailyCoinClaim";
 import { useUser } from "@/contexts/UserContext";
 import { loadLevelConfig, resolveLevelProgress, type LevelConfigEntry } from "@/utils/levelConfig";
 import { getApiBaseUrl } from "@/utils/baseUrl";
+import { areSplashAssetsReady, preloadSplashAssets } from "@/utils/splashAssets";
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
@@ -91,6 +92,7 @@ export default function Home() {
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
   const [refreshCategoryLoading, setRefreshCategoryLoading] = useState(false);
   const [nextCategoryPreview, setNextCategoryPreview] = useState<CategoryToPlayResponse | null>(null);
+  const [assetsReady, setAssetsReady] = useState<boolean>(areSplashAssetsReady());
   const [levelConfig, setLevelConfig] = useState<LevelConfigEntry[] | null>(null);
   const [levelConfigError, setLevelConfigError] = useState<string | null>(null);
   const [hasCategoryBootstrapCompleted, setHasCategoryBootstrapCompleted] = useState(false);
@@ -233,6 +235,19 @@ export default function Home() {
         if (!isMounted) return;
         setLevelConfigError((error as Error).message);
       });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    preloadSplashAssets().finally(() => {
+      if (!isMounted) return;
+      setAssetsReady(true);
+    });
 
     return () => {
       isMounted = false;
@@ -553,6 +568,7 @@ export default function Home() {
   const isLevelConfigLoading = !levelConfig && !levelConfigError;
   const isHomeDataLoading =
     userLoading ||
+    !assetsReady ||
     isLevelConfigLoading ||
     (!!userToken && !!user && !hasCategoryBootstrapCompleted);
 

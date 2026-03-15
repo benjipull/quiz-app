@@ -87,7 +87,23 @@ router.post("/", authenticateToken, async (req, res) => {
         $project: {
           _id: "$questions._id",
           question: "$questions.text",
-          answers: "$questions.answers.text",
+          answers: {
+            $map: {
+              input: "$questions.answers",
+              as: "answer",
+              in: "$$answer.text",
+            },
+          },
+          answerCounts: {
+            $map: {
+              input: "$questions.answers",
+              as: "answer",
+              in: {
+                text: "$$answer.text",
+                count: { $ifNull: ["$$answer.correctCount", 0] },
+              },
+            },
+          },
           correct_answer: "$questions.correct_answer",
           explanation: "$questions.explanation",
           timesAnsweredCorrectly: "$questions.timesAnsweredCorrectly",
@@ -139,7 +155,23 @@ router.post("/", authenticateToken, async (req, res) => {
           $project: {
             _id: "$questions._id",
             question: "$questions.text",
-            answers: "$questions.answers.text",
+            answers: {
+              $map: {
+                input: "$questions.answers",
+                as: "answer",
+                in: "$$answer.text",
+              },
+            },
+            answerCounts: {
+              $map: {
+                input: "$questions.answers",
+                as: "answer",
+                in: {
+                  text: "$$answer.text",
+                  count: { $ifNull: ["$$answer.correctCount", 0] },
+                },
+              },
+            },
             correct_answer: "$questions.correct_answer",
             explanation: "$questions.explanation",
             timesAnsweredCorrectly: "$questions.timesAnsweredCorrectly",
