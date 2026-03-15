@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useEffect, useState } from "react";
 
 const navTabs = [
   { icon: Home, label: "Home", path: "/" },
@@ -46,7 +46,16 @@ export const Header = ({
 }: HeaderProps) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
+  const [isDesktopNav, setIsDesktopNav] = useState<boolean>(
+    typeof window !== "undefined" ? window.innerWidth >= 1024 : true
+  );
+
+  useEffect(() => {
+    const onResize = () => setIsDesktopNav(window.innerWidth >= 1024);
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-lg border-b border-border">
@@ -79,7 +88,7 @@ export const Header = ({
 
         <div className="flex items-center gap-2">
           {/* Desktop Navigation Tabs */}
-          {!isMobile && (
+          {isDesktopNav && (
             <div className="flex items-center gap-1"> {/* Removed mr-4 class */}
               {navTabs.map((tab) => {
                 const isActive = location.pathname === tab.path;

@@ -101,6 +101,7 @@ export default function Home() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState<number>(typeof window !== "undefined" ? window.innerWidth : 390);
   const [viewportHeight, setViewportHeight] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 800);
 
   // Simple component-level cache for next category
@@ -145,6 +146,7 @@ export default function Home() {
   useEffect(() => {
     const checkScreenSize = () => {
       setIsSmallScreen(window.innerWidth < 768);
+      setViewportWidth(window.innerWidth);
       setViewportHeight(window.innerHeight);
     };
     checkScreenSize();
@@ -604,32 +606,41 @@ export default function Home() {
   const levelProgressPercent = levelProgressTarget > 0
     ? (levelProgressPoints / levelProgressTarget) * 100
     : 100;
+  const isUltraShortHeight = isSmallScreen && viewportHeight <= 520;
+  const isCompactEconomyResolution = isSmallScreen && (viewportHeight <= 700 || viewportWidth <= 360);
+  const isTinyPhone = isSmallScreen && viewportWidth <= 360 && viewportHeight <= 700;
   const isShortPhone = isSmallScreen && viewportHeight < 780;
+  const isDesktopView = viewportWidth >= 1024;
+  const hasBottomTabs = !isDesktopView;
   const avatarSizeClass = `${
-    isShortPhone
+    isTinyPhone
+      ? "w-[clamp(112px,min(33vw,20vh),150px)] h-[clamp(112px,min(33vw,20vh),150px)]"
+      : isShortPhone
       ? "w-[clamp(140px,min(39vw,25vh),205px)] h-[clamp(140px,min(39vw,25vh),205px)]"
       : "w-[clamp(192px,min(55vw,36vh),286px)] h-[clamp(192px,min(55vw,36vh),286px)]"
   } sm:w-[clamp(200px,min(34vw,30vh),280px)] sm:h-[clamp(200px,min(34vw,30vh),280px)]`;
-  const moonOffsetY = -34;
-  const moonScale = 1.32;
-
-  const backgroundStyle = {
-    backgroundColor: "#0e0316",
-    backgroundImage: "url('/homebg1.jpg')",
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
-  };
+  // Keep a consistent moon-to-avatar proportion across all resolutions.
+  const moonScale = 1.4;
+  const moonTranslateY = "calc(-56% - 10px)";
+  const aliasHeadingClass = isTinyPhone
+    ? "text-white font-extrabold text-center whitespace-nowrap text-xl max-w-[180px]"
+    : "text-white font-extrabold text-center whitespace-nowrap text-2xl sm:text-3xl md:text-4xl max-w-[220px] sm:max-w-[300px] md:max-w-[360px]";
 
   return (
-    <div
-      className="min-h-[100dvh] flex flex-col overflow-y-auto"
-      style={backgroundStyle}
-    >     
-      {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
+    <div className="relative isolate min-h-[100dvh] flex flex-col overflow-y-auto bg-[#0e0316]">
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#0e0316]">
+        <img
+          src="/homebg1.jpg"
+          alt=""
+          aria-hidden="true"
+          className="h-full w-full object-cover object-center"
+        />
+      </div>
 
-      <div className={`flex-1 flex flex-col px-4 lg:px-8 w-full max-w-4xl mx-auto ${isSmallScreen ? "min-h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] pt-2" : "min-h-0 pt-3 pb-4"}`}>
-        <div className={`space-y-[28px] flex-shrink-0 ${isSmallScreen ? 'pt-1' : 'pt-2'} w-full`}>
+      {isDesktopView && <Header logoAsTitle imageSrc={logo} showNotifications />}
+
+      <div className={`relative flex-1 flex flex-col px-4 lg:px-8 w-full max-w-4xl mx-auto ${hasBottomTabs ? "min-h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] pt-2" : "min-h-0 pt-3 pb-4"}`}>
+        <div className={`relative z-20 ${isUltraShortHeight ? "space-y-2" : "space-y-[28px]"} flex-shrink-0 ${isSmallScreen ? 'pt-1' : 'pt-2'} w-full`}>
           <GameStatsHeader
             userToken={userToken}
             isParentLoading={false}
@@ -637,6 +648,7 @@ export default function Home() {
             userXP={user.knowledgePoints ?? 0}
             userGem1={user.wisdomGems ?? 0}
             userGem2={user.enlightenmentCrystals ?? 0}
+            compactMode={isCompactEconomyResolution}
           />
 
           <DailyCoinClaim
@@ -648,7 +660,7 @@ export default function Home() {
           />
         </div>
 
-        <div className={`${isSmallScreen ? "flex-1 min-h-0 flex items-center justify-center py-2" : "flex items-center justify-center flex-1 py-4"}`}>
+        <div className={`relative z-20 ${isSmallScreen ? "flex-1 min-h-0 flex items-center justify-center py-2" : "flex items-center justify-center flex-1 py-4"}`}>
           <div className="relative flex flex-col items-center justify-center">
             <div className="relative rounded-full flex items-center justify-center overflow-visible mx-auto">
               <div className="relative z-10 flex flex-col items-center">
@@ -671,11 +683,12 @@ export default function Home() {
                       style={{
                         width: `${moonScale * 100}%`,
                         height: `${moonScale * 100}%`,
-                        backgroundImage: `url('/image.png')`,
+                        backgroundImage: "url('/image.png')",
                         backgroundSize: "contain",
                         backgroundPosition: "center",
                         backgroundRepeat: "no-repeat",
-                        transform: `translate(-50%, calc(-50% + ${moonOffsetY}px))`,
+                        transform: `translate(-50%, ${moonTranslateY})`,
+                        opacity: 0.96,
                       }}
                     />
                   <Avatar className="rounded-full overflow-visible relative z-10 w-full h-full">
@@ -689,10 +702,10 @@ export default function Home() {
                     </AvatarFallback>
                   </Avatar>
                   </div>
-                  <div className="z-20 pointer-events-none mt-7 sm:mt-8 flex justify-center">
+                  <div className={`z-20 pointer-events-none ${isTinyPhone ? "mt-4 sm:mt-8" : "mt-7 sm:mt-8"} flex justify-center`}>
                     <div className="relative w-fit">
                       <h2
-                        className="text-white font-extrabold text-center whitespace-nowrap text-2xl sm:text-3xl md:text-4xl max-w-[220px] sm:max-w-[300px] md:max-w-[360px]"
+                        className={aliasHeadingClass}
                         style={{
                           textShadow: '0 0 8px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.4)',
                         }}
@@ -706,15 +719,15 @@ export default function Home() {
                         src="/assets/images/icons/edit-icon-cropped.png"
                         alt=""
                         aria-hidden="true"
-                        className="absolute left-full top-1/2 -translate-y-1/2 ml-2 sm:ml-2.5 text-2xl sm:text-3xl md:text-4xl w-[2em] h-[2em] opacity-100 drop-shadow-[0_0_6px_rgba(255,255,255,0.55)] shrink-0"
+                        className={`absolute left-full top-1/2 -translate-y-1/2 ml-2 sm:ml-2.5 ${isTinyPhone ? "text-xl w-[1.8em] h-[1.8em]" : "text-2xl sm:text-3xl md:text-4xl w-[2em] h-[2em]"} opacity-100 drop-shadow-[0_0_6px_rgba(255,255,255,0.55)] shrink-0`}
                       />
                     </div>
                   </div>
                 </div>
                 <div
-                  className="z-20 mt-7 sm:mt-8 w-[min(92vw,380px)] sm:w-[min(70vw,430px)]"
+                  className={`z-20 ${isTinyPhone ? "mt-4 sm:mt-8 w-[min(92vw,320px)] sm:w-[min(70vw,430px)]" : "mt-7 sm:mt-8 w-[min(92vw,380px)] sm:w-[min(70vw,430px)]"}`}
                 >
-                  <div className="relative h-[35px] sm:h-[39px] w-full rounded-full bg-white/20 overflow-hidden border border-white/25">
+                  <div className={`relative ${isTinyPhone ? "h-[30px] sm:h-[39px]" : "h-[35px] sm:h-[39px]"} w-full rounded-full bg-white/20 overflow-hidden border border-white/25`}>
                     <div
                       className="h-full rounded-full transition-[width] duration-500 ease-out"
                       style={{
@@ -723,17 +736,17 @@ export default function Home() {
                         boxShadow: "0 0 14px rgba(34,211,238,0.55)",
                       }}
                     />
-                    <span className="absolute left-2 sm:left-2.5 top-1/2 -translate-y-1/2 z-10 text-[10px] sm:text-xs font-extrabold uppercase tracking-[0.08em] text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                    <span className={`absolute left-2 sm:left-2.5 top-1/2 -translate-y-1/2 z-10 ${isTinyPhone ? "text-[9px] sm:text-xs" : "text-[10px] sm:text-xs"} font-extrabold uppercase tracking-[0.08em] text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]`}>
                       Level {userLevel}
                     </span>
-                    <span className="absolute right-2 sm:right-2.5 top-1/2 -translate-y-1/2 z-10 text-[10px] sm:text-xs font-extrabold uppercase tracking-[0.08em] text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                    <span className={`absolute right-2 sm:right-2.5 top-1/2 -translate-y-1/2 z-10 ${isTinyPhone ? "text-[9px] sm:text-xs" : "text-[10px] sm:text-xs"} font-extrabold uppercase tracking-[0.08em] text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]`}>
                       Level {nextLevel}
                     </span>
-                    <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] sm:text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                    <span className={`absolute inset-0 z-10 flex items-center justify-center ${isTinyPhone ? "text-[9px] sm:text-xs" : "text-[10px] sm:text-xs"} font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]`}>
                       {levelProgressPoints}/{levelProgressTarget || levelProgressPoints} KP
                     </span>
                   </div>
-                  <p className="mt-1.5 text-center text-[11px] sm:text-sm font-semibold text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                  <p className={`mt-1.5 text-center ${isTinyPhone ? "text-[10px] sm:text-sm" : "text-[11px] sm:text-sm"} font-semibold text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]`}>
                     {remainingKpToNextLevel}KP left to Level {nextLevel}
                   </p>
                 </div>
@@ -742,14 +755,14 @@ export default function Home() {
           </div>
         </div>
 
-        <div className={`space-y-2 flex-shrink-0 w-full mt-auto ${isSmallScreen ? 'pt-1 pb-[calc(7.1rem+env(safe-area-inset-bottom))]' : 'pt-6'}`}>
+        <div className={`space-y-2 flex-shrink-0 w-full mt-auto ${hasBottomTabs ? 'pt-1 pb-[calc(7.1rem+env(safe-area-inset-bottom))]' : 'pt-6'}`}>
           <Button
             variant="default"
             onClick={handleQuickQuiz}
             disabled={playButtonLoading || currentCoins < QUIZ_COST}
-            className={`relative w-full overflow-hidden px-3 sm:px-4 py-0 ${isSmallScreen ? 'h-[4.5rem]' : 'h-[5.4rem] sm:h-[5.4rem]'} ${!playButtonLoading && currentCoins >= QUIZ_COST ? "home-play-glow-pulse" : ""}`}
+            className={`relative w-full overflow-hidden px-3 sm:px-4 py-0 ${isTinyPhone ? 'h-[4rem]' : isSmallScreen ? 'h-[4.5rem]' : 'h-[5.4rem] sm:h-[5.4rem]'} ${!playButtonLoading && currentCoins >= QUIZ_COST ? "home-play-glow-pulse" : ""}`}
             style={{
-              borderRadius: isSmallScreen ? "22px" : "28px",
+              borderRadius: isTinyPhone ? "18px" : isSmallScreen ? "22px" : "28px",
               border: "2px solid #B2F574",
               background: "linear-gradient(180deg, rgba(103,217,63,0.58) 0%, rgba(63,188,55,0.5) 38%, rgba(28,157,42,0.45) 70%, rgba(18,132,32,0.4) 100%)",
               boxShadow: "0 10px 20px rgba(15,102,28,0.22)",
@@ -767,7 +780,7 @@ export default function Home() {
                   style={{
                     background:
                       "linear-gradient(180deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.08) 60%, rgba(255,255,255,0) 100%)",
-                    borderRadius: isSmallScreen ? "22px" : "28px",
+                    borderRadius: isTinyPhone ? "18px" : isSmallScreen ? "22px" : "28px",
                   }}
                 />
                 <span
@@ -775,26 +788,26 @@ export default function Home() {
                   style={{
                     background:
                       "radial-gradient(circle at 16% 28%, rgba(255,255,120,0.2) 0%, rgba(255,255,120,0) 32%), radial-gradient(circle at 85% 70%, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0) 36%)",
-                    borderRadius: isSmallScreen ? "22px" : "28px",
+                    borderRadius: isTinyPhone ? "18px" : isSmallScreen ? "22px" : "28px",
                   }}
                 />
 
                 <div className="relative z-10 grid h-full w-full grid-cols-[1fr_auto] items-center gap-2 sm:gap-3">
-                  <span className="pointer-events-none absolute left-[-23px] inset-y-0 inline-flex items-center justify-start w-7 sm:w-8 md:w-9 shrink-0">
+                  <span className={`pointer-events-none absolute ${isTinyPhone ? "left-[-18px]" : "left-[-23px]"} inset-y-0 inline-flex items-center justify-start w-7 sm:w-8 md:w-9 shrink-0`}>
                     <img
                       src="/assets/images/icons/Play Icon.png"
                       alt=""
                       aria-hidden="true"
-                      className="h-7 sm:h-8 md:h-9 w-auto object-contain scale-[4.8] origin-left translate-y-[6px]"
+                      className={`h-7 sm:h-8 md:h-9 w-auto object-contain ${isTinyPhone ? "scale-[4.2] translate-y-[4px]" : "scale-[4.8] translate-y-[6px]"} origin-left`}
                     />
                   </span>
-                  <div className="pl-16 sm:pl-20 md:pl-24 flex items-center gap-2.5 sm:gap-3">
-                    <span className="text-lg sm:text-2xl md:text-3xl font-bold text-white leading-none whitespace-nowrap flex items-center gap-1.5 sm:gap-2 drop-shadow-[0_2px_0_rgba(0,0,0,0.35)]">
+                  <div className={`${isTinyPhone ? "pl-[3.25rem] sm:pl-20 md:pl-24" : "pl-16 sm:pl-20 md:pl-24"} flex items-center gap-2.5 sm:gap-3`}>
+                    <span className={`${isTinyPhone ? "text-base sm:text-2xl md:text-3xl" : "text-lg sm:text-2xl md:text-3xl"} font-bold text-white leading-none whitespace-nowrap flex items-center gap-1.5 sm:gap-2 drop-shadow-[0_2px_0_rgba(0,0,0,0.35)]`}>
                       Play Now
                     </span>
 
                     <span
-                      className="relative h-8 sm:h-10 min-w-[74px] sm:min-w-[90px] text-sm sm:text-lg font-bold text-[#F6DE6C] flex items-center justify-center gap-1.5 px-2.5 sm:px-3 rounded-full"
+                      className={`relative ${isTinyPhone ? "h-7 min-w-[66px] text-xs px-2" : "h-8 min-w-[74px] text-sm px-2.5"} sm:h-10 sm:min-w-[90px] sm:text-lg font-bold text-[#F6DE6C] flex items-center justify-center gap-1.5 sm:px-3 rounded-full`}
                       style={{
                         border: "1px solid rgba(158, 228, 120, 0.62)",
                         background: "linear-gradient(180deg, rgba(34,118,52,0.75) 0%, rgba(24,88,39,0.84) 48%, rgba(18,68,30,0.9) 100%)",
@@ -802,7 +815,7 @@ export default function Home() {
                       }}
                     >
                       <span
-                        className="inline-flex items-center justify-center rounded-full h-4 w-4 sm:h-5 sm:w-5"
+                        className={`inline-flex items-center justify-center rounded-full ${isTinyPhone ? "h-3.5 w-3.5" : "h-4 w-4"} sm:h-5 sm:w-5`}
                         style={{
                           color: "#2D5E19",
                           background: "linear-gradient(180deg, #FFE98F 0%, #F2C63A 60%, #DAAB1D 100%)",
@@ -829,17 +842,17 @@ export default function Home() {
                   </div>
 
                   <div
-                    className="rounded-full w-12 h-12 sm:w-[72px] sm:h-[72px] flex flex-col items-center justify-center"
+                    className={`rounded-full ${isTinyPhone ? "w-10 h-10" : "w-12 h-12"} sm:w-[72px] sm:h-[72px] flex flex-col items-center justify-center`}
                     style={{
                       border: "2px solid #7BD651",
                       background: "radial-gradient(circle at 34% 22%, #FFFFFF 0%, #F5FFF0 65%, #E8F8DF 100%)",
                       boxShadow: "0 2px 8px rgba(0,0,0,0.28), inset 0 2px 5px rgba(255,255,255,0.78), inset 0 -2px 4px rgba(132,181,94,0.25)",
                     }}
                   >
-                    <span className="text-[#41B646] text-xl sm:text-3xl font-bold leading-none">
+                    <span className={`text-[#41B646] ${isTinyPhone ? "text-lg" : "text-xl"} sm:text-3xl font-bold leading-none`}>
                       {userLevel}
                     </span>
-                    <span className="text-[#41B646] text-[9px] sm:text-xs font-semibold uppercase leading-none tracking-wide">
+                    <span className={`text-[#41B646] ${isTinyPhone ? "text-[8px]" : "text-[9px]"} sm:text-xs font-semibold uppercase leading-none tracking-wide`}>
                       Level
                     </span>
                   </div>
@@ -852,7 +865,7 @@ export default function Home() {
             <div className="w-full flex items-center justify-center">
               <div className="inline-flex items-center gap-2 sm:gap-3">
                 <p className="text-center">
-                <span className="text-yellow-400 text-lg sm:text-2xl font-bold tracking-wide">
+                <span className={`text-yellow-400 ${isTinyPhone ? "text-base sm:text-2xl" : "text-lg sm:text-2xl"} font-bold tracking-wide`}>
                   {nextCategoryPreview.name}
                 </span>
                 {/* Legacy preview text intentionally hidden */}
