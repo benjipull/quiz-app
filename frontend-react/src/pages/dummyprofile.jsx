@@ -10,14 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import GameStatsHeader from "@/components/GameStatsHeader";
+import { avatarUrls } from "@/utils/avatarPaths";
 
 const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
 
-const avatarImages = import.meta.glob('../assets/images/avatars/*.png', {
-  eager: true,
-  import: 'default',
-});
-const avatars = Object.values(avatarImages) as string[];
+const avatars = avatarUrls;
 
 const Profile = () => {
   const [user, setUser] = useState<any | null>(null);

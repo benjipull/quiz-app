@@ -13,6 +13,7 @@ import InterestSelector from "@/components/InterestSelector";
 import { trackEvent } from "@/utils/analytics";
 import { useUser } from "@/contexts/UserContext";
 import { getApiBaseUrl } from "@/utils/baseUrl";
+import { avatarUrls } from "@/utils/avatarPaths";
 import {
   Dialog,
   DialogContent,
@@ -23,11 +24,7 @@ import {
 
 const BASE_URL = getApiBaseUrl();
 
-const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
-  eager: true,
-  import: "default",
-});
-const avatars = Object.values(avatarImages) as string[];
+const avatars = avatarUrls;
 
 interface Interest {
   _id: string;
