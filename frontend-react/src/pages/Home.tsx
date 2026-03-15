@@ -29,12 +29,9 @@ import { useUser } from "@/contexts/UserContext";
 import { loadLevelConfig, resolveLevelProgress, type LevelConfigEntry } from "@/utils/levelConfig";
 import { getApiBaseUrl } from "@/utils/baseUrl";
 import { areSplashAssetsReady, preloadSplashAssets } from "@/utils/splashAssets";
+import { avatarUrls } from "@/utils/avatarPaths";
 
-const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
-  eager: true,
-  import: "default",
-});
-const avatars: string[] = Object.values(avatarImages) as string[];
+const avatars = avatarUrls;
 
 const BASE_URL = getApiBaseUrl();
 const QUIZ_COST = 50;
