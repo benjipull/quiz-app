@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
 import { setGAUser } from "@/utils/gaClient";
 import { trackLogin, trackSignup } from "@/utils/analytics";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = getApiBaseUrl();
 
 const AuthSection = () => {
     const navigate = useNavigate();

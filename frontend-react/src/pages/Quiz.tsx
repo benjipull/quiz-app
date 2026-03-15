@@ -10,6 +10,7 @@ import {
   trackQuestionAnswered,
   trackQuizComplete,
 } from "@/utils/analytics";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
 const StarfieldBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -209,7 +210,7 @@ const ReportDialog = ({ onClose, onSubmit, isSubmitting, isThankYou }: ReportDia
   );
 };
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = getApiBaseUrl();
 
 interface Question {
   _id: string;

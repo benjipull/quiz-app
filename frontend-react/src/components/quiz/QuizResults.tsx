@@ -18,13 +18,14 @@ import {
 import Confetti from "react-confetti";
 import { useUser } from "@/contexts/UserContext"; 
 import { trackEvent } from "@/utils/analytics";
+import { loadLevelConfig, resolveLevelProgress, type LevelConfigEntry } from "@/utils/levelConfig";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
 const KNOWLEDGE_GAIN_SOUND_SRC = "/knowledge-point.mp3"; 
 const LEVEL_UP_SOUND_SRC = "/player-level-up.mp3";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = getApiBaseUrl();
 const QUIZ_COST = 50;
-const KNOWLEDGE_POINTS_PER_LEVEL = 1000;
 const REWARD_ANIMATION_SPEED_FACTOR = 0.49; // another 30% faster (0.7 * 0.7)
 
 const fasterMs = (ms: number) =>
@@ -226,6 +227,24 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     updateSize();
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadLevelConfig()
+      .then((levels) => {
+        if (!isMounted) return;
+        setLevelConfig(levels);
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        console.error("Failed to load level config in quiz results:", error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
   
   // 📝 MODIFIED EFFECT: Start fetching the next category ID early/in background
@@ -521,6 +540,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
   const [ratingMessage, setRatingMessage] = useState<string | null>(null);
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
+  const [levelConfig, setLevelConfig] = useState<LevelConfigEntry[] | null>(null);
 
   // 📝 MODIFIED: handleNextQuiz function uses nextCategoryId state or fetches it directly.
   const handleNextQuiz = async () => {
@@ -621,11 +641,13 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
   const performanceData = useMemo(() => getPerformanceData(percentage), [percentage]);
   const displayedTotalXP = Math.max(0, animatedTotalXP);
-  const levelProgressPoints = displayedTotalXP % KNOWLEDGE_POINTS_PER_LEVEL;
-  const levelProgressPercent = Math.min(
-    100,
-    (levelProgressPoints / KNOWLEDGE_POINTS_PER_LEVEL) * 100
-  );
+  const levelProgress = levelConfig ? resolveLevelProgress(displayedTotalXP, levelConfig) : null;
+  const levelProgressPoints = levelProgress?.progressIntoLevel ?? 0;
+  const levelProgressTarget = levelProgress?.progressToNextLevel ?? 0;
+  const nextLevelLabel = levelProgress?.nextLevel ?? (currentLevel + 1);
+  const levelProgressPercent = levelProgressTarget > 0
+    ? Math.min(100, (levelProgressPoints / levelProgressTarget) * 100)
+    : 100;
   
   if (!mounted) {
     return null;
@@ -866,10 +888,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                     Level {currentLevel}
                   </span>
                   <span className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-10 text-[10px] sm:text-xs font-extrabold uppercase tracking-[0.08em] text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
-                    Level {currentLevel + 1}
+                    Level {nextLevelLabel}
                   </span>
                   <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] sm:text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
-                    {levelProgressPoints}/{KNOWLEDGE_POINTS_PER_LEVEL} KP
+                    {levelProgressPoints}/{levelProgressTarget || levelProgressPoints} KP
                   </span>
                 </div>
               </Card>

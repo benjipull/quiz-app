@@ -22,7 +22,7 @@ router.get("/", authenticateToken, async (req, res) => {
     const userInterests = user.interests || [];
 
     // Keep this aligned with startQuiz.
-    const minDifficulty = Math.max(1, userLevel - 1);
+    const minDifficulty = Math.max(1, userLevel);
     const maxDifficulty = Math.min(10, userLevel + 2);
 
     console.log(`User level: ${userLevel}, difficulties ${minDifficulty}-${maxDifficulty}`);

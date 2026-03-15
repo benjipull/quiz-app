@@ -1,7 +1,8 @@
 // UserContext.tsx
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = getApiBaseUrl();
 
 interface UserDetails {
   _id: string;

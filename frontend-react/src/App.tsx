@@ -22,9 +22,10 @@ import NotFound from "./pages/NotFound";
 import About from "./pages/About";
 import Claim from "./components/dummy";
 import SplashScreen from "./components/SplashScreen";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
 const queryClient = new QueryClient();
-const BASE_URL = import.meta.env.VITE_BASE_URL || window.location.origin;
+const BASE_URL = getApiBaseUrl();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);

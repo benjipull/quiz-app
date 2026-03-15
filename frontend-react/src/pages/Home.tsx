@@ -14,9 +14,11 @@ import {
 } from "@/components/ui/dialog";
 import { trackHomeScreen } from "@/utils/analytics";
 import { trackEvent } from "@/utils/analytics";
+import { trackFirstSessionInteraction } from "@/utils/analytics";
 import { setGAUser } from "@/utils/gaClient";
 import {
   AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import logo from "../assets/images/QuizicleLogo.png";
 import SplashScreen from "../components/SplashScreen";
@@ -24,6 +26,8 @@ import GameStatsHeader from "../components/GameStatsHeader";
 import { useToast } from "@/hooks/use-toast";
 import DailyCoinClaim from "@/components/DailyCoinClaim";
 import { useUser } from "@/contexts/UserContext";
+import { loadLevelConfig, resolveLevelProgress, type LevelConfigEntry } from "@/utils/levelConfig";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
 const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
   eager: true,
@@ -31,10 +35,9 @@ const avatarImages = import.meta.glob("../assets/images/avatars/*.png", {
 });
 const avatars: string[] = Object.values(avatarImages) as string[];
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = getApiBaseUrl();
 const QUIZ_COST = 50;
 const API_TIMEOUT = 15000; // 15 second timeout for API calls
-const KNOWLEDGE_POINTS_PER_LEVEL = 1000;
 
 interface CategoryToPlayResponse {
   message: string;
@@ -86,6 +89,11 @@ const fetchWithTimeout = async (url: string, options: RequestInit, timeout = API
 export default function Home() {
   const { user, loading: userLoading, refreshUser, updateUserLocally, updateCoins, markUserStale } = useUser();
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
+  const [refreshCategoryLoading, setRefreshCategoryLoading] = useState(false);
+  const [nextCategoryPreview, setNextCategoryPreview] = useState<CategoryToPlayResponse | null>(null);
+  const [levelConfig, setLevelConfig] = useState<LevelConfigEntry[] | null>(null);
+  const [levelConfigError, setLevelConfigError] = useState<string | null>(null);
+  const [hasCategoryBootstrapCompleted, setHasCategoryBootstrapCompleted] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [editAlias, setEditAlias] = useState("");
@@ -100,6 +108,8 @@ export default function Home() {
     data: CategoryToPlayResponse | null;
     timestamp: number;
   }>({ data: null, timestamp: 0 });
+  const categoryPrefetchPromiseRef = useRef<Promise<CategoryToPlayResponse | null> | null>(null);
+  const categoryBootstrapUserIdRef = useRef<string | null>(null);
 
   const hasInitializedRef = useRef(false);
   const hasDeductedRef = useRef(false);
@@ -209,24 +219,65 @@ export default function Home() {
     trackHomeScreenIfNeeded(user?._id || storedUserId);
   }, [user?._id, storedUserId]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    loadLevelConfig()
+      .then((levels) => {
+        if (!isMounted) return;
+        setLevelConfig(levels);
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setLevelConfigError((error as Error).message);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // ✅ Fetch category on-demand (with component-level cache)
-  const fetchCategoryToPlay = async (): Promise<CategoryToPlayResponse | null> => {
+  const fetchCategoryToPlay = async (
+    options?: { force?: boolean; excludeCategoryId?: string }
+  ): Promise<CategoryToPlayResponse | null> => {
     const now = Date.now();
     const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache
+    const force = options?.force === true;
+    const excludeCategoryId = options?.excludeCategoryId;
+
+    const buildCategoryToPlayUrl = (endpoint: string) => {
+      if (!excludeCategoryId) return endpoint;
+      return `${endpoint}?exclude=${encodeURIComponent(excludeCategoryId)}`;
+    };
     
     // Check cache first
-    if (categoryCache.current.data && (now - categoryCache.current.timestamp) < CACHE_DURATION) {
+    if (
+      !force &&
+      categoryCache.current.data &&
+      (now - categoryCache.current.timestamp) < CACHE_DURATION &&
+      categoryCache.current.data.categoryId !== excludeCategoryId
+    ) {
       console.log("⚡ Using cached category");
+      setNextCategoryPreview(categoryCache.current.data);
       return categoryCache.current.data;
     }
 
     try {
       console.log("🌐 Fetching next category from API...");
-      const response = await fetchWithTimeout(
-        `${BASE_URL}/api/getGetegoryToPlay`,
+      let response = await fetchWithTimeout(
+        buildCategoryToPlayUrl(`${BASE_URL}/api/getCategoryToPlay`),
         { method: "GET" },
         API_TIMEOUT
       );
+
+      if (response.status === 404) {
+        response = await fetchWithTimeout(
+          buildCategoryToPlayUrl(`${BASE_URL}/api/getGetegoryToPlay`),
+          { method: "GET" },
+          API_TIMEOUT
+        );
+      }
 
       if (response && response.ok) {
         const data: CategoryToPlayResponse = await response.json();
@@ -237,6 +288,7 @@ export default function Home() {
             timestamp: now
           };
           console.log("✅ Category fetched and cached:", data.categoryId);
+          setNextCategoryPreview(data);
           return data;
         }
       } else {
@@ -255,9 +307,46 @@ export default function Home() {
     return null;
   };
 
+  useEffect(() => {
+    if (!userToken || userLoading || !user) return;
+
+    if (categoryBootstrapUserIdRef.current !== user._id) {
+      categoryBootstrapUserIdRef.current = user._id;
+      setHasCategoryBootstrapCompleted(false);
+      categoryCache.current = { data: null, timestamp: 0 };
+      setNextCategoryPreview(null);
+    }
+
+    if (categoryCache.current.data) {
+      setNextCategoryPreview(categoryCache.current.data);
+      setHasCategoryBootstrapCompleted(true);
+      return;
+    }
+
+    if (!categoryPrefetchPromiseRef.current) {
+      categoryPrefetchPromiseRef.current = fetchCategoryToPlay().finally(() => {
+        categoryPrefetchPromiseRef.current = null;
+      });
+    }
+
+    categoryPrefetchPromiseRef.current
+      .catch((error) => {
+        console.warn("Category prefetch on home load failed:", (error as Error).message);
+      })
+      .finally(() => {
+        setHasCategoryBootstrapCompleted(true);
+      });
+  }, [userToken, userLoading, user?._id]);
+
   const handleQuickQuiz = async () => {
     const resolvedUserId = user?._id || storedUserId;
     trackHomeScreenIfNeeded(resolvedUserId);
+    trackFirstSessionInteraction({
+      user_id: resolvedUserId,
+      event_label: "Play Now",
+      location: "home",
+      cta: "play_quiz",
+    });
     trackEvent("home_cta_click", { user_id: resolvedUserId, cta: "play_quiz" });
 
     if (!userToken) {
@@ -283,8 +372,17 @@ export default function Home() {
     setPlayButtonLoading(true);
 
     try {
-      // Fetch category when needed
-      const category = await fetchCategoryToPlay();
+      // Reuse the value loaded for the home screen first.
+      const cachedCategory = categoryCache.current.data || nextCategoryPreview;
+      if (!categoryPrefetchPromiseRef.current) {
+        categoryPrefetchPromiseRef.current = fetchCategoryToPlay().finally(() => {
+          categoryPrefetchPromiseRef.current = null;
+        });
+      }
+
+      const category = cachedCategory?.categoryId
+        ? cachedCategory
+        : await categoryPrefetchPromiseRef.current;
       
       if (!category || !category.categoryId) {
         // Restore coins on failure
@@ -329,6 +427,51 @@ export default function Home() {
       });
     } finally {
       setPlayButtonLoading(false);
+    }
+  };
+
+  const handleRefreshCategory = async () => {
+    if (!userToken || refreshCategoryLoading || playButtonLoading) return;
+
+    const resolvedUserId = user?._id || storedUserId;
+    trackFirstSessionInteraction({
+      user_id: resolvedUserId,
+      event_label: "Refresh Category",
+      location: "home",
+      cta: "refresh_category",
+    });
+    trackEvent("home_cta_click", { user_id: resolvedUserId, cta: "refresh_category" });
+
+    setRefreshCategoryLoading(true);
+    try {
+      const refreshedCategory = await fetchCategoryToPlay({
+        force: true,
+        excludeCategoryId: nextCategoryPreview?.categoryId,
+      });
+
+      if (!refreshedCategory?.categoryId) {
+        toast({
+          title: "No Category Found",
+          description: "Could not load another category right now. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (refreshedCategory.categoryId === nextCategoryPreview?.categoryId) {
+        toast({
+          title: "No New Category",
+          description: "No alternate category is currently available.",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to refresh category: ${(error as Error).message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setRefreshCategoryLoading(false);
     }
   };
 
@@ -405,8 +548,32 @@ export default function Home() {
     }
   };
 
-  if (showSplash || userLoading) {
-    return <SplashScreen dataLoaded={!userLoading} />;
+  const isLevelConfigLoading = !levelConfig && !levelConfigError;
+  const isHomeDataLoading =
+    userLoading ||
+    isLevelConfigLoading ||
+    (!!userToken && !!user && !hasCategoryBootstrapCompleted);
+
+  if (showSplash || isHomeDataLoading) {
+    return <SplashScreen dataLoaded={!showSplash && !isHomeDataLoading} />;
+  }
+
+  if (levelConfigError) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{
+          background: `radial-gradient(circle at center, #2a0a3b 0%, #180524 55%, #0e0316 100%)`,
+        }}
+      >
+        <div className="flex flex-col items-center gap-4 text-center px-4">
+          <AlertTriangle className="w-16 h-16 text-yellow-500" />
+          <p className="text-white text-lg">Unable to load level configuration</p>
+          <p className="text-white/80 text-sm max-w-md">{levelConfigError}</p>
+          <Button onClick={() => window.location.reload()}>Reload Page</Button>
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
@@ -428,9 +595,15 @@ export default function Home() {
   const alias = user.alias || "Guest";
   const avatarImage = userAvatar || undefined;
   const knowledgePoints = Math.max(0, user.knowledgePoints ?? 0);
-  const userLevel = Math.floor(knowledgePoints / KNOWLEDGE_POINTS_PER_LEVEL) + 1;
-  const levelProgressPoints = knowledgePoints % KNOWLEDGE_POINTS_PER_LEVEL;
-  const levelProgressPercent = (levelProgressPoints / KNOWLEDGE_POINTS_PER_LEVEL) * 100;
+  const levelProgress = levelConfig ? resolveLevelProgress(knowledgePoints, levelConfig) : null;
+  const userLevel = levelProgress?.currentLevel ?? Math.max(1, Number(user.level ?? 1));
+  const nextLevel = levelProgress?.nextLevel ?? userLevel;
+  const levelProgressPoints = levelProgress?.progressIntoLevel ?? 0;
+  const levelProgressTarget = levelProgress?.progressToNextLevel ?? 0;
+  const remainingKpToNextLevel = levelProgress?.remainingKpToNextLevel ?? 0;
+  const levelProgressPercent = levelProgressTarget > 0
+    ? (levelProgressPoints / levelProgressTarget) * 100
+    : 100;
   const isShortPhone = isSmallScreen && viewportHeight < 780;
   const avatarSizeClass = `${
     isShortPhone
@@ -456,7 +629,7 @@ export default function Home() {
       {!isSmallScreen && <Header logoAsTitle imageSrc={logo} showNotifications />}
 
       <div className={`flex-1 flex flex-col px-4 lg:px-8 w-full max-w-4xl mx-auto ${isSmallScreen ? "min-h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] pt-2" : "min-h-0 pt-3 pb-4"}`}>
-        <div className={`space-y-2 flex-shrink-0 ${isSmallScreen ? 'pt-1' : 'pt-2'} w-full`}>
+        <div className={`space-y-[28px] flex-shrink-0 ${isSmallScreen ? 'pt-1' : 'pt-2'} w-full`}>
           <GameStatsHeader
             userToken={userToken}
             isParentLoading={false}
@@ -471,6 +644,7 @@ export default function Home() {
             onCoinsEarned={refreshUser}
             isClaimAvailable={user.dailyClaimAvailable ?? false} 
             updateUserLocally={updateUserLocally}
+            lastDailyCoinClaim={user.lastDailyCoinClaim ?? null}
           />
         </div>
 
@@ -553,12 +727,15 @@ export default function Home() {
                       Level {userLevel}
                     </span>
                     <span className="absolute right-2 sm:right-2.5 top-1/2 -translate-y-1/2 z-10 text-[10px] sm:text-xs font-extrabold uppercase tracking-[0.08em] text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
-                      Level {userLevel + 1}
+                      Level {nextLevel}
                     </span>
                     <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] sm:text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
-                      {levelProgressPoints}/{KNOWLEDGE_POINTS_PER_LEVEL} KP
+                      {levelProgressPoints}/{levelProgressTarget || levelProgressPoints} KP
                     </span>
                   </div>
+                  <p className="mt-1.5 text-center text-[11px] sm:text-sm font-semibold text-[#D8FFBD] drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                    {remainingKpToNextLevel}KP left to Level {nextLevel}
+                  </p>
                 </div>
               </div>
             </div>
@@ -570,7 +747,7 @@ export default function Home() {
             variant="default"
             onClick={handleQuickQuiz}
             disabled={playButtonLoading || currentCoins < QUIZ_COST}
-            className={`relative w-full overflow-hidden px-3 sm:px-4 py-0 ${isSmallScreen ? 'h-[4.5rem]' : 'h-[5.4rem] sm:h-[5.4rem]'}`}
+            className={`relative w-full overflow-hidden px-3 sm:px-4 py-0 ${isSmallScreen ? 'h-[4.5rem]' : 'h-[5.4rem] sm:h-[5.4rem]'} ${!playButtonLoading && currentCoins >= QUIZ_COST ? "home-play-glow-pulse" : ""}`}
             style={{
               borderRadius: isSmallScreen ? "22px" : "28px",
               border: "2px solid #B2F574",
@@ -613,7 +790,7 @@ export default function Home() {
                   </span>
                   <div className="pl-16 sm:pl-20 md:pl-24 flex items-center gap-2.5 sm:gap-3">
                     <span className="text-lg sm:text-2xl md:text-3xl font-bold text-white leading-none whitespace-nowrap flex items-center gap-1.5 sm:gap-2 drop-shadow-[0_2px_0_rgba(0,0,0,0.35)]">
-                      Start Quiz
+                      Play Now
                     </span>
 
                     <span
@@ -671,6 +848,33 @@ export default function Home() {
             )}
           </Button>
 
+          {nextCategoryPreview?.name && (
+            <div className="w-full flex items-center justify-center">
+              <div className="inline-flex items-center gap-2 sm:gap-3">
+                <p className="text-center">
+                <span className="text-yellow-400 text-lg sm:text-2xl font-bold tracking-wide">
+                  {nextCategoryPreview.name}
+                </span>
+                {/* Legacy preview text intentionally hidden */}
+                {/*
+                {nextCategoryPreview.name} - 5 Questions - ¬60 Seconds
+                */}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleRefreshCategory}
+                  disabled={refreshCategoryLoading || playButtonLoading}
+                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border-yellow-400/70 bg-black/20 text-yellow-400 hover:bg-yellow-400/15 hover:text-yellow-300"
+                  aria-label="Refresh category"
+                >
+                  <RefreshCw className={`h-4 w-4 ${refreshCategoryLoading ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
+            </div>
+          )}
+
           {currentCoins < QUIZ_COST && (
             <p className="text-red-400 text-sm text-center font-medium">
               Not enough coins to start a quiz.
@@ -678,6 +882,24 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      <style>{`
+        @keyframes home-play-glow-pulse {
+          0%, 80%, 100% {
+            box-shadow: 0 10px 20px rgba(15,102,28,0.22);
+          }
+          90% {
+            box-shadow:
+              0 10px 20px rgba(15,102,28,0.22),
+              0 0 18px rgba(178,245,116,0.58),
+              0 0 32px rgba(178,245,116,0.36);
+          }
+        }
+
+        .home-play-glow-pulse {
+          animation: home-play-glow-pulse 4s ease-in-out infinite;
+        }
+      `}</style>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-md bg-card/95 backdrop-blur-sm border-border/70">

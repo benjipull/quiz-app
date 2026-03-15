@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
 interface AddCategoryProps {
   fetchCategories?: () => void;
@@ -27,7 +28,7 @@ const AddCategory: React.FC<AddCategoryProps> = ({
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState<Notification | null>(null);
 
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const BASE_URL = getApiBaseUrl();
 
   const showNotification = (message: string, type: "success" | "error") => {
     setNotification({ message, type });

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/contexts/UserContext";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL || window.location.origin;
+const BASE_URL = getApiBaseUrl();
 const DELETE_CONFIRM_TEXT = "DELETE";
 
 const DeleteAccount = () => {

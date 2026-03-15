@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const { getLevelForKnowledgePoints } = require("../config/levelConfig");
 
 const UserSchema = new mongoose.Schema({
   alias: { type: String, required: true, unique: true, trim: true },
@@ -15,7 +16,7 @@ const UserSchema = new mongoose.Schema({
   enlightenmentCrystals: { type: Number, required: true, default: 0 },
   // Default coins for a new player is 1000
   coins: { type: Number, required: true, default: 1000 },
-  level: { type: Number, required: true, default: 1 },
+  level: { type: Number, required: true, default: () => getLevelForKnowledgePoints(0) },
 
   // 🏷️ New: Player interests
   interests: [
@@ -65,8 +66,7 @@ UserSchema.pre("save", async function (next) {
 
 // 📊 Level calculation
 UserSchema.methods.calculateLevel = function () {
-  // Start at level 1, +1 for each 1000 knowledge points
-  return Math.floor(this.knowledgePoints / 1000) + 1;
+  return getLevelForKnowledgePoints(this.knowledgePoints);
 };
 
 module.exports = mongoose.model("User", UserSchema);

@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { apiClient } from '@/utils/apiClient';
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+const BASE_URL = getApiBaseUrl();
 const PERIODS = ['day', 'week', 'month', 'year'];
 
 // Global cache shared across all components
