@@ -55,7 +55,7 @@ router.post("/", authenticateToken, async (req, res) => {
     }
 
     const userLevel = user.level || 1;
-    const minDifficulty = Math.max(1, userLevel - 1);
+    const minDifficulty = Math.max(1, userLevel);
     const maxDifficulty = Math.min(10, userLevel + 2);
 
     // 2) Strict fetch in the level window first

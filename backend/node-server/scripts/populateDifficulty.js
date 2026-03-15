@@ -84,6 +84,47 @@ function parseModelJson(raw) {
   }
 }
 
+function salvageDifficultyFromMalformedJson(raw) {
+  const cleaned = String(raw || "")
+    .trim()
+    .replace(/```(\w+)?/g, "")
+    .replace(/\u201C|\u201D/g, "\"")
+    .replace(/\u2018|\u2019/g, "'");
+
+  const levelMatch = cleaned.match(/["']?difficulty_level["']?\s*:\s*(-?\d+(?:\.\d+)?)/i);
+  if (!levelMatch) {
+    return null;
+  }
+
+  const parsedLevel = Number(levelMatch[1]);
+  if (!Number.isFinite(parsedLevel)) {
+    return null;
+  }
+
+  let rationale = "";
+  const fullRationaleMatch = cleaned.match(/["']?difficulty_rationale["']?\s*:\s*"([^"]*)"/i);
+  if (fullRationaleMatch && fullRationaleMatch[1]) {
+    rationale = fullRationaleMatch[1].trim();
+  } else {
+    const partialRationaleMatch = cleaned.match(/["']?difficulty_rationale["']?\s*:\s*"([\s\S]*)$/i);
+    if (partialRationaleMatch && partialRationaleMatch[1]) {
+      rationale = partialRationaleMatch[1]
+        .replace(/[\r\n]+/g, " ")
+        .replace(/[}\],\s]+$/g, "")
+        .trim();
+    }
+  }
+
+  if (!rationale) {
+    rationale = "Recovered from malformed model response.";
+  }
+
+  return {
+    difficulty_level: parsedLevel,
+    difficulty_rationale: rationale,
+  };
+}
+
 async function populateDifficulty(categoryId, questionId) {
   try {
     assertSetup();
@@ -167,30 +208,34 @@ Respond in strict JSON:
     );
 
     let parsed;
+    const rawModelResponse = String(response?.data?.response || "").trim();
     try {
-      parsed = parseModelJson(response?.data?.response);
+      parsed = parseModelJson(rawModelResponse);
     } catch {
-      const raw = String(response?.data?.response || "").trim();
-      console.error(`Failed to parse JSON for ${questionId}: ${raw}`);
-      return false;
+      const salvaged = salvageDifficultyFromMalformedJson(rawModelResponse);
+      if (!salvaged) {
+        console.error(`Failed to parse JSON for ${questionId}: ${rawModelResponse}`);
+        return false;
+      }
+
+      parsed = salvaged;
+      console.warn(`Recovered malformed JSON for ${questionId}; applying salvaged difficulty.`);
     }
 
-    if (
-      typeof parsed.difficulty_level !== "number" ||
-      !parsed.difficulty_rationale
-    ) {
+    if (typeof parsed.difficulty_level !== "number" || Number.isNaN(parsed.difficulty_level)) {
       console.error(`Invalid model response for ${questionId}`);
       return false;
     }
 
     const difficultyLevel = Math.max(1, Math.min(10, Math.round(parsed.difficulty_level)));
+    const difficultyRationale = String(parsed.difficulty_rationale || "Recovered from malformed model response.").trim();
 
     await Category.updateOne(
       { _id: categoryId, "questions._id": questionId },
       {
         $set: {
           "questions.$.difficulty_level": difficultyLevel,
-          "questions.$.difficulty_rationale": String(parsed.difficulty_rationale),
+          "questions.$.difficulty_rationale": difficultyRationale,
           "questions.$.difficultyConfirmedVersion": DIFFICULTY_VERSION,
         },
       }
