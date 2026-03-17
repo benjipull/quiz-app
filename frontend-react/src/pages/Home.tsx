@@ -41,8 +41,6 @@ interface CategoryToPlayResponse {
   message: string;
   categoryId: string;
   name: string;
-  averageRating: number;
-  questionsCount: number;
 }
 
 const authenticatedFetch = async (url: string, options: RequestInit) => {
