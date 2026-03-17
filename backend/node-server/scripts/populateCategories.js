@@ -1,19 +1,29 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
 const crypto = require("crypto");
-const axios = require("axios");
 const Category = require("../models/categoryModel");
+const {
+  OLLAMA_URL,
+  assertOllamaSetup,
+  callOllama,
+  getOllamaResponseText,
+} = require("../services/ollamaClient");
 
 const { buildQuestionPrompt } = require("./prompts/questionPrompt");
 //const { processSingleQuestion } = require("./validateDuplicateQuestions");
 
 
 // ==== GLOBAL CONFIG ====
-const OLLAMA_URL = process.env.OLLAMA_URL;
 const avoidedQuestions = [];
+const avoidedQuestionSet = new Set();
+const MAX_AVOIDED_QUESTIONS = Number(process.env.POPULATE_MAX_AVOIDED_QUESTIONS || 120);
+const MAX_CONSECUTIVE_NO_ADD = Number(process.env.POPULATE_MAX_CONSECUTIVE_NO_ADD || 5);
+const MAX_SAME_DUPLICATE_STREAK = Number(process.env.POPULATE_MAX_SAME_DUPLICATE_STREAK || 3);
 
-if (!OLLAMA_URL) {
-  console.error("❌ OLLAMA_URL is not set! Please set it in your environment variables.");
+try {
+  assertOllamaSetup();
+} catch (error) {
+  console.error(`❌ ${error.message}`);
   process.exit(1);
 }
 
@@ -27,11 +37,28 @@ function generateQuestionHash(text) {
 
 function buildAvoidSection() {
   if (avoidedQuestions.length === 0) return "";
-  return `Do NOT generate any of these questions (nor semantically similar ones):\n${avoidedQuestions.map(q => `- ${q}`).join("\n")}\n\n`;
+  return `Do NOT generate any of these questions (nor semantically similar ones).
+Use a different fact/subtopic from all items below:
+${avoidedQuestions.map(q => `- ${q}`).join("\n")}\n\n`;
 }
 
 function buildDifficultySection(hint) {
   return hint ? `\nDifficulty requested: ${hint}. Generate the question at this difficulty.\n` : "";
+}
+
+function rememberAvoidedQuestion(text) {
+  const trimmed = String(text || "").trim();
+  if (!trimmed || avoidedQuestionSet.has(trimmed)) return;
+
+  avoidedQuestions.push(trimmed);
+  avoidedQuestionSet.add(trimmed);
+
+  while (avoidedQuestions.length > MAX_AVOIDED_QUESTIONS) {
+    const removed = avoidedQuestions.shift();
+    if (removed) {
+      avoidedQuestionSet.delete(removed);
+    }
+  }
 }
 
 function normalizeQuestion(raw) {
@@ -106,33 +133,17 @@ function parseOllamaResponse(rawResponse) {
 
 async function queryOllama(prompt) {
   try {
-    const res = await axios.post(
-      OLLAMA_URL,
-      {
-        model: "qwen3:8b",
-        format: "json",
-        prompt,
-        stream: false,
-        options: {
-          num_ctx: 4096,
-          num_keep: 200,
-          temperature: 0.25,
-          top_p: 0.9,
-          top_k: 40,
-          min_p: 0.1,
-          repeat_penalty: 1.1,
-          repeat_last_n: 128,
-          num_predict: 512
-        }
-      },
-      { timeout: 240_000 }
-    );
+    const response = await callOllama({
+      prompt,
+      presetName: "populateCategories",
+    });
 
-    if (!res.data || !res.data.response) {
-      throw new Error("❌ Ollama response missing 'response' field.");
+    const responseText = getOllamaResponseText(response);
+    if (!responseText) {
+      throw new Error("❌ Ollama response missing parsable text payload.");
     }
 
-    const parsed = parseOllamaResponse(String(res.data.response).trim());
+    const parsed = parseOllamaResponse(responseText);
     return normalizeQuestion(parsed);
 
   } catch (error) {
@@ -194,13 +205,13 @@ async function populateCategory(categoryId, difficultyHint) {
     const category = await Category.findById(categoryId);
     if (!category) {
       console.error(`❌ Category not found: ${categoryId}`);
-      return;
+      return { addedCount: 0, duplicateQuestion: null };
     }
 
     const activeQuestions = category.questions.filter(q => !q.disabled).length;
     if (activeQuestions >= 100) {
       console.log(`🚫 Skipping ${category.name} (already has ${activeQuestions} questions).`);
-      return;
+      return { addedCount: 0, duplicateQuestion: null };
     }
 
     console.log(`🔹 ${category.name}: ${activeQuestions} questions. Fetching a ${difficultyHint} one.`);
@@ -209,20 +220,30 @@ async function populateCategory(categoryId, difficultyHint) {
     const fetchedQuestions = await fetchQuestions(category.name, difficultyHint);
     if (!fetchedQuestions?.length) {
       console.log("⚠️ No question returned from Ollama.");
-      return;
+      return { addedCount: 0, duplicateQuestion: null };
     }
 
     // 🧠 Step 2: Add them to category object
     const addedCount = await addQuestionsToCategory(category, fetchedQuestions);
     if (addedCount === 0) {
       console.log("⚠️ No new question added (duplicate hash skipped).");
-      return;
+      const generatedQuestion = String(fetchedQuestions[0]?.question || "").trim();
+      const generatedHash = generatedQuestion ? generateQuestionHash(generatedQuestion) : null;
+      const isDuplicate = generatedHash
+        ? category.questions.some((x) => x.hash === generatedHash)
+        : false;
+
+      return {
+        addedCount: 0,
+        duplicateQuestion: isDuplicate ? generatedQuestion : null,
+      };
     }
 
     // 🧠 Step 3: Save the updated category to MongoDB
     category.disabled = false;
     await category.save();
     console.log(`✅ Added ${addedCount} question(s) to ${category.name}.`);
+    return { addedCount, duplicateQuestion: null };
 
     /*
     // 🧠 Step 4: Re-fetch category to ensure IDs are present
@@ -239,6 +260,7 @@ async function populateCategory(categoryId, difficultyHint) {
 
   } catch (error) {
     console.error("❌ Error populating category:", error.message);
+    return { addedCount: 0, duplicateQuestion: null };
   }
 }
 
@@ -254,7 +276,7 @@ async function addQuestionsToCategory(category, questions) {
     }
 
     const hash = generateQuestionHash(q.question);
-    avoidedQuestions.push(q.question);
+    rememberAvoidedQuestion(q.question);
 
     if (category.questions.some(x => x.hash === hash)) {
       console.log(`⚠️ Duplicate skipped: ${q.question}`);
@@ -278,7 +300,7 @@ async function addQuestionsToCategory(category, questions) {
       timesAnsweredCorrectly: 0,
       timesAnsweredIncorrectly: 0,
       hash,
-      version: 2.00
+      version: 3.10
     });
 
     added++;
@@ -308,13 +330,60 @@ async function checkQuestionInSameCategory(category, newQuestion) {
 
 
 async function populateCategoryLoop(categoryId, iterations, difficultyHint) {
+  let totalAdded = 0;
+  let consecutiveNoAdd = 0;
+  let sameDuplicateStreak = 0;
+  let lastDuplicateHash = null;
+
   try {
     for (let i = 0; i < iterations; i++) {
       console.log(`\n🔄 Iteration ${i + 1}/${iterations} for category ${categoryId}`);
-      await populateCategory(categoryId, difficultyHint);
+      const result = await populateCategory(categoryId, difficultyHint);
+      const added = Number(result?.addedCount || 0);
+      totalAdded += added;
+
+      if (added > 0) {
+        consecutiveNoAdd = 0;
+        sameDuplicateStreak = 0;
+        lastDuplicateHash = null;
+        continue;
+      }
+
+      consecutiveNoAdd++;
+      const duplicateQuestion = String(result?.duplicateQuestion || "").trim();
+
+      if (duplicateQuestion) {
+        const duplicateHash = generateQuestionHash(duplicateQuestion);
+        if (duplicateHash === lastDuplicateHash) {
+          sameDuplicateStreak++;
+        } else {
+          sameDuplicateStreak = 1;
+          lastDuplicateHash = duplicateHash;
+        }
+
+        if (sameDuplicateStreak >= MAX_SAME_DUPLICATE_STREAK) {
+          console.log(
+            `🛑 Stopping early: same duplicate generated ${sameDuplicateStreak} times in a row: "${duplicateQuestion}"`
+          );
+          break;
+        }
+      } else {
+        sameDuplicateStreak = 0;
+        lastDuplicateHash = null;
+      }
+
+      if (consecutiveNoAdd >= MAX_CONSECUTIVE_NO_ADD) {
+        console.log(
+          `🛑 Stopping early: no new question added for ${consecutiveNoAdd} consecutive iterations.`
+        );
+        break;
+      }
     }
+
+    return totalAdded;
   } finally {
     avoidedQuestions.length = 0;
+    avoidedQuestionSet.clear();
     console.log("🧹 Cleared avoided questions list after loop.");
   }
 }

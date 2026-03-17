@@ -2,18 +2,19 @@ const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 
 const mongoose = require("mongoose");
-const axios = require("axios");
 
 const connectDB = require("../config/db");
 const Category = require("../models/categoryModel");
+const {
+  assertOllamaSetup,
+  callOllama,
+  getOllamaResponseText,
+} = require("../services/ollamaClient");
 
-const OLLAMA_URL = process.env.OLLAMA_URL;
 const DIFFICULTY_VERSION = 0.01;
 
 function assertSetup() {
-  if (!OLLAMA_URL) {
-    throw new Error("Missing OLLAMA_URL in backend/node-server/.env");
-  }
+  assertOllamaSetup();
 }
 
 function extractFirstJsonObject(text) {
@@ -186,29 +187,13 @@ Respond in strict JSON:
   "difficulty_rationale": "<string explaining reasoning>"
 }`.trim();
 
-    const response = await axios.post(
-      OLLAMA_URL,
-      {
-        model: "qwen3:8b",
-        format: "json",
-        prompt,
-        stream: false,
-        options: {
-          num_ctx: 2048,
-          num_keep: 100,
-          temperature: 0.0,
-          top_p: 0.9,
-          top_k: 30,
-          repeat_penalty: 1.1,
-          repeat_last_n: 32,
-          num_predict: 120,
-        },
-      },
-      { timeout: 180000 }
-    );
+    const response = await callOllama({
+      prompt,
+      presetName: "populateDifficulty",
+    });
 
     let parsed;
-    const rawModelResponse = String(response?.data?.response || "").trim();
+    const rawModelResponse = getOllamaResponseText(response);
     try {
       parsed = parseModelJson(rawModelResponse);
     } catch {

@@ -1,14 +1,18 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
-const axios = require("axios");
 
 const Category = require("../models/categoryModel");
 const Interest = require("../models/interest");
+const {
+  assertOllamaSetup,
+  callOllama,
+  getOllamaResponseText,
+} = require("../services/ollamaClient");
 
-const OLLAMA_URL = process.env.OLLAMA_URL;
-
-if (!OLLAMA_URL) {
-  console.error("❌ Missing OLLAMA_URL in .env");
+try {
+  assertOllamaSetup();
+} catch (error) {
+  console.error(`❌ ${error.message}`);
   process.exit(1);
 }
 
@@ -51,22 +55,12 @@ Respond ONLY in strict JSON:
 
     try {
       // 3️⃣ Query Llama
-      const response = await axios.post(
-        OLLAMA_URL,
-        {
-          model: "qwen3:8b",
-          prompt,
-          stream: false,
-          options: {
-            temperature: 0.2,
-            top_p: 0.9,
-            num_predict: 120
-          }
-        },
-        { timeout: 180_000 }
-      );
+      const response = await callOllama({
+        prompt,
+        presetName: "assignCategoryInterests",
+      });
 
-      const raw = String(response.data.response || "").trim();
+      const raw = getOllamaResponseText(response);
       let parsed;
 
       try {

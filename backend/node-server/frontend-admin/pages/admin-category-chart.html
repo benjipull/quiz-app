@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Category & Difficulty Charts</title>
+  <title>Category Charts</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
@@ -43,20 +43,88 @@
     .back-link:hover {
       text-decoration: underline;
     }
+
+    .view-toggle {
+      max-width: 1000px;
+      margin: 0 auto 0.5rem auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.6rem;
+      color: #cfd8e3;
+      font-size: 0.95rem;
+    }
+
+    .view-toggle select {
+      background: #1f1f1f;
+      color: #fff;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      padding: 0.4rem 0.6rem;
+      font-size: 0.95rem;
+    }
+
+    .legend-context-menu {
+      position: fixed;
+      z-index: 10000;
+      min-width: 180px;
+      background: #181818;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      padding: 0.35rem;
+      text-align: left;
+    }
+
+    .legend-context-menu[hidden] {
+      display: none;
+    }
+
+    .legend-context-menu button {
+      width: 100%;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: #e5e7eb;
+      padding: 0.5rem 0.6rem;
+      text-align: left;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .legend-context-menu button:hover {
+      background: #252525;
+    }
+
+    .legend-context-menu button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
-  <a href="/admin/pages/admin-landing.html" class="back-link">← Back to Admin Home</a>
-  <h1>📊 Questions Overview</h1>
+  <a href="/admin/pages/admin-landing.html" class="back-link"><- Back to Admin Home</a>
+  <h1>Questions Overview</h1>
 
-  <!-- Category Chart -->
+  <div class="view-toggle">
+    <label for="viewModeSelect">View split by</label>
+    <select id="viewModeSelect">
+      <option value="difficulty">Difficulty</option>
+      <option value="version">Question Version</option>
+    </select>
+  </div>
+
   <div class="chart-container">
     <canvas id="categoryChart"></canvas>
   </div>
 
-  <!-- Difficulty Chart -->
   <div class="chart-container">
-    <canvas id="difficultyChart"></canvas>
+    <canvas id="overviewChart"></canvas>
+  </div>
+
+  <div id="legendContextMenu" class="legend-context-menu" hidden>
+    <button id="hideOthersMenuItem" type="button">Hide all others</button>
+    <button id="deleteVersionMenuItem" type="button">Delete this version</button>
   </div>
 
   <script>
@@ -64,277 +132,501 @@
     const userType = (localStorage.getItem("userType") || "").toLowerCase();
     if (!token || userType !== "admin") window.location.href = "/admin/pages/admin-login.html";
 
-    async function loadChart() {
-      try {
-        // --- CATEGORY CHART ---
-        const res = await fetch("/api/admin/categories", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) throw new Error("Failed to fetch categories");
-        const data = await res.json();
+    let categoriesData = [];
+    let difficultyPayload = null;
+    let categoryChart = null;
+    let overviewChart = null;
+    let categoryTooltipEl = null;
+    let currentMode = "difficulty";
+    let legendContext = null;
 
-        const sorted = [...data].sort((a, b) => (b.questionCount || 0) - (a.questionCount || 0));
-        const labels = sorted.map(c => c.name);
-        const difficultyLevels = Array.from(
-          new Set(sorted.flatMap(c => Object.keys(c.difficultyBreakdown || {})))
-        ).sort((a, b) => {
-          const aNum = Number(a);
-          const bNum = Number(b);
-          const aNumeric = Number.isFinite(aNum);
-          const bNumeric = Number.isFinite(bNum);
-          if (aNumeric && bNumeric) return aNum - bNum;
-          if (aNumeric) return -1;
-          if (bNumeric) return 1;
-          return a.localeCompare(b);
-        });
+    function ensureTooltipElement() {
+      if (categoryTooltipEl) return categoryTooltipEl;
 
-        const difficultyLabel = (level) => {
-          if (level === "unknown") return "Unknown";
-          const asNumber = Number(level);
-          if (!Number.isFinite(asNumber)) return `Level ${level}`;
-          if (asNumber === 1) return "Easy (1)";
-          if (asNumber === 2) return "Medium (2)";
-          if (asNumber === 3) return "Hard (3)";
-          return `Level ${asNumber}`;
-        };
+      const tooltip = document.createElement("div");
+      tooltip.style.position = "fixed";
+      tooltip.style.pointerEvents = "none";
+      tooltip.style.zIndex = "9999";
+      tooltip.style.backgroundColor = "#222";
+      tooltip.style.border = "1px solid #5ea6ff";
+      tooltip.style.borderRadius = "8px";
+      tooltip.style.padding = "8px 10px";
+      tooltip.style.color = "#ccc";
+      tooltip.style.font = "12px system-ui, sans-serif";
+      tooltip.style.whiteSpace = "nowrap";
+      tooltip.style.display = "none";
+      document.body.appendChild(tooltip);
+      categoryTooltipEl = tooltip;
+      return tooltip;
+    }
 
-        const difficultyColor = (level, index) => {
-          if (level === "unknown") return "#6b7280";
-          const asNumber = Number(level);
-          if (!Number.isFinite(asNumber)) {
-            const fallback = ["#4f46e5", "#0891b2", "#c2410c", "#0d9488", "#9333ea"];
-            return fallback[index % fallback.length];
-          }
-          const bounded = Math.max(1, Math.min(10, Math.round(asNumber)));
-          const strongScale = {
-            1: "#16a34a",  // green
-            2: "#65a30d",  // lime green
-            3: "#84cc16",  // yellow-green
-            4: "#eab308",  // amber/yellow
-            5: "#f97316",  // strong orange
-            6: "#ea580c",  // deep orange
-            7: "#f43f5e",  // orange-red
-            8: "#ef4444",  // strong red
-            9: "#dc2626",  // deeper red
-            10: "#b91c1c"  // deep/strong red
-          };
-          return strongScale[bounded];
-        };
+    function sortBreakdownKeys(keys) {
+      return [...keys].sort((a, b) => {
+        if (a === "unknown" && b === "unknown") return 0;
+        if (a === "unknown") return 1;
+        if (b === "unknown") return -1;
 
-        const categoryDatasets = difficultyLevels.length
-          ? difficultyLevels.map((level, index) => ({
-              label: difficultyLabel(level),
-              data: sorted.map(c => (c.difficultyBreakdown && c.difficultyBreakdown[level]) || 0),
-              backgroundColor: difficultyColor(level, index),
+        const aNum = Number(a);
+        const bNum = Number(b);
+        const aNumeric = Number.isFinite(aNum);
+        const bNumeric = Number.isFinite(bNum);
+        if (aNumeric && bNumeric) return aNum - bNum;
+        if (aNumeric) return -1;
+        if (bNumeric) return 1;
+        return String(a).localeCompare(String(b));
+      });
+    }
+
+    function formatVersionKey(versionKey) {
+      if (versionKey === "unknown") return "Unknown";
+      const asNumber = Number(versionKey);
+      if (!Number.isFinite(asNumber)) return `Version ${versionKey}`;
+      return `Version ${String(asNumber)}`;
+    }
+
+    function difficultyLabel(level) {
+      const labelsByLevel = difficultyPayload?.labelsByLevel || {};
+      if (labelsByLevel[level]) return labelsByLevel[level];
+      if (level === "unknown") return "Unknown";
+      const asNumber = Number(level);
+      if (!Number.isFinite(asNumber)) return "Unknown";
+      return labelsByLevel[String(asNumber)] || "Unknown";
+    }
+
+    function difficultyColor(level, index) {
+      if (level === "unknown") return "#6b7280";
+      const asNumber = Number(level);
+      if (!Number.isFinite(asNumber)) {
+        const fallback = ["#4f46e5", "#0891b2", "#c2410c", "#0d9488", "#9333ea"];
+        return fallback[index % fallback.length];
+      }
+
+      const bounded = Math.max(1, Math.min(10, Math.round(asNumber)));
+      const strongScale = {
+        1: "#16a34a",
+        2: "#65a30d",
+        3: "#84cc16",
+        4: "#eab308",
+        5: "#f97316",
+        6: "#ea580c",
+        7: "#f43f5e",
+        8: "#ef4444",
+        9: "#dc2626",
+        10: "#b91c1c",
+      };
+      return strongScale[bounded];
+    }
+
+    function versionColor(versionKey, index) {
+      if (versionKey === "unknown") return "#6b7280";
+      const palette = [
+        "#5ea6ff",
+        "#4f46e5",
+        "#0891b2",
+        "#0d9488",
+        "#16a34a",
+        "#65a30d",
+        "#c2410c",
+        "#dc2626",
+        "#9333ea",
+      ];
+      return palette[index % palette.length];
+    }
+
+    function buildCategoryViewData(mode) {
+      const sorted = [...categoriesData].sort((a, b) => (b.questionCount || 0) - (a.questionCount || 0));
+      const labels = sorted.map(c => c.name);
+      const breakdownField = mode === "version" ? "versionBreakdown" : "difficultyBreakdown";
+
+      const keys = sortBreakdownKeys(
+        new Set(sorted.flatMap(c => Object.keys(c[breakdownField] || {})))
+      );
+
+      const datasets = keys.length
+        ? keys.map((key, index) => ({
+            label: mode === "version" ? formatVersionKey(key) : difficultyLabel(key),
+            breakdownKey: key,
+            data: sorted.map(c => (c[breakdownField] && c[breakdownField][key]) || 0),
+            backgroundColor: mode === "version" ? versionColor(key, index) : difficultyColor(key, index),
+            borderRadius: 6,
+            stack: mode,
+          }))
+        : [
+            {
+              label: "Number of Questions",
+              data: sorted.map(c => c.questionCount || 0),
+              backgroundColor: "#5ea6ff",
               borderRadius: 6,
-              stack: "difficulty"
-            }))
-          : [
-              {
-                label: "Number of Questions",
-                data: sorted.map(c => c.questionCount || 0),
-                backgroundColor: "#5ea6ff",
-                borderRadius: 6,
-                stack: "difficulty"
-              }
-            ];
-
-        const categoryCanvas = document.getElementById("categoryChart");
-        const barHeight = 25;
-        categoryCanvas.height = Math.max(400, sorted.length * barHeight);
-        const ctx = categoryCanvas.getContext("2d");
-        const categoryTooltipEl = document.createElement("div");
-        categoryTooltipEl.style.position = "fixed";
-        categoryTooltipEl.style.pointerEvents = "none";
-        categoryTooltipEl.style.zIndex = "9999";
-        categoryTooltipEl.style.backgroundColor = "#222";
-        categoryTooltipEl.style.border = "1px solid #5ea6ff";
-        categoryTooltipEl.style.borderRadius = "8px";
-        categoryTooltipEl.style.padding = "8px 10px";
-        categoryTooltipEl.style.color = "#ccc";
-        categoryTooltipEl.style.font = "12px system-ui, sans-serif";
-        categoryTooltipEl.style.whiteSpace = "nowrap";
-        categoryTooltipEl.style.display = "none";
-        document.body.appendChild(categoryTooltipEl);
-
-        const categoryChart = new Chart(ctx, {
-          type: "bar",
-          data: {
-            labels,
-            datasets: categoryDatasets
-          },
-          options: {
-            indexAxis: "y",
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: {
-              mode: "index",
-              intersect: false
+              stack: mode,
             },
-            plugins: {
-              legend: {
-                display: difficultyLevels.length > 0,
-                labels: { color: "#ccc" }
-              },
-              title: {
-                display: true,
-                text: "Questions per Category by Difficulty",
-                color: "#eee",
-                font: { size: 18 }
-              },
-              tooltip: {
-                enabled: false,
-                backgroundColor: "#222",
-                borderColor: "#5ea6ff",
-                borderWidth: 1,
-                titleColor: "#fff",
-                bodyColor: "#ccc",
-                callbacks: {
-                  footer: (items) => {
-                    const total = items.reduce((sum, item) => sum + (item.raw || 0), 0);
-                    return `Total: ${total}`;
-                  }
-                }
-              }
-            },
-            scales: {
-              x: {
-                ticks: { color: "#aaa", precision: 0 },
-                grid: { color: "#333" },
-                stacked: true
-              },
-              y: {
-                ticks: { color: "#ccc", autoSkip: false },
-                grid: { color: "#222" },
-                stacked: true
-              }
-            }
-          }
-        });
+          ];
 
-        const getCategoryTooltipHtml = (rowIndex) => {
-          const name = labels[rowIndex];
-          const rows = categoryDatasets
-            .map((dataset) => {
-              const value = Number(dataset.data[rowIndex] || 0);
-              return {
-                label: dataset.label,
-                value,
-                color: dataset.backgroundColor,
-              };
-            })
-            .filter((item) => item.value > 0);
+      return { labels, datasets };
+    }
 
-          const total = rows.reduce((sum, item) => sum + item.value, 0);
-          const lines = rows.map((item) =>
-            `<div><span style="display:inline-block;width:8px;height:8px;background:${item.color};border-radius:2px;margin-right:6px;"></span>${item.label}: ${item.value}</div>`
-          );
+    function hideLegendContextMenu() {
+      const menu = document.getElementById("legendContextMenu");
+      menu.hidden = true;
+      legendContext = null;
+    }
 
-          return `<div style="font-weight:700;color:#fff;margin-bottom:4px;">${name}</div>${lines.join("")}<div style="margin-top:4px;border-top:1px solid #444;padding-top:4px;">Total: ${total}</div>`;
+    function showLegendContextMenu(clientX, clientY, contextData) {
+      const menu = document.getElementById("legendContextMenu");
+      const deleteBtn = document.getElementById("deleteVersionMenuItem");
+
+      legendContext = contextData;
+      deleteBtn.disabled = !contextData?.versionKey || contextData.versionKey === "unknown";
+
+      menu.hidden = false;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const menuRect = menu.getBoundingClientRect();
+      const left = Math.min(clientX, viewportWidth - menuRect.width - 8);
+      const top = Math.min(clientY, viewportHeight - menuRect.height - 8);
+      menu.style.left = `${Math.max(8, left)}px`;
+      menu.style.top = `${Math.max(8, top)}px`;
+    }
+
+    function getLegendItemAtPosition(chart, canvasX, canvasY) {
+      const legend = chart?.legend;
+      if (!legend || !Array.isArray(legend.legendHitBoxes)) return null;
+
+      const hitBoxes = legend.legendHitBoxes;
+      const legendItems = legend.legendItems || [];
+
+      for (let i = 0; i < hitBoxes.length; i++) {
+        const box = hitBoxes[i];
+        const item = legendItems[i];
+        if (!box || !item) continue;
+
+        const inX = canvasX >= box.left && canvasX <= box.left + box.width;
+        const inY = canvasY >= box.top && canvasY <= box.top + box.height;
+        if (!inX || !inY) continue;
+
+        const datasetIndex = Number(item.datasetIndex);
+        const dataset = chart.data.datasets?.[datasetIndex];
+        return {
+          datasetIndex,
+          versionKey: dataset?.breakdownKey || null,
+          label: item.text || dataset?.label || "",
         };
+      }
 
-        categoryCanvas.addEventListener("mousemove", (event) => {
-          const rect = categoryCanvas.getBoundingClientRect();
-          const x = event.clientX - rect.left;
-          const y = event.clientY - rect.top;
-          const yScale = categoryChart.scales.y;
-          const chartArea = categoryChart.chartArea;
-          if (!yScale || !chartArea) return;
+      return null;
+    }
 
-          const withinCategoryBand = y >= yScale.top && y <= yScale.bottom;
-          const overBars = x >= chartArea.left && x <= chartArea.right && withinCategoryBand;
-          const overCategoryLabels = x >= 0 && x < chartArea.left && withinCategoryBand;
-          if (!overBars && !overCategoryLabels) {
-            categoryTooltipEl.style.display = "none";
-            return;
-          }
+    function hideAllOtherVersionDatasets(datasetIndex) {
+      if (!categoryChart) return;
 
-          const yValue = yScale.getValueForPixel(y);
-          const dataIndex =
-            typeof yValue === "number"
-              ? Math.round(yValue)
-              : labels.indexOf(yValue);
-          if (dataIndex < 0 || dataIndex >= labels.length) {
-            categoryTooltipEl.style.display = "none";
-            return;
-          }
+      categoryChart.data.datasets.forEach((_, index) => {
+        categoryChart.setDatasetVisibility(index, index === datasetIndex);
+      });
+      categoryChart.update();
+    }
 
-          categoryTooltipEl.innerHTML = getCategoryTooltipHtml(dataIndex);
-          categoryTooltipEl.style.left = `${event.clientX + 14}px`;
-          categoryTooltipEl.style.top = `${event.clientY + 14}px`;
-          categoryTooltipEl.style.display = "block";
-        });
+    async function deleteQuestionsByVersion(versionKey, label) {
+      if (!versionKey || versionKey === "unknown") {
+        alert("Unknown version cannot be deleted.");
+        return;
+      }
 
-        categoryCanvas.addEventListener("mouseleave", () => {
-          categoryTooltipEl.style.display = "none";
-        });
+      const confirmed = window.confirm(
+        `Are you sure you want to delete all questions for ${label}? This includes disabled questions.`
+      );
+      if (!confirmed) return;
 
-        // --- DIFFICULTY CHART ---
-        const diffRes = await fetch("/api/admin/questions/difficulty", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!diffRes.ok) throw new Error("Failed to fetch difficulty data");
-        const diffData = await diffRes.json();
-
-        const diffLabels = diffData.map(d => d._id || "Unknown");
-        const diffValues = diffData.map(d => d.count);
-        const diffCtx = document.getElementById("difficultyChart").getContext("2d");
-
-        new Chart(diffCtx, {
-          type: "bar",
-          data: {
-            labels: diffLabels,
-            datasets: [
-              {
-                label: "Question Count",
-                data: diffValues,
-                backgroundColor: diffLabels.map(label => {
-                  if (label.toLowerCase().includes("easy")) return "#4caf50";
-                  if (label.toLowerCase().includes("medium")) return "#ffb300";
-                  if (label.toLowerCase().includes("hard")) return "#f44336";
-                  return "#5ea6ff";
-                }),
-                borderRadius: 6
-              }
-            ]
+      try {
+        const response = await fetch(`/api/admin/questions/by-version/${encodeURIComponent(versionKey)}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
           },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              title: {
-                display: true,
-                text: "Questions by Difficulty Level",
-                color: "#eee",
-                font: { size: 18 }
-              },
-              tooltip: {
-                backgroundColor: "#222",
-                borderColor: "#5ea6ff",
-                borderWidth: 1,
-                titleColor: "#fff",
-                bodyColor: "#ccc"
-              }
-            },
-            scales: {
-              x: {
-                ticks: { color: "#ccc" },
-                grid: { color: "#333" }
-              },
-              y: {
-                ticks: { color: "#ccc", precision: 0 },
-                grid: { color: "#333" }
-              }
-            }
-          }
         });
-      } catch (err) {
-        document.body.innerHTML = `<p style="color:#ff5555;">❌ ${err.message}</p>`;
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(payload.message || `Delete failed (${response.status})`);
+        }
+
+        await loadData();
+        renderCharts(currentMode);
+        alert(payload.message || `Deleted all questions for ${label}.`);
+      } catch (error) {
+        alert(`Failed to delete version: ${error.message}`);
       }
     }
 
-    document.addEventListener("DOMContentLoaded", loadChart);
+    function buildOverviewData(mode) {
+      if (mode === "difficulty") {
+        const levels = Array.isArray(difficultyPayload?.levels) ? difficultyPayload.levels : [];
+        return {
+          labels: levels.map(item => item.label || "Unknown"),
+          values: levels.map(item => item.count || 0),
+          keys: levels.map(item => item.key || "unknown"),
+        };
+      }
+
+      const totalsByVersion = new Map();
+      categoriesData.forEach(category => {
+        const breakdown = category.versionBreakdown || {};
+        Object.entries(breakdown).forEach(([key, value]) => {
+          totalsByVersion.set(key, (totalsByVersion.get(key) || 0) + Number(value || 0));
+        });
+      });
+
+      const keys = sortBreakdownKeys(new Set(Array.from(totalsByVersion.keys())));
+      return {
+        labels: keys.map(formatVersionKey),
+        values: keys.map(key => totalsByVersion.get(key) || 0),
+        keys,
+      };
+    }
+
+    function renderCategoryChart(mode) {
+      const { labels, datasets } = buildCategoryViewData(mode);
+      const canvas = document.getElementById("categoryChart");
+      const ctx = canvas.getContext("2d");
+      const tooltip = ensureTooltipElement();
+
+      if (categoryChart) categoryChart.destroy();
+
+      const barHeight = 7.03125;
+      canvas.height = Math.max(400, labels.length * barHeight);
+
+      categoryChart = new Chart(ctx, {
+        type: "bar",
+        data: { labels, datasets },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          datasets: {
+            bar: {
+              categoryPercentage: 0.87,
+              barPercentage: 0.83,
+            },
+          },
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: { display: datasets.length > 0, labels: { color: "#ccc" } },
+            title: {
+              display: true,
+              text: mode === "difficulty"
+                ? "Questions per Category by Difficulty"
+                : "Questions per Category by Version",
+              color: "#eee",
+              font: { size: 18 },
+            },
+            tooltip: { enabled: false },
+          },
+          scales: {
+            x: { ticks: { color: "#aaa", precision: 0 }, grid: { color: "#333" }, stacked: true },
+            y: { ticks: { color: "#ccc", autoSkip: false }, grid: { color: "#222" }, stacked: true },
+          },
+        },
+      });
+
+      const getTooltipHtml = (rowIndex) => {
+        const name = labels[rowIndex];
+        const rows = datasets
+          .map((dataset) => ({
+            label: dataset.label,
+            value: Number(dataset.data[rowIndex] || 0),
+            color: dataset.backgroundColor,
+          }))
+          .filter((item) => item.value > 0);
+
+        const total = rows.reduce((sum, item) => sum + item.value, 0);
+        const lines = rows.map((item) =>
+          `<div><span style="display:inline-block;width:8px;height:8px;background:${item.color};border-radius:2px;margin-right:6px;"></span>${item.label}: ${item.value}</div>`
+        );
+        return `<div style="font-weight:700;color:#fff;margin-bottom:4px;">${name}</div>${lines.join("")}<div style="margin-top:4px;border-top:1px solid #444;padding-top:4px;">Total: ${total}</div>`;
+      };
+
+      canvas.onmousemove = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        const yScale = categoryChart.scales.y;
+        const chartArea = categoryChart.chartArea;
+        if (!yScale || !chartArea) return;
+
+        const withinCategoryBand = y >= yScale.top && y <= yScale.bottom;
+        const overBars = x >= chartArea.left && x <= chartArea.right && withinCategoryBand;
+        const overCategoryLabels = x >= 0 && x < chartArea.left && withinCategoryBand;
+        if (!overBars && !overCategoryLabels) {
+          tooltip.style.display = "none";
+          return;
+        }
+
+        const yValue = yScale.getValueForPixel(y);
+        const dataIndex = typeof yValue === "number" ? Math.round(yValue) : labels.indexOf(yValue);
+        if (dataIndex < 0 || dataIndex >= labels.length) {
+          tooltip.style.display = "none";
+          return;
+        }
+
+        tooltip.innerHTML = getTooltipHtml(dataIndex);
+        tooltip.style.left = `${event.clientX + 14}px`;
+        tooltip.style.top = `${event.clientY + 14}px`;
+        tooltip.style.display = "block";
+      };
+
+      canvas.onmouseleave = () => {
+        tooltip.style.display = "none";
+      };
+
+      canvas.oncontextmenu = (event) => {
+        if (mode !== "version") return;
+
+        const rect = canvas.getBoundingClientRect();
+        const canvasX = event.clientX - rect.left;
+        const canvasY = event.clientY - rect.top;
+        const hit = getLegendItemAtPosition(categoryChart, canvasX, canvasY);
+        if (!hit) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        showLegendContextMenu(event.clientX, event.clientY, hit);
+      };
+
+      hideLegendContextMenu();
+    }
+
+    function renderOverviewChart(mode) {
+      const { labels, values, keys } = buildOverviewData(mode);
+      const canvas = document.getElementById("overviewChart");
+      const ctx = canvas.getContext("2d");
+
+      if (overviewChart) overviewChart.destroy();
+
+      overviewChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "Question Count",
+              data: values,
+              backgroundColor: keys.map((key, index) =>
+                mode === "difficulty" ? difficultyColor(key, index) : versionColor(key, index)
+              ),
+              borderRadius: 6,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            title: {
+              display: true,
+              text: mode === "difficulty" ? "Questions by Difficulty Level" : "Questions by Version",
+              color: "#eee",
+              font: { size: 18 },
+            },
+            tooltip: {
+              backgroundColor: "#222",
+              borderColor: "#5ea6ff",
+              borderWidth: 1,
+              titleColor: "#fff",
+              bodyColor: "#ccc",
+            },
+          },
+          scales: {
+            x: { ticks: { color: "#ccc" }, grid: { color: "#333" } },
+            y: { ticks: { color: "#ccc", precision: 0 }, grid: { color: "#333" } },
+          },
+        },
+      });
+    }
+
+    function stabilizeChartLayout() {
+      const settle = () => {
+        if (categoryChart) {
+          categoryChart.resize();
+          categoryChart.update("none");
+        }
+        if (overviewChart) {
+          overviewChart.resize();
+          overviewChart.update("none");
+        }
+      };
+
+      requestAnimationFrame(() => requestAnimationFrame(settle));
+    }
+
+    function renderCharts(mode) {
+      currentMode = mode;
+      renderCategoryChart(mode);
+      renderOverviewChart(mode);
+      stabilizeChartLayout();
+    }
+
+    async function loadData() {
+      const [categoriesRes, difficultyRes] = await Promise.all([
+        fetch("/api/admin/categories", {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch("/api/admin/questions/difficulty?extended=true", {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+      ]);
+
+      if (!categoriesRes.ok) throw new Error("Failed to fetch categories");
+      if (!difficultyRes.ok) throw new Error("Failed to fetch difficulty data");
+
+      categoriesData = await categoriesRes.json();
+      difficultyPayload = await difficultyRes.json();
+    }
+
+    async function initCharts() {
+      try {
+        await loadData();
+
+        const modeSelect = document.getElementById("viewModeSelect");
+        renderCharts(modeSelect.value || "difficulty");
+
+        modeSelect.addEventListener("change", () => {
+          renderCharts(modeSelect.value || "difficulty");
+        });
+
+        document.addEventListener("click", (event) => {
+          const menu = document.getElementById("legendContextMenu");
+          if (menu.hidden) return;
+          if (!event.target.closest("#legendContextMenu")) {
+            hideLegendContextMenu();
+          }
+        });
+
+        document.addEventListener("contextmenu", (event) => {
+          if (!event.target.closest("#categoryChart")) {
+            hideLegendContextMenu();
+          }
+        });
+
+        window.addEventListener("resize", hideLegendContextMenu);
+        window.addEventListener("load", stabilizeChartLayout, { once: true });
+
+        document.getElementById("hideOthersMenuItem").addEventListener("click", () => {
+          if (legendContext?.datasetIndex === undefined || legendContext?.datasetIndex === null) return;
+          hideAllOtherVersionDatasets(legendContext.datasetIndex);
+          hideLegendContextMenu();
+        });
+
+        document.getElementById("deleteVersionMenuItem").addEventListener("click", async () => {
+          if (!legendContext) return;
+          const { versionKey, label } = legendContext;
+          hideLegendContextMenu();
+          await deleteQuestionsByVersion(versionKey, label || `Version ${versionKey}`);
+        });
+      } catch (err) {
+        document.body.innerHTML = `<p style="color:#ff5555;">${err.message}</p>`;
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", initCharts);
   </script>
 </body>
 </html>
