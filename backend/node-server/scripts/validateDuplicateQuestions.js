@@ -1,34 +1,28 @@
 require("dotenv").config({ path: __dirname + "/../.env" });
 const mongoose = require("mongoose");
-const axios = require("axios");
 const Category = require("../models/categoryModel");
 const connectDB = require("../config/db");
 const { buildDuplicatePrompt } = require("./prompts/duplicatePrompt");
+const {
+  assertOllamaSetup,
+  callOllamaForText,
+} = require("../services/ollamaClient");
 
-const OLLAMA_URL = process.env.OLLAMA_URL;
 const DUPLICATE_VERSION = 0.18;
+
+try {
+  assertOllamaSetup();
+} catch (error) {
+  console.error(`❌ ${error.message}`);
+  process.exit(1);
+}
 
 async function queryOllama(prompt) {
   try {
-    const res = await axios.post(
-      OLLAMA_URL,
-      {
-        model: "qwen3:8b",
-        prompt,
-        options: {
-          temperature: 0.0,      // eliminate creativity — factual only
-          top_p: 0.8,            // less diversity in sampling
-          top_k: 20,             // focus on most likely tokens
-          repeat_penalty: 1.2,   // discourage alternative phrasing loops
-          num_ctx: 4096,         // enough context for longer comparisons
-          num_predict: 60        // short, focused output
-        },
-        stream: false,
-      },
-      { timeout: 60_000 }
-    );
-
-    const raw = String(res.data.response || "").trim();
+    const raw = await callOllamaForText({
+      prompt,
+      presetName: "validateDuplicateQuestions",
+    });
 
     // Extract everything from the first { to the end
     const jsonMatch = raw.match(/\{[\s\S]*?\}/);

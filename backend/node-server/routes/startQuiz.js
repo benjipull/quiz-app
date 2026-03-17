@@ -5,21 +5,9 @@ const Category = require("../models/categoryModel");
 const User = require("../models/user");
 const authenticateToken = require("../middleware/auth");
 const { userQuestions } = require("../index");
+const { getDifficultyLabel } = require("../config/difficultyLevels");
 
 const QUIZ_COST = 50;
-
-const difficultyNames = {
-  1: "Basic",
-  2: "Easy",
-  3: "Casual",
-  4: "Moderate",
-  5: "Challenging",
-  6: "Hard",
-  7: "Tough",
-  8: "Expert",
-  9: "Master",
-  10: "Legendary",
-};
 
 router.post("/", authenticateToken, async (req, res) => {
   const { categoryId, numQuestions = 5 } = req.body;
@@ -56,7 +44,7 @@ router.post("/", authenticateToken, async (req, res) => {
 
     const userLevel = user.level || 1;
     const minDifficulty = Math.max(1, userLevel);
-    const maxDifficulty = Math.min(10, userLevel + 2);
+    const maxDifficulty = Math.min(10, userLevel + 1);
 
     // 2) Strict fetch in the level window first
     const strictQuestions = await Category.aggregate([
@@ -199,7 +187,7 @@ router.post("/", authenticateToken, async (req, res) => {
     userQuestions[userToken] = {
       queue: questions.map((q) => ({
         ...q,
-        difficultyName: difficultyNames[q.difficultyLevel] || "Unknown",
+        difficultyName: getDifficultyLabel(q.difficultyLevel),
       })),
       current: null,
     };

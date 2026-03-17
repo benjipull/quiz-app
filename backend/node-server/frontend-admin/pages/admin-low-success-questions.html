@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Low Success Questions</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #111;
+      color: #eee;
+      margin: 0;
+      padding: 2rem;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1rem;
+      color: #5ea6ff;
+      text-decoration: none;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    #status {
+      text-align: center;
+      margin-bottom: 1rem;
+      color: #5ea6ff;
+      min-height: 1.2rem;
+    }
+
+    #criteriaSummary {
+      max-width: 1300px;
+      margin: 0 auto 1rem auto;
+      color: #a7c9ff;
+      font-size: 0.95rem;
+    }
+
+    #filterPanel {
+      max-width: 1300px;
+      margin: 0 auto 1rem auto;
+      padding: 0.9rem 1rem;
+      background: #1a1a1a;
+      border-radius: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.8rem 1rem;
+    }
+
+    #filterPanel label {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.92rem;
+    }
+
+    #filterPanel input[type="number"] {
+      width: 90px;
+      background: #0f0f0f;
+      border: 1px solid #3a3a3a;
+      color: #eee;
+      border-radius: 6px;
+      padding: 0.28rem 0.4rem;
+    }
+
+    #applyFiltersBtn {
+      padding: 0.4rem 0.9rem;
+      border: none;
+      border-radius: 6px;
+      background: #5ea6ff;
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    #applyFiltersBtn:hover {
+      background: #3a8cff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      max-width: 1300px;
+      margin: 0 auto;
+      background: #1e1e1e;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #222;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    thead {
+      background: #2b2b2b;
+    }
+
+    th[data-key] {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    th[data-key]:hover {
+      color: #fff;
+    }
+
+    tr:hover {
+      background: #292929;
+    }
+
+    .question-row {
+      cursor: pointer;
+    }
+
+    .answers-row {
+      display: none;
+      transition: all 0.3s ease;
+    }
+
+    .answers-row.open {
+      display: table-row;
+    }
+
+    .answers-content {
+      background: #181818;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+    }
+
+    .answers-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .answer-row {
+      margin: 8px 0;
+    }
+
+    .bar-container {
+      position: relative;
+      background: #1c1c1c;
+      border-radius: 6px;
+      overflow: hidden;
+      height: 30px;
+      display: flex;
+      align-items: center;
+    }
+
+    .bar-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      transition: width 0.5s ease;
+    }
+
+    .bar-content {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: 0 12px;
+      font-weight: 500;
+      color: #eee;
+    }
+
+    .bar-count {
+      font-size: 0.85em;
+      color: #aaa;
+    }
+
+    .correct-answer {
+      color: #6cff6c;
+      font-weight: bold;
+    }
+
+    .answer-row:hover .bar-fill {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .explanation {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: #222;
+      border-left: 4px solid #6cff6c;
+      border-radius: 6px;
+      color: #ddd;
+      font-size: 0.95em;
+    }
+
+    .meta-panel {
+      margin-top: 0.75rem;
+      padding: 0.75rem 1rem;
+      background: #202020;
+      border-left: 4px solid #5ea6ff;
+      border-radius: 6px;
+      color: #d0e4ff;
+      font-size: 0.92rem;
+    }
+
+    .open-category-btn {
+      margin-top: 0.75rem;
+      display: inline-block;
+      text-decoration: none;
+      background: #5ea6ff;
+      color: #fff;
+      border-radius: 6px;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.85rem;
+    }
+
+    .open-category-btn:hover {
+      background: #3a8cff;
+    }
+
+    .disable-question-btn {
+      margin-top: 0.75rem;
+      margin-left: 0.5rem;
+      border: none;
+      background: #b13030;
+      color: #fff;
+      border-radius: 6px;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .disable-question-btn:hover {
+      background: #922626;
+    }
+
+    .disable-question-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .question-action-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .success-critical {
+      color: #ff7d7d;
+      font-weight: 700;
+    }
+
+    .success-warning {
+      color: #ffd166;
+      font-weight: 700;
+    }
+
+    .disabled {
+      color: #ff7d7d;
+      font-weight: bold;
+    }
+
+    .sort-indicator {
+      font-size: 0.8em;
+      opacity: 0.6;
+      margin-left: 5px;
+    }
+  </style>
+</head>
+
+<body>
+  <a href="/admin/pages/admin-content-management.html" class="back-link">← Back to Content Management</a>
+  <h1>Low Success Questions</h1>
+
+  <div id="filterPanel">
+    <label>
+      Min Attempts >
+      <input type="number" id="minAttempts" min="0" step="1" value="10" />
+    </label>
+    <label>
+      Max Correct % <
+      <input type="number" id="maxSuccessRate" min="0" max="100" step="1" value="50" />
+    </label>
+    <label>
+      <input type="checkbox" id="showDisabled" />
+      Show disabled questions
+    </label>
+    <button id="applyFiltersBtn">Apply</button>
+  </div>
+
+  <div id="criteriaSummary"></div>
+  <div id="status">Loading low-success questions...</div>
+
+  <table id="questionTable" style="display:none;">
+    <thead>
+      <tr>
+        <th data-key="categoryName">Category</th>
+        <th data-key="text">Question</th>
+        <th data-key="totalAttempts">Attempts</th>
+        <th data-key="successRate">Correct %</th>
+        <th data-key="correctSelections">Correct Picks</th>
+        <th data-key="incorrectSelections">Incorrect Picks</th>
+        <th data-key="difficulty_level">Difficulty</th>
+        <th data-key="disabled">Disabled</th>
+        <th data-key="createdAt">Created</th>
+      </tr>
+    </thead>
+    <tbody id="questionTableBody"></tbody>
+  </table>
+
+  <script>
+    const token = localStorage.getItem("token");
+    const userType = (localStorage.getItem("userType") || "").toLowerCase();
+    if (!token || userType !== "admin") {
+      window.location.href = "/admin/pages/admin-login.html";
+    }
+
+    const DEFAULT_SORT = { key: "successRate", asc: true };
+    let sortState = { ...DEFAULT_SORT };
+    let questionsData = [];
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, c => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[c]));
+    }
+
+    function readFilters() {
+      const minAttemptsInput = Number(document.getElementById("minAttempts").value);
+      const maxSuccessRateInput = Number(document.getElementById("maxSuccessRate").value);
+
+      return {
+        minAttempts: Number.isFinite(minAttemptsInput) ? Math.max(0, Math.trunc(minAttemptsInput)) : 10,
+        maxSuccessRate: Number.isFinite(maxSuccessRateInput) ? Math.max(0, Math.min(100, maxSuccessRateInput)) : 50,
+        showDisabled: document.getElementById("showDisabled").checked
+      };
+    }
+
+    function compareValues(a, b, key, asc) {
+      let va = a[key];
+      let vb = b[key];
+
+      if (key === "createdAt") {
+        va = new Date(va).getTime();
+        vb = new Date(vb).getTime();
+      }
+
+      if (typeof va === "boolean" && typeof vb === "boolean") {
+        const result = Number(va) - Number(vb);
+        return asc ? result : -result;
+      }
+
+      const na = parseFloat(va);
+      const nb = parseFloat(vb);
+      const numeric = !Number.isNaN(na) && !Number.isNaN(nb);
+      const result = numeric
+        ? na - nb
+        : String(va ?? "").localeCompare(String(vb ?? ""), undefined, { sensitivity: "base" });
+
+      return asc ? result : -result;
+    }
+
+    function updateSortIndicators() {
+      document.querySelectorAll("th[data-key]").forEach(th => {
+        const existing = th.querySelector(".sort-indicator");
+        if (existing) existing.remove();
+        if (th.dataset.key === sortState.key) {
+          const indicator = document.createElement("span");
+          indicator.className = "sort-indicator";
+          indicator.textContent = sortState.asc ? "▲" : "▼";
+          th.appendChild(indicator);
+        }
+      });
+    }
+
+    function renderAnswers(question) {
+      if (!Array.isArray(question.answers) || question.answers.length === 0) {
+        return "<em>No answers available</em>";
+      }
+
+      return `
+        <ul class="answers-list">
+          ${question.answers.map(answer => `
+            <li class="answer-row">
+              <div class="bar-container">
+                <div class="bar-fill" style="width:${answer.percentage}%;"></div>
+                <div class="bar-content ${answer.isCorrect ? "correct-answer" : ""}">
+                  ${answer.isCorrect ? "✅ " : "• "}
+                  ${escapeHtml(answer.text)}
+                  <span class="bar-count">${answer.count} (${answer.percentage}%)</span>
+                </div>
+              </div>
+            </li>
+          `).join("")}
+        </ul>
+      `;
+    }
+
+    function successRateClass(successRate) {
+      if (successRate < 35) return "success-critical";
+      if (successRate < 50) return "success-warning";
+      return "";
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("questionTableBody");
+      const sorted = [...questionsData].sort((a, b) => compareValues(a, b, sortState.key, sortState.asc));
+
+      tbody.innerHTML = sorted.map(q => `
+        <tr class="question-row" data-id="${q.questionId}">
+          <td>${escapeHtml(q.categoryName)}</td>
+          <td>${escapeHtml(q.text)}</td>
+          <td>${q.totalAttempts}</td>
+          <td class="${successRateClass(q.successRate)}">${q.successRate.toFixed(2)}%</td>
+          <td>${q.correctSelections}</td>
+          <td>${q.incorrectSelections}</td>
+          <td>${q.difficulty_level ?? "—"}</td>
+          <td class="${q.disabled ? "disabled" : ""}">${q.disabled ? "Yes" : "No"}</td>
+          <td>${q.createdAt ? new Date(q.createdAt).toLocaleDateString() : "—"}</td>
+        </tr>
+        <tr class="answers-row" id="answers-${q.questionId}">
+          <td colspan="9">
+            <div class="answers-content">
+              ${renderAnswers(q)}
+              ${q.explanation ? `<div class="explanation"><b>🧠 Explanation:</b> ${escapeHtml(q.explanation)}</div>` : ""}
+              <div class="meta-panel">
+                <div><b>Question ID:</b> ${escapeHtml(q.questionId)}</div>
+                <div><b>Correct Answer:</b> ${escapeHtml(q.correct_answer)}</div>
+                <div><b>Validation:</b> ${escapeHtml(q.validation_verdict || "Not validated")}</div>
+              </div>
+              <div class="question-action-row">
+                <a class="open-category-btn" href="/admin/pages/admin-category-questions.html?id=${q.categoryId}">
+                  Open Category Questions
+                </a>
+                <button
+                  type="button"
+                  class="disable-question-btn"
+                  data-disable-question-id="${q.questionId}"
+                  ${q.disabled ? "disabled" : ""}
+                >
+                  ${q.disabled ? "Question Disabled" : "Disable Question"}
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `).join("");
+
+      document.querySelectorAll(".question-row").forEach(row => {
+        row.addEventListener("click", () => {
+          const questionId = row.getAttribute("data-id");
+          const answersRow = document.getElementById(`answers-${questionId}`);
+          answersRow.classList.toggle("open");
+        });
+      });
+
+      updateSortIndicators();
+    }
+
+    async function disableQuestion(questionId) {
+      const status = document.getElementById("status");
+      const filters = readFilters();
+
+      const question = questionsData.find(q => String(q.questionId) === String(questionId));
+      if (!question) {
+        status.textContent = "Question not found in current view.";
+        return false;
+      }
+
+      if (question.disabled) {
+        status.textContent = "Question is already disabled.";
+        return false;
+      }
+
+      const confirmed = window.confirm("Disable this question? It will no longer appear in quizzes.");
+      if (!confirmed) return false;
+
+      status.textContent = "Disabling question...";
+
+      try {
+        const res = await fetch(`/api/admin/questions/${encodeURIComponent(questionId)}`, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            disabled: true,
+            disabled_reason: "Disabled from low success questions admin screen"
+          })
+        });
+
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(payload.message || `Error ${res.status}: failed to disable question`);
+        }
+
+        questionsData = questionsData.map(q =>
+          String(q.questionId) === String(questionId)
+            ? { ...q, disabled: true }
+            : q
+        );
+
+        if (!filters.showDisabled) {
+          questionsData = questionsData.filter(q => String(q.questionId) !== String(questionId));
+        }
+
+        renderTable();
+        status.textContent = filters.showDisabled
+          ? "Question disabled successfully."
+          : "Question disabled and removed from this view.";
+        return true;
+      } catch (error) {
+        status.textContent = `Error: ${error.message}`;
+        return false;
+      }
+    }
+
+    async function loadQuestions() {
+      const status = document.getElementById("status");
+      const table = document.getElementById("questionTable");
+      const summary = document.getElementById("criteriaSummary");
+      const filters = readFilters();
+
+      status.textContent = "Loading low-success questions...";
+      status.style.display = "block";
+      table.style.display = "none";
+
+      const params = new URLSearchParams({
+        minAttempts: String(filters.minAttempts),
+        maxSuccessRate: String(filters.maxSuccessRate),
+        showDisabled: String(filters.showDisabled)
+      });
+
+      try {
+        const res = await fetch(`/api/admin/questions/low-success?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error(`Error ${res.status}: failed to fetch low-success questions`);
+        const data = await res.json();
+
+        questionsData = Array.isArray(data.questions) ? data.questions : [];
+        renderTable();
+
+        summary.textContent =
+          `Showing questions with attempts > ${data.criteria.minAttempts} and correct rate < ${data.criteria.maxSuccessRate}%` +
+          `${data.criteria.showDisabled ? " (including disabled)." : "."}`;
+
+        status.textContent = questionsData.length
+          ? `Loaded ${questionsData.length} question(s).`
+          : "No questions match the selected criteria.";
+        table.style.display = "table";
+      } catch (err) {
+        status.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      document.querySelectorAll("th[data-key]").forEach(th => {
+        th.addEventListener("click", () => {
+          const key = th.dataset.key;
+          if (sortState.key === key) {
+            sortState.asc = !sortState.asc;
+          } else {
+            sortState = { key, asc: true };
+          }
+          renderTable();
+        });
+      });
+
+      document.addEventListener("click", async (event) => {
+        const button = event.target.closest(".disable-question-btn");
+        if (!button) return;
+        event.preventDefault();
+        event.stopPropagation();
+
+        const questionId = button.getAttribute("data-disable-question-id");
+        if (!questionId) return;
+
+        button.disabled = true;
+        const success = await disableQuestion(questionId);
+        if (!success) {
+          button.disabled = false;
+        }
+      });
+
+      document.getElementById("applyFiltersBtn").addEventListener("click", loadQuestions);
+      loadQuestions();
+    });
+  </script>
+</body>
+
+</html>
