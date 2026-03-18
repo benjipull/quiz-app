@@ -23,6 +23,8 @@ import About from "./pages/About";
 import Claim from "./components/dummy";
 import SplashScreen from "./components/SplashScreen";
 import { getApiBaseUrl } from "@/utils/baseUrl";
+import { setGAUser } from "@/utils/gaClient";
+import { trackEnteredGame } from "@/utils/analytics";
 
 const queryClient = new QueryClient();
 const BASE_URL = getApiBaseUrl();
@@ -55,6 +57,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
+        setGAUser(data.user._id);
+        trackEnteredGame(data.user._id, "guest_login_api");
 
         if (isMounted) {
           setIsCheckingAuth(false);
