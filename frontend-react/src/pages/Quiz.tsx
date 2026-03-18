@@ -316,9 +316,9 @@ export default function Quiz() {
 
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
 
-  const startSound = new Audio("/intro-sound.mp3");
-  const correctSound = new Audio("/victory-beat.mp3");
-  const incorrectSound = new Audio("/incorrect.mp3");
+  const startSound = new Audio("/assets/sounds/intro-sound.mp3");
+  const correctSound = new Audio("/assets/sounds/victory-beat.mp3");
+  const incorrectSound = new Audio("/assets/sounds/incorrect.mp3");
 
   const handleBackNavigation = () => {
     setShowExitDialog(true);

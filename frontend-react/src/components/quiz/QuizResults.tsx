@@ -21,8 +21,8 @@ import { trackEvent } from "@/utils/analytics";
 import { loadLevelConfig, resolveLevelProgress, type LevelConfigEntry } from "@/utils/levelConfig";
 import { getApiBaseUrl } from "@/utils/baseUrl";
 
-const KNOWLEDGE_GAIN_SOUND_SRC = "/knowledge-point.mp3"; 
-const LEVEL_UP_SOUND_SRC = "/player-level-up.mp3";
+const KNOWLEDGE_GAIN_SOUND_SRC = "/assets/sounds/knowledge-point.mp3"; 
+const LEVEL_UP_SOUND_SRC = "/assets/sounds/player-level-up.mp3";
 
 const BASE_URL = getApiBaseUrl();
 const QUIZ_COST = 50;
