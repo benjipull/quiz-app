@@ -132,6 +132,22 @@
       font-size: .95em;
     }
 
+    .difficulty-meta {
+      margin-top: .75rem;
+      padding: .75rem 1rem;
+      background: #20242b;
+      border-left: 4px solid #5ea6ff;
+      border-radius: 6px;
+      color: #dce9ff;
+      font-size: .92em;
+    }
+
+    .difficulty-meta .label {
+      color: #9fc6ff;
+      font-weight: 600;
+      margin-right: .3rem;
+    }
+
     /* === VALIDATION NEEDED PANEL === */
     .validation-needed {
       margin-top: 1rem;
@@ -527,6 +543,18 @@
         ? `<div class="explanation"><b>🧠 Explanation:</b> ${escapeHtml(explanation)}</div>`
         : "";
 
+      const difficultyRationale = String(q.difficulty_rationale || "").trim();
+      const difficultyConfirmedVersion =
+        q.difficultyConfirmedVersion === null || q.difficultyConfirmedVersion === undefined
+          ? "—"
+          : q.difficultyConfirmedVersion;
+
+      const difficultyMetaHTML = `
+        <div class="difficulty-meta">
+          <div><span class="label">Difficulty Confirmed Version:</span>${escapeHtml(difficultyConfirmedVersion)}</div>
+          <div style="margin-top:.4rem;"><span class="label">Difficulty Rationale:</span>${difficultyRationale ? escapeHtml(difficultyRationale) : "—"}</div>
+        </div>`;
+
       const validationHTML = q.needs_validation
         ? `<div class="validation-needed">
          <div class="dup-header">⚠️ Validation Needed</div>
@@ -536,7 +564,7 @@
        </div>`
         : "";
 
-      return answersHTML + explanationHTML + validationHTML;
+      return answersHTML + explanationHTML + difficultyMetaHTML + validationHTML;
     }
 
 

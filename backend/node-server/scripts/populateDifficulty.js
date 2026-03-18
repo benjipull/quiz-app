@@ -2,18 +2,19 @@ const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 
 const mongoose = require("mongoose");
-const axios = require("axios");
 
 const connectDB = require("../config/db");
 const Category = require("../models/categoryModel");
+const {
+  assertOllamaSetup,
+  callOllama,
+  getOllamaResponseText,
+} = require("../services/ollamaClient");
 
-const OLLAMA_URL = process.env.OLLAMA_URL;
 const DIFFICULTY_VERSION = 0.01;
 
 function assertSetup() {
-  if (!OLLAMA_URL) {
-    throw new Error("Missing OLLAMA_URL in backend/node-server/.env");
-  }
+  assertOllamaSetup();
 }
 
 function extractFirstJsonObject(text) {
@@ -158,20 +159,42 @@ async function populateDifficulty(categoryId, questionId) {
     }
 
     const prompt = `
-You are an assistant that classifies trivia questions into difficulty levels.
+You are an assistant that classifies trivia questions into a single difficulty level from 1 to 10.
 
-RUBRIC for "difficulty_level" (integer 1-10):
-1-2 Very Easy: universally known, primary-school facts.
-3-4 Easy: commonly taught basics.
-5-6 Moderate: regional specifics, niche-but-accessible details.
-7-8 Hard: specialized knowledge, advanced concepts, enthusiast-level facts.
-9-10 Very Hard: highly obscure, expert/scholarly facts.
+=== RULE ===
+Select EXACTLY ONE integer from 1–10.
 
-Additional guidance:
-- Consider how widely known the fact is, not just its length or wording.
-- If the answer requires academic study or field expertise, score higher.
-- If the answer is guessable by most adults, score lower.
-- Use the explanation to infer whether uncommon context is required.
+=== CRITICAL INSTRUCTION ===
+Do NOT default to 5.
+Level 5 should be used ONLY if the question is truly balanced between common and niche knowledge.
+If unsure, choose the closest NON-5 level.
+
+=== DIFFICULTY SCALE ===
+1 — Extremely common knowledge (known by nearly everyone worldwide)
+2 — Very common knowledge
+3 — Common knowledge
+4 — Familiar but not universal
+5 — Balanced midpoint (use rarely)
+6 — Somewhat niche
+7 — Niche knowledge
+8 — Specialist knowledge
+9 — Expert knowledge
+10 — Highly obscure
+
+=== DECISION PROCESS (MANDATORY) ===
+1. Ask: “Would most adults know this?”
+   - Yes → choose 1–4
+2. Else ask: “Would only interested or knowledgeable people know this?”
+   - Yes → choose 6–7
+3. Else ask: “Does this require expertise or deep study?”
+   - Yes → choose 8–10
+4. Use 5 ONLY if it clearly fits none of the above.
+
+=== PRINCIPLES ===
+- Judge the FACT, not the wording.
+- If guessable → lower score.
+- If requires recall or exposure → mid-high.
+- If requires study → high.
 
 Now classify the following trivia question:
 
@@ -186,29 +209,13 @@ Respond in strict JSON:
   "difficulty_rationale": "<string explaining reasoning>"
 }`.trim();
 
-    const response = await axios.post(
-      OLLAMA_URL,
-      {
-        model: "qwen3:8b",
-        format: "json",
-        prompt,
-        stream: false,
-        options: {
-          num_ctx: 2048,
-          num_keep: 100,
-          temperature: 0.0,
-          top_p: 0.9,
-          top_k: 30,
-          repeat_penalty: 1.1,
-          repeat_last_n: 32,
-          num_predict: 120,
-        },
-      },
-      { timeout: 180000 }
-    );
+    const response = await callOllama({
+      prompt,
+      presetName: "populateDifficulty",
+    });
 
     let parsed;
-    const rawModelResponse = String(response?.data?.response || "").trim();
+    const rawModelResponse = getOllamaResponseText(response);
     try {
       parsed = parseModelJson(rawModelResponse);
     } catch {

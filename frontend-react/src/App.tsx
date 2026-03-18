@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, { Suspense, lazy, useEffect, useLayoutEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { StatusBar } from "@capacitor/status-bar";
 import { Toaster } from "@/components/ui/toaster";
@@ -6,26 +6,28 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { MobileLayout } from "@/components/layout/MobileLayout";
-import Home from "./pages/Home";
-import Quiz from "./pages/Quiz";
 import { usePageTracking } from "./hooks/usePageTracking";
-import Leaderboard from "./pages/Leaderboard";
-import Categories from "./pages/Categories";
-import Profile from "./pages/Profile";
-import DeleteAccount from "./pages/DeleteAccount";
-import Notifications from "./pages/Notification";
-import Store from "./pages/Store";
-import Menu from "./pages/Menu";
-import Interests from "./pages/Interests";
-import NotFound from "./pages/NotFound";
-import About from "./pages/About";
-import Claim from "./components/dummy";
 import SplashScreen from "./components/SplashScreen";
 import { getApiBaseUrl } from "@/utils/baseUrl";
+import { setGAUser } from "@/utils/gaClient";
+import { trackEnteredGame } from "@/utils/analytics";
 
 const queryClient = new QueryClient();
 const BASE_URL = getApiBaseUrl();
+const MobileLayout = lazy(() => import("@/components/layout/MobileLayout").then((module) => ({ default: module.MobileLayout })));
+const Home = lazy(() => import("./pages/Home"));
+const Quiz = lazy(() => import("./pages/Quiz"));
+const Leaderboard = lazy(() => import("./pages/Leaderboard"));
+const Categories = lazy(() => import("./pages/Categories"));
+const Profile = lazy(() => import("./pages/Profile"));
+const DeleteAccount = lazy(() => import("./pages/DeleteAccount"));
+const Notifications = lazy(() => import("./pages/Notification"));
+const Store = lazy(() => import("./pages/Store"));
+const Menu = lazy(() => import("./pages/Menu"));
+const Interests = lazy(() => import("./pages/Interests"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const About = lazy(() => import("./pages/About"));
+const Claim = lazy(() => import("./components/dummy"));
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -55,6 +57,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
+        setGAUser(data.user._id);
+        trackEnteredGame(data.user._id, "guest_login_api");
 
         if (isMounted) {
           setIsCheckingAuth(false);
@@ -117,27 +121,29 @@ const AppContent = () => {
   }, [location.pathname]);
 
   return (
-    <Routes>
-      <Route path="/auth" element={<Navigate to="/" replace />} />
-      <Route path="/reset-password" element={<Navigate to="/" replace />} />
+    <Suspense fallback={<SplashScreen dataLoaded={false} />}>
+      <Routes>
+        <Route path="/auth" element={<Navigate to="/" replace />} />
+        <Route path="/reset-password" element={<Navigate to="/" replace />} />
 
-      <Route path="/" element={<ProtectedRoute><MobileLayout /></ProtectedRoute>}>
-        <Route index element={<Home />} />
-        <Route path="all-quizzes" element={<Categories />} />
-        <Route path="quiz/:categoryId?" element={<Quiz />} />
-        <Route path="leaderboard" element={<Leaderboard />} />
-        <Route path="profile" element={<Profile />} />
-        <Route path="delete-account" element={<DeleteAccount />} />
-        <Route path="interests" element={<Interests />} />
-        <Route path="notifications" element={<Notifications />} />
-        <Route path="store" element={<Store />} />
-        <Route path="about-us" element={<About />} />
-        <Route path="menu" element={<Menu />} />
-        <Route path="claim" element={<Claim />} />
-      </Route>
+        <Route path="/" element={<ProtectedRoute><MobileLayout /></ProtectedRoute>}>
+          <Route index element={<Home />} />
+          <Route path="all-quizzes" element={<Categories />} />
+          <Route path="quiz/:categoryId?" element={<Quiz />} />
+          <Route path="leaderboard" element={<Leaderboard />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="delete-account" element={<DeleteAccount />} />
+          <Route path="interests" element={<Interests />} />
+          <Route path="notifications" element={<Notifications />} />
+          <Route path="store" element={<Store />} />
+          <Route path="about-us" element={<About />} />
+          <Route path="menu" element={<Menu />} />
+          <Route path="claim" element={<Claim />} />
+        </Route>
 
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
 };
 

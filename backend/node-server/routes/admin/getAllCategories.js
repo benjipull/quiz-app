@@ -76,6 +76,55 @@ router.get("/", auth, adminAuth, async (req, res) => {
               },
             },
           },
+          versionBreakdown: {
+            $let: {
+              vars: {
+                enabledQuestions: {
+                  $filter: {
+                    input: "$questions",
+                    as: "q",
+                    cond: { $eq: ["$$q.disabled", false] },
+                  },
+                },
+              },
+              in: {
+                $arrayToObject: {
+                  $map: {
+                    input: {
+                      $setUnion: [
+                        [],
+                        {
+                          $map: {
+                            input: "$$enabledQuestions",
+                            as: "q",
+                            in: { $toString: { $ifNull: ["$$q.version", "unknown"] } },
+                          },
+                        },
+                      ],
+                    },
+                    as: "versionKey",
+                    in: {
+                      k: "$$versionKey",
+                      v: {
+                        $size: {
+                          $filter: {
+                            input: "$$enabledQuestions",
+                            as: "q",
+                            cond: {
+                              $eq: [
+                                { $toString: { $ifNull: ["$$q.version", "unknown"] } },
+                                "$$versionKey",
+                              ],
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
 
           hasDuplicates: {
             $gt: [

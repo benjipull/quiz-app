@@ -28,7 +28,7 @@ import DailyCoinClaim from "@/components/DailyCoinClaim";
 import { useUser } from "@/contexts/UserContext";
 import { loadLevelConfig, resolveLevelProgress, type LevelConfigEntry } from "@/utils/levelConfig";
 import { getApiBaseUrl } from "@/utils/baseUrl";
-import { areSplashAssetsReady, preloadSplashAssets } from "@/utils/splashAssets";
+import { areSplashAssetsReady, getPreloadedImageSrc, preloadSplashAssets } from "@/utils/splashAssets";
 import { avatarUrls } from "@/utils/avatarPaths";
 
 const avatars = avatarUrls;
@@ -36,13 +36,12 @@ const avatars = avatarUrls;
 const BASE_URL = getApiBaseUrl();
 const QUIZ_COST = 50;
 const API_TIMEOUT = 15000; // 15 second timeout for API calls
+const HOME_BACKGROUND_SRC = "/assets/images/homebg1.jpg";
 
 interface CategoryToPlayResponse {
   message: string;
   categoryId: string;
   name: string;
-  averageRating: number;
-  questionsCount: number;
 }
 
 const authenticatedFetch = async (url: string, options: RequestInit) => {
@@ -94,6 +93,7 @@ export default function Home() {
   const [levelConfigError, setLevelConfigError] = useState<string | null>(null);
   const [hasCategoryBootstrapCompleted, setHasCategoryBootstrapCompleted] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
+  const [homeBackgroundSrc, setHomeBackgroundSrc] = useState<string>(() => getPreloadedImageSrc(HOME_BACKGROUND_SRC));
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [editAlias, setEditAlias] = useState("");
   const [editAvatarIndex, setEditAvatarIndex] = useState(0);
@@ -243,6 +243,7 @@ export default function Home() {
 
     preloadSplashAssets().finally(() => {
       if (!isMounted) return;
+      setHomeBackgroundSrc(getPreloadedImageSrc(HOME_BACKGROUND_SRC));
       setAssetsReady(true);
     });
 
@@ -643,7 +644,7 @@ export default function Home() {
     <div className="relative isolate min-h-[100dvh] flex flex-col overflow-y-auto bg-[#0e0316]">
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#0e0316]">
         <img
-          src="/homebg1.jpg"
+          src={homeBackgroundSrc}
           alt=""
           aria-hidden="true"
           className="h-full w-full object-cover object-center"
@@ -696,7 +697,7 @@ export default function Home() {
                       style={{
                         width: `${moonScale * 100}%`,
                         height: `${moonScale * 100}%`,
-                        backgroundImage: "url('/image.png')",
+                        backgroundImage: "url('/assets/images/image.png')",
                         backgroundSize: "contain",
                         backgroundPosition: "center",
                         backgroundRepeat: "no-repeat",
@@ -729,10 +730,10 @@ export default function Home() {
                           .join(" ")}
                       </h2>
                       <img
-                        src="/assets/images/icons/edit-icon-cropped.png"
+                        src="/assets/images/icons/edit-icon.png"
                         alt=""
                         aria-hidden="true"
-                        className={`absolute left-full top-1/2 -translate-y-1/2 ml-2 sm:ml-2.5 ${isTinyPhone ? "text-xl w-[1.8em] h-[1.8em]" : "text-2xl sm:text-3xl md:text-4xl w-[2em] h-[2em]"} opacity-100 drop-shadow-[0_0_6px_rgba(255,255,255,0.55)] shrink-0`}
+                        className={`absolute left-full top-1/2 -translate-y-1/2 ml-2 sm:ml-2.5 ${isTinyPhone ? "text-xl h-[3.6em] w-auto" : "text-2xl sm:text-3xl md:text-4xl h-[4em] w-auto"} object-contain opacity-100 drop-shadow-[0_0_6px_rgba(255,255,255,0.55)] shrink-0`}
                       />
                     </div>
                   </div>
@@ -808,7 +809,7 @@ export default function Home() {
                 <div className="relative z-10 grid h-full w-full grid-cols-[1fr_auto] items-center gap-2 sm:gap-3">
                   <span className={`pointer-events-none absolute ${isTinyPhone ? "left-[-18px]" : "left-[-23px]"} inset-y-0 inline-flex items-center justify-start w-7 sm:w-8 md:w-9 shrink-0`}>
                     <img
-                      src="/assets/images/icons/Play Icon.png"
+                      src="/assets/images/icons/play-icon.png"
                       alt=""
                       aria-hidden="true"
                       className={`h-7 sm:h-8 md:h-9 w-auto object-contain ${isTinyPhone ? "scale-[4.2] translate-y-[4px]" : "scale-[4.8] translate-y-[6px]"} origin-left`}

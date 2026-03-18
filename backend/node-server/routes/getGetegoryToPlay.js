@@ -12,25 +12,23 @@ const MIN_QUESTIONS_FOR_PLAY = 5;
 router.get("/", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const user = await User.findById(userId).select("level interests").lean();
+    const user = await User.findById(userId).select("level").lean();
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
     const userLevel = user.level || 1;
-    const userInterests = user.interests || [];
 
     // Keep this aligned with startQuiz.
     const minDifficulty = Math.max(1, userLevel);
-    const maxDifficulty = Math.min(10, userLevel + 2);
+    const maxDifficulty = Math.min(10, userLevel + 1);
 
     console.log(`User level: ${userLevel}, difficulties ${minDifficulty}-${maxDifficulty}`);
 
     // 1) Load category metadata only.
     let categories = await Category.find({ disabled: false })
-      .select("_id name interests averageRating ratings")
-      .populate("interests", "name")
+      .select("_id name")
       .lean();
 
     const categoryIds = categories.map((c) => c._id);
@@ -84,43 +82,9 @@ router.get("/", authenticateToken, async (req, res) => {
       });
     }
 
-    // 4) Filter by user interests if possible.
-    const interestMatched = categories.filter(
-      (cat) =>
-        Array.isArray(cat.interests) &&
-        cat.interests.length > 0 &&
-        cat.interests.some((intObj) =>
-          userInterests.some((userIntId) => intObj._id.toString() === userIntId.toString())
-        )
-    );
-
-    const finalCategories = interestMatched.length > 0 ? interestMatched : categories;
-
-    // 5) Build weighted pool.
-    const weightedPool = [];
-
-    for (const cat of finalCategories) {
-      let weight = 1;
-
-      if (cat.ratings && cat.ratings.length > 5) {
-        if (cat.averageRating >= 3) {
-          const normalized = (cat.averageRating - 3) / 2;
-          weight = Math.floor(2 + Math.pow(normalized, 2) * 18);
-        } else {
-          weight = 1;
-        }
-      } else {
-        weight = 3;
-      }
-
-      for (let i = 0; i < weight; i += 1) {
-        weightedPool.push(cat);
-      }
-    }
-
-    // 6) Pick random category.
-    const randomIndex = Math.floor(Math.random() * weightedPool.length);
-    const chosenCategory = weightedPool[randomIndex];
+    // 4) Pick a random eligible category (no interests/rating weighting).
+    const randomIndex = Math.floor(Math.random() * categories.length);
+    const chosenCategory = categories[randomIndex];
     const eligibleCount = countMap.get(chosenCategory._id.toString()) || 0;
 
     const fullCategory = await Category.findById(chosenCategory._id)
@@ -131,10 +95,6 @@ router.get("/", authenticateToken, async (req, res) => {
       message: "Category selected for play",
       categoryId: chosenCategory._id,
       name: chosenCategory.name,
-      interests: Array.isArray(chosenCategory.interests)
-        ? chosenCategory.interests.map((i) => i.name)
-        : [],
-      averageRating: chosenCategory.averageRating || 0,
       totalQuestions: fullCategory?.questions?.length || 0,
       filteredQuestions: eligibleCount,
       difficultyRange: [minDifficulty, maxDifficulty],

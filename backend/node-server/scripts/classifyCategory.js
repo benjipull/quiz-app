@@ -1,13 +1,17 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
-const axios = require("axios");
 
 const Category = require("../models/categoryModel");
+const {
+  assertOllamaSetup,
+  callOllama,
+  getOllamaResponseText,
+} = require("../services/ollamaClient");
 
-const OLLAMA_URL = process.env.OLLAMA_URL;
-
-if (!OLLAMA_URL) {
-  console.error("❌ OLLAMA_URL is not set in .env");
+try {
+  assertOllamaSetup();
+} catch (error) {
+  console.error(`❌ ${error.message}`);
   process.exit(1);
 }
 
@@ -45,13 +49,12 @@ async function classifyCategory(name) {
   const prompt = buildPrompt(name);
 
   try {
-    const response = await axios.post(OLLAMA_URL, {
-      model: "qwen3:8b",
+    const response = await callOllama({
       prompt,
-      stream: false
+      presetName: "classifyCategory",
     });
 
-    const output = response.data.response || response.data;
+    const output = getOllamaResponseText(response);
     const json = JSON.parse(output.trim());
 
     // Safety: only allow groups from FIXED_GROUPS

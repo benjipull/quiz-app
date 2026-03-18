@@ -6,6 +6,7 @@ import App from "./App.tsx";
 import "./index.css";
 import "./App.css";
 import { initGA } from "@/utils/gaClient";
+import { trackEnteredGame } from "@/utils/analytics";
 
 const storedUser = localStorage.getItem("user");
 let userId: string | undefined;
@@ -22,6 +23,7 @@ if (storedUser) {
 
 // Initialize GA only once, and set userId if available
 initGA(userId);
+trackEnteredGame(userId, "local_storage");
 
 console.log("🚀 App starting...");
 

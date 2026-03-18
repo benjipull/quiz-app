@@ -13,6 +13,7 @@ function printUsage() {
   console.log("Usage: node populateAllDifficulty.js [options]");
   console.log("");
   console.log("Options:");
+  console.log("  --category-id=<id>    Process questions only from a specific category.");
   console.log("  --all                 Process all enabled questions.");
   console.log("  --pending-only        Process only questions missing difficulty (default).");
   console.log(`  --limit=<n>           Max questions to process (${DEFAULT_LIMIT} default, 0 = no limit).`);
@@ -35,6 +36,7 @@ function parseArgs(args) {
     includeDisabled: false,
     limit: DEFAULT_LIMIT,
     delayMs: DEFAULT_DELAY_MS,
+    categoryId: null,
     help: false,
   };
 
@@ -69,6 +71,15 @@ function parseArgs(args) {
       continue;
     }
 
+    if (arg.startsWith("--category-id=")) {
+      const categoryId = arg.split("=")[1];
+      if (!categoryId || !mongoose.isValidObjectId(categoryId)) {
+        throw new Error(`Invalid category-id: ${categoryId || "<empty>"}`);
+      }
+      options.categoryId = categoryId;
+      continue;
+    }
+
     throw new Error(`Unknown option: ${arg}`);
   }
 
@@ -77,6 +88,10 @@ function parseArgs(args) {
 
 function buildPipeline(options) {
   const match = {};
+
+  if (options.categoryId) {
+    match._id = new mongoose.Types.ObjectId(options.categoryId);
+  }
 
   if (!options.includeDisabled) {
     match["questions.disabled"] = { $ne: true };
@@ -118,8 +133,9 @@ async function batchPopulateDifficulty(options) {
 
   const mode = options.processAll ? "all questions" : "pending-only questions";
   const scope = options.includeDisabled ? "including disabled" : "excluding disabled";
+  const categoryLabel = options.categoryId ? options.categoryId : "all categories";
   const limitLabel = options.limit > 0 ? String(options.limit) : "none";
-  console.log(`Running difficulty population in ${mode} mode (${scope}, limit=${limitLabel}, delay=${options.delayMs}ms).`);
+  console.log(`Running difficulty population in ${mode} mode (${scope}, category=${categoryLabel}, limit=${limitLabel}, delay=${options.delayMs}ms).`);
 
   const questions = await Category.aggregate(buildPipeline(options));
 

@@ -1,34 +1,27 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
-const axios = require("axios");
 const Category = require("../models/categoryModel");
 const connectDB = require("../config/db");
+const {
+  assertOllamaSetup,
+  callOllamaForText,
+} = require("../services/ollamaClient");
 
-const OLLAMA_URL = process.env.OLLAMA_URL;
 const CURRENT_VALIDATION_VERSION = 0.07; // ⬅️ bump version so questions get revalidated
 
-if (!OLLAMA_URL) {
-  console.error("❌ Missing OLLAMA_URL in .env");
+try {
+  assertOllamaSetup();
+} catch (error) {
+  console.error(`❌ ${error.message}`);
   process.exit(1);
 }
 
 // ----- Low-level helper -----
 async function callOllama(prompt) {
-  const res = await axios.post(OLLAMA_URL, {
-    model: "qwen3:8b",
+  return callOllamaForText({
     prompt: `${prompt}\n\nSTRICT FORMAT: Respond with exactly one JSON object only. Do not output <think> tags, markdown, or any prose before/after JSON.`,
-    format: "json",
-    options: {
-      temperature: 0.0,
-      top_p: 0.85,
-      top_k: 40,
-      num_ctx: 2048,
-      num_predict: 400,
-      repeat_penalty: 1.1,
-    },
-    stream: false,
+    presetName: "validateQuestions",
   });
-  return (res.data?.response || "").trim();
 }
 
 function extractJson(text) {

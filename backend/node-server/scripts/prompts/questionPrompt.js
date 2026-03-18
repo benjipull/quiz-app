@@ -1,74 +1,68 @@
 
 function buildQuestionPrompt(categoryName, avoidSection = "", difficultySection = "") {
   return `
-You are an international trivia expert. Use metric units, global examples, and neutral English spelling.
+You are an international trivia expert creating engaging quiz questions.
 
-Output STRICT JSON only (no prose, no markdown).
+Use metric units, global examples, and neutral English spelling.
 
-=== CORE TASK ===
-Generate ONE factual trivia question based on the provided category.
+Output STRICT JSON only. No prose or markdown.
+
+=== TASK ===
+Generate ONE engaging factual trivia question based on the provided category.
 
 The question must:
 - Have exactly 4 distinct answer choices.
 - Have exactly 1 correct answer.
 - Be based on a clear, verifiable fact.
-- Be objectively true according to a reputable source.
+- Be objectively true according to reputable sources.
 
-All answers must belong to the same logical context so the question is unambiguous.
+All answer options must belong to the same logical context.
 
-=== FACT-FIRST GENERATION RULE ===
-Before generating the question, internally identify a single verifiable factual statement from a reputable source related to the category.
+=== FACT-FIRST RULE ===
+Before writing the question, internally identify a single verifiable factual statement related to the category.
 
-The following fields must all derive from that same fact:
+The following fields must derive from that same fact:
 - question
 - correct_answer
 - explanation
 
-Do NOT invent a fact while writing the question.
+Do not output the internal fact.
 
-Do NOT output the internal fact-selection step.
+=== TRIVIA QUALITY RULE ===
+Prefer facts that are interesting and suitable for a trivia game.
 
-=== FACTUAL CONSTRAINTS ===
-All questions must be grounded in objective, academically verifiable facts.
+Good topics include:
+- famous discoveries
+- historical events
+- geography
+- science phenomena
+- notable inventions
+- well-known cultural works
+- famous people
 
-Do NOT generate questions that rely on:
-- statistics, surveys, or datasets
-- rankings, popularity, or frequency
-- cultural reputation, informal naming, or nicknames
-- folklore, myths, religious traditions, or symbolism
-- opinions, interpretations, or societal perceptions
-- behavioral tendencies of populations or groups
+Avoid mundane measurement or unit-conversion questions unless the value is widely known.
 
-The correctness of the answer must be deterministically true.
-
-=== QUESTION QUALITY RULES ===
-- Avoid ambiguous wording.
-- Avoid subjective language.
-- Do not use phrases implying opinion or reputation (e.g., “considered”, “widely known as”, “thought to be”).
-- The question must be fully understandable without additional context.
-- All four answer options must logically belong to the same contextual frame.
+The question should feel like something that could appear in a pub quiz.
 
 === ANSWER RULES ===
 - Exactly 4 answers must be provided.
 - Exactly 1 answer must be correct.
-- The correct answer MUST appear exactly in the answers array.
-- Answers must be distinct and plausible within the question context.
+- The correct answer must appear exactly in the answers array.
+- Answers must be plausible and clearly distinct.
 
-=== EXPLANATION RULES ===
-- Provide a concise explanation (1–2 sentences).
-- This field must never be empty.
+=== EXPLANATION RULE ===
+Provide a concise explanation (1–2 sentences).
 
-=== DIFFICULTY RUBRIC (1–10) ===
-1–2: Very basic factual recall (e.g., color of a fruit, number of continents)
-3–4: Simple factual recall with slight detail
-5–6: Intermediate factual knowledge requiring some learning or context
-7–8: Advanced factual knowledge often covered in higher studies
-9–10: Highly specialized or expert-level factual knowledge
+=== DIFFICULTY (1–10) ===
+1–2: basic facts
+3–4: common knowledge with some detail
+5–6: intermediate knowledge
+7–8: advanced knowledge
+9–10: expert knowledge
 
-=== DIFFICULTY RULE ===
-Difficulty is determined by how specific or specialized the fact is, NOT by how well-known it is.
+Difficulty depends on how specialized the fact is.
 
-The difficulty_rationale must explain why the fact fits the chosen difficulty level.
+The difficulty_rationale must explain why the fact fits the level.
 
 === OUTPUT FORMAT ===
 {
@@ -82,13 +76,8 @@ The difficulty_rationale must explain why the fact fits the chosen difficulty le
 
 If any requirement cannot be satisfied, output {}.
 
-=== CATEGORY INTERPRETATION ===
-Interpret the category as a single unified topic or concept, not as separate words.
-Infer its most likely subject area.
-
-Generate ONE factual quiz question clearly about that concept.
-
-Category: ${categoryName}
+=== CATEGORY ===
+${categoryName}
 
 ${avoidSection}
 
