@@ -727,7 +727,7 @@ export default function Home() {
                           .join(" ")}
                       </h2>
                       <img
-                        src="/assets/images/icons/edit-icon-cropped.png"
+                        src="/assets/images/icons/edit-icon.png"
                         alt=""
                         aria-hidden="true"
                         className={`absolute left-full top-1/2 -translate-y-1/2 ml-2 sm:ml-2.5 ${isTinyPhone ? "text-xl w-[1.8em] h-[1.8em]" : "text-2xl sm:text-3xl md:text-4xl w-[2em] h-[2em]"} opacity-100 drop-shadow-[0_0_6px_rgba(255,255,255,0.55)] shrink-0`}
@@ -806,7 +806,7 @@ export default function Home() {
                 <div className="relative z-10 grid h-full w-full grid-cols-[1fr_auto] items-center gap-2 sm:gap-3">
                   <span className={`pointer-events-none absolute ${isTinyPhone ? "left-[-18px]" : "left-[-23px]"} inset-y-0 inline-flex items-center justify-start w-7 sm:w-8 md:w-9 shrink-0`}>
                     <img
-                      src="/assets/images/icons/Play Icon.png"
+                      src="/assets/images/icons/play-icon.png"
                       alt=""
                       aria-hidden="true"
                       className={`h-7 sm:h-8 md:h-9 w-auto object-contain ${isTinyPhone ? "scale-[4.2] translate-y-[4px]" : "scale-[4.8] translate-y-[6px]"} origin-left`}
