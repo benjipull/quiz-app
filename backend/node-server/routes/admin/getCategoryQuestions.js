@@ -28,6 +28,8 @@ router.get("/:id/questions", auth, adminAuth, async (req, res) => {
       text: q.text,
       version: q.version ?? 1,
       difficulty_level: q.difficulty_level,
+      difficulty_rationale: q.difficulty_rationale || "",
+      difficultyConfirmedVersion: q.difficultyConfirmedVersion ?? 0,
       disabled: q.disabled,
       correct_answer: q.correct_answer,
       explanation: q.explanation || "",

@@ -7,6 +7,7 @@ function logEventDebug(eventName: string, params: Record<string, any>) {
 }
 
 const FIRST_INTERACTION_SESSION_KEY = "ga_first_interaction_tracked";
+const ENTERED_GAME_SESSION_KEY = "ga_entered_game_tracked";
 
 // === NEW GENERIC TRACKING FUNCTION ===
 export const trackEvent = (eventName: string, params: Record<string, any> = {}) => {
@@ -35,6 +36,23 @@ export const trackFirstSessionInteraction = (params: Record<string, any> = {}) =
 
   ReactGA.event("first_session_interaction", payload);
   logEventDebug("first_session_interaction", payload);
+};
+
+export const trackEnteredGame = (userId?: string, identificationMethod: string = "unknown") => {
+  if (!userId) return;
+  if (typeof window !== "undefined") {
+    try {
+      if (sessionStorage.getItem(ENTERED_GAME_SESSION_KEY) === "1") return;
+      sessionStorage.setItem(ENTERED_GAME_SESSION_KEY, "1");
+    } catch {
+      // If sessionStorage is unavailable, still emit the event.
+    }
+  }
+
+  trackEvent("entered_game", {
+    user_id: userId,
+    identification_method: identificationMethod,
+  });
 };
 
 export const trackQuizStart = (categoryId: string, userId?: string) => {
