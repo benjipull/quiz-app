@@ -184,7 +184,7 @@ const Leaderboard = () => {
   };
 
   return (
-    <div className="w-full h-[100dvh] max-h-[100dvh] flex flex-col items-center px-3 sm:px-4 bg-[#100321] bg-[url('/leaderboard.jpg')] bg-no-repeat bg-center bg-cover overflow-hidden fixed inset-0">
+    <div className="w-full h-[100dvh] max-h-[100dvh] flex flex-col items-center px-3 sm:px-4 bg-[#100321] bg-[url('/assets/images/leaderboard.jpg')] bg-no-repeat bg-center bg-cover overflow-hidden fixed inset-0">
       {/* Responsive CSS */}
       <style>{`
         @media (max-width: 420px) {
@@ -241,7 +241,7 @@ const Leaderboard = () => {
 
         {/* Trophy */}
         <div className="-mt-8 sm:-mt-12 flex justify-center mb-4">
-          <img src="/trophy.png" alt="Trophy" className="w-40 h-40 sm:w-56 sm:h-56 object-contain drop-shadow-2xl" />
+          <img src="/assets/images/trophy.png" alt="Trophy" className="w-40 h-40 sm:w-56 sm:h-56 object-contain drop-shadow-2xl" />
         </div>
       </div>
 

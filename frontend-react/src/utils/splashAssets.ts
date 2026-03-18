@@ -1,4 +1,7 @@
 import { PRELOAD_CONFIG } from "@/utils/preloadConfig";
+import { warmSound } from "@/utils/soundCache";
+
+const preloadedImageSources = new Map<string, string>();
 
 const preloadImage = (src: string) =>
   new Promise<void>((resolve) => {
@@ -8,7 +11,10 @@ const preloadImage = (src: string) =>
     }
 
     const image = new Image();
-    const settle = () => resolve();
+    const settle = () => {
+      preloadedImageSources.set(src, image.currentSrc || image.src);
+      resolve();
+    };
 
     image.onload = settle;
     image.onerror = settle;
@@ -21,42 +27,14 @@ const preloadImage = (src: string) =>
 
 const preloadAudio = (src: string) =>
   new Promise<void>((resolve) => {
-    if (typeof Audio === "undefined") {
-      resolve();
-      return;
-    }
-
-    const audio = new Audio();
-    let settled = false;
-
-    const settle = () => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeoutId);
-      audio.onloadeddata = null;
-      audio.oncanplaythrough = null;
-      audio.onerror = null;
-      audio.onstalled = null;
-      audio.onabort = null;
-      resolve();
-    };
-
-    const timeoutId = setTimeout(settle, 5000);
-
-    audio.preload = "auto";
-    audio.onloadeddata = settle;
-    audio.oncanplaythrough = settle;
-    audio.onerror = settle;
-    audio.onstalled = settle;
-    audio.onabort = settle;
-    audio.src = src;
-    audio.load();
+    warmSound(src).finally(resolve);
   });
 
 let splashAssetsReady = false;
 let splashAssetsPromise: Promise<void> | null = null;
 
 export const areSplashAssetsReady = () => splashAssetsReady;
+export const getPreloadedImageSrc = (src: string) => preloadedImageSources.get(src) ?? src;
 
 export const preloadSplashAssets = async () => {
   if (splashAssetsReady) return;

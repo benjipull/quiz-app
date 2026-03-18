@@ -767,7 +767,7 @@ const handleGuestLogin = async () => {
                         <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full blur-xl opacity-50 animate-pulse"></div>
                         <img
                             className="relative mx-auto h-12 sm:h-16 w-auto filter drop-shadow-2xl"
-                            src="/logo1.jpg"
+                            src="/assets/images/logo1.jpg"
                             alt="Quizicle Logo"
                         />
                     </div>

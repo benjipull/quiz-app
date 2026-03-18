@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Clock } from "lucide-react";
-import { preloadSounds } from "@/utils/soundCache";
+import { createPortal } from "react-dom";
+import { playSound } from "@/utils/soundCache";
 import { getApiBaseUrl } from "@/utils/baseUrl";
 import { trackEvent, trackFirstSessionInteraction } from "@/utils/analytics";
 
@@ -190,11 +191,7 @@ export default function DailyCoinClaim({
     }
 
     const finalTokenCount = Math.floor(tokenCount);
-    for (let i = 0; i < finalTokenCount; i++) {
-      setTimeout(() => {
-        preloadSounds("/knowledge-point.mp3", 0.2);
-      }, i * 150);
-    }
+    playSound("/assets/sounds/knowledge-point.mp3", 0.2);
 
     setTimeout(() => {
       setShowFlyingCoins(false);
@@ -221,10 +218,15 @@ export default function DailyCoinClaim({
     return formatTimeRemaining(timeRemaining);
   }
 
+  const renderOverlay = (node: React.ReactNode) => {
+    if (typeof document === "undefined") return null;
+    return createPortal(node, document.body);
+  };
+
   return (
     <>
-      {isClaiming && showDailyOverlay && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center pointer-events-none">
+      {isClaiming && showDailyOverlay && renderOverlay(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center pointer-events-none">
           <div
             ref={earnedCoinsRef}
             className="py-4 sm:py-8 text-center space-y-3 sm:space-y-4 animate-pop-in"
@@ -243,34 +245,38 @@ export default function DailyCoinClaim({
         </div>
       )}
 
-      {showFlyingCoins && coinTokens.map((token) => (
-        <div
-          key={token.id}
-          className="daily-coin-token"
-          style={{ '--daily-coin-delay': `${token.delay}ms` } as React.CSSProperties}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="w-4 h-4 text-white"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <circle cx="12" cy="12" r="10" fill="#f59e0b" />
-            <circle cx="12" cy="12" r="8" fill="#fbbf24" />
-            <text
-              x="12"
-              y="16"
-              fontSize="10"
-              fontWeight="bold"
-              fill="#d97706"
-              textAnchor="middle"
+      {showFlyingCoins && renderOverlay(
+        <>
+          {coinTokens.map((token) => (
+            <div
+              key={token.id}
+              className="daily-coin-token"
+              style={{ '--daily-coin-delay': `${token.delay}ms` } as React.CSSProperties}
             >
-              $
-            </text>
-          </svg>
-        </div>
-      ))}
+              <svg
+                viewBox="0 0 24 24"
+                className="w-4 h-4 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle cx="12" cy="12" r="10" fill="#f59e0b" />
+                <circle cx="12" cy="12" r="8" fill="#fbbf24" />
+                <text
+                  x="12"
+                  y="16"
+                  fontSize="10"
+                  fontWeight="bold"
+                  fill="#d97706"
+                  textAnchor="middle"
+                >
+                  $
+                </text>
+              </svg>
+            </div>
+          ))}
+        </>
+      )}
 
-      <div className="daily-reward-shell relative inline-block overflow-visible w-[300px] sm:w-[420px] lg:w-[520px] max-w-full">
+      <div className="daily-reward-shell relative inline-block overflow-visible w-[310px] sm:w-[430px] lg:w-[530px] max-w-full">
         <div className="daily-reward-gift pointer-events-none absolute left-[-31px] top-1/2 z-20 -translate-y-1/2">
           <img
             src={COIN_GIFT_IMAGE_SRC}
@@ -279,19 +285,19 @@ export default function DailyCoinClaim({
           />
         </div>
 
-        <Card className="daily-reward-card h-[74px] sm:h-[78px] overflow-hidden rounded-[14px] border-2 border-amber-300 bg-orange-500/15 px-0 py-0 shadow-[0_0_22px_rgba(251,191,36,0.35),inset_0_0_0_1px_rgba(253,230,138,0.5)]">
+        <Card className="daily-reward-card h-[74px] sm:h-[78px] overflow-hidden rounded-[14px] border-2 border-amber-300 bg-orange-500/15 p-2 sm:p-2.5 shadow-[0_0_22px_rgba(251,191,36,0.35),inset_0_0_0_1px_rgba(253,230,138,0.5)]">
           <div className="relative h-full">
           <p className="daily-reward-title pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 text-xl sm:text-2xl font-bold whitespace-nowrap leading-none bg-gradient-to-b from-orange-200 via-orange-400 to-orange-600 bg-clip-text text-transparent">
             Daily Reward
           </p>
 
-          <div className="daily-reward-content flex h-full items-end justify-between gap-2 pl-20 pr-0 pb-0 sm:pl-24">
+          <div className="daily-reward-content flex h-full items-end justify-between gap-2 pl-20 pr-2 pb-2 pt-5 sm:pl-24 sm:pr-2.5 sm:pb-2.5">
             <p className="daily-reward-coins text-yellow-400 text-xs sm:text-sm font-semibold leading-none">
               {dailyBonusAmount} Coins
             </p>
 
             <Button
-              className="daily-reward-button mr-[10px] mb-[10px] h-8 sm:h-9 px-4 sm:px-5 text-sm rounded-[8px]"
+              className="daily-reward-button h-8 sm:h-9 px-4 sm:px-5 text-sm rounded-[8px]"
               ref={claimButtonRef}
               type="button"
               onClick={(event) => {
@@ -339,7 +345,7 @@ export default function DailyCoinClaim({
             0 0 0 3px rgba(251, 191, 36, 0.3),
             0 0 15px rgba(251, 191, 36, 0.5),
             0 5px 20px rgba(0, 0, 0, 0.4);
-          z-index: 9999;
+          z-index: 10001;
           opacity: 0;
           pointer-events: none;
           display: flex;
@@ -402,6 +408,9 @@ export default function DailyCoinClaim({
 
           .daily-reward-content {
             padding-left: 3.5rem !important;
+            padding-right: 0.5rem !important;
+            padding-bottom: 0.5rem !important;
+            padding-top: 1.6rem !important;
           }
 
           .daily-reward-coins {
@@ -409,8 +418,6 @@ export default function DailyCoinClaim({
           }
 
           .daily-reward-button {
-            margin-right: 8px !important;
-            margin-bottom: 8px !important;
             height: 1.5rem !important;
             padding-left: 0.625rem !important;
             padding-right: 0.625rem !important;

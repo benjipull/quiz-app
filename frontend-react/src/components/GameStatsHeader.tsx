@@ -200,7 +200,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
         {/* Middle - User Icon  */}
         <div className={`flex-shrink-0 ${compact ? "w-12 h-12 border-2" : "w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 border-4"} rounded-full border-slate-300 shadow-2xl overflow-hidden`}>
           <img
-            src="/q.jpg"
+            src="/assets/images/q.jpg"
             alt="center icon"
             className="w-full h-full object-cover"
           />
