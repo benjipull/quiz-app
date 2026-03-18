@@ -62,6 +62,12 @@ export const trackQuizStart = (categoryId: string, userId?: string) => {
   logEventDebug("quiz_start", params);
 };
 
+export const trackNextQuiz = (categoryId: string, userId?: string) => {
+  const params = { quiz_category_id: categoryId, user_id: userId };
+  ReactGA.event("next_quiz", params);
+  logEventDebug("next_quiz", params);
+};
+
 export const trackQuestionAnswered = (questionId: string, isCorrect: boolean, userId?: string) => {
   if (!isGAEnabled) return;
   const params = {

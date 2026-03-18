@@ -15,6 +15,9 @@ import {
   Award,
   Trophy,
 } from "lucide-react";
+import {
+  trackNextQuiz
+} from "@/utils/analytics";
 import Confetti from "react-confetti";
 import { useUser } from "@/contexts/UserContext"; 
 import { trackEvent } from "@/utils/analytics";
@@ -41,6 +44,8 @@ const OVERLAY_CLOSE_DELAY_MS = fasterMs(200);
 const TOKEN_FLIGHT_DURATION_MS = fasterMs(1200);
 const NUMBER_GROW_ANIMATION_MS = fasterMs(800);
 
+const storedUser = localStorage.getItem("user");
+const userId = storedUser ? JSON.parse(storedUser)._id : null;
 
 interface QuizResultsProps {
   results: {
