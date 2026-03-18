@@ -10,15 +10,15 @@ export interface PreloadConfig {
  */
 export const PRELOAD_CONFIG: PreloadConfig = {
   images: [
-    "/homebg.jpg",
+    "/homebg1.jpg",
     "/image.png",
     "/logo1.jpg",
     "/moon.jpg",
-    "/moon1.JPG",
+    "/moon.jpg",
     "/q.jpg",
     "/assets/images/icons/coin gift.png",
-    "/assets/images/icons/edit-icon-cropped.png",
-    "/assets/images/icons/Play Icon.png",
+    "/assets/images/icons/edit-icon.png",
+    "/assets/images/icons/play-icon.png",
   ],
   sounds: [
     "/clicksound.m4a",
