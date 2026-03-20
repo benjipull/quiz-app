@@ -7,7 +7,7 @@ const authenticateToken = require("../middleware/auth");
 const { userQuestions } = require("../index");
 const { getDifficultyLabel } = require("../config/difficultyLevels");
 
-const QUIZ_COST = 50;
+const QUIZ_COST = 100;
 
 router.post("/", authenticateToken, async (req, res) => {
   const { categoryId, numQuestions = 5 } = req.body;

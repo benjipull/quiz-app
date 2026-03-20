@@ -52,7 +52,13 @@ async function callOllama({ prompt, presetName, overrides = {} }) {
 }
 
 function getOllamaResponseText(response) {
-  return String(response?.data?.response || "").trim();
+  const data = response?.data || {};
+  const text =
+    data.response ??
+    data?.message?.content ??
+    data?.output?.[0]?.choices?.[0]?.text ??
+    "";
+  return String(text).trim();
 }
 
 async function callOllamaForText({ prompt, presetName, overrides = {} }) {

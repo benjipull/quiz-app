@@ -28,7 +28,7 @@ const KNOWLEDGE_GAIN_SOUND_SRC = "/assets/sounds/knowledge-point.mp3";
 const LEVEL_UP_SOUND_SRC = "/assets/sounds/player-level-up.mp3";
 
 const BASE_URL = getApiBaseUrl();
-const QUIZ_COST = 50;
+const QUIZ_COST = 100;
 const REWARD_ANIMATION_SPEED_FACTOR = 0.49; // another 30% faster (0.7 * 0.7)
 
 const fasterMs = (ms: number) =>
@@ -207,13 +207,21 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const headerXPRef = useRef<HTMLDivElement>(null);
   const headerCoinRef = useRef<HTMLDivElement>(null); 
 
-  const [knowledgeGainAudio] = useState(
-    typeof Audio !== "undefined" ? new Audio(KNOWLEDGE_GAIN_SOUND_SRC) : null
-  );
+  const [knowledgeGainAudio] = useState(() => {
+    if (typeof Audio === "undefined") return null;
+    const audio = new Audio(KNOWLEDGE_GAIN_SOUND_SRC);
+    audio.preload = "auto";
+    audio.load();
+    return audio;
+  });
   
-  const [levelUpAudio] = useState(
-    typeof Audio !== "undefined" ? new Audio(LEVEL_UP_SOUND_SRC) : null
-  );
+  const [levelUpAudio] = useState(() => {
+    if (typeof Audio === "undefined") return null;
+    const audio = new Audio(LEVEL_UP_SOUND_SRC);
+    audio.preload = "auto";
+    audio.load();
+    return audio;
+  });
 
   useEffect(() => {
     // Scroll to top when the component mounts
@@ -407,9 +415,9 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       setAnimatedTotalXP(Math.min(currentXP, totalKnowledge));
       
       if (knowledgeGainAudio) {
-        const audioClone = knowledgeGainAudio.cloneNode(true) as HTMLAudioElement;
-        audioClone.volume = 0.2;
-        audioClone.play().catch(e => console.log("Audio play failed:", e));
+        knowledgeGainAudio.volume = 0.2;
+        knowledgeGainAudio.currentTime = 0;
+        knowledgeGainAudio.play().catch(e => console.log("Audio play failed:", e));
       }
     }, TOKEN_TICK_INTERVAL_MS);
 
@@ -503,11 +511,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
       setAnimatedTotalCoins(Math.min(currentCoins, totalCoins));
       
-      // Re-use knowledge gain sound for coins for simplicity
       if (knowledgeGainAudio) {
-        const audioClone = knowledgeGainAudio.cloneNode(true) as HTMLAudioElement;
-        audioClone.volume = 0.2;
-        audioClone.play().catch(e => console.log("Audio play failed:", e));
+        knowledgeGainAudio.volume = 0.2;
+        knowledgeGainAudio.currentTime = 0;
+        knowledgeGainAudio.play().catch(e => console.log("Audio play failed:", e));
       }
     }, TOKEN_TICK_INTERVAL_MS);
 

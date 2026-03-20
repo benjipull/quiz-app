@@ -16,6 +16,47 @@ try {
   process.exit(1);
 }
 
+function parseParallelLimit(args) {
+  const aliases = ["--parallel", "--concurrency", "-p", "-n"];
+  let rawValue = null;
+
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    const [key, inlineValue] = arg.split("=");
+
+    if (!aliases.includes(key)) {
+      continue;
+    }
+
+    rawValue = inlineValue ?? args[i + 1];
+    break;
+  }
+
+  if (rawValue == null) {
+    return 1;
+  }
+
+  const parsedValue = Number.parseInt(rawValue, 10);
+  if (!Number.isInteger(parsedValue) || parsedValue < 1) {
+    console.warn(`Invalid parallel limit '${rawValue}'. Falling back to 1.`);
+    return 1;
+  }
+
+  return parsedValue;
+}
+
+async function processInParallelBatches(items, concurrency, worker) {
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const results = await Promise.allSettled(batch.map((item) => worker(item)));
+    results
+      .filter((result) => result.status === "rejected")
+      .forEach((result) => {
+        console.error("Error processing validation batch item:", result.reason?.message ?? result.reason);
+      });
+  }
+}
+
 // ----- Low-level helper -----
 async function callOllama(prompt) {
   return callOllamaForText({
@@ -331,8 +372,12 @@ module.exports = {
 // ----- Bulk category validation -----
 async function validateAllCategories() {
   try {
+    const parallelLimit = parseParallelLimit(process.argv.slice(2));
+
     await connectDB();
     console.log("✅ Connected to MongoDB");
+
+    console.log(`Running question validations with parallel limit: ${parallelLimit}`);
 
     // Fetch all categories so we can know which ones were skipped
     const allCategories = await Category.find({}, { name: 1 });
@@ -390,9 +435,9 @@ async function validateAllCategories() {
     for (const category of categories) {
       console.log(`🔹 Validating category: ${category.name} (${category.questions.length} questions)`);
 
-      for (const question of category.questions) {
+      await processInParallelBatches(category.questions, parallelLimit, async (question) => {
         const parsed = await validateQuestion(question);
-        if (!parsed) continue;
+        if (!parsed) return;
 
         // LENIENT MODE:
         // ❌ Incorrect → disable
@@ -444,7 +489,7 @@ async function validateAllCategories() {
           console.log("------------------------------------------------------\n");
         }
 
-      }
+      });
     }
 
     console.log("\n🎉 All categories validated!");
