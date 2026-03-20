@@ -34,7 +34,7 @@ import { avatarUrls } from "@/utils/avatarPaths";
 const avatars = avatarUrls;
 
 const BASE_URL = getApiBaseUrl();
-const QUIZ_COST = 50;
+const QUIZ_COST = 100;
 const API_TIMEOUT = 15000; // 15 second timeout for API calls
 const HOME_BACKGROUND_SRC = "/assets/images/homebg1.jpg";
 

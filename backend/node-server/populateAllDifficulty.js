@@ -8,6 +8,7 @@ const { populateDifficulty } = require("./scripts/populateDifficulty");
 
 const DEFAULT_LIMIT = 1000;
 const DEFAULT_DELAY_MS = 500;
+const DEFAULT_PARALLEL = 1;
 
 function printUsage() {
   console.log("Usage: node populateAllDifficulty.js [options]");
@@ -18,6 +19,9 @@ function printUsage() {
   console.log("  --pending-only        Process only questions missing difficulty (default).");
   console.log(`  --limit=<n>           Max questions to process (${DEFAULT_LIMIT} default, 0 = no limit).`);
   console.log(`  --delay-ms=<n>        Delay between questions in milliseconds (${DEFAULT_DELAY_MS} default).`);
+  console.log(`  --parallel=<n>        Number of questions to process in parallel (${DEFAULT_PARALLEL} default).`);
+  console.log("  --concurrency=<n>     Alias for --parallel.");
+  console.log("  -n <n>, -p <n>        Shorthand for --parallel.");
   console.log("  --include-disabled    Include disabled questions.");
   console.log("  --help                Show this help.");
 }
@@ -30,17 +34,28 @@ function parsePositiveInt(value, fieldName) {
   return num;
 }
 
+function parseMinOneInt(value, fieldName) {
+  const num = Number(value);
+  if (!Number.isInteger(num) || num < 1) {
+    throw new Error(`Invalid ${fieldName}: ${value}`);
+  }
+  return num;
+}
+
 function parseArgs(args) {
   const options = {
     processAll: false,
     includeDisabled: false,
     limit: DEFAULT_LIMIT,
     delayMs: DEFAULT_DELAY_MS,
+    parallel: DEFAULT_PARALLEL,
     categoryId: null,
     help: false,
   };
 
-  for (const arg of args) {
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+
     if (arg === "--all") {
       options.processAll = true;
       continue;
@@ -61,13 +76,81 @@ function parseArgs(args) {
       continue;
     }
 
+    if (arg === "--limit") {
+      const value = args[i + 1];
+      if (value == null) {
+        throw new Error("Missing value for --limit");
+      }
+      options.limit = parsePositiveInt(value, "limit");
+      i += 1;
+      continue;
+    }
+
     if (arg.startsWith("--limit=")) {
       options.limit = parsePositiveInt(arg.split("=")[1], "limit");
       continue;
     }
 
+    if (arg === "--delay-ms") {
+      const value = args[i + 1];
+      if (value == null) {
+        throw new Error("Missing value for --delay-ms");
+      }
+      options.delayMs = parsePositiveInt(value, "delay-ms");
+      i += 1;
+      continue;
+    }
+
     if (arg.startsWith("--delay-ms=")) {
       options.delayMs = parsePositiveInt(arg.split("=")[1], "delay-ms");
+      continue;
+    }
+
+    if (
+      arg === "--parallel" ||
+      arg === "--concurrency" ||
+      arg === "-n" ||
+      arg === "-p"
+    ) {
+      const value = args[i + 1];
+      if (value == null) {
+        throw new Error(`Missing value for ${arg}`);
+      }
+      options.parallel = parseMinOneInt(value, "parallel");
+      i += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--parallel=")) {
+      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      continue;
+    }
+
+    if (arg.startsWith("--concurrency=")) {
+      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      continue;
+    }
+
+    if (arg.startsWith("-n=")) {
+      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      continue;
+    }
+
+    if (arg.startsWith("-p=")) {
+      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      continue;
+    }
+
+    if (arg === "--category-id") {
+      const value = args[i + 1];
+      if (value == null) {
+        throw new Error("Missing value for --category-id");
+      }
+      if (!mongoose.isValidObjectId(value)) {
+        throw new Error(`Invalid category-id: ${value || "<empty>"}`);
+      }
+      options.categoryId = value;
+      i += 1;
       continue;
     }
 
@@ -135,7 +218,9 @@ async function batchPopulateDifficulty(options) {
   const scope = options.includeDisabled ? "including disabled" : "excluding disabled";
   const categoryLabel = options.categoryId ? options.categoryId : "all categories";
   const limitLabel = options.limit > 0 ? String(options.limit) : "none";
-  console.log(`Running difficulty population in ${mode} mode (${scope}, category=${categoryLabel}, limit=${limitLabel}, delay=${options.delayMs}ms).`);
+  console.log(
+    `Running difficulty population in ${mode} mode (${scope}, category=${categoryLabel}, limit=${limitLabel}, delay=${options.delayMs}ms, parallel=${options.parallel}).`
+  );
 
   const questions = await Category.aggregate(buildPipeline(options));
 
@@ -149,19 +234,33 @@ async function batchPopulateDifficulty(options) {
   let success = 0;
   let fail = 0;
 
-  for (let i = 0; i < questions.length; i++) {
-    const q = questions[i];
-    const snippet = (q.text || "").substring(0, 80);
-    console.log(`(${i + 1}/${questions.length}) ${snippet}...`);
+  const indexedQuestions = questions.map((q, index) => ({ q, index }));
+  for (let i = 0; i < indexedQuestions.length; i += options.parallel) {
+    const batch = indexedQuestions.slice(i, i + options.parallel);
+    const results = await Promise.allSettled(
+      batch.map(async ({ q, index }) => {
+        const snippet = (q.text || "").substring(0, 80);
+        console.log(`(${index + 1}/${questions.length}) ${snippet}...`);
+        return populateDifficulty(q.categoryId, q.questionId);
+      })
+    );
 
-    const ok = await populateDifficulty(q.categoryId, q.questionId);
-    if (ok) {
-      success += 1;
-    } else {
+    results.forEach((result) => {
+      if (result.status === "fulfilled" && result.value === true) {
+        success += 1;
+        return;
+      }
+
+      if (result.status === "rejected") {
+        console.error(`Unhandled question processing error: ${result.reason?.message || result.reason}`);
+      }
+
       fail += 1;
-    }
+    });
 
-    await sleep(options.delayMs);
+    if (options.delayMs > 0 && i + options.parallel < indexedQuestions.length) {
+      await sleep(options.delayMs);
+    }
   }
 
   console.log("");
