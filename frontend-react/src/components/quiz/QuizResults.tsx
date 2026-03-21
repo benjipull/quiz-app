@@ -14,6 +14,7 @@ import {
   X,
   Award,
   Trophy,
+  RefreshCw,
 } from "lucide-react";
 import {
   trackNextQuiz
@@ -66,6 +67,12 @@ interface QuizResultsProps {
   };
   onPlayAgain: () => void;
   onClose: () => void;
+}
+
+interface CategoryToPlayResponse {
+  message?: string;
+  categoryId: string;
+  name?: string;
 }
 
 const getPerformanceData = (percentage: number) => {
@@ -173,11 +180,12 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     currentLevel,
   } = completionData;
 
-  // 📝 NEW STATE: Next category ID (replaces preloader dependency)
-  const [nextCategoryId, setNextCategoryId] = useState<string | null>(null);
-  // 📝 NEW STATE: Loading state for the next category ID
+  // Prefetched next category preview (id + name).
+  const [nextCategoryPreview, setNextCategoryPreview] = useState<CategoryToPlayResponse | null>(null);
+  // Loading states for category lookup and manual refresh.
   const [isNextCategoryFetching, setIsNextCategoryFetching] = useState(false);
-  // ❌ Removed: [hasPreloadedNext, setHasPreloadedNext]
+  const [refreshCategoryLoading, setRefreshCategoryLoading] = useState(false);
+  const [nextQuizMessage, setNextQuizMessage] = useState<string | null>(null);
 
   const percentage = Math.min(Math.max(percentageCorrect, 0), 100);
   const hasLeveledUp = currentLevel > previousLevel;
@@ -204,7 +212,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   
   const earnedPointsRef = useRef<HTMLDivElement>(null);
   const earnedCoinsRef = useRef<HTMLDivElement>(null); 
-  const headerXPRef = useRef<HTMLDivElement>(null);
+  const kpProgressBarRef = useRef<HTMLDivElement>(null);
   const headerCoinRef = useRef<HTMLDivElement>(null); 
 
   const [knowledgeGainAudio] = useState(() => {
@@ -265,21 +273,26 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
     // Start fetching the next quiz ID after a short delay
     const timer = setTimeout(() => {
       // Only fetch the ID here. The quiz session content will be loaded on click.
-      fetchNextCategoryId();
+      fetchNextCategory();
     }, 2000); 
 
     return () => clearTimeout(timer);
   }, [userToken, categoryId]);
 
   // 📝 NEW FUNCTION: Fetch the ID of the next category (No preloading logic)
-  const fetchNextCategoryId = async () => {
-    if (!userToken || isNextCategoryFetching || nextCategoryId) return;
+  const fetchNextCategory = async (
+    options?: { force?: boolean; excludeCategoryId?: string }
+  ): Promise<CategoryToPlayResponse | null> => {
+    const force = options?.force === true;
+    if (!userToken) return null;
+    if (isNextCategoryFetching && !force) return nextCategoryPreview;
+    if (!force && nextCategoryPreview?.categoryId) return nextCategoryPreview;
     
     setIsNextCategoryFetching(true);
     
     try {
       console.log("🎯 Fetching next category ID...");
-      const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay?exclude=${categoryId}`, {
+      const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay?exclude=${encodeURIComponent(options?.excludeCategoryId || categoryId)}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -288,19 +301,23 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data: CategoryToPlayResponse = await response.json();
         if (data.categoryId) {
-          setNextCategoryId(data.categoryId);
-          console.log("✅ Next category ID fetched:", data.categoryId);
-        } else {
-          console.log("⚠️ API returned no next category ID.");
+          const preview = {
+            categoryId: data.categoryId,
+            name: data.name,
+            message: data.message,
+          };
+          setNextCategoryPreview(preview);
+          return preview;
         }
       }
     } catch (error) {
-      console.error("❌ Error fetching next category ID:", error);
+      console.error("Error fetching next category:", error);
     } finally {
-        setIsNextCategoryFetching(false);
+      setIsNextCategoryFetching(false);
     }
+    return null;
   };
 
   // Animated score counter
@@ -368,9 +385,9 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   // XP Token flying animation - Refactored from startTokenAnimation
   const startXPTokenAnimation = () => {
     const earnedRect = earnedPointsRef.current?.getBoundingClientRect();
-    const headerRect = headerXPRef.current?.getBoundingClientRect();
+    const progressRect = kpProgressBarRef.current?.getBoundingClientRect();
 
-    if (!earnedRect || !headerRect) {
+    if (!earnedRect || !progressRect) {
       setAnimatedTotalXP(totalKnowledge);
       startCoinAnimation(); // If refs fail, skip token animation and move to Coins
       return;
@@ -378,8 +395,8 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
     const startX = earnedRect.left + earnedRect.width / 2;
     const startY = earnedRect.top + earnedRect.height / 2;
-    const endX = headerRect.left + headerRect.width / 2;
-    const endY = headerRect.top + headerRect.height / 2;
+    const endX = progressRect.left + progressRect.width / 2;
+    const endY = progressRect.top + progressRect.height / 2;
     
     const tokenCount = Math.min(15, Math.max(8, knowledgeGained / 8));
     const newTokens = Array.from({ length: Math.floor(tokenCount) }, (_, i) => ({
@@ -554,20 +571,21 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
   const [levelConfig, setLevelConfig] = useState<LevelConfigEntry[] | null>(null);
 
-  // 📝 MODIFIED: handleNextQuiz function uses nextCategoryId state or fetches it directly.
+  // Start the next quiz using the prefetched category preview.
   const handleNextQuiz = async () => {
     if (!userToken) {
       console.error("User must be logged in to play the next quiz.");
-      setRatingMessage("You must be logged in to play the next quiz.");
+      setNextQuizMessage("You must be logged in to play the next quiz.");
       return;
     }
 
     setPlayButtonLoading(true);
+    setNextQuizMessage(null);
 
-    let nextId = nextCategoryId;
+    let nextCategory = nextCategoryPreview;
 
-    // If nextCategoryId hasn't been fetched yet, fetch it now
-    if (!nextId) {
+    // Fetch on-demand if preview is not available yet.
+    if (!nextCategory?.categoryId) {
       console.log("⚠️ Next category ID not pre-fetched, fetching now...");
       try {
         const response = await fetch(`${BASE_URL}/api/getGetegoryToPlay?exclude=${categoryId}`, {
@@ -582,31 +600,64 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           throw new Error(`Failed to get category to play: ${response.status}`);
         }
 
-        const data = await response.json();
-        nextId = data.categoryId;
+        const data: CategoryToPlayResponse = await response.json();
+        nextCategory = data.categoryId
+          ? { categoryId: data.categoryId, name: data.name, message: data.message }
+          : null;
+        if (nextCategory) {
+          setNextCategoryPreview(nextCategory);
+        }
 
       } catch (error: unknown) {
         if (error instanceof Error) {
           console.error("Error getting category to play:", error);
-          setRatingMessage(`Error playing next quiz: ${error.message}`);
+          setNextQuizMessage(`Error playing next quiz: ${error.message}`);
         } else {
           console.error("Unknown error:", error);
-          setRatingMessage("An unknown error occurred while playing the next quiz.");
+          setNextQuizMessage("An unknown error occurred while playing the next quiz.");
         }
         setPlayButtonLoading(false);
         return;
       }
     }
     
-    // Now we have the nextId (either pre-fetched or just-fetched)
-    if (nextId) {
-        console.log(`🚀 Navigating to next quiz: /quiz/${nextId}`);
+    // Navigate when a category is available.
+    if (nextCategory?.categoryId) {
+        console.log(`Navigating to next quiz: /quiz/${nextCategory.categoryId}`);
         trackEvent("next_quiz");
         await new Promise((resolve) => setTimeout(resolve, 150));
-        navigate(`/quiz/${nextId}`);
+        navigate(`/quiz/${nextCategory.categoryId}`);
     } else {
-        setRatingMessage("Could not find a new category to play.");
+        setNextQuizMessage("Could not find a new category to play.");
         setPlayButtonLoading(false);
+    }
+  };
+
+  const handleRefreshCategory = async () => {
+    if (!userToken || refreshCategoryLoading || playButtonLoading || isNextCategoryFetching) return;
+
+    setRefreshCategoryLoading(true);
+    setNextQuizMessage(null);
+    const currentPreviewId = nextCategoryPreview?.categoryId;
+
+    try {
+      const refreshed = await fetchNextCategory({
+        force: true,
+        excludeCategoryId: currentPreviewId || categoryId,
+      });
+
+      if (!refreshed?.categoryId) {
+        setNextQuizMessage("Could not load another category right now. Please try again.");
+        return;
+      }
+
+      if (currentPreviewId && refreshed.categoryId === currentPreviewId) {
+        setNextQuizMessage("No alternate category is currently available.");
+      }
+    } catch (error) {
+      setNextQuizMessage(`Failed to refresh category: ${(error as Error).message}`);
+    } finally {
+      setRefreshCategoryLoading(false);
     }
   };
 
@@ -660,17 +711,63 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
   const levelProgressPercent = levelProgressTarget > 0
     ? Math.min(100, (levelProgressPoints / levelProgressTarget) * 100)
     : 100;
+  const viewportHeight = windowSize.height || (typeof window !== "undefined" ? window.innerHeight : 800);
+  const isSmallScreen = windowSize.width < 768;
+  const isShortHeight = isSmallScreen && viewportHeight <= 760;
+  const isUltraShortHeight = isSmallScreen && viewportHeight <= 680;
+  const isTinyPhone = isSmallScreen && windowSize.width <= 360 && viewportHeight <= 700;
+  const rootPaddingClass = isUltraShortHeight ? "p-1.5" : isShortHeight ? "p-2" : "p-2 sm:p-3";
+  const statBarPaddingClass = isUltraShortHeight ? "p-1.5" : isShortHeight ? "p-2" : "p-2 sm:p-3";
+  const mainCardMarginClass = isShortHeight ? "mt-1" : "mt-2 sm:mt-3";
+  const cardContentClass = isUltraShortHeight
+    ? "relative z-10 p-2 flex-1 flex flex-col gap-2 overflow-hidden"
+    : isShortHeight
+    ? "relative z-10 p-2.5 flex-1 flex flex-col gap-2.5 overflow-hidden"
+    : "relative z-10 p-3 sm:p-4 flex-1 flex flex-col gap-3 sm:gap-4 overflow-hidden";
+  const contentScale = isUltraShortHeight ? 0.86 : isShortHeight ? 0.93 : 1;
+  const resultsStackClass = isUltraShortHeight
+    ? "space-y-2 animate-fade-in pt-0.5 flex-1 flex flex-col"
+    : isShortHeight
+    ? "space-y-2.5 animate-fade-in pt-1 flex-1 flex flex-col"
+    : "space-y-2.5 sm:space-y-3 animate-fade-in pt-1 sm:pt-2 flex-1 flex flex-col";
+  const ctaSectionClass = isShortHeight
+    ? "mt-2 pt-1.5 border-t border-slate-700/50 space-y-2"
+    : "mt-3 sm:mt-4 pt-2 sm:pt-3 border-t border-slate-700/50 space-y-2.5";
+  const ctaButtonHeightClass = isUltraShortHeight
+    ? "h-[3.35rem]"
+    : isTinyPhone
+    ? "h-[4rem]"
+    : isShortHeight
+    ? "h-[4.1rem]"
+    : "h-[4.5rem] sm:h-[5.4rem]";
+  const ratingCardClass = isShortHeight
+    ? "bg-slate-800/50 border border-slate-600/60 p-2.5"
+    : "bg-slate-800/50 border border-slate-600/60 p-3 sm:p-4";
+  const ratingTitleClass = isShortHeight
+    ? "text-xs sm:text-sm font-extrabold text-slate-100 tracking-wide"
+    : "text-sm sm:text-base font-extrabold text-slate-100 tracking-wide";
+  const ratingHelpClass = isShortHeight
+    ? "text-[11px] sm:text-xs text-slate-300"
+    : "text-xs sm:text-sm text-slate-300";
+  const ratingStarsWrapClass = isShortHeight
+    ? "mt-2.5 flex items-center justify-center gap-1.5 sm:gap-2"
+    : "mt-3 sm:mt-4 flex items-center justify-center gap-2 sm:gap-2.5";
+  const ratingButtonSizeClass = isShortHeight ? "h-9 w-9 sm:h-10 sm:w-10" : "h-11 w-11 sm:h-12 sm:w-12";
+  const ratingIconSizeClass = isShortHeight ? "h-5 w-5 sm:h-6 sm:w-6" : "h-6 w-6 sm:h-7 sm:w-7";
+  const nextCategoryLabel =
+    nextCategoryPreview?.name ||
+    (isNextCategoryFetching ? "Loading next category..." : "Tap refresh to load category");
   
   if (!mounted) {
     return null;
   }
 
   return (
-    <div className="h-[100dvh] max-h-[100dvh] w-full z-50 flex flex-col items-center p-2 sm:p-3 font-sans bg-gradient-to-br from-[#100221] via-[#4f187a] to-[#380d67] overflow-hidden">
+    <div className={`h-[100dvh] max-h-[100dvh] w-full z-50 flex flex-col items-center ${rootPaddingClass} font-sans bg-gradient-to-br from-[#100221] via-[#4f187a] to-[#380d67] overflow-hidden`}>
       
       {/* Header with Stats (The XP target) */}
       <div className="w-full max-w-lg flex-shrink-0 animate-fade-in-down">
-        <div className="flex items-center justify-between p-2 sm:p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 backdrop-blur-sm">
+        <div className={`flex items-center justify-between ${statBarPaddingClass} bg-slate-800/60 rounded-xl border border-slate-700/50 backdrop-blur-sm`}>
           {/* Stat Item: Coins - TARGET FOR COIN TOKENS */}
           <div ref={headerCoinRef} className="flex items-center gap-1 sm:gap-1.5 relative">
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
@@ -682,7 +779,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           </div>
 
            {/* Stat Item - XP - TARGET FOR XP TOKENS */}
-           <div ref={headerXPRef} className="flex items-center gap-1 sm:gap-1.5 relative">
+           <div className="flex items-center gap-1 sm:gap-1.5 relative">
             <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center transition-all duration-300">
               <KnowledgePointIcon className="h-4 w-4 text-amber-500" />
             </div>
@@ -777,7 +874,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
       )}
 
       {/* Main Results Card Container - Takes remaining space */}
-      <div className="relative z-10 w-full max-w-lg mx-auto flex-1 flex flex-col min-h-0 mt-2 sm:mt-3">
+      <div className={`relative z-10 w-full max-w-lg mx-auto flex-1 flex flex-col min-h-0 ${mainCardMarginClass}`}>
         <Card className="relative overflow-hidden bg-gradient-to-br from-[#100321] via-[#2d1b4e] to-[#380d67] backdrop-blur-xl border-2 border-slate-700/50 shadow-2xl animate-scale-in flex-1 flex flex-col">
           
           {/* Close Button */}
@@ -790,7 +887,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
           </Link>
           
           {/* Content Wrapper - Scrollable */}
-          <div className="relative z-10 p-3 sm:p-4 flex-1 flex flex-col gap-3 sm:gap-4 overflow-hidden">
+          <div
+            className={cardContentClass}
+            style={contentScale < 1 ? { transform: `scale(${contentScale})`, transformOrigin: "top center" } : undefined}
+          >
             
             {/* Header */}
             <div className="text-center space-y-1.5 sm:space-y-2 animate-fade-in-up">
@@ -804,7 +904,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             </div>
 
             {/* Results Content */}
-            <div className="space-y-2.5 sm:space-y-3 animate-fade-in pt-1 sm:pt-2 flex-1 flex flex-col">
+            <div className={resultsStackClass}>
               {/* Results Grid */}
               <div className="grid grid-cols-2 gap-2">
                 {/* Correct/Incorrect */}
@@ -887,7 +987,7 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
 
               {/* KP Progress Bar */}
               <Card className="bg-slate-800/40 border border-slate-700/50 p-2.5 sm:p-3">
-                <div className="relative h-9 sm:h-10 w-full rounded-full bg-white/10 overflow-hidden border border-white/15">
+                <div ref={kpProgressBarRef} className="relative h-9 sm:h-10 w-full rounded-full bg-white/10 overflow-hidden border border-white/15">
                   <div
                     className="h-full rounded-full transition-[width] duration-500 ease-out"
                     style={{
@@ -909,37 +1009,43 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
               </Card>
 
               {/* Rating */}
-              <Card className="bg-slate-800/40 border border-slate-700/50 p-2">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="text-xs font-bold text-slate-500 uppercase">
+              <Card className={ratingCardClass}>
+                <div className="text-center space-y-1 sm:space-y-1.5">
+                  <div className={ratingTitleClass}>
                     Rate This Quiz
                   </div>
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        disabled={hasRated || isSubmittingRating}
-                        onClick={() => handleRatingSubmit(star)}
-                        onMouseEnter={() => !hasRated && setHoveredRating(star)}
-                        onMouseLeave={() => !hasRated && setHoveredRating(0)}
-                        className={`transition-all duration-200 transform ${
-                          hasRated || isSubmittingRating ? "cursor-default" : "cursor-pointer hover:scale-125"
-                        }`}
-                      >
-                        <StarIcon
-                          className={`h-4 w-4 transition-all ${
-                            star <= (hoveredRating || rating)
-                              ? "fill-yellow-400 text-yellow-400"
-                              : "text-slate-600 hover:text-yellow-400/60"
-                          }`}
-                        />
-                      </button>
-                    ))}
+                  <div className={ratingHelpClass}>
+                    Tap a star to share your experience
                   </div>
                 </div>
+                <div className={ratingStarsWrapClass}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
+                      disabled={hasRated || isSubmittingRating}
+                      onClick={() => handleRatingSubmit(star)}
+                      onMouseEnter={() => !hasRated && setHoveredRating(star)}
+                      onMouseLeave={() => !hasRated && setHoveredRating(0)}
+                      className={`${ratingButtonSizeClass} rounded-xl border flex items-center justify-center transition-all duration-200 ${
+                        hasRated || isSubmittingRating
+                          ? "cursor-default border-slate-600/70 bg-slate-700/40"
+                          : "cursor-pointer border-slate-500/70 bg-slate-700/35 hover:scale-110 hover:border-yellow-300/70 hover:bg-slate-700/60"
+                      }`}
+                    >
+                      <StarIcon
+                        className={`${ratingIconSizeClass} transition-all ${
+                          star <= (hoveredRating || rating)
+                            ? "fill-yellow-400 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.55)]"
+                            : "text-slate-500 hover:text-yellow-300/70"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
                 {ratingMessage && (
-                  <div className={`text-xs ${
+                  <div className={`mt-3 text-sm text-center ${
                     ratingMessage.includes("Thanks") ? "text-emerald-400" : "text-red-400"
                   }`}>
                     {ratingMessage}
@@ -947,53 +1053,143 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
                 )}
               </Card>
 
-              {/* Next Quiz Button - UPDATED for no preloading */}
-            <Button
-              onClick={handleNextQuiz}
-              onMouseEnter={fetchNextCategoryId} // ADDED: Trigger ID fetch on hover
-              disabled={playButtonLoading || isNextCategoryFetching}
-              className="w-full flex items-center justify-between px-4 sm:px-5 h-14 sm:h-16 text-white shadow-lg transition-all duration-300 hover:scale-[1.01] mt-auto"
-            >
-              {(playButtonLoading || isNextCategoryFetching) ? (
-                <div className="flex items-center text-lg sm:text-xl justify-center w-full gap-2">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span>Loading Next Quiz...</span>
+            </div>
+
+            <div className={ctaSectionClass}>
+              <Button
+                variant="default"
+                onClick={handleNextQuiz}
+                onMouseEnter={() => {
+                  if (!nextCategoryPreview?.categoryId) {
+                    fetchNextCategory();
+                  }
+                }}
+                disabled={playButtonLoading || isNextCategoryFetching}
+                className={`relative w-full overflow-hidden px-3 sm:px-4 py-0 ${ctaButtonHeightClass} ${!playButtonLoading ? "home-play-glow-pulse" : ""}`}
+                style={{
+                  borderRadius: isTinyPhone ? "18px" : "22px",
+                  border: "2px solid #B2F574",
+                  background: "linear-gradient(180deg, rgba(103,217,63,0.58) 0%, rgba(63,188,55,0.5) 38%, rgba(28,157,42,0.45) 70%, rgba(18,132,32,0.4) 100%)",
+                  boxShadow: "0 10px 20px rgba(15,102,28,0.22)",
+                }}
+              >
+                {playButtonLoading ? (
+                  <div className="flex items-center justify-center w-full gap-2 text-lg sm:text-2xl">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    Starting Quiz...
+                  </div>
+                ) : (
+                  <>
+                    <span
+                      className="pointer-events-none absolute left-0 right-0 top-0 h-[42%] opacity-95"
+                      style={{
+                        background:
+                          "linear-gradient(180deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.08) 60%, rgba(255,255,255,0) 100%)",
+                        borderRadius: isTinyPhone ? "18px" : "22px",
+                      }}
+                    />
+                    <span
+                      className="pointer-events-none absolute inset-0 opacity-80"
+                      style={{
+                        background:
+                          "radial-gradient(circle at 16% 28%, rgba(255,255,120,0.2) 0%, rgba(255,255,120,0) 32%), radial-gradient(circle at 85% 70%, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0) 36%)",
+                        borderRadius: isTinyPhone ? "18px" : "22px",
+                      }}
+                    />
+
+                    <div className="relative z-10 grid h-full w-full grid-cols-[1fr_auto] items-center gap-2 sm:gap-3">
+                      <span className={`pointer-events-none absolute ${isTinyPhone ? "left-[-18px]" : "left-[-23px]"} inset-y-0 inline-flex items-center justify-start w-7 sm:w-8 md:w-9 shrink-0`}>
+                        <img
+                          src="/assets/images/icons/play-icon.png"
+                          alt=""
+                          aria-hidden="true"
+                          className={`h-7 sm:h-8 md:h-9 w-auto object-contain ${isTinyPhone ? "scale-[4.2] translate-y-[4px]" : "scale-[4.8] translate-y-[6px]"} origin-left`}
+                        />
+                      </span>
+                      <div className={`${isTinyPhone ? "pl-[3.25rem] sm:pl-20 md:pl-24" : "pl-16 sm:pl-20 md:pl-24"} flex items-center gap-2.5 sm:gap-3`}>
+                        <span className={`${isTinyPhone ? "text-base sm:text-2xl md:text-3xl" : "text-lg sm:text-2xl md:text-3xl"} font-bold text-white leading-none whitespace-nowrap flex items-center gap-1.5 sm:gap-2 drop-shadow-[0_2px_0_rgba(0,0,0,0.35)]`}>
+                          Next Quiz
+                        </span>
+
+                        <span
+                          className={`relative ${isTinyPhone ? "h-7 min-w-[66px] text-xs px-2" : "h-8 min-w-[74px] text-sm px-2.5"} sm:h-10 sm:min-w-[90px] sm:text-lg font-bold text-[#F6DE6C] flex items-center justify-center gap-1.5 sm:px-3 rounded-full`}
+                          style={{
+                            border: "1px solid rgba(158, 228, 120, 0.62)",
+                            background: "linear-gradient(180deg, rgba(34,118,52,0.75) 0%, rgba(24,88,39,0.84) 48%, rgba(18,68,30,0.9) 100%)",
+                            boxShadow: "inset 0 3px 6px rgba(5,35,11,0.74), inset 0 -2px 2px rgba(255,255,255,0.08), inset 0 0 0 1px rgba(10,52,20,0.62)",
+                          }}
+                        >
+                          <span
+                            className={`inline-flex items-center justify-center rounded-full ${isTinyPhone ? "h-3.5 w-3.5" : "h-4 w-4"} sm:h-5 sm:w-5`}
+                            style={{
+                              color: "#2D5E19",
+                              background: "linear-gradient(180deg, #FFE98F 0%, #F2C63A 60%, #DAAB1D 100%)",
+                              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.62), inset 0 -1px 0 rgba(125,92,0,0.28), 0 1px 2px rgba(0,0,0,0.25)",
+                            }}
+                          >
+                            <svg
+                              viewBox="0 0 24 24"
+                              className="h-2.5 w-2.5 sm:h-3 sm:w-3"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                            >
+                              <path
+                                d="M5.5 12.5L10 17L18.5 8.5"
+                                stroke="currentColor"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </span>
+                          {QUIZ_COST}
+                        </span>
+                      </div>
+
+                      <div
+                        className={`rounded-full ${isTinyPhone ? "w-10 h-10" : "w-12 h-12"} sm:w-[72px] sm:h-[72px] flex flex-col items-center justify-center`}
+                        style={{
+                          border: "2px solid #7BD651",
+                          background: "radial-gradient(circle at 34% 22%, #FFFFFF 0%, #F5FFF0 65%, #E8F8DF 100%)",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.28), inset 0 2px 5px rgba(255,255,255,0.78), inset 0 -2px 4px rgba(132,181,94,0.25)",
+                        }}
+                      >
+                        <span className={`text-[#41B646] ${isTinyPhone ? "text-lg" : "text-xl"} sm:text-3xl font-bold leading-none`}>
+                          {currentLevel}
+                        </span>
+                        <span className={`text-[#41B646] ${isTinyPhone ? "text-[8px]" : "text-[9px]"} sm:text-xs font-semibold uppercase leading-none tracking-wide`}>
+                          Level
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </Button>
+
+              <div className="w-full flex items-center justify-center">
+                <div className="inline-flex items-center gap-2 sm:gap-3">
+                  <p className="text-center">
+                    <span className={`text-yellow-400 ${isTinyPhone ? "text-base sm:text-2xl" : "text-lg sm:text-2xl"} font-bold tracking-wide`}>
+                      {nextCategoryLabel}
+                    </span>
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleRefreshCategory}
+                    disabled={refreshCategoryLoading || playButtonLoading}
+                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full border-yellow-400/70 bg-black/20 text-yellow-400 hover:bg-yellow-400/15 hover:text-yellow-300"
+                    aria-label="Refresh category"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${refreshCategoryLoading ? "animate-spin" : ""}`} />
+                  </Button>
                 </div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <span className="text-xl sm:text-2xl font-extrabold text-white leading-none">
-                      Next Quiz
-                    </span>
-                    <span className="text-sm sm:text-base font-semibold text-yellow-300 flex items-center gap-1.5 bg-gray-700/70 px-2.5 py-1 rounded-full">
-                      <svg viewBox="0 0 24 24" className="h-4 w-4 sm:h-5 sm:w-5" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="12" cy="12" r="8" fill="#f59e0b" />
-                        <circle cx="12" cy="12" r="7" fill="#fbbf24" />
-                        <circle cx="12" cy="12" r="4" fill="#f59e0b" opacity="0.4" />
-                      </svg>
-                      {QUIZ_COST}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center">
-                    <svg
-                      className="w-5 h-5 sm:w-6 sm:h-6 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  </div>
-                </>
+              </div>
+
+              {nextQuizMessage && (
+                <p className="text-red-400 text-sm text-center font-medium">{nextQuizMessage}</p>
               )}
-            </Button>
             </div>
           </div>
         </Card>
@@ -1163,6 +1359,18 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
             opacity: 1;
           }
         }
+
+        @keyframes home-play-glow-pulse {
+          0%, 80%, 100% {
+            box-shadow: 0 10px 20px rgba(15,102,28,0.22);
+          }
+          90% {
+            box-shadow:
+              0 10px 20px rgba(15,102,28,0.22),
+              0 0 18px rgba(178,245,116,0.58),
+              0 0 32px rgba(178,245,116,0.36);
+          }
+        }
         
         .animate-pulse-glow {
           animation: pulse-glow 2s ease-in-out infinite;
@@ -1170,6 +1378,10 @@ export default function QuizResults({ results, onPlayAgain, onClose }: QuizResul
         
         .animate-number-grow {
           animation: number-grow ${NUMBER_GROW_ANIMATION_MS}ms ease-out forwards;
+        }
+
+        .home-play-glow-pulse {
+          animation: home-play-glow-pulse 4s ease-in-out infinite;
         }
         
         /* XP Text Aura (Yellow/Orange Glow) - IMPROVED READABILITY */
