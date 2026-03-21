@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -215,10 +215,20 @@ const ANSWER_BAR_REVEAL_DELAY_MS = 300;
 const ANSWER_BAR_ANIMATION_DURATION_MS = 400;
 const SCROLL_AFTER_BARS_DELAY_MS = ANSWER_BAR_REVEAL_DELAY_MS + ANSWER_BAR_ANIMATION_DURATION_MS + 50;
 
+const shuffleArray = <T,>(items: T[]): T[] => {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
 interface Question {
   _id: string;
   question: string;
   answers: string[];
+  shuffledAnswers?: string[];
   answerCounts?: Array<{
     text: string;
     count: number;
@@ -269,6 +279,8 @@ export default function Quiz() {
   const navigate = useNavigate();
   const location = useLocation();
   const explanationRef = useRef<HTMLDivElement>(null);
+  const questionTextContainerRef = useRef<HTMLDivElement>(null);
+  const questionTextMeasureRef = useRef<HTMLDivElement>(null);
   const timerInSecondsRef = useRef<NodeJS.Timeout | null>(null);
   // FIX: hasStartedRef is the key to prevent double execution in React Strict Mode
   const hasStartedRef = useRef(false);
@@ -309,6 +321,7 @@ export default function Quiz() {
   const [isReporting, setIsReporting] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState(10);
+  const [questionFontSizePx, setQuestionFontSizePx] = useState(28);
 
   const userToken = localStorage.getItem("token");
   const storedUser = localStorage.getItem("user");
@@ -396,6 +409,7 @@ export default function Quiz() {
         const questionWithTimer = {
           ...data.question,
           timerInSeconds: data.timerInSeconds,
+          shuffledAnswers: shuffleArray(data.question.answers || []),
         };
         nextQuestionRef.current = questionWithTimer;
       } else {
@@ -501,6 +515,82 @@ export default function Quiz() {
     setShowBars(false);
     setAnswerResponse(null);
   }, [quizState.question, quizState.currentQuestionIndex]);
+
+  useLayoutEffect(() => {
+    const questionText = quizState.question?.question?.trim();
+    if (!questionText) return;
+
+    const getCharacterDrivenBounds = (characterCount: number) => {
+      const viewportWidth = window.innerWidth;
+      const viewportScale =
+        viewportWidth < 360 ? 0.8 :
+          viewportWidth < 480 ? 0.9 :
+            viewportWidth < 768 ? 1 :
+              viewportWidth < 1024 ? 1.1 : 1.2;
+
+      let preferredBaseSize = 18;
+      if (characterCount <= 35) preferredBaseSize = 34;
+      else if (characterCount <= 55) preferredBaseSize = 30;
+      else if (characterCount <= 80) preferredBaseSize = 26;
+      else if (characterCount <= 110) preferredBaseSize = 23;
+      else if (characterCount <= 150) preferredBaseSize = 20;
+      else preferredBaseSize = 17;
+
+      const preferredSize = Math.max(12, Math.round(preferredBaseSize * viewportScale));
+      return {
+        min: Math.max(11, preferredSize - 8),
+        max: preferredSize,
+      };
+    };
+
+    const fitQuestionText = () => {
+      const container = questionTextContainerRef.current;
+      const measurer = questionTextMeasureRef.current;
+      if (!container || !measurer) return;
+
+      const availableWidth = container.clientWidth;
+      const availableHeight = container.clientHeight;
+      if (availableWidth <= 0 || availableHeight <= 0) return;
+
+      measurer.style.width = `${availableWidth}px`;
+      measurer.style.fontWeight = "700";
+      measurer.style.lineHeight = "1.25";
+      measurer.textContent = questionText;
+
+      const { min, max } = getCharacterDrivenBounds(questionText.length);
+      let low = min;
+      let high = max;
+      let best = min;
+
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        measurer.style.fontSize = `${mid}px`;
+        const fits = measurer.scrollHeight <= availableHeight && measurer.scrollWidth <= availableWidth;
+
+        if (fits) {
+          best = mid;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
+      }
+
+      setQuestionFontSizePx(best);
+    };
+
+    let frameId = window.requestAnimationFrame(fitQuestionText);
+
+    const handleResize = () => {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(fitQuestionText);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [quizState.question?.question]);
 
   useEffect(() => {
     if (quizState.currentQuestionIndex > 0) {
@@ -646,6 +736,7 @@ export default function Quiz() {
         const questionWithTimer = {
           ...data.question,
           timerInSeconds: data.timerInSeconds,
+          shuffledAnswers: shuffleArray(data.question.answers || []),
         };
 
         setQuizState((prev) => {
@@ -1167,14 +1258,31 @@ export default function Quiz() {
 
         <div className="flex-1 px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-4xl">
           <div className="space-y-6">
-            <div className="px-1 py-3 md:py-6 text-center">
-              <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-white leading-relaxed drop-shadow-lg">
-                {quizState.question?.question}
-              </h2>
+            <div className="px-1 py-1 md:py-2 text-center">
+              <div
+                ref={questionTextContainerRef}
+                className="h-[clamp(48px,9vh,95px)] md:h-[clamp(62px,10vh,115px)] flex items-center justify-center px-1"
+              >
+                <h2
+                  className="font-bold text-white leading-tight drop-shadow-lg break-words w-full"
+                  style={{
+                    fontSize: `${questionFontSizePx}px`,
+                    lineHeight: 1.25,
+                  }}
+                >
+                  {quizState.question?.question}
+                </h2>
+              </div>
+              <div className="fixed -left-[9999px] top-0 pointer-events-none opacity-0" aria-hidden="true">
+                <div
+                  ref={questionTextMeasureRef}
+                  className="font-bold leading-tight break-words whitespace-pre-wrap"
+                />
+              </div>
             </div>
 
             <div className="space-y-4">
-              {quizState.question?.answers.map((answer, index) => {
+              {(quizState.question?.shuffledAnswers || quizState.question?.answers || []).map((answer, index) => {
                 const getFontSize = (text: string) => {
                   const length = text.length;
                   if (length > 60) return 'text-xs md:text-base';
@@ -1185,7 +1293,7 @@ export default function Quiz() {
 
                 return (
                   <Card
-                    key={index}
+                    key={`${answer}-${index}`}
                     className={`p-6 md:p-8 transition-all duration-300 ${getOptionStyle(answer)} relative overflow-hidden cursor-pointer`}
                     onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
                     style={{ 
