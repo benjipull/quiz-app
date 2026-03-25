@@ -274,10 +274,40 @@ interface QuizState {
   }>;
 }
 
+type QuizLocationState = {
+  from?: string;
+  sagaLevelId?: string | null;
+} | null;
+
+const normalizeId = (value: unknown): string | null => {
+  if (value == null) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === "null" || trimmed === "undefined") return null;
+    return trimmed;
+  }
+  if (typeof value === "object") {
+    const asRecord = value as Record<string, unknown>;
+    const normalizedOid = normalizeId(asRecord.$oid);
+    if (normalizedOid) return normalizedOid;
+    const normalizedNestedId = normalizeId(asRecord._id);
+    if (normalizedNestedId) return normalizedNestedId;
+    const normalizedIdField = normalizeId(asRecord.id);
+    if (normalizedIdField) return normalizedIdField;
+
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  if (!normalized || normalized === "null" || normalized === "undefined") return null;
+  return normalized;
+};
+
 export default function Quiz() {
   const { categoryId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const locationState = (location.state as QuizLocationState) || null;
   const explanationRef = useRef<HTMLDivElement>(null);
   const questionTextContainerRef = useRef<HTMLDivElement>(null);
   const questionTextMeasureRef = useRef<HTMLDivElement>(null);
@@ -326,6 +356,16 @@ export default function Quiz() {
   const userToken = localStorage.getItem("token");
   const storedUser = localStorage.getItem("user");
   const userId = storedUser ? JSON.parse(storedUser)._id : null;
+  const returnPath = locationState?.from || "";
+  const sagaLevelMatch = typeof returnPath === "string"
+    ? returnPath.match(/^\/saga-level\/(\d+)/)
+    : null;
+  const sagaNumberFromReturnPath = sagaLevelMatch
+    ? Number.parseInt(sagaLevelMatch[1], 10)
+    : null;
+  const shouldReturnToSagaLevelAfterCompletion =
+    typeof returnPath === "string" && returnPath.startsWith("/saga-level/");
+  const normalizedSagaLevelId = normalizeId(locationState?.sagaLevelId);
 
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
 
@@ -338,8 +378,8 @@ export default function Quiz() {
   };
 
   const confirmExit = () => {
-    if (location.state?.from) {
-      navigate(location.state.from);
+    if (locationState?.from) {
+      navigate(locationState.from);
     } else {
       navigate("/");
     }
@@ -620,7 +660,7 @@ export default function Quiz() {
   setQuizState({
     started: true, // Set this IMMEDIATELY
     completed: false,
-    selectedCategory: null,
+    selectedCategory: { id: categoryId, name: "Quiz" },
     question: null,
     currentQuestionIndex: 0,
     correctAnswers: 0,
@@ -629,30 +669,12 @@ export default function Quiz() {
     isAnswerSelected: false,
     userAnswers: [],
   });
+  setCategoryTitle("Quiz");
   setCategoryImage(undefined);
   setTotalQuestions(10);
   nextQuestionRef.current = null;
 
   try {
-    const categoryResponse = await fetch(`${BASE_URL}/api/categories`, {
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${userToken}`,
-      },
-    });
-    if (categoryResponse.ok) {
-      const categories = await categoryResponse.json();
-      const category = categories.find((cat: any) => cat._id === categoryId);
-      if (category) {
-        setCategoryTitle(category.name);
-        setCategoryImage(category.imageUrl || category.image);
-        setQuizState(prev => ({
-          ...prev,
-          selectedCategory: { id: categoryId, name: category.name }
-        }));
-      }
-    }
-
     const startResponse = await fetch(`${BASE_URL}/api/startQuiz`, {
       method: "POST",
       headers: {
@@ -892,6 +914,11 @@ export default function Quiz() {
         questionsAttempted: totalQuestions,
         correctAnswers,
         incorrectAnswers: totalQuestions - correctAnswers,
+        sagaLevelId: normalizedSagaLevelId || undefined,
+        sagaNumber:
+          sagaNumberFromReturnPath && sagaNumberFromReturnPath > 0
+            ? sagaNumberFromReturnPath
+            : undefined,
       };
 
       const response = await fetch(
@@ -909,6 +936,46 @@ export default function Quiz() {
       if (response.ok) {
         const completionData = await response.json();
         trackQuizComplete(quizState.selectedCategory.id, quizState.correctAnswers, userId);
+
+        if (shouldReturnToSagaLevelAfterCompletion) {
+          const completionTimestamp = Date.now();
+          const completedCategoryId = normalizeId(quizState.selectedCategory.id);
+          const completionParams = new URLSearchParams({
+            fromQuizCompletion: "1",
+            completedSagaLevelId: normalizedSagaLevelId || "",
+            completedCategoryId: completedCategoryId || "",
+            completedStarCount: String(correctAnswers),
+            completedAt: String(completionTimestamp),
+          });
+
+          try {
+            sessionStorage.setItem(
+              "saga_level_completion_return",
+              JSON.stringify({
+                path: returnPath,
+                completedSagaLevelId: normalizedSagaLevelId || null,
+                completedCategoryId: completedCategoryId || null,
+                completedStarCount: correctAnswers,
+                completedAt: completionTimestamp,
+              }),
+            );
+          } catch {
+            // Non-blocking fallback; navigation state still carries this info.
+          }
+
+          navigate(`${returnPath}?${completionParams.toString()}`, {
+            replace: true,
+            state: {
+              fromQuizCompletion: true,
+              completedSagaLevelId: normalizedSagaLevelId || null,
+              completedCategoryId: completedCategoryId || null,
+              completedStarCount: correctAnswers,
+              completedAt: completionTimestamp,
+            },
+          });
+          return;
+        }
+
         setQuizState((prev) => ({
           ...prev,
           completed: true,

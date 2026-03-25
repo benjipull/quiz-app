@@ -10,6 +10,8 @@ const {
 } = require("../services/ollamaClient");
 
 const { buildQuestionPrompt } = require("./prompts/questionPrompt");
+const { validateAndPersistQuestion } = require("./validateQuestions");
+const { populateDifficulty } = require("./populateDifficulty");
 //const { processSingleQuestion } = require("./validateDuplicateQuestions");
 
 
@@ -200,6 +202,54 @@ async function fetchQuestions(categoryName, difficultyHint) {
   return question ? [question] : [];
 }
 
+async function runPostGenerationScripts(categoryId, questionIds) {
+  const disableQuestionOnValidationFailure = async (questionId, reason) => {
+    await Category.updateOne(
+      { _id: categoryId, "questions._id": questionId },
+      {
+        $set: {
+          "questions.$.disabled": true,
+          "questions.$.disabled_reason": reason,
+        },
+      }
+    );
+  };
+
+  for (const questionId of questionIds) {
+    try {
+      const validationResult = await validateAndPersistQuestion(categoryId, questionId);
+      if (!validationResult.success) {
+        await disableQuestionOnValidationFailure(
+          questionId,
+          "Disabled automatically because validation failed during populate flow."
+        );
+        console.log(`Validation failed for question ${questionId}. Skipping difficulty population.`);
+        continue;
+      }
+
+      if (validationResult.disabled) {
+        console.log(`Question ${questionId} was disabled by validation. Skipping difficulty population.`);
+        continue;
+      }
+
+      await populateDifficulty(String(categoryId), String(questionId));
+    } catch (error) {
+      try {
+        await disableQuestionOnValidationFailure(
+          questionId,
+          "Disabled automatically because validation errored during populate flow."
+        );
+      } catch (disableError) {
+        console.error(
+          `Failed to disable question ${questionId} after validation error:`,
+          disableError.message
+        );
+      }
+      console.error(`Post-generation pipeline failed for question ${questionId}:`, error.message);
+    }
+  }
+}
+
 async function populateCategory(categoryId, difficultyHint) {
   try {
     const category = await Category.findById(categoryId);
@@ -224,7 +274,7 @@ async function populateCategory(categoryId, difficultyHint) {
     }
 
     // 🧠 Step 2: Add them to category object
-    const addedCount = await addQuestionsToCategory(category, fetchedQuestions);
+    const { addedCount, addedQuestionIds } = await addQuestionsToCategory(category, fetchedQuestions);
     if (addedCount === 0) {
       console.log("⚠️ No new question added (duplicate hash skipped).");
       const generatedQuestion = String(fetchedQuestions[0]?.question || "").trim();
@@ -242,6 +292,7 @@ async function populateCategory(categoryId, difficultyHint) {
     // 🧠 Step 3: Save the updated category to MongoDB
     category.disabled = false;
     await category.save();
+    await runPostGenerationScripts(category._id, addedQuestionIds);
     console.log(`✅ Added ${addedCount} question(s) to ${category.name}.`);
     return { addedCount, duplicateQuestion: null };
 
@@ -267,6 +318,7 @@ async function populateCategory(categoryId, difficultyHint) {
 
 async function addQuestionsToCategory(category, questions) {
   let added = 0;
+  const addedQuestionIds = [];
 
   for (const q of questions) {
     const validation = validateQuestionShape(q);
@@ -283,8 +335,9 @@ async function addQuestionsToCategory(category, questions) {
       continue;
     }
 
+    const newQuestionId = new mongoose.Types.ObjectId();
     category.questions.push({
-      _id: new mongoose.Types.ObjectId(),
+      _id: newQuestionId,
       text: q.question,
       answers: q.answers.map(a => ({ text: a, correctCount: 0, incorrectCount: 0 })),
       correct_answer: q.correct_answer,
@@ -304,9 +357,10 @@ async function addQuestionsToCategory(category, questions) {
     });
 
     added++;
+    addedQuestionIds.push(newQuestionId.toString());
   }
 
-  return added;
+  return { addedCount: added, addedQuestionIds };
 }
 
 async function checkQuestionInSameCategory(category, newQuestion) {

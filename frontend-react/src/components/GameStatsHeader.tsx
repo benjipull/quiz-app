@@ -14,6 +14,11 @@ interface GameStatsHeaderProps {
   userGem1: number;
   userGem2: number;
   compactMode?: boolean;
+  centerImageSrc?: string;
+  centerSubLabel?: string;
+  onCenterClick?: () => void;
+  centerAriaLabel?: string;
+  centerBadgeValue?: string | number | null;
 }
 
 const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
@@ -24,6 +29,11 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
   userGem1,
   userGem2,
   compactMode = false,
+  centerImageSrc = "/assets/images/q.jpg",
+  centerSubLabel,
+  onCenterClick,
+  centerAriaLabel = "Open profile editor",
+  centerBadgeValue = null,
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [animatedXP, setAnimatedXP] = useState(userXP);
@@ -198,12 +208,44 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
         </div>
 
         {/* Middle - User Icon  */}
-        <div className={`flex-shrink-0 ${compact ? "w-12 h-12 border-2" : "w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 border-4"} rounded-full border-slate-300 shadow-2xl overflow-hidden`}>
-          <img
-            src="/assets/images/q.jpg"
-            alt="center icon"
-            className="w-full h-full object-cover"
-          />
+        <div
+          className={`flex-shrink-0 flex flex-col items-center ${onCenterClick ? "cursor-pointer" : ""}`}
+          onClick={onCenterClick}
+          onKeyDown={(event) => {
+            if (!onCenterClick) return;
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onCenterClick();
+            }
+          }}
+          role={onCenterClick ? "button" : undefined}
+          tabIndex={onCenterClick ? 0 : undefined}
+          aria-label={onCenterClick ? centerAriaLabel : undefined}
+        >
+          <div className="relative">
+            <div className={`${compact ? "w-12 h-12 border-2" : "w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 border-4"} rounded-full border-slate-300 shadow-2xl overflow-hidden`}>
+              <img
+                src={centerImageSrc}
+                alt="center icon"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            {centerBadgeValue !== null && centerBadgeValue !== undefined && centerBadgeValue !== "" ? (
+              <div
+                className={`absolute -right-1 -bottom-1 ${
+                  compact ? "min-w-5 h-5 text-[10px] px-1" : "min-w-6 h-6 sm:min-w-7 sm:h-7 text-[11px] sm:text-xs px-1.5"
+                } rounded-full bg-emerald-400 border-2 border-white text-slate-900 font-black flex items-center justify-center shadow-lg leading-none`}
+                aria-label={`Level ${centerBadgeValue}`}
+              >
+                {centerBadgeValue}
+              </div>
+            ) : null}
+          </div>
+          {centerSubLabel ? (
+            <p className={`${compact ? "text-[9px] mt-0.5 max-w-[72px]" : "text-[10px] sm:text-xs mt-1 max-w-[110px]"} text-cyan-100 font-semibold leading-none truncate text-center drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]`}>
+              {centerSubLabel}
+            </p>
+          ) : null}
         </div>
 
         {/* Right Stats - XP & Gem2 */}
