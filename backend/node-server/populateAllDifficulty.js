@@ -15,6 +15,7 @@ function printUsage() {
   console.log("");
   console.log("Options:");
   console.log("  --category-id=<id>    Process questions only from a specific category.");
+  console.log("  --difficulty-level=<n> Process questions whose current difficulty_level is n (1-10).");
   console.log("  --all                 Process all enabled questions.");
   console.log("  --pending-only        Process only questions missing difficulty (default).");
   console.log(`  --limit=<n>           Max questions to process (${DEFAULT_LIMIT} default, 0 = no limit).`);
@@ -22,7 +23,6 @@ function printUsage() {
   console.log(`  --parallel=<n>        Number of questions to process in parallel (${DEFAULT_PARALLEL} default).`);
   console.log("  --concurrency=<n>     Alias for --parallel.");
   console.log("  -n <n>, -p <n>        Shorthand for --parallel.");
-  console.log("  --include-disabled    Include disabled questions.");
   console.log("  --help                Show this help.");
 }
 
@@ -42,14 +42,22 @@ function parseMinOneInt(value, fieldName) {
   return num;
 }
 
+function parseDifficultyLevel(value) {
+  const level = parseMinOneInt(value, "difficulty-level");
+  if (level > 10) {
+    throw new Error(`Invalid difficulty-level: ${value}`);
+  }
+  return level;
+}
+
 function parseArgs(args) {
   const options = {
     processAll: false,
-    includeDisabled: false,
     limit: DEFAULT_LIMIT,
     delayMs: DEFAULT_DELAY_MS,
     parallel: DEFAULT_PARALLEL,
     categoryId: null,
+    difficultyLevel: null,
     help: false,
   };
 
@@ -63,11 +71,6 @@ function parseArgs(args) {
 
     if (arg === "--pending-only") {
       options.processAll = false;
-      continue;
-    }
-
-    if (arg === "--include-disabled") {
-      options.includeDisabled = true;
       continue;
     }
 
@@ -163,6 +166,21 @@ function parseArgs(args) {
       continue;
     }
 
+    if (arg === "--difficulty-level") {
+      const value = args[i + 1];
+      if (value == null) {
+        throw new Error("Missing value for --difficulty-level");
+      }
+      options.difficultyLevel = parseDifficultyLevel(value);
+      i += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--difficulty-level=")) {
+      options.difficultyLevel = parseDifficultyLevel(arg.split("=")[1]);
+      continue;
+    }
+
     throw new Error(`Unknown option: ${arg}`);
   }
 
@@ -176,9 +194,12 @@ function buildPipeline(options) {
     match._id = new mongoose.Types.ObjectId(options.categoryId);
   }
 
-  if (!options.includeDisabled) {
-    match["questions.disabled"] = { $ne: true };
+  if (options.difficultyLevel != null) {
+    match["questions.difficulty_level"] = options.difficultyLevel;
   }
+
+  // Always process enabled questions only.
+  match["questions.disabled"] = { $ne: true };
 
   if (!options.processAll) {
     match.$or = [
@@ -215,11 +236,12 @@ async function batchPopulateDifficulty(options) {
   await connectDB();
 
   const mode = options.processAll ? "all questions" : "pending-only questions";
-  const scope = options.includeDisabled ? "including disabled" : "excluding disabled";
   const categoryLabel = options.categoryId ? options.categoryId : "all categories";
+  const difficultyLabel =
+    options.difficultyLevel == null ? "all levels" : `level ${options.difficultyLevel}`;
   const limitLabel = options.limit > 0 ? String(options.limit) : "none";
   console.log(
-    `Running difficulty population in ${mode} mode (${scope}, category=${categoryLabel}, limit=${limitLabel}, delay=${options.delayMs}ms, parallel=${options.parallel}).`
+    `Running difficulty population in ${mode} mode (enabled only, category=${categoryLabel}, difficulty=${difficultyLabel}, limit=${limitLabel}, delay=${options.delayMs}ms, parallel=${options.parallel}).`
   );
 
   const questions = await Category.aggregate(buildPipeline(options));
@@ -239,9 +261,12 @@ async function batchPopulateDifficulty(options) {
     const batch = indexedQuestions.slice(i, i + options.parallel);
     const results = await Promise.allSettled(
       batch.map(async ({ q, index }) => {
-        const snippet = (q.text || "").substring(0, 80);
-        console.log(`(${index + 1}/${questions.length}) ${snippet}...`);
-        return populateDifficulty(q.categoryId, q.questionId);
+        return populateDifficulty(q.categoryId, q.questionId, {
+          progress: {
+            current: index + 1,
+            total: questions.length,
+          },
+        });
       })
     );
 

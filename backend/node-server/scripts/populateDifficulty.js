@@ -126,7 +126,7 @@ function salvageDifficultyFromMalformedJson(raw) {
   };
 }
 
-async function populateDifficulty(categoryId, questionId) {
+async function populateDifficulty(categoryId, questionId, options = {}) {
   try {
     assertSetup();
 
@@ -174,7 +174,7 @@ If unsure, choose the closest NON-5 level.
 2 — Very common knowledge
 3 — Common knowledge
 4 — Familiar but not universal
-5 — Balanced midpoint (use rarely)
+5 — Balanced midpoint
 6 — Somewhat niche
 7 — Niche knowledge
 8 — Specialist knowledge
@@ -248,7 +248,12 @@ Respond in strict JSON:
       }
     );
 
-    console.log(`Updated question ${questionId} -> level ${difficultyLevel}`);
+    const questionLabel = String(question.text || questionId).trim();
+    const current = Number(options?.progress?.current);
+    const total = Number(options?.progress?.total);
+    const hasProgress = Number.isInteger(current) && current > 0 && Number.isInteger(total) && total > 0;
+    const progressPrefix = hasProgress ? `(${current}/${total}) ` : "";
+    console.log(`${progressPrefix}Updated question "${questionLabel}" -> level ${difficultyLevel}`);
     return true;
   } catch (err) {
     console.error(`Error processing ${questionId}: ${err.message}`);

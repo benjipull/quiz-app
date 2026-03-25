@@ -90,6 +90,7 @@ app.use("/api/DBpedia", require("./routes/DBpedia"));
 
 app.use("/api/leaderboard", require("./routes/leaderboard"));
 app.use("/api/claimDailyCoins", require("./routes/claimDailyCoins"))
+app.use("/api/saga", require("./routes/sagaLevelProgression"));
 
 // Admin APIs
 app.use("/api/admin/login", require("./routes/admin/adminLogin"));

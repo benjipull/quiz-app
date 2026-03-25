@@ -7,7 +7,7 @@ const {
   callOllamaForText,
 } = require("../services/ollamaClient");
 
-const CURRENT_VALIDATION_VERSION = 0.07; // ⬅️ bump version so questions get revalidated
+const CURRENT_VALIDATION_VERSION = 0.08; // ⬅️ bump version so questions get revalidated
 
 try {
   assertOllamaSetup();
@@ -365,9 +365,103 @@ async function validateQuestion(question) {
   }
 }
 
-module.exports = {
-  validateQuestion,
-};
+function buildValidationUpdate(parsed) {
+  const shouldDisable =
+    parsed.final_verdict === "Incorrect" ||
+    parsed.explanation_consistent === false;
+
+  return {
+    shouldDisable,
+    validation: {
+      is_correct_answer_valid: parsed.is_correct_answer_valid,
+      correct_answer_reasoning: parsed.correct_answer_reasoning,
+      explanation_consistent: parsed.explanation_consistent,
+      explanation_reasoning: parsed.explanation_reasoning,
+      other_answers_possible: parsed.other_answers_possible,
+      final_verdict: parsed.final_verdict,
+      validationVersion: CURRENT_VALIDATION_VERSION,
+    },
+  };
+}
+
+function logDisabledQuestionDetails(question, parsed) {
+  console.log("\n❌ DISABLED QUESTION DETAILS ❌");
+  console.log("------------------------------------------------------");
+  console.log(`🆔 Question ID: ${question._id}`);
+  console.log(`📌 Text: ${question.text}`);
+  console.log("📝 Answers:");
+  (question.answers || []).forEach((a, i) => {
+    console.log(`   ${i + 1}. ${a.text}`);
+  });
+  console.log(`✔ Correct Answer: ${question.correct_answer}`);
+  console.log(`💬 Explanation: ${question.explanation || "(none)"}`);
+  console.log("\n🔍 VALIDATION DETAILS:");
+  console.log(`- Final Verdict: ${parsed.final_verdict}`);
+  console.log(`- is_correct_answer_valid: ${parsed.is_correct_answer_valid}`);
+  console.log(`- explanation_consistent: ${parsed.explanation_consistent}`);
+  console.log(`- Reasoning: ${parsed.correct_answer_reasoning}`);
+  console.log("------------------------------------------------------\n");
+}
+
+async function validateAndPersistQuestion(categoryId, questionId, questionOverride = null) {
+  if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+    console.error(`❌ Invalid categoryId for validation: ${categoryId}`);
+    return { success: false, disabled: true };
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(questionId)) {
+    console.error(`❌ Invalid questionId for validation: ${questionId}`);
+    return { success: false, disabled: true };
+  }
+
+  let question = questionOverride;
+  if (!question) {
+    const category = await Category.findOne(
+      { _id: categoryId, "questions._id": questionId },
+      {
+        name: 1,
+        questions: { $elemMatch: { _id: questionId } },
+      }
+    );
+    question = category?.questions?.[0] || null;
+  }
+
+  if (!question) {
+    console.error(`❌ Could not load question ${questionId} in category ${categoryId} for validation.`);
+    return { success: false, disabled: true };
+  }
+
+  const parsed = await validateQuestion(question);
+  if (!parsed) {
+    return { success: false, disabled: true };
+  }
+
+  const { shouldDisable, validation } = buildValidationUpdate(parsed);
+
+  await Category.updateOne(
+    { _id: categoryId, "questions._id": questionId },
+    {
+      $set: {
+        "questions.$.validation": validation,
+        "questions.$.disabled": shouldDisable,
+      },
+    }
+  );
+
+  console.log(
+    `   ✅ Question ${questionId} updated | Verdict: ${parsed.final_verdict} | Disabled: ${shouldDisable}`
+  );
+
+  if (shouldDisable) {
+    logDisabledQuestionDetails(question, parsed);
+  }
+
+  return {
+    success: true,
+    disabled: shouldDisable,
+    verdict: parsed.final_verdict,
+  };
+}
 
 // ----- Bulk category validation -----
 async function validateAllCategories() {
@@ -436,59 +530,7 @@ async function validateAllCategories() {
       console.log(`🔹 Validating category: ${category.name} (${category.questions.length} questions)`);
 
       await processInParallelBatches(category.questions, parallelLimit, async (question) => {
-        const parsed = await validateQuestion(question);
-        if (!parsed) return;
-
-        // LENIENT MODE:
-        // ❌ Incorrect → disable
-        // ⚠️ Ambiguous → keep
-        // ❗ But if explanation is inconsistent → disable
-        const shouldDisable =
-          parsed.final_verdict === "Incorrect" ||
-          parsed.explanation_consistent === false;
-
-        await Category.updateOne(
-          { "questions._id": question._id },
-          {
-            $set: {
-              "questions.$.validation": {
-                is_correct_answer_valid: parsed.is_correct_answer_valid,
-                correct_answer_reasoning: parsed.correct_answer_reasoning,
-                explanation_consistent: parsed.explanation_consistent,
-                explanation_reasoning: parsed.explanation_reasoning,
-                other_answers_possible: parsed.other_answers_possible,
-                final_verdict: parsed.final_verdict,
-                validationVersion: CURRENT_VALIDATION_VERSION,
-              },
-              "questions.$.disabled": shouldDisable,
-            },
-          }
-        );
-
-        console.log(
-          `   ✅ Question ${question._id} updated | Verdict: ${parsed.final_verdict} | Disabled: ${shouldDisable}`
-        );
-
-        // 🔥 Log detailed info only if disabled
-        if (shouldDisable) {
-          console.log("\n❌ DISABLED QUESTION DETAILS ❌");
-          console.log("------------------------------------------------------");
-          console.log(`🆔 Question ID: ${question._id}`);
-          console.log(`📌 Text: ${question.text}`);
-          console.log("📝 Answers:");
-          question.answers.forEach((a, i) => {
-            console.log(`   ${i + 1}. ${a.text}`);
-          });
-          console.log(`✔ Correct Answer: ${question.correct_answer}`);
-          console.log(`💬 Explanation: ${question.explanation || "(none)"}`);
-          console.log("\n🔍 VALIDATION DETAILS:");
-          console.log(`- Final Verdict: ${parsed.final_verdict}`);
-          console.log(`- is_correct_answer_valid: ${parsed.is_correct_answer_valid}`);
-          console.log(`- explanation_consistent: ${parsed.explanation_consistent}`);
-          console.log(`- Reasoning: ${parsed.correct_answer_reasoning}`);
-          console.log("------------------------------------------------------\n");
-        }
-
+        await validateAndPersistQuestion(category._id, question._id, question);
       });
     }
 
@@ -500,5 +542,13 @@ async function validateAllCategories() {
   }
 }
 
-// Run as script
-validateAllCategories();
+module.exports = {
+  CURRENT_VALIDATION_VERSION,
+  validateQuestion,
+  validateAndPersistQuestion,
+  validateAllCategories,
+};
+
+if (require.main === module) {
+  validateAllCategories();
+}

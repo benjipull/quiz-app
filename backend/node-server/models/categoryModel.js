@@ -73,6 +73,7 @@ const CategorySchema = new mongoose.Schema({
     description: { type: String, default: "" },
     disabled: { type: Boolean, default: false },
     imageUrl: { type: String },
+    image64: { type: String, default: "" },
     createdAt: { type: Date, default: Date.now },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     completions: [CompletionSchema],

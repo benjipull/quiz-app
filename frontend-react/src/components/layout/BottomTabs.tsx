@@ -20,8 +20,9 @@ export const BottomTabs = () => {
 
   // Hide on quiz playing page (/quiz or /quiz/:categoryId)
   const hideOnQuizPage = location.pathname.startsWith("/quiz");
+  const hideOnSagaLevelPage = location.pathname.startsWith("/saga-level");
 
-  if (hideOnQuizPage) return null;
+  if (hideOnQuizPage || hideOnSagaLevelPage) return null;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-card/95 to-card/80 backdrop-blur-lg border-t border-border z-50 lg:hidden">

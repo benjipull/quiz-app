@@ -5,6 +5,8 @@ export const MobileLayout = () => {
   const location = useLocation();
   const isHomeRoute = location.pathname === "/";
   const isQuizRoute = location.pathname.startsWith("/quiz");
+  const isSagaMapRoute = location.pathname.startsWith("/saga-map");
+  const isSagaLevelRoute = location.pathname.startsWith("/saga-level");
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-gradient-to-br from-background to-quiz-background">
@@ -14,7 +16,7 @@ export const MobileLayout = () => {
         <Outlet />
 
         {/* space so content doesn't touch fixed tabs */}
-        {!isHomeRoute && !isQuizRoute && <div className="h-16 lg:hidden" />}
+        {!isHomeRoute && !isQuizRoute && !isSagaMapRoute && !isSagaLevelRoute && <div className="h-16 lg:hidden" />}
       </div>
 
       {/* FIXED BOTTOM TABS */}
