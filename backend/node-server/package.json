@@ -8,6 +8,11 @@
     "populate:difficulty": "node populateAllDifficulty.js",
     "populate:difficulty:all": "node populateAllDifficulty.js --all --limit=0",
     "populate:difficulty:one": "node scripts/populateDifficulty.js",
+    "populate:image-eligibility": "node populateAllImageEligibility.js",
+    "populate:image-eligibility:all": "node populateAllImageEligibility.js --all --limit=0",
+    "populate:image-eligibility:one": "node scripts/populateImageEligibility.js",
+    "populate:question-image64": "node scripts/populateQuestionImage64.js",
+    "populate:question-image64:all": "node scripts/populateQuestionImage64.js --all --limit=0",
     "populate:image64": "node scripts/populateCategoryImage64.js",
     "populate:image64:all": "node scripts/populateCategoryImage64.js --all"
   },

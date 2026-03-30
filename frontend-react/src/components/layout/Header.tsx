@@ -91,7 +91,10 @@ export const Header = ({
           {isDesktopNav && (
             <div className="flex items-center gap-1"> {/* Removed mr-4 class */}
               {navTabs.map((tab) => {
-                const isActive = location.pathname === tab.path;
+                const isActive =
+                  tab.path === "/"
+                    ? location.pathname === "/" || location.pathname === "/saga-map"
+                    : location.pathname === tab.path;
                 return (
                   <NavLink
                     key={tab.path}

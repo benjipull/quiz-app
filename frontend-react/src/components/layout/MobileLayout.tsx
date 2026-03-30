@@ -4,6 +4,8 @@ import { BottomTabs } from "./BottomTabs";
 export const MobileLayout = () => {
   const location = useLocation();
   const isHomeRoute = location.pathname === "/";
+  const isAboutRoute = location.pathname === "/about-us";
+  const isProfileRoute = location.pathname === "/profile";
   const isQuizRoute = location.pathname.startsWith("/quiz");
   const isSagaMapRoute = location.pathname.startsWith("/saga-map");
   const isSagaLevelRoute = location.pathname.startsWith("/saga-level");
@@ -16,13 +18,10 @@ export const MobileLayout = () => {
         <Outlet />
 
         {/* space so content doesn't touch fixed tabs */}
-        {!isHomeRoute && !isQuizRoute && !isSagaMapRoute && !isSagaLevelRoute && <div className="h-16 lg:hidden" />}
+        {!isHomeRoute && !isAboutRoute && !isProfileRoute && !isQuizRoute && !isSagaMapRoute && !isSagaLevelRoute && <div className="h-24 lg:hidden" />}
       </div>
 
-      {/* FIXED BOTTOM TABS */}
-      <div className="fixed bottom-0 left-0 right-0">
-        <BottomTabs />
-      </div>
+      <BottomTabs />
     </div>
   );
 };
