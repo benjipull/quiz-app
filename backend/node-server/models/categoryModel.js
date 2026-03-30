@@ -24,6 +24,13 @@ const DuplicateSchema = new mongoose.Schema({
     last_checked_at: { type: Date, default: null }           // timestamp
 }, { _id: false });
 
+const ImageEligibilitySchema = new mongoose.Schema({
+    should_use_image: { type: Boolean, default: false },
+    reason: { type: String, default: "" },
+    version: { type: Number, default: 0 },
+    processed_at: { type: Date, default: null }
+}, { _id: false });
+
 
 const QuestionSchema = new mongoose.Schema({
     _id: { type: mongoose.Schema.Types.ObjectId, auto: true },  
@@ -54,6 +61,11 @@ const QuestionSchema = new mongoose.Schema({
     needs_validation: { type: Boolean, default: false },
     new_question: { type: Boolean, default: true },
     duplicate: { type: DuplicateSchema, default: {} },
+    image_eligibility: { type: ImageEligibilitySchema, default: {} },
+    image64: { type: String, default: "" },
+    image_prompt: { type: String, default: "" },
+    image_version: { type: Number, default: 0 },
+    image_generated_at: { type: Date, default: null },
 
     hash: { type: String, required: true, unique: true },
     version: { type: Number, default: 1, required: true }

@@ -15,10 +15,15 @@ function assertImageSetup() {
   }
 }
 
-function buildPayload(categoryName) {
+function buildPayloadForPrompt(prompt) {
+  const safePrompt = String(prompt || "").trim();
+  if (!safePrompt) {
+    throw new Error("Image prompt cannot be empty.");
+  }
+
   return {
     input: {
-      prompt: `A cartoon of ${categoryName}`,
+      prompt: safePrompt,
       negative_prompt: "blurry, low quality, deformed, ugly, text, watermark, signature",
       height: 512,
       width: 512,
@@ -30,15 +35,43 @@ function buildPayload(categoryName) {
   };
 }
 
+function buildCategoryPrompt(categoryName) {
+  return `A cartoon of ${String(categoryName || "").trim()}`;
+}
+
+function buildQuestionImagePrompt(question, categoryName = "") {
+  const text = String(question?.text || "").trim();
+  const correctAnswer = String(question?.correct_answer || "").trim();
+  const category = String(categoryName || "").trim();
+
+  const subject = correctAnswer || text || "the trivia answer subject";
+  const contextLine = text
+    ? `Context: Trivia question "${text}".`
+    : "";
+  const categoryLine = category
+    ? `Category: ${category}.`
+    : "";
+
+  return [
+    `A clear, educational, family-friendly image of ${subject}.`,
+    contextLine,
+    categoryLine,
+    "Single subject, centered composition, realistic or clean illustration style.",
+    "No text, no labels, no logos, no watermark, no collage, no split-screen.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function attachApiOutput(error, apiOutput) {
   if (!error || typeof error !== "object") return;
   error.apiOutput = apiOutput;
 }
 
-async function generateCategoryImageBase64(categoryName) {
+async function generateImageBase64FromPrompt(prompt) {
   assertImageSetup();
 
-  const payload = buildPayload(categoryName);
+  const payload = buildPayloadForPrompt(prompt);
   let response;
   try {
     response = await axios.post(RUNPOD_IMAGE_URL, payload, {
@@ -67,12 +100,26 @@ async function generateCategoryImageBase64(categoryName) {
 
   return {
     base64: imageBase64,
+    prompt: String(prompt || "").trim(),
     raw: response.data,
   };
+}
+
+async function generateCategoryImageBase64(categoryName) {
+  const prompt = buildCategoryPrompt(categoryName);
+  return generateImageBase64FromPrompt(prompt);
+}
+
+async function generateQuestionImageBase64(question, categoryName = "") {
+  const prompt = buildQuestionImagePrompt(question, categoryName);
+  return generateImageBase64FromPrompt(prompt);
 }
 
 module.exports = {
   RUNPOD_IMAGE_URL,
   assertImageSetup,
+  buildQuestionImagePrompt,
+  generateImageBase64FromPrompt,
   generateCategoryImageBase64,
+  generateQuestionImageBase64,
 };

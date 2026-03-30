@@ -17,7 +17,6 @@ import { trackEnteredGame } from "@/utils/analytics";
 const queryClient = new QueryClient();
 const BASE_URL = getApiBaseUrl();
 const MobileLayout = lazy(() => import("@/components/layout/MobileLayout").then((module) => ({ default: module.MobileLayout })));
-const Home = lazy(() => import("./pages/Home"));
 const SagaMap = lazy(() => import("./pages/SagaMap"));
 const SagaLevel = lazy(() => import("./pages/SagaLevel"));
 const Leaderboard = lazy(() => import("./pages/Leaderboard"));
@@ -111,7 +110,7 @@ const AppContent = () => {
   const previousPathnameRef = useRef(location.pathname);
 
   const isSagaRoutePath = (pathname: string) =>
-    pathname === "/saga-map" || pathname.startsWith("/saga-level/");
+    pathname === "/" || pathname === "/saga-map" || pathname.startsWith("/saga-level/");
   const shouldAnimateSagaRouteTransition =
     previousPathnameRef.current !== location.pathname &&
     isSagaRoutePath(previousPathnameRef.current) &&
@@ -162,7 +161,7 @@ const AppContent = () => {
             <Route path="/reset-password" element={<Navigate to="/" replace />} />
 
             <Route path="/" element={<ProtectedRoute><MobileLayout /></ProtectedRoute>}>
-              <Route index element={<Home />} />
+              <Route index element={<SagaMap />} />
               <Route path="all-quizzes" element={<Categories />} />
               <Route path="saga-map" element={<SagaMap />} />
               <Route path="saga-level/:sagaNumber" element={<SagaLevel />} />

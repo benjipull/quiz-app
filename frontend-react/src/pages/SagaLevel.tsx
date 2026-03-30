@@ -814,6 +814,12 @@ export default function SagaLevel() {
         });
         navigate("/saga-map", {
           replace: true,
+          state: {
+            fromSagaLevelCompletion: true,
+            unlockedSagaLevel: sagaNumber + 1,
+            completedSagaNumber: sagaNumber,
+            completedAt: Date.now(),
+          },
         });
         return;
       }
@@ -1042,6 +1048,25 @@ export default function SagaLevel() {
     return <Navigate to="/saga-map" replace />;
   }
 
+  const backButtonOverlay =
+    typeof document !== "undefined"
+      ? createPortal(
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            onClick={() => navigate("/saga-map")}
+            aria-label="Back to Saga Map"
+            title="Back to Saga Map"
+            className="fixed top-[max(0.5rem,env(safe-area-inset-top))] left-2 sm:left-4 z-[10010] h-11 w-11 sm:h-12 sm:w-12 rounded-full border border-cyan-200/75 bg-slate-950/45 text-cyan-50 backdrop-blur-md shadow-[0_10px_24px_rgba(8,47,73,0.45),0_0_16px_rgba(34,211,238,0.3)] transition-all duration-200 hover:scale-[1.05] hover:border-cyan-100 hover:bg-cyan-500/22 hover:shadow-[0_14px_28px_rgba(8,47,73,0.55),0_0_22px_rgba(103,232,249,0.45)] active:scale-[0.98]"
+          >
+            <ArrowLeft className="h-5 w-5 sm:h-6 sm:w-6" />
+            <span className="sr-only">Back</span>
+          </Button>,
+          document.body,
+        )
+      : null;
+
   const completionFlyInOverlay =
     showCompletionFlyInOverlay && typeof document !== "undefined"
       ? createPortal(
@@ -1076,10 +1101,11 @@ export default function SagaLevel() {
           document.body,
         )
       : null;
+  const lastPlayableRowIndex = getNextPlayableRowIndex();
 
   return (
     <div
-      className="relative min-h-[100dvh] px-2 sm:px-4 py-2 sm:py-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] overflow-x-hidden"
+      className="relative min-h-[100dvh] px-2 sm:px-4 py-2 sm:py-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] overflow-x-hidden bg-[#0a1730]"
     >
       <style>
         {`
@@ -1183,18 +1209,65 @@ export default function SagaLevel() {
             height: 0;
             display: none;
           }
+
+          .saga-level-scroll-bg-base {
+            background:
+              linear-gradient(
+                180deg,
+                #0a1831 0%,
+                #1f447a 50%,
+                #0a1831 100%
+              );
+            background-size: 100% 980px;
+            background-repeat: repeat-y;
+            background-position: center top;
+          }
+
+          .saga-level-scroll-bg-glow {
+            background:
+              linear-gradient(
+                180deg,
+                rgba(96, 156, 234, 0) 0%,
+                rgba(131, 187, 255, 0.1) 22%,
+                rgba(196, 229, 255, 0.46) 50%,
+                rgba(131, 187, 255, 0.1) 78%,
+                rgba(96, 156, 234, 0) 100%
+              ),
+              radial-gradient(
+                88% 56% at 50% 50%,
+                rgba(209, 236, 255, 0.42) 0%,
+                rgba(171, 214, 255, 0.2) 46%,
+                rgba(113, 156, 221, 0) 80%
+              );
+            background-size: 100% 980px;
+            background-repeat: repeat-y;
+            background-position: center top;
+            mix-blend-mode: screen;
+            opacity: 1;
+          }
+
+          .saga-level-scroll-bg-speckles {
+            background-image:
+              radial-gradient(circle at 14% 42%, rgba(255, 244, 220, 0.62) 0 0.9px, transparent 1.9px),
+              radial-gradient(circle at 26% 60%, rgba(202, 235, 255, 0.58) 0 0.85px, transparent 1.8px),
+              radial-gradient(circle at 39% 49%, rgba(255, 228, 241, 0.54) 0 0.8px, transparent 1.8px),
+              radial-gradient(circle at 51% 58%, rgba(255, 255, 255, 0.6) 0 0.9px, transparent 1.9px),
+              radial-gradient(circle at 63% 44%, rgba(196, 233, 255, 0.58) 0 0.85px, transparent 1.8px),
+              radial-gradient(circle at 74% 61%, rgba(255, 230, 243, 0.56) 0 0.85px, transparent 1.8px),
+              radial-gradient(circle at 86% 48%, rgba(255, 247, 228, 0.6) 0 0.9px, transparent 1.9px);
+            background-size: 100% 980px;
+            background-repeat: repeat-y;
+            background-position: center top;
+            opacity: 0.45;
+          }
         `}
       </style>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        onClick={() => navigate("/saga-map")}
-        className="fixed top-[max(0.5rem,env(safe-area-inset-top))] left-2 sm:left-4 z-[70] h-8 px-2 sm:px-3 border-cyan-300/60 text-cyan-100 hover:bg-cyan-500/15"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        <span className="ml-1 hidden sm:inline">Back</span>
-      </Button>
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <div className="absolute inset-0 saga-level-scroll-bg-base" />
+        <div className="absolute inset-0 saga-level-scroll-bg-glow" />
+        <div className="absolute inset-0 saga-level-scroll-bg-speckles" />
+      </div>
+      {backButtonOverlay}
       <div className="relative z-10 mx-auto min-h-[100dvh] w-full max-w-5xl flex flex-col gap-2 sm:gap-3">
         <div className="flex-1 min-h-0">
         {isLoadingRows ? (
@@ -1253,6 +1326,11 @@ export default function SagaLevel() {
               const isCategoryDisabled = Boolean(categoryIdForRow && row?.category?.disabled);
               const isLockedByProgress = Boolean(categoryIdForRow) && !isUnlocked;
               const isVisuallyNotPlayable = isCategoryDisabled || isLockedByProgress;
+              const shouldShowFrameAura =
+                index === lastPlayableRowIndex &&
+                Boolean(categoryIdForRow) &&
+                !isCategoryDisabled &&
+                isUnlocked;
               const isFrameDisabled =
                 !categoryIdForRow || isCategoryDisabled || startingCategoryId !== null || !isUnlocked;
               const nonPlayableVisualClasses = isVisuallyNotPlayable
@@ -1360,15 +1438,17 @@ export default function SagaLevel() {
                           </p>
                         </div>
                         <>
-                          <img
-                            src={WOODEN_FRAME_SRC}
-                            alt=""
-                            aria-hidden="true"
-                            className={`absolute inset-0 z-[9] h-full w-full object-contain pointer-events-none ${nonPlayableVisualClasses}`}
-                            style={{
-                              animation: "sagaFrameAura 2.8s ease-in-out infinite",
-                            }}
-                          />
+                          {shouldShowFrameAura ? (
+                            <img
+                              src={WOODEN_FRAME_SRC}
+                              alt=""
+                              aria-hidden="true"
+                              className={`absolute inset-0 z-[9] h-full w-full object-contain pointer-events-none ${nonPlayableVisualClasses}`}
+                              style={{
+                                animation: "sagaFrameAura 2.8s ease-in-out infinite",
+                              }}
+                            />
+                          ) : null}
                           <img
                             src={WOODEN_FRAME_SRC}
                             alt=""

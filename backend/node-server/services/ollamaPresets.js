@@ -67,6 +67,18 @@ const OLLAMA_PRESETS = Object.freeze({
       num_predict: 40,
     },
   },
+  populateImageEligibility: {
+    timeoutMs: 180_000,
+    format: "json",
+    options: {
+      temperature: 0.0,
+      top_p: 0.9,
+      top_k: 40,
+      num_ctx: 2048,
+      num_predict: 180,
+      repeat_penalty: 1.1,
+    },
+  },
 });
 
 module.exports = {
