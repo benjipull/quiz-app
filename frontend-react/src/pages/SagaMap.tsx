@@ -22,6 +22,7 @@ const LOAD_BATCH = 30;
 const LOAD_THRESHOLD_PX = 320;
 const OVERSCAN_PX = LEVEL_GAP * 2;
 const UNLOCK_ANIMATION_SIGNAL_MAX_AGE_MS = 2 * 60 * 1000;
+const UNLOCK_ENTRY_ANIMATION_DURATION_MS = 900;
 const BASE_URL = getApiBaseUrl();
 
 type BubblePoint = {
@@ -183,6 +184,7 @@ export default function SagaMap() {
   const isAppendingRef = useRef(false);
   const centeredPlayableLevelRef = useRef<number | null>(null);
   const hasConsumedUnlockAnimationRef = useRef(false);
+  const economyBarSlideTimerRef = useRef<number | null>(null);
 
   const [maxLevel, setMaxLevel] = useState(40);
   const [scrollTop, setScrollTop] = useState(0);
@@ -196,6 +198,7 @@ export default function SagaMap() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [unlockAnimatingLevel, setUnlockAnimatingLevel] = useState<number | null>(null);
+  const [isEconomyBarSliding, setIsEconomyBarSliding] = useState(false);
   const [isInitialMapReady, setIsInitialMapReady] = useState(false);
   const [viewport, setViewport] = useState({
     width: typeof window !== "undefined" ? window.innerWidth : 390,
@@ -569,6 +572,38 @@ export default function SagaMap() {
     nextPlayableSagaLevel,
   ]);
 
+  useEffect(() => {
+    if (unlockAnimatingLevel === null) {
+      return;
+    }
+
+    // Reset and restart the header slide cycle so it always retriggers.
+    setIsEconomyBarSliding(false);
+    const rafId = window.requestAnimationFrame(() => {
+      setIsEconomyBarSliding(true);
+    });
+
+    if (economyBarSlideTimerRef.current !== null) {
+      window.clearTimeout(economyBarSlideTimerRef.current);
+    }
+    economyBarSlideTimerRef.current = window.setTimeout(() => {
+      setIsEconomyBarSliding(false);
+      economyBarSlideTimerRef.current = null;
+    }, UNLOCK_ENTRY_ANIMATION_DURATION_MS + 60);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [unlockAnimatingLevel]);
+
+  useEffect(() => {
+    return () => {
+      if (economyBarSlideTimerRef.current !== null) {
+        window.clearTimeout(economyBarSlideTimerRef.current);
+      }
+    };
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-[100dvh] grid place-items-center bg-[#0b1325] text-slate-200">
@@ -614,7 +649,11 @@ export default function SagaMap() {
         </div>
       </div>
 
-      <div className="relative z-20 pt-[max(0.25rem,env(safe-area-inset-top))] px-1">
+      <div
+        className={`relative z-20 pt-[max(0.25rem,env(safe-area-inset-top))] px-1 ${
+          isEconomyBarSliding ? "saga-economy-bar-slide-cycle" : ""
+        }`}
+      >
         <GameStatsHeader
           userToken={userToken}
           isParentLoading={false}
@@ -816,6 +855,26 @@ export default function SagaMap() {
         .saga-unlock-entry-bubble {
           animation: sagaUnlockBubbleEntry 900ms cubic-bezier(0.2, 0.92, 0.28, 1.05) forwards;
           will-change: transform, background, border-color, box-shadow, filter;
+        }
+
+        @keyframes sagaEconomyBarSlideDownUp {
+          0% {
+            transform: translateY(0);
+          }
+          28% {
+            transform: translateY(44px);
+          }
+          78% {
+            transform: translateY(44px);
+          }
+          100% {
+            transform: translateY(0);
+          }
+        }
+
+        .saga-economy-bar-slide-cycle {
+          animation: sagaEconomyBarSlideDownUp 900ms cubic-bezier(0.2, 0.92, 0.28, 1.05) both;
+          will-change: transform;
         }
 
         .saga-scroll {
