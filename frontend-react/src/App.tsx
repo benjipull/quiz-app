@@ -13,6 +13,7 @@ import SplashScreen from "./components/SplashScreen";
 import { getApiBaseUrl } from "@/utils/baseUrl";
 import { setGAUser } from "@/utils/gaClient";
 import { trackEnteredGame } from "@/utils/analytics";
+import { useUser } from "@/contexts/UserContext";
 
 const queryClient = new QueryClient();
 const BASE_URL = getApiBaseUrl();
@@ -32,20 +33,35 @@ const About = lazy(() => import("./pages/About"));
 const Claim = lazy(() => import("./components/dummy"));
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading, refreshUser } = useUser();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [guestLoginFailed, setGuestLoginFailed] = useState(false);
+  const isBootstrappingSessionRef = useRef(false);
 
   useEffect(() => {
-    let isMounted = true;
+    if (loading) {
+      setIsCheckingAuth(true);
+      return;
+    }
 
+    if (user) {
+      setGuestLoginFailed(false);
+      setIsCheckingAuth(false);
+      return;
+    }
+
+    if (isBootstrappingSessionRef.current) {
+      return;
+    }
+
+    let isMounted = true;
     const ensureSession = async () => {
-      const existingToken = localStorage.getItem("token");
-      if (existingToken) {
-        if (isMounted) {
-          setIsCheckingAuth(false);
-        }
-        return;
-      }
+      isBootstrappingSessionRef.current = true;
+      setIsCheckingAuth(true);
+
+      // Clear stale local session before creating a fresh guest session.
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
 
       try {
         const response = await fetch(`${BASE_URL}/api/users/guestLogin`, {
@@ -62,7 +78,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         setGAUser(data.user._id);
         trackEnteredGame(data.user._id, "guest_login_api");
 
+        await refreshUser();
+
         if (isMounted) {
+          setGuestLoginFailed(false);
           setIsCheckingAuth(false);
         }
       } catch (error) {
@@ -71,17 +90,19 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
           setGuestLoginFailed(true);
           setIsCheckingAuth(false);
         }
+      } finally {
+        isBootstrappingSessionRef.current = false;
       }
     };
 
-    ensureSession();
+    void ensureSession();
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [loading, user?._id]);
 
-  if (isCheckingAuth) {
+  if (loading || isCheckingAuth) {
     return <SplashScreen dataLoaded={false} />;
   }
 

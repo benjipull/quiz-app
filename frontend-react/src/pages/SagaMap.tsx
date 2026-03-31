@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "@/contexts/UserContext";
 import { getApiBaseUrl } from "@/utils/baseUrl";
 import GameStatsHeader from "@/components/GameStatsHeader";
@@ -450,7 +450,7 @@ export default function SagaMap() {
   }, [loading, user?._id]);
 
   useLayoutEffect(() => {
-    if (loading || !user || user.userType !== "Admin" || isProgressLoading) {
+    if (loading || !user || isProgressLoading) {
       return;
     }
 
@@ -482,7 +482,6 @@ export default function SagaMap() {
   }, [
     loading,
     user?._id,
-    user?.userType,
     isProgressLoading,
     maxLevel,
     nextPlayableSagaLevel,
@@ -490,7 +489,7 @@ export default function SagaMap() {
   ]);
 
   useEffect(() => {
-    if (loading || !user || user.userType !== "Admin") return;
+    if (loading || !user) return;
 
     let isMounted = true;
     const userToken =
@@ -543,7 +542,7 @@ export default function SagaMap() {
     return () => {
       isMounted = false;
     };
-  }, [loading, user?._id, user?.userType]);
+  }, [loading, user?._id]);
 
   useEffect(() => {
     if (isProgressLoading || !shouldAnimateUnlockOnEntry || hasConsumedUnlockAnimationRef.current) {
@@ -578,8 +577,12 @@ export default function SagaMap() {
     );
   }
 
-  if (!user || user.userType !== "Admin") {
-    return <Navigate to="/" replace />;
+  if (!user) {
+    return (
+      <div className="min-h-[100dvh] grid place-items-center bg-[#0b1325] text-slate-200">
+        Restoring your session...
+      </div>
+    );
   }
 
   return (
