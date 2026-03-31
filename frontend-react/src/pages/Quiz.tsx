@@ -935,6 +935,22 @@ export default function Quiz() {
 
       if (response.ok) {
         const completionData = await response.json();
+        const completionResults =
+          completionData && typeof completionData === "object"
+            ? (completionData.results as Record<string, unknown> | undefined)
+            : undefined;
+        const completedKnowledgeGainedRaw = Number(
+          completionResults?.knowledgeGained ?? 0,
+        );
+        const completedCoinsEarnedRaw = Number(
+          completionResults?.coinsEarned ?? 0,
+        );
+        const completedKnowledgeGained = Number.isFinite(completedKnowledgeGainedRaw)
+          ? Math.max(0, Math.round(completedKnowledgeGainedRaw))
+          : 0;
+        const completedCoinsEarned = Number.isFinite(completedCoinsEarnedRaw)
+          ? Math.max(0, Math.round(completedCoinsEarnedRaw))
+          : 0;
         trackQuizComplete(quizState.selectedCategory.id, quizState.correctAnswers, userId);
 
         if (shouldReturnToSagaLevelAfterCompletion) {
@@ -945,6 +961,8 @@ export default function Quiz() {
             completedSagaLevelId: normalizedSagaLevelId || "",
             completedCategoryId: completedCategoryId || "",
             completedStarCount: String(correctAnswers),
+            completedKnowledgeGained: String(completedKnowledgeGained),
+            completedCoinsEarned: String(completedCoinsEarned),
             completedAt: String(completionTimestamp),
           });
 
@@ -956,6 +974,8 @@ export default function Quiz() {
                 completedSagaLevelId: normalizedSagaLevelId || null,
                 completedCategoryId: completedCategoryId || null,
                 completedStarCount: correctAnswers,
+                completedKnowledgeGained,
+                completedCoinsEarned,
                 completedAt: completionTimestamp,
               }),
             );
@@ -970,6 +990,8 @@ export default function Quiz() {
               completedSagaLevelId: normalizedSagaLevelId || null,
               completedCategoryId: completedCategoryId || null,
               completedStarCount: correctAnswers,
+              completedKnowledgeGained,
+              completedCoinsEarned,
               completedAt: completionTimestamp,
             },
           });

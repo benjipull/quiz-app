@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Lock, Star } from "lucide-react";
+import { ArrowLeft, Brain, CircleDollarSign, Lock, Star } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/contexts/UserContext";
 import { getApiBaseUrl } from "@/utils/baseUrl";
 import { useToast } from "@/hooks/use-toast";
+import GameStatsHeader from "@/components/GameStatsHeader";
+import { avatarUrls } from "@/utils/avatarPaths";
 
 const BASE_URL = getApiBaseUrl();
 const QUIZ_COST = 100;
@@ -67,6 +69,8 @@ type SagaLevelLocationState = {
   completedSagaLevelId?: string | null;
   completedCategoryId?: string | null;
   completedStarCount?: number | null;
+  completedKnowledgeGained?: number | null;
+  completedCoinsEarned?: number | null;
   completedAt?: number;
 };
 
@@ -75,6 +79,8 @@ type SagaLevelCompletionReturnStorage = {
   completedSagaLevelId?: string | null;
   completedCategoryId?: string | null;
   completedStarCount?: number | null;
+  completedKnowledgeGained?: number | null;
+  completedCoinsEarned?: number | null;
   completedAt?: number;
 };
 
@@ -117,6 +123,12 @@ const normalizeId = (value: unknown): string | null => {
   const asString = String(value).trim();
   if (!asString || asString === "null" || asString === "undefined") return null;
   return asString;
+};
+
+const toNonNegativeInt = (value: unknown): number => {
+  const parsed = Number(value ?? 0);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.round(parsed));
 };
 
 const getRowId = (row: SagaLevelRow | null | undefined): string | null => {
@@ -227,6 +239,8 @@ export default function SagaLevel() {
       completedSagaLevelId: params.get("completedSagaLevelId"),
       completedCategoryId: params.get("completedCategoryId"),
       completedStarCount: params.get("completedStarCount"),
+      completedKnowledgeGained: params.get("completedKnowledgeGained"),
+      completedCoinsEarned: params.get("completedCoinsEarned"),
       completedAt: params.get("completedAt"),
     };
   })();
@@ -306,6 +320,20 @@ export default function SagaLevel() {
             completionReturnFromStorage?.completedStarCount,
         )
       : null;
+  const completedKnowledgeGainedFromQuizReturn = isReturningFromQuizCompletion
+    ? toNonNegativeInt(
+        locationState?.completedKnowledgeGained ??
+          completionReturnFromQuery?.completedKnowledgeGained ??
+          completionReturnFromStorage?.completedKnowledgeGained,
+      )
+    : 0;
+  const completedCoinsEarnedFromQuizReturn = isReturningFromQuizCompletion
+    ? toNonNegativeInt(
+        locationState?.completedCoinsEarned ??
+          completionReturnFromQuery?.completedCoinsEarned ??
+          completionReturnFromStorage?.completedCoinsEarned,
+      )
+    : 0;
 
   const [rows, setRows] = useState<SagaLevelRow[]>([]);
   const [isLoadingRows, setIsLoadingRows] = useState(true);
@@ -324,6 +352,10 @@ export default function SagaLevel() {
   } | null>(null);
   const [showEntryTransitionCover, setShowEntryTransitionCover] = useState(cameFromSagaMap);
   const [pathSegments, setPathSegments] = useState<SagaPathSegment[]>([]);
+  const [isEconomyBarLowered, setIsEconomyBarLowered] = useState(false);
+  const [showCompletionRewardsOverlay, setShowCompletionRewardsOverlay] = useState(false);
+  const [animatedCompletionKnowledge, setAnimatedCompletionKnowledge] = useState(0);
+  const [animatedCompletionCoins, setAnimatedCompletionCoins] = useState(0);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const frameRefs = useRef<Array<HTMLDivElement | null>>([]);
   const starSlotRefs = useRef<Record<string, HTMLSpanElement | null>>({});
@@ -334,7 +366,11 @@ export default function SagaLevel() {
   const hasAutoScrolledRef = useRef(false);
   const hasHandledCompletionReturnRef = useRef(false);
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
+  const sagaLevelUserToken =
+    typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
   const currentCoins = user?.coins ?? 0;
+  const selectedAvatarIndex = Math.max(0, (user?.avatar || 1) - 1);
+  const userAvatarImage = avatarUrls[selectedAvatarIndex] || avatarUrls[0];
   const displayRows = rows.slice(0, 6);
   const gridCells: Array<SagaLevelRow | null> = [
     ...displayRows,
@@ -463,6 +499,8 @@ export default function SagaLevel() {
       params.delete("completedSagaLevelId");
       params.delete("completedCategoryId");
       params.delete("completedStarCount");
+      params.delete("completedKnowledgeGained");
+      params.delete("completedCoinsEarned");
       params.delete("completedAt");
       const queryString = params.toString();
       const nextUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ""}${window.location.hash || ""}`;
@@ -478,6 +516,8 @@ export default function SagaLevel() {
               delete sanitized.completedSagaLevelId;
               delete sanitized.completedCategoryId;
               delete sanitized.completedStarCount;
+              delete sanitized.completedKnowledgeGained;
+              delete sanitized.completedCoinsEarned;
               delete sanitized.completedAt;
               return sanitized;
             })()
@@ -623,6 +663,9 @@ export default function SagaLevel() {
     setShowCompletionFlyInOverlay(false);
     setIsCompletionFlyInInMotion(false);
     setCompletionStarsOverride(null);
+    setShowCompletionRewardsOverlay(false);
+    setAnimatedCompletionKnowledge(0);
+    setAnimatedCompletionCoins(0);
   }, [sagaNumber]);
 
   useEffect(() => {
@@ -1036,6 +1079,58 @@ export default function SagaLevel() {
     });
   }, [showCompletionFlyInOverlay, completionFlyInStars, isCompletionFlyInInMotion]);
 
+  useEffect(() => {
+    setIsEconomyBarLowered(isCompletionStarAnimationActive);
+  }, [isCompletionStarAnimationActive]);
+
+  useEffect(() => {
+    if (!isCompletionStarAnimationActive) {
+      setShowCompletionRewardsOverlay(false);
+      setAnimatedCompletionKnowledge(0);
+      setAnimatedCompletionCoins(0);
+      return;
+    }
+
+    const targetKnowledge = completedKnowledgeGainedFromQuizReturn;
+    const targetCoins = completedCoinsEarnedFromQuizReturn;
+    if (targetKnowledge <= 0 && targetCoins <= 0) {
+      setShowCompletionRewardsOverlay(false);
+      return;
+    }
+
+    setShowCompletionRewardsOverlay(true);
+    setAnimatedCompletionKnowledge(0);
+    setAnimatedCompletionCoins(0);
+
+    const animationDurationMs = Math.max(900, QUIZ_COMPLETION_STARS_SEQUENCE_MS - 600);
+    const startTime = performance.now();
+    let rafId = 0;
+
+    const animateCounts = (timestamp: number) => {
+      const elapsed = timestamp - startTime;
+      const progress = Math.max(0, Math.min(1, elapsed / animationDurationMs));
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+      setAnimatedCompletionKnowledge(Math.round(targetKnowledge * easedProgress));
+      setAnimatedCompletionCoins(Math.round(targetCoins * easedProgress));
+
+      if (progress < 1) {
+        rafId = window.requestAnimationFrame(animateCounts);
+      }
+    };
+
+    rafId = window.requestAnimationFrame(animateCounts);
+
+    return () => {
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
+  }, [
+    isCompletionStarAnimationActive,
+    completedKnowledgeGainedFromQuizReturn,
+    completedCoinsEarnedFromQuizReturn,
+  ]);
+
   if (loading) {
     return (
       <div className="min-h-[100dvh] grid place-items-center bg-[#0b1325] text-slate-200">
@@ -1071,6 +1166,68 @@ export default function SagaLevel() {
             <ArrowLeft className="h-5 w-5 sm:h-6 sm:w-6" />
             <span className="sr-only">Back</span>
           </Button>,
+          document.body,
+        )
+      : null;
+  const economyBarOverlay =
+    typeof document !== "undefined"
+      ? createPortal(
+          <div className="pointer-events-none fixed inset-x-0 top-0 z-[10005]">
+            <div
+              className={`mx-auto w-full max-w-5xl px-1 pt-[max(0.25rem,env(safe-area-inset-top))] transition-transform duration-300 ${
+                isEconomyBarLowered ? "translate-y-10" : "-translate-y-[140%]"
+              }`}
+            >
+              <GameStatsHeader
+                userToken={sagaLevelUserToken}
+                isParentLoading={false}
+                currentCoinsFromParent={currentCoins}
+                userXP={user.knowledgePoints ?? 0}
+                userGem1={user.wisdomGems ?? 0}
+                userGem2={user.enlightenmentCrystals ?? 0}
+                compactMode
+                centerImageSrc={userAvatarImage}
+                centerSubLabel={user.alias || ""}
+                centerBadgeValue={user.level ?? 1}
+              />
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+  const completionRewardsOverlay =
+    showCompletionRewardsOverlay && typeof document !== "undefined"
+      ? createPortal(
+          <div className="pointer-events-none fixed inset-x-0 top-0 z-[10008] flex justify-center px-3 pt-[max(5.8rem,env(safe-area-inset-top)+4.8rem)]">
+            <div className="saga-reward-overlay-enter flex w-full max-w-md items-center justify-center gap-2 rounded-2xl border border-amber-200/40 bg-slate-950/70 px-3 py-2 backdrop-blur-md shadow-[0_10px_30px_rgba(2,6,23,0.5)] sm:gap-3 sm:px-4 sm:py-3">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-cyan-200/35 bg-cyan-900/25 px-2 py-2 sm:px-3">
+                <div className="rounded-full bg-cyan-200/20 p-1.5 text-cyan-100">
+                  <Brain className="h-4 w-4 sm:h-5 sm:w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200/80 sm:text-xs">
+                    KP Earned
+                  </p>
+                  <p className="saga-reward-value text-base font-extrabold leading-none text-cyan-100 tabular-nums sm:text-xl">
+                    +{animatedCompletionKnowledge}
+                  </p>
+                </div>
+              </div>
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-amber-200/35 bg-amber-900/20 px-2 py-2 sm:px-3">
+                <div className="rounded-full bg-amber-200/20 p-1.5 text-amber-100">
+                  <CircleDollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-200/80 sm:text-xs">
+                    Coins Earned
+                  </p>
+                  <p className="saga-reward-value text-base font-extrabold leading-none text-amber-100 tabular-nums sm:text-xl">
+                    +{animatedCompletionCoins}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>,
           document.body,
         )
       : null;
@@ -1186,6 +1343,36 @@ export default function SagaLevel() {
             }
           }
 
+          @keyframes sagaRewardOverlayIn {
+            0% {
+              opacity: 0;
+              transform: translateY(-12px) scale(0.97);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+
+          @keyframes sagaRewardValuePulse {
+            0%, 100% {
+              transform: scale(1);
+              text-shadow: 0 0 6px rgba(255, 255, 255, 0.15);
+            }
+            50% {
+              transform: scale(1.05);
+              text-shadow: 0 0 14px rgba(255, 255, 255, 0.32);
+            }
+          }
+
+          .saga-reward-overlay-enter {
+            animation: sagaRewardOverlayIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+
+          .saga-reward-value {
+            animation: sagaRewardValuePulse 0.9s ease-in-out infinite;
+          }
+
           .saga-rating-star {
             display: inline-block;
             line-height: 1;
@@ -1276,6 +1463,8 @@ export default function SagaLevel() {
         <div className="absolute inset-0 saga-level-scroll-bg-speckles" />
       </div>
       {backButtonOverlay}
+      {economyBarOverlay}
+      {completionRewardsOverlay}
       <div className="relative z-10 mx-auto min-h-[100dvh] w-full max-w-5xl flex flex-col gap-2 sm:gap-3">
         <div className="flex-1 min-h-0">
         {isLoadingRows ? (
