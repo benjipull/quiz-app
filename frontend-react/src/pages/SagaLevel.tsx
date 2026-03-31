@@ -15,6 +15,11 @@ const QUIZ_COMPLETION_SIGNAL_MAX_AGE_MS = 2 * 60 * 1000;
 const QUIZ_COMPLETION_SCROLL_TO_COMPLETED_DELAY_MS = 120;
 const QUIZ_COMPLETION_SCROLL_SETTLE_BEFORE_STARS_MS = 820;
 const QUIZ_COMPLETION_STARS_SEQUENCE_MS = 3400;
+const ENTRY_TRANSITION_SPEED_MULTIPLIER = 1.5;
+const ENTRY_TRANSITION_MIN_VISIBLE_MS = Math.round(520 / ENTRY_TRANSITION_SPEED_MULTIPLIER);
+const ENTRY_TRANSITION_EXIT_DURATION_S = 0.45 / ENTRY_TRANSITION_SPEED_MULTIPLIER;
+const ENTRY_TRANSITION_BG_PULSE_DURATION_S = 1.35 / ENTRY_TRANSITION_SPEED_MULTIPLIER;
+const ENTRY_TRANSITION_LABEL_PULSE_DURATION_S = 1.05 / ENTRY_TRANSITION_SPEED_MULTIPLIER;
 const WOODEN_FRAME_SRC = "/assets/images/SagaLevelGraphics/wooden-frame.png";
 const DEFAULT_CATEGORY_IMAGE_SRC = "/assets/images/SagaLevelGraphics/Enchanted-Forest.png";
 
@@ -635,9 +640,8 @@ export default function SagaLevel() {
       return;
     }
 
-    const minVisibleDurationMs = 520;
     const elapsed = Date.now() - entryTransitionStartAtRef.current;
-    const remaining = Math.max(0, minVisibleDurationMs - elapsed);
+    const remaining = Math.max(0, ENTRY_TRANSITION_MIN_VISIBLE_MS - elapsed);
     const timerId = window.setTimeout(() => {
       setShowEntryTransitionCover(false);
     }, remaining);
@@ -1527,7 +1531,7 @@ export default function SagaLevel() {
             className="fixed inset-0 z-[130] pointer-events-auto"
             initial={{ opacity: 1 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } }}
+            exit={{ opacity: 0, transition: { duration: ENTRY_TRANSITION_EXIT_DURATION_S, ease: [0.22, 1, 0.36, 1] } }}
           >
             <div
               className="absolute inset-0"
@@ -1543,12 +1547,12 @@ export default function SagaLevel() {
                   "radial-gradient(circle at 20% 22%, rgba(56,189,248,0.34) 0%, rgba(56,189,248,0) 38%), radial-gradient(circle at 80% 72%, rgba(34,197,94,0.18) 0%, rgba(34,197,94,0) 32%)",
               }}
               animate={{ opacity: [0.5, 0.86, 0.5], scale: [1, 1.02, 1] }}
-              transition={{ duration: 1.35, repeat: Infinity, ease: "easeInOut" }}
+              transition={{ duration: ENTRY_TRANSITION_BG_PULSE_DURATION_S, repeat: Infinity, ease: "easeInOut" }}
             />
             <motion.div
               className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/50 bg-cyan-950/55 px-4 py-2 text-sm font-semibold text-cyan-100 backdrop-blur-sm"
               animate={{ opacity: [0.72, 1, 0.72] }}
-              transition={{ duration: 1.05, repeat: Infinity, ease: "easeInOut" }}
+              transition={{ duration: ENTRY_TRANSITION_LABEL_PULSE_DURATION_S, repeat: Infinity, ease: "easeInOut" }}
             >
               Loading Saga Level...
             </motion.div>
