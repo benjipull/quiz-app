@@ -148,10 +148,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           // Ignore non-JSON response body
         }
 
-        if (errorMessage.toLowerCase().includes("token expired")) {
-          console.warn("Token expired from getUserDetails. Logging out user.");
-          logoutUser();
-        }
+        console.warn(
+          `Unauthorized from getUserDetails (${errorMessage || "no details"}). Logging out user.`
+        );
+        logoutUser();
       }
     } catch (error) {
       console.error("❌ Error refreshing user:", error);

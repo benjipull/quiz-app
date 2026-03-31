@@ -559,7 +559,7 @@ export default function SagaLevel() {
   };
 
   useEffect(() => {
-    if (loading || !user || user.userType !== "Admin" || !hasValidSagaNumber) return;
+    if (loading || !user || !hasValidSagaNumber) return;
 
     let isMounted = true;
     const userToken =
@@ -606,7 +606,7 @@ export default function SagaLevel() {
     return () => {
       isMounted = false;
     };
-  }, [loading, user?._id, user?.userType, hasValidSagaNumber, sagaNumber]);
+  }, [loading, user?._id, hasValidSagaNumber, sagaNumber]);
 
   useEffect(() => {
     hasAutoScrolledRef.current = false;
@@ -1040,8 +1040,12 @@ export default function SagaLevel() {
     );
   }
 
-  if (!user || user.userType !== "Admin") {
-    return <Navigate to="/" replace />;
+  if (!user) {
+    return (
+      <div className="min-h-[100dvh] grid place-items-center bg-[#0b1325] text-slate-200">
+        Restoring your session...
+      </div>
+    );
   }
 
   if (!hasValidSagaNumber) {
