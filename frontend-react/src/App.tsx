@@ -17,6 +17,7 @@ import { useUser } from "@/contexts/UserContext";
 
 const queryClient = new QueryClient();
 const BASE_URL = getApiBaseUrl();
+const SAGA_ROUTE_TRANSITION_DURATION = 0.35 / 1.5;
 const MobileLayout = lazy(() => import("@/components/layout/MobileLayout").then((module) => ({ default: module.MobileLayout })));
 const SagaMap = lazy(() => import("./pages/SagaMap"));
 const SagaLevel = lazy(() => import("./pages/SagaLevel"));
@@ -173,7 +174,7 @@ const AppContent = () => {
           }
           transition={
             shouldAnimateSagaRouteTransition
-              ? { duration: 0.35, ease: [0.22, 1, 0.36, 1] }
+              ? { duration: SAGA_ROUTE_TRANSITION_DURATION, ease: [0.22, 1, 0.36, 1] }
               : { duration: 0.01 }
           }
         >
