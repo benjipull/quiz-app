@@ -8,19 +8,20 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import Quiz from "./pages/Quiz";
+import SagaMap from "./pages/SagaMap";
+import SagaLevel from "./pages/SagaLevel";
 import { usePageTracking } from "./hooks/usePageTracking";
 import SplashScreen from "./components/SplashScreen";
 import { getApiBaseUrl } from "@/utils/baseUrl";
 import { setGAUser } from "@/utils/gaClient";
 import { trackEnteredGame } from "@/utils/analytics";
 import { useUser } from "@/contexts/UserContext";
+import { installGlobalApiErrorToasts } from "@/utils/installGlobalApiErrorToasts";
 
 const queryClient = new QueryClient();
 const BASE_URL = getApiBaseUrl();
 const SAGA_ROUTE_TRANSITION_DURATION = 0.35 / 1.5;
 const MobileLayout = lazy(() => import("@/components/layout/MobileLayout").then((module) => ({ default: module.MobileLayout })));
-const SagaMap = lazy(() => import("./pages/SagaMap"));
-const SagaLevel = lazy(() => import("./pages/SagaLevel"));
 const Leaderboard = lazy(() => import("./pages/Leaderboard"));
 const Categories = lazy(() => import("./pages/Categories"));
 const Profile = lazy(() => import("./pages/Profile"));
@@ -139,6 +140,10 @@ const AppContent = () => {
     isSagaRoutePath(location.pathname);
 
   useEffect(() => {
+    installGlobalApiErrorToasts();
+  }, []);
+
+  useEffect(() => {
     if (Capacitor.getPlatform() !== "android") {
       return;
     }
@@ -163,14 +168,14 @@ const AppContent = () => {
           key={location.key}
           initial={
             shouldAnimateSagaRouteTransition
-              ? { opacity: 0, y: 24, scale: 0.985, filter: "blur(1.5px)" }
+              ? { y: 24, scale: 0.985 }
               : false
           }
-          animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+          animate={{ y: 0, scale: 1 }}
           exit={
             shouldAnimateSagaRouteTransition
-              ? { opacity: 0.32, y: -18, scale: 1.012, filter: "blur(2px)" }
-              : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }
+              ? { y: -18, scale: 1.012 }
+              : { y: 0, scale: 1 }
           }
           transition={
             shouldAnimateSagaRouteTransition

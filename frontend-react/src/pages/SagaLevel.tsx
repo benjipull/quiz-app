@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Brain, CircleDollarSign, Lock, Star } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/contexts/UserContext";
@@ -17,12 +16,7 @@ const QUIZ_COMPLETION_SIGNAL_MAX_AGE_MS = 2 * 60 * 1000;
 const QUIZ_COMPLETION_SCROLL_TO_COMPLETED_DELAY_MS = 120;
 const QUIZ_COMPLETION_SCROLL_SETTLE_BEFORE_STARS_MS = 820;
 const QUIZ_COMPLETION_STARS_SEQUENCE_MS = 3400;
-const ENTRY_TRANSITION_SPEED_MULTIPLIER = 1.5;
-const ENTRY_TRANSITION_MIN_VISIBLE_MS = Math.round(520 / ENTRY_TRANSITION_SPEED_MULTIPLIER);
-const ENTRY_TRANSITION_EXIT_DURATION_S = 0.45 / ENTRY_TRANSITION_SPEED_MULTIPLIER;
-const ENTRY_TRANSITION_BG_PULSE_DURATION_S = 1.35 / ENTRY_TRANSITION_SPEED_MULTIPLIER;
-const ENTRY_TRANSITION_LABEL_PULSE_DURATION_S = 1.05 / ENTRY_TRANSITION_SPEED_MULTIPLIER;
-const WOODEN_FRAME_SRC = "/assets/images/SagaLevelGraphics/wooden-frame.png";
+const WOODEN_FRAME_SRC = "/assets/images/SagaLevelGraphics/wooden-frame.webp";
 const DEFAULT_CATEGORY_IMAGE_SRC = "/assets/images/SagaLevelGraphics/Enchanted-Forest.png";
 
 type SagaLevelRow = {
@@ -65,6 +59,7 @@ type CubicArcSample = {
 type SagaLevelLocationState = {
   fromSagaMap?: boolean;
   transitionStartedAt?: number;
+  bootstrapRows?: SagaLevelRow[];
   fromQuizCompletion?: boolean;
   completedSagaLevelId?: string | null;
   completedCategoryId?: string | null;
@@ -227,6 +222,9 @@ export default function SagaLevel() {
   const hasValidSagaNumber = Number.isInteger(sagaNumber) && sagaNumber > 0;
   const locationState = (location.state as SagaLevelLocationState | null) ?? null;
   const cameFromSagaMap = Boolean(locationState?.fromSagaMap);
+  const preloadedRowsFromSagaMap = cameFromSagaMap && Array.isArray(locationState?.bootstrapRows)
+    ? (locationState.bootstrapRows as SagaLevelRow[])
+    : null;
   const completionReturnFromQuery: SagaLevelCompletionReturnStorage | null = (() => {
     if (typeof window === "undefined") return null;
 
@@ -335,8 +333,8 @@ export default function SagaLevel() {
       )
     : 0;
 
-  const [rows, setRows] = useState<SagaLevelRow[]>([]);
-  const [isLoadingRows, setIsLoadingRows] = useState(true);
+  const [rows, setRows] = useState<SagaLevelRow[]>(preloadedRowsFromSagaMap || []);
+  const [isLoadingRows, setIsLoadingRows] = useState(!preloadedRowsFromSagaMap);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [startingCategoryId, setStartingCategoryId] = useState<string | null>(null);
   const [lockedMessageRowId, setLockedMessageRowId] = useState<string | null>(null);
@@ -350,7 +348,6 @@ export default function SagaLevel() {
     rowId: string;
     filledCount: number;
   } | null>(null);
-  const [showEntryTransitionCover, setShowEntryTransitionCover] = useState(cameFromSagaMap);
   const [pathSegments, setPathSegments] = useState<SagaPathSegment[]>([]);
   const [isEconomyBarLowered, setIsEconomyBarLowered] = useState(false);
   const [showCompletionRewardsOverlay, setShowCompletionRewardsOverlay] = useState(false);
@@ -360,9 +357,6 @@ export default function SagaLevel() {
   const frameRefs = useRef<Array<HTMLDivElement | null>>([]);
   const starSlotRefs = useRef<Record<string, HTMLSpanElement | null>>({});
   const lockMessageTimerRef = useRef<number | null>(null);
-  const entryTransitionStartAtRef = useRef<number>(
-    cameFromSagaMap ? Date.now() : 0
-  );
   const hasAutoScrolledRef = useRef(false);
   const hasHandledCompletionReturnRef = useRef(false);
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
@@ -372,6 +366,7 @@ export default function SagaLevel() {
   const selectedAvatarIndex = Math.max(0, (user?.avatar || 1) - 1);
   const userAvatarImage = avatarUrls[selectedAvatarIndex] || avatarUrls[0];
   const displayRows = rows.slice(0, 6);
+  const isShowingLoadingSkeleton = isLoadingRows && rows.length === 0;
   const gridCells: Array<SagaLevelRow | null> = [
     ...displayRows,
     ...Array.from({ length: Math.max(0, 6 - displayRows.length) }, () => null),
@@ -606,6 +601,13 @@ export default function SagaLevel() {
   useEffect(() => {
     if (loading || !user || !hasValidSagaNumber) return;
 
+    if (preloadedRowsFromSagaMap) {
+      setRows(preloadedRowsFromSagaMap);
+      setIsLoadingRows(false);
+      setErrorMessage(null);
+      return;
+    }
+
     let isMounted = true;
     const userToken =
       typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
@@ -619,9 +621,14 @@ export default function SagaLevel() {
     const fetchSagaLevel = async () => {
       setIsLoadingRows(true);
       setErrorMessage(null);
+      setRows([]);
       try {
-        const response = await fetch(`${BASE_URL}/api/saga/levels/${sagaNumber}`, {
-          method: "GET",
+        const shouldBootstrap = cameFromSagaMap;
+        const endpoint = shouldBootstrap
+          ? `${BASE_URL}/api/saga/levels/${sagaNumber}/bootstrap`
+          : `${BASE_URL}/api/saga/levels/${sagaNumber}`;
+        const response = await fetch(endpoint, {
+          method: shouldBootstrap ? "POST" : "GET",
           headers: {
             Authorization: `Bearer ${userToken}`,
           },
@@ -651,7 +658,7 @@ export default function SagaLevel() {
     return () => {
       isMounted = false;
     };
-  }, [loading, user?._id, hasValidSagaNumber, sagaNumber]);
+  }, [loading, user?._id, hasValidSagaNumber, sagaNumber, preloadedRowsFromSagaMap, cameFromSagaMap]);
 
   useEffect(() => {
     hasAutoScrolledRef.current = false;
@@ -667,32 +674,6 @@ export default function SagaLevel() {
     setAnimatedCompletionKnowledge(0);
     setAnimatedCompletionCoins(0);
   }, [sagaNumber]);
-
-  useEffect(() => {
-    if (cameFromSagaMap) {
-      entryTransitionStartAtRef.current = Date.now();
-      setShowEntryTransitionCover(true);
-      return;
-    }
-
-    setShowEntryTransitionCover(false);
-  }, [cameFromSagaMap, sagaNumber]);
-
-  useEffect(() => {
-    if (!showEntryTransitionCover || isLoadingRows) {
-      return;
-    }
-
-    const elapsed = Date.now() - entryTransitionStartAtRef.current;
-    const remaining = Math.max(0, ENTRY_TRANSITION_MIN_VISIBLE_MS - elapsed);
-    const timerId = window.setTimeout(() => {
-      setShowEntryTransitionCover(false);
-    }, remaining);
-
-    return () => {
-      window.clearTimeout(timerId);
-    };
-  }, [showEntryTransitionCover, isLoadingRows]);
 
   useEffect(() => {
     setLockedMessageRowId(null);
@@ -947,7 +928,7 @@ export default function SagaLevel() {
   }, [isLoadingRows, rows, isReturningFromQuizCompletion]);
 
   useEffect(() => {
-    if (isLoadingRows || rows.length < 2) {
+    if (!isShowingLoadingSkeleton && rows.length < 2) {
       setPathSegments([]);
       return;
     }
@@ -978,7 +959,8 @@ export default function SagaLevel() {
           const lowerFrameRect = measuredFrames[index].getBoundingClientRect();
           const upperFrameRect = measuredFrames[index - 1].getBoundingClientRect();
           const sourceRow = gridCells[index];
-          const useLockedPathColor = Boolean(sourceRow && !sourceRow.isCompleted);
+          const useLoadingPathColor = isShowingLoadingSkeleton;
+          const useLockedPathColor = !useLoadingPathColor && Boolean(sourceRow && !sourceRow.isCompleted);
 
           const start: Point = {
             x: lowerFrameRect.left + lowerFrameRect.width / 2 - gridRect.left,
@@ -1030,13 +1012,21 @@ export default function SagaLevel() {
             id: `path-${index}`,
             d,
             dots,
-            strokeColor: useLockedPathColor
+            strokeColor: useLoadingPathColor
+              ? "rgba(148, 163, 184, 0.42)"
+              : useLockedPathColor
               ? "rgba(248, 113, 113, 0.5)"
               : "rgba(125, 211, 252, 0.35)",
-            dotColor: useLockedPathColor
+            dotColor: useLoadingPathColor
+              ? "rgba(226, 232, 240, 0.92)"
+              : useLockedPathColor
               ? "rgba(254, 202, 202, 0.95)"
               : "rgba(186, 230, 253, 0.95)",
-            dotAnimationName: useLockedPathColor ? "sagaPathGlowLocked" : "sagaPathGlow",
+            dotAnimationName: useLoadingPathColor
+              ? "sagaPathGlowLoading"
+              : useLockedPathColor
+                ? "sagaPathGlowLocked"
+                : "sagaPathGlow",
           });
         }
 
@@ -1061,7 +1051,7 @@ export default function SagaLevel() {
       window.removeEventListener("resize", recomputePaths);
       resizeObserver.disconnect();
     };
-  }, [isLoadingRows, rows]);
+  }, [rows, isShowingLoadingSkeleton]);
 
   useEffect(() => {
     if (!showCompletionFlyInOverlay) return;
@@ -1296,6 +1286,17 @@ export default function SagaLevel() {
             }
           }
 
+          @keyframes sagaPathGlowLoading {
+            0%, 100% {
+              opacity: 0.3;
+              filter: drop-shadow(0 0 2px rgba(203, 213, 225, 0.45));
+            }
+            50% {
+              opacity: 0.9;
+              filter: drop-shadow(0 0 7px rgba(226, 232, 240, 0.75));
+            }
+          }
+
           @keyframes sagaFrameAura {
             0%, 100% {
               opacity: 0.55;
@@ -1466,16 +1467,20 @@ export default function SagaLevel() {
       {economyBarOverlay}
       {completionRewardsOverlay}
       <div className="relative z-10 mx-auto min-h-[100dvh] w-full max-w-5xl flex flex-col gap-2 sm:gap-3">
-        <div className="flex-1 min-h-0">
-        {isLoadingRows ? (
-          <div className="h-full rounded-xl border border-cyan-400/30 bg-cyan-900/20 p-4 text-cyan-100 grid place-items-center">
-            Loading categories...
+        <div className="relative flex-1 min-h-0">
+        {isShowingLoadingSkeleton ? (
+          <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/30 bg-slate-900/70 px-3 py-1.5 text-xs font-semibold text-slate-100 backdrop-blur-sm">
+              <span className="inline-block h-4 w-4 rounded-full border-2 border-slate-200/75 border-t-transparent animate-spin" />
+              Loading saga level...
+            </div>
           </div>
-        ) : errorMessage ? (
+        ) : null}
+        {errorMessage ? (
           <div className="h-full rounded-xl border border-red-400/40 bg-red-900/20 p-4 text-red-200 grid place-items-center">
             {errorMessage}
           </div>
-        ) : rows.length === 0 ? (
+        ) : !isShowingLoadingSkeleton && rows.length === 0 ? (
           <div className="h-full rounded-xl border border-slate-500/40 bg-slate-900/30 p-4 text-slate-200 grid place-items-center">
             No categories found for this saga level.
           </div>
@@ -1519,20 +1524,28 @@ export default function SagaLevel() {
                 transform: `translateX(${(index + 1) % 2 === 0 ? "-" : ""}${frameShift})`,
               };
               const categoryImageSrc = row ? getCategoryImageSrc(row) : "";
-              const isUnlocked = isRowUnlocked(index, row);
+              const isLoadingPlaceholder = isShowingLoadingSkeleton;
+              const isUnlocked = isLoadingPlaceholder ? false : isRowUnlocked(index, row);
               const isCategoryDisabled = Boolean(categoryIdForRow && row?.category?.disabled);
               const isLockedByProgress = Boolean(categoryIdForRow) && !isUnlocked;
               const isVisuallyNotPlayable = isCategoryDisabled || isLockedByProgress;
               const shouldShowFrameAura =
+                !isLoadingPlaceholder &&
                 index === lastPlayableRowIndex &&
                 Boolean(categoryIdForRow) &&
                 !isCategoryDisabled &&
                 isUnlocked;
               const isFrameDisabled =
-                !categoryIdForRow || isCategoryDisabled || startingCategoryId !== null || !isUnlocked;
-              const nonPlayableVisualClasses = isVisuallyNotPlayable
-                ? "grayscale opacity-80"
-                : "";
+                isLoadingPlaceholder ||
+                !categoryIdForRow ||
+                isCategoryDisabled ||
+                startingCategoryId !== null ||
+                !isUnlocked;
+              const nonPlayableVisualClasses = isLoadingPlaceholder
+                ? "grayscale opacity-70"
+                : isVisuallyNotPlayable
+                  ? "grayscale opacity-80"
+                  : "";
               const completionOverrideForRow =
                 rowId && completionStarsOverride?.rowId === rowId
                   ? completionStarsOverride
@@ -1565,6 +1578,7 @@ export default function SagaLevel() {
                     role="button"
                     tabIndex={0}
                     onClick={() => {
+                      if (isLoadingPlaceholder) return;
                       const categoryId = categoryIdForRow;
                       if (!categoryId) return;
                       if (isCategoryDisabled) {
@@ -1582,6 +1596,7 @@ export default function SagaLevel() {
                       handleStartCategoryQuiz(categoryId, rowId || undefined);
                     }}
                     onKeyDown={(event) => {
+                      if (isLoadingPlaceholder) return;
                       const categoryId = categoryIdForRow;
                       if ((event.key === "Enter" || event.key === " ") && categoryId) {
                         event.preventDefault();
@@ -1602,7 +1617,9 @@ export default function SagaLevel() {
                     }}
                     aria-disabled={isFrameDisabled}
                     className={`rounded-lg p-1 sm:p-2 transition-transform overflow-hidden ${
-                      categoryIdForRow && !isCategoryDisabled && startingCategoryId === null && isUnlocked
+                      isLoadingPlaceholder
+                        ? "opacity-90 cursor-default"
+                        : categoryIdForRow && !isCategoryDisabled && startingCategoryId === null && isUnlocked
                         ? "cursor-pointer hover:scale-[1.01]"
                         : categoryIdForRow && (isCategoryDisabled || !isUnlocked)
                           ? "cursor-not-allowed"
@@ -1613,7 +1630,9 @@ export default function SagaLevel() {
                       <div className="h-full w-full">
                         <div className="absolute left-[calc(53%-5px)] top-[calc(56%+10px)] z-[8] w-[calc(77%-20px)] h-[calc(67%-20px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-sm bg-black/15">
                           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,255,255,0.16),rgba(255,255,255,0)_62%),linear-gradient(180deg,rgba(2,6,23,0.32),rgba(2,6,23,0.58))]" />
-                          {row && categoryImageSrc ? (
+                          {isLoadingPlaceholder ? (
+                            <div className="relative z-10 h-full w-full animate-pulse bg-gradient-to-b from-slate-400/25 via-slate-300/20 to-slate-500/30" />
+                          ) : row && categoryImageSrc ? (
                             <img
                               src={categoryImageSrc}
                               alt={row.category?.name || "Category image"}
@@ -1630,9 +1649,13 @@ export default function SagaLevel() {
                           )}
                         </div>
                         <div className="absolute left-1/2 top-[calc(18%+20px)] z-20 w-[60%] -translate-x-1/2 pointer-events-none">
-                          <p className="text-[#F2E1BF] font-bold text-sm sm:text-base text-center truncate drop-shadow-[0_1px_1px_rgba(0,0,0,0.65)]">
-                            {row?.category?.name || " "}
-                          </p>
+                          {isLoadingPlaceholder ? (
+                            <div className="mx-auto h-4 sm:h-5 w-[72%] rounded-full bg-slate-200/35 animate-pulse" />
+                          ) : (
+                            <p className="text-[#F2E1BF] font-bold text-sm sm:text-base text-center truncate drop-shadow-[0_1px_1px_rgba(0,0,0,0.65)]">
+                              {row?.category?.name || " "}
+                            </p>
+                          )}
                         </div>
                         <>
                           {shouldShowFrameAura ? (
@@ -1713,41 +1736,6 @@ export default function SagaLevel() {
         <div ref={bottomAnchorRef} />
       </div>
       {completionFlyInOverlay}
-      <AnimatePresence>
-        {showEntryTransitionCover ? (
-          <motion.div
-            key="saga-level-entry-transition-cover"
-            className="fixed inset-0 z-[130] pointer-events-auto"
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: ENTRY_TRANSITION_EXIT_DURATION_S, ease: [0.22, 1, 0.36, 1] } }}
-          >
-            <div
-              className="absolute inset-0"
-              style={{
-                background:
-                  "linear-gradient(180deg, #050b16 0%, #071125 54%, #0b1730 100%)",
-              }}
-            />
-            <motion.div
-              className="absolute inset-0"
-              style={{
-                background:
-                  "radial-gradient(circle at 20% 22%, rgba(56,189,248,0.34) 0%, rgba(56,189,248,0) 38%), radial-gradient(circle at 80% 72%, rgba(34,197,94,0.18) 0%, rgba(34,197,94,0) 32%)",
-              }}
-              animate={{ opacity: [0.5, 0.86, 0.5], scale: [1, 1.02, 1] }}
-              transition={{ duration: ENTRY_TRANSITION_BG_PULSE_DURATION_S, repeat: Infinity, ease: "easeInOut" }}
-            />
-            <motion.div
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/50 bg-cyan-950/55 px-4 py-2 text-sm font-semibold text-cyan-100 backdrop-blur-sm"
-              animate={{ opacity: [0.72, 1, 0.72] }}
-              transition={{ duration: ENTRY_TRANSITION_LABEL_PULSE_DURATION_S, repeat: Infinity, ease: "easeInOut" }}
-            >
-              Loading Saga Level...
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
     </div>
   );
 }
