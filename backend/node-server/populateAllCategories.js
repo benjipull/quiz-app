@@ -7,7 +7,7 @@ const { populateCategoryLoop } = require("./scripts/populateCategories");
 // --- Config ---
 const BATCH_SIZE = 10;          // how many categories to process each iteration
 const QUESTIONS_TO_FILL = 10;   // how many questions to add per category
-const THRESHOLD = 100;           // only categories with <100 enabled questions
+const THRESHOLD = 60;           // only categories with <100 enabled questions
 
 /**
  * Get categories with the lowest enabled-question count

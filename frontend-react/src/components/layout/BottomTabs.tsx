@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom"; 
 import { Home, Grid3X3, User, Info, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createPortal } from "react-dom";
 
 const tabs = [
   // 1. Profile
@@ -24,8 +25,9 @@ export const BottomTabs = () => {
   const hideOnSagaLevelPage = location.pathname.startsWith("/saga-level");
 
   if (hideOnQuizPage || hideOnSagaLevelPage) return null;
+  if (typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
       className={cn(
         "fixed inset-x-0 bottom-0 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]",
@@ -81,7 +83,8 @@ export const BottomTabs = () => {
         })}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

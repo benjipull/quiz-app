@@ -395,7 +395,7 @@ export default function SagaMap() {
     return level <= maxEnabledSagaNumber;
   };
 
-  const handleBubbleClick = async (level: number) => {
+  const handleBubbleClick = (level: number) => {
     if (!isBubbleClickable(level)) return;
     setSelectedSagaLevel(level);
 
@@ -409,30 +409,12 @@ export default function SagaMap() {
       return;
     }
 
-    try {
-      const response = await fetch(`${BASE_URL}/api/saga/levels/${level}/bootstrap`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${userToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed with status ${response.status}`);
-      }
-
-      await response.json();
-      navigate(`/saga-level/${level}`, {
-        state: {
-          fromSagaMap: true,
-          transitionStartedAt: Date.now(),
-        },
-      });
-    } catch (error) {
-      console.error("Failed to bootstrap saga level:", error);
-    } finally {
-      setCreatingSagaLevel(null);
-    }
+    navigate(`/saga-level/${level}`, {
+      state: {
+        fromSagaMap: true,
+        transitionStartedAt: Date.now(),
+      },
+    });
   };
 
   useEffect(() => {
