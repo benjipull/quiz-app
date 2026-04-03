@@ -1,6 +1,8 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
 const crypto = require("crypto");
+const { installScriptErrorPrefix } = require("./errorLogger");
+installScriptErrorPrefix();
 const Category = require("../models/categoryModel");
 const {
   OLLAMA_URL,
@@ -12,6 +14,7 @@ const {
 const { buildQuestionPrompt } = require("./prompts/questionPrompt");
 const { validateAndPersistQuestion } = require("./validateQuestions");
 const { populateDifficulty } = require("./populateDifficulty");
+const { normalizeJsonText, parseJsonObject } = require("./jsonParsingHelper");
 //const { processSingleQuestion } = require("./validateDuplicateQuestions");
 
 
@@ -80,6 +83,25 @@ function normalizeQuestion(raw) {
   };
 }
 
+function sanitizeGeneratedQuestionText(text) {
+  const normalized = String(text ?? "");
+  return normalized
+    .replace(/\s*[—-]\s*(where is it|what is it)\??/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function sanitizeGeneratedQuestion(question) {
+  if (!question || typeof question !== "object") {
+    return question;
+  }
+
+  return {
+    ...question,
+    question: sanitizeGeneratedQuestionText(question.question),
+  };
+}
+
 function validateQuestionShape(question) {
   if (!question || typeof question !== "object") {
     return { isValid: false, reason: "empty question payload" };
@@ -111,23 +133,39 @@ function validateQuestionShape(question) {
 }
 
 function parseOllamaResponse(rawResponse) {
+  const rawText = String(rawResponse ?? "");
+  const cleaned = normalizeJsonText(rawText, {
+    stripMarkdown: true,
+    normalizeQuotes: true,
+  });
+
   try {
-    return JSON.parse(rawResponse);
+    return JSON.parse(rawText);
   } catch (rawParseError) {
-    const cleaned = rawResponse
-      .replace(/```(\w+)?/g, "")
-      .replace(/\u201C|\u201D/g, '"')
-      .replace(/\u2019/g, "'");
-    try {
-      return JSON.parse(cleaned);
-    } catch (cleanedParseError) {
-      const parseError = new Error(
-        `Failed to parse Ollama JSON. Raw parse error: ${rawParseError.message}. Cleaned parse error: ${cleanedParseError.message}`
-      );
-      parseError.rawResponse = rawResponse;
-      parseError.cleanedResponse = cleaned;
-      throw parseError;
+    const parsed = parseJsonObject(rawText, {
+      normalizeOptions: {
+        stripMarkdown: true,
+        stripThinkTags: true,
+        normalizeQuotes: true,
+      },
+    });
+    if (parsed) {
+      return parsed;
     }
+
+    let cleanedParseError;
+    try {
+      JSON.parse(cleaned);
+    } catch (error) {
+      cleanedParseError = error;
+    }
+
+    const parseError = new Error(
+      `Failed to parse Ollama JSON. Raw parse error: ${rawParseError.message}. Cleaned parse error: ${cleanedParseError?.message || "Unable to extract JSON object from response."}`
+    );
+    parseError.rawResponse = rawResponse;
+    parseError.cleanedResponse = cleaned;
+    throw parseError;
   }
 }
 
@@ -199,7 +237,10 @@ async function fetchQuestions(categoryName, difficultyHint) {
   const prompt = buildQuestionPrompt(categoryName, avoidSection, difficultySection);
 
   const question = await queryOllama(prompt);
-  return question ? [question] : [];
+  if (!question) return [];
+
+  const parsedQuestion = sanitizeGeneratedQuestion(question);
+  return [parsedQuestion];
 }
 
 async function runPostGenerationScripts(categoryId, questionIds) {
@@ -353,7 +394,7 @@ async function addQuestionsToCategory(category, questions) {
       timesAnsweredCorrectly: 0,
       timesAnsweredIncorrectly: 0,
       hash,
-      version: 3.10
+      version: 3.30
     });
 
     added++;

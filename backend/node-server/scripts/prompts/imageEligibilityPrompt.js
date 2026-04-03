@@ -1,17 +1,19 @@
 function buildImageEligibilityPrompt(question) {
-    const questionText = String(question?.text ?? question?.question ?? "").trim();
-    const answers = Array.isArray(question?.answers)
-      ? question.answers.map((answer) => {
+  const questionText = String(question?.text ?? question?.question ?? "").trim();
+  const answers = Array.isArray(question?.answers)
+    ? question.answers
+        .map((answer) => {
           if (answer && typeof answer === "object") {
             return String(answer.text ?? "").trim();
           }
           return String(answer ?? "").trim();
-        }).filter(Boolean)
-      : [];
-    const correctAnswer = String(question?.correct_answer ?? question?.correctAnswer ?? "").trim();
-    const explanation = String(question?.explanation ?? "").trim();
+        })
+        .filter(Boolean)
+    : [];
+  const correctAnswer = String(question?.correct_answer ?? question?.correctAnswer ?? "").trim();
+  const explanation = String(question?.explanation ?? "").trim();
 
-    return `
+  return `
 You are an assistant that determines whether a trivia question would benefit from displaying an image.
 
 Output STRICT JSON only. No prose or markdown.

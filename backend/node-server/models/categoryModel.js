@@ -12,6 +12,17 @@ const ValidationSchema = new mongoose.Schema({
     explanation_reasoning: { type: String, default: "" },
     other_answers_possible: [{ type: String, default: [] }],
     final_verdict: { type: String, enum: ["Correct", "Incorrect", "Ambiguous"], default: "Ambiguous" },
+    ambiguity_fix_attempted: { type: Boolean, default: false },
+    can_be_fixed_by_rewording: { type: Boolean, default: false },
+    ambiguity_type: {
+        type: String,
+        enum: ["scope", "approximation", "vague_wording", "subjective", "multiple_valid_answers", "other"],
+        default: "other"
+    },
+    ambiguity_reasoning: { type: String, default: "" },
+    ambiguity_fix_applied: { type: Boolean, default: false },
+    fixed_question: { type: String, default: "" },
+    ambiguity_fix_failure_reason: { type: String, default: "" },
     validationVersion: { type: Number, default: 0 }
 }, { _id: false });
 
@@ -84,7 +95,6 @@ const CategorySchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
     description: { type: String, default: "" },
     disabled: { type: Boolean, default: false },
-    imageUrl: { type: String },
     image64: { type: String, default: "" },
     createdAt: { type: Date, default: Date.now },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },

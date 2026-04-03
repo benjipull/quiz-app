@@ -11,10 +11,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import GameStatsHeader from "@/components/GameStatsHeader";
 import { avatarUrls } from "@/utils/avatarPaths";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
-const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
+const BASE_URL = getApiBaseUrl();
 
 const avatars = avatarUrls;
+const FALLBACK_CATEGORY_IMAGE = "/assets/images/SagaLevelGraphics/Enchanted-Forest.png";
+
+const resolveCategoryImageSrc = (image64, image) => {
+  const normalizedImage = typeof image === "string" ? image.trim() : "";
+  if (normalizedImage) return normalizedImage;
+
+  const normalizedImage64 = typeof image64 === "string" ? image64.trim() : "";
+  if (!normalizedImage64 || normalizedImage64 === "null" || normalizedImage64 === "undefined") {
+    return FALLBACK_CATEGORY_IMAGE;
+  }
+
+  return normalizedImage64.startsWith("data:")
+    ? normalizedImage64
+    : `data:image/png;base64,${normalizedImage64}`;
+};
 
 const Profile = () => {
   const [user, setUser] = useState<any | null>(null);
@@ -134,7 +150,7 @@ const Profile = () => {
           questionCount: category.questionCount || 10,
           averageRating: category.averageRating || 0,
           difficulty: category.difficulty || "Medium",
-          imageUrl: category.imageUrl || category.image,
+          image: resolveCategoryImageSrc(category.image64, category.image),
           createdAt: category.createdAt,
         }));
         setUserCategories(transformedCategories);
@@ -617,7 +633,7 @@ const Profile = () => {
                           >
                             <div className="relative overflow-hidden h-32 bg-gradient-to-br from-primary/20 to-secondary/20">
                               <img
-                                src={category.imageUrl || `https://picsum.photos/seed/${category._id}/300/200`}
+                                src={category.image || `https://picsum.photos/seed/${category._id}/300/200`}
                                 alt={category.name}
                                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                                 onError={(e) => {

@@ -1,5 +1,7 @@
 const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, ".env") });
+const { installScriptErrorPrefix } = require("./scripts/errorLogger");
+installScriptErrorPrefix();
 
 const mongoose = require("mongoose");
 

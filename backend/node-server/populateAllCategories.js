@@ -1,4 +1,6 @@
 require("dotenv").config();
+const { installScriptErrorPrefix } = require("./scripts/errorLogger");
+installScriptErrorPrefix();
 const mongoose = require("mongoose");
 const Category = require("./models/categoryModel");
 const connectDB = require("./config/db");

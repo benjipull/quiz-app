@@ -191,7 +191,7 @@ const buildSagaLevelRows = async (playerId, sagaNumber, sagaLevels = []) => {
 
   const categories = categoryIds.length
     ? await Category.find({ _id: { $in: categoryIds } })
-        .select("_id name imageUrl image64 disabled")
+        .select("_id name image64 disabled")
         .lean()
     : [];
 
@@ -214,7 +214,6 @@ const buildSagaLevelRows = async (playerId, sagaNumber, sagaLevels = []) => {
         ? {
             _id: category._id,
             name: category.name,
-            imageUrl: category.imageUrl || "",
             image64: category.image64 || "",
             disabled: Boolean(category.disabled),
           }
@@ -222,7 +221,6 @@ const buildSagaLevelRows = async (playerId, sagaNumber, sagaLevels = []) => {
           ? {
               _id: categoryId,
               name: "Category unavailable",
-              imageUrl: "",
               image64: "",
               disabled: true,
             }
@@ -296,7 +294,7 @@ const getCanonicalProgression = async (playerId, { migrate = false } = {}) => {
 
 const getEligibleCategories = async (minDifficulty, maxDifficulty) => {
   const categories = await Category.find({ disabled: false })
-    .select("_id name imageUrl")
+    .select("_id name")
     .lean();
 
   if (!categories.length) {

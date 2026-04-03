@@ -2,85 +2,24 @@ const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 
 const mongoose = require("mongoose");
+const { installScriptErrorPrefix } = require("./errorLogger");
+
+installScriptErrorPrefix();
 
 const connectDB = require("../config/db");
 const Category = require("../models/categoryModel");
-const { buildImageEligibilityPrompt } = require("./prompts/imageEligibility");
+const { buildImageEligibilityPrompt } = require("./prompts/imageEligibilityPrompt");
 const {
   assertOllamaSetup,
   callOllama,
   getOllamaResponseText,
 } = require("../services/ollamaClient");
+const { parseJsonObjectOrThrow } = require("./jsonParsingHelper");
 
 const CURRENT_IMAGE_ELIGIBILITY_VERSION = 1;
 
 function assertSetup() {
   assertOllamaSetup();
-}
-
-function extractFirstJsonObject(text) {
-  const start = text.indexOf("{");
-  if (start < 0) return null;
-
-  let depth = 0;
-  let inString = false;
-  let isEscaped = false;
-
-  for (let i = start; i < text.length; i += 1) {
-    const char = text[i];
-
-    if (inString) {
-      if (isEscaped) {
-        isEscaped = false;
-        continue;
-      }
-      if (char === "\\") {
-        isEscaped = true;
-        continue;
-      }
-      if (char === "\"") {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === "\"") {
-      inString = true;
-      continue;
-    }
-
-    if (char === "{") {
-      depth += 1;
-      continue;
-    }
-
-    if (char === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return text.slice(start, i + 1);
-      }
-    }
-  }
-
-  return null;
-}
-
-function parseModelJson(raw) {
-  const cleaned = String(raw || "")
-    .trim()
-    .replace(/```(\w+)?/g, "")
-    .replace(/\u201C|\u201D/g, "\"")
-    .replace(/\u2018|\u2019/g, "'");
-
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    const extracted = extractFirstJsonObject(cleaned);
-    if (!extracted) {
-      throw new Error("No JSON object found in model response");
-    }
-    return JSON.parse(extracted);
-  }
 }
 
 function parseBooleanLike(value) {
@@ -151,7 +90,13 @@ async function populateImageEligibility(categoryId, questionId, options = {}) {
       presetName: "populateImageEligibility",
     });
     const rawModelResponse = getOllamaResponseText(response);
-    const parsed = parseModelJson(rawModelResponse);
+    const parsed = parseJsonObjectOrThrow(rawModelResponse, {
+      normalizeOptions: {
+        stripMarkdown: true,
+        stripThinkTags: true,
+        normalizeQuotes: true,
+      },
+    });
     const normalized = normalizeEligibilityResult(parsed);
 
     await Category.updateOne(

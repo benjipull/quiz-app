@@ -27,7 +27,6 @@ type SagaLevelRow = {
   category: {
     _id: string;
     name: string;
-    imageUrl: string;
     image64: string;
     disabled?: boolean;
   } | null;
@@ -367,19 +366,19 @@ export default function SagaLevel() {
   const userAvatarImage = avatarUrls[selectedAvatarIndex] || avatarUrls[0];
   const displayRows = rows.slice(0, 6);
   const isShowingLoadingSkeleton = isLoadingRows && rows.length === 0;
-  const gridCells: Array<SagaLevelRow | null> = [
-    ...displayRows,
-    ...Array.from({ length: Math.max(0, 6 - displayRows.length) }, () => null),
-  ];
+  const gridCells: Array<SagaLevelRow | null> = isShowingLoadingSkeleton
+    ? Array.from({ length: 6 }, () => null)
+    : displayRows;
   const getCategoryImageSrc = (row: SagaLevelRow) => {
     const image64 = row.category?.image64?.trim();
-    if (image64 && image64 !== "null" && image64 !== "undefined") {
+    const hasImage64 = Boolean(image64 && image64 !== "null" && image64 !== "undefined");
+
+    if (hasImage64) {
       return image64.startsWith("data:")
         ? image64
         : `data:image/png;base64,${image64}`;
     }
-    const imageUrl = row.category?.imageUrl?.trim() || "";
-    if (imageUrl) return imageUrl;
+
     return DEFAULT_CATEGORY_IMAGE_SRC;
   };
   const getFilledStarCount = (row: SagaLevelRow | null) => {
@@ -1626,9 +1625,9 @@ export default function SagaLevel() {
                           : "opacity-80 cursor-default"
                     }`}
                   >
-                    <div className="relative h-full min-h-[330px] sm:min-h-[420px]">
+                    <div className="relative mx-auto h-full w-[260px] sm:w-full min-h-[330px] sm:min-h-[420px]">
                       <div className="h-full w-full">
-                        <div className="absolute left-[calc(53%-5px)] top-[calc(56%+10px)] z-[8] w-[calc(77%-20px)] h-[calc(67%-20px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-sm bg-black/15">
+                        <div className="absolute left-[calc(53%-5px)] sm:left-[calc(53%-15px)] top-[calc(56%+10px)] z-[8] w-[180px] h-[200px] sm:w-[220px] sm:h-[240px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-sm bg-black/15">
                           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,255,255,0.16),rgba(255,255,255,0)_62%),linear-gradient(180deg,rgba(2,6,23,0.32),rgba(2,6,23,0.58))]" />
                           {isLoadingPlaceholder ? (
                             <div className="relative z-10 h-full w-full animate-pulse bg-gradient-to-b from-slate-400/25 via-slate-300/20 to-slate-500/30" />

@@ -9,12 +9,19 @@ export const MobileLayout = () => {
   const isQuizRoute = location.pathname.startsWith("/quiz");
   const isSagaMapRoute = location.pathname.startsWith("/saga-map");
   const isSagaLevelRoute = location.pathname.startsWith("/saga-level");
+  const isFullBleedRoute = isSagaLevelRoute;
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-gradient-to-br from-background to-quiz-background">
       
       {/* MAIN CONTENT (scrolls) */}
-      <div className="flex-1 max-w-md md:max-w-4xl xl:max-w-6xl mx-auto w-full px-0 md:px-4">
+      <div
+        className={
+          isFullBleedRoute
+            ? "flex-1 w-full max-w-none px-0"
+            : "flex-1 max-w-md md:max-w-4xl xl:max-w-6xl mx-auto w-full px-0 md:px-4"
+        }
+      >
         <Outlet />
 
         {/* space so content doesn't touch fixed tabs */}

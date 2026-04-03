@@ -48,7 +48,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ dataLoaded }) => {
       <div className="flex flex-col items-center space-y-8 relative z-10">
         <div className="relative">
           <img
-            src="/assets/images/splash-screen.png"
+            src="/assets/images/splash-screen-fs8.png"
             alt="Quiz Game Loading"
             className={`max-w-sm w-full h-auto object-contain transition-all duration-1000 ${
               imageLoaded ? "scale-100 opacity-100" : "scale-95 opacity-0"

@@ -1,6 +1,8 @@
 // grantCoins.js
 require('dotenv').config({ path: '../.env' }); // load env
 const mongoose = require("mongoose");
+const { installScriptErrorPrefix } = require("./errorLogger");
+installScriptErrorPrefix();
 const User = require("../models/user");
 const connectDB = require("../config/db"); // make sure you have a connectDB function
 

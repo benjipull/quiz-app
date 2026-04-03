@@ -1,5 +1,8 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
+const { installScriptErrorPrefix } = require("./errorLogger");
+
+installScriptErrorPrefix();
 
 const Category = require("../models/categoryModel");
 const Interest = require("../models/interest");
@@ -8,111 +11,98 @@ const {
   callOllama,
   getOllamaResponseText,
 } = require("../services/ollamaClient");
+const { parseJsonObject } = require("./jsonParsingHelper");
+const {
+  buildAssignCategoryInterestsPrompt,
+} = require("./prompts/assignCategoryInterestsPrompt");
 
 try {
   assertOllamaSetup();
 } catch (error) {
-  console.error(`❌ ${error.message}`);
+  console.error(`❌ ERROR ${error.message}`);
   process.exit(1);
 }
 
 async function run() {
   await mongoose.connect(process.env.MONGO_URI);
-  console.log("📦 Connected to MongoDB");
+  console.log("Connected to MongoDB");
 
-  // 1️⃣ Load all interests
   const allInterests = await Interest.find({});
-  const interestNames = allInterests.map(i => i.name);
+  const interestNames = allInterests.map((interest) => interest.name);
+  console.log(`Loaded ${allInterests.length} interests`);
 
-  console.log(`📘 Loaded ${allInterests.length} interests`);
-  
-  // 2️⃣ Load all categories
   const categories = await Category.find({});
-  console.log(`📗 Loaded ${categories.length} categories\n`);
+  console.log(`Loaded ${categories.length} categories`);
 
   for (const category of categories) {
     console.log("------------------------------------------------------------");
-    console.log(`📂 Category: ${category.name}`);
+    console.log(`Category: ${category.name}`);
     console.log("------------------------------------------------------------");
 
-    const prompt = `
-You are an AI assistant that assigns user interests to quiz categories.
-
-Here is the list of ALL interests available:
-
-${interestNames.join(", ")}
-
-Given this category, choose the MOST RELEVANT 1–3 interests.
-
-Category Name: ${category.name}
-Description: ${category.description || "No description"}
-
-Respond ONLY in strict JSON:
-{
-  "interests": ["Interest1", "Interest2"]
-}
-    `.trim();
+    const prompt = buildAssignCategoryInterestsPrompt({
+      interestNames,
+      categoryName: category.name,
+      categoryDescription: category.description,
+    });
 
     try {
-      // 3️⃣ Query Llama
       const response = await callOllama({
         prompt,
         presetName: "assignCategoryInterests",
       });
 
       const raw = getOllamaResponseText(response);
-      let parsed;
+      const parsed = parseJsonObject(raw, {
+        normalizeOptions: {
+          stripMarkdown: true,
+          stripThinkTags: true,
+          normalizeQuotes: true,
+        },
+      });
 
-      try {
-        parsed = JSON.parse(raw);
-      } catch (err) {
+      if (!parsed) {
         console.error("❌ Could not parse model JSON:");
         console.log(raw);
         continue;
       }
 
-      if (!parsed.interests || !Array.isArray(parsed.interests)) {
+      if (!Array.isArray(parsed.interests)) {
         console.error("❌ Invalid response format:", parsed);
         continue;
       }
 
-      // 4️⃣ Convert interest names → IDs
       const interestIds = parsed.interests
-        .map(name => {
+        .map((name) => {
           const found = allInterests.find(
-            i => i.name.toLowerCase() === name.toLowerCase()
+            (interest) => interest.name.toLowerCase() === String(name).toLowerCase(),
           );
           return found ? found._id : null;
         })
-        .filter(id => id !== null);
+        .filter((id) => id !== null);
 
-      // 🧾 Pretty Print to console
-      console.log("🧠 AI Suggested Interests:");
-      parsed.interests.forEach(i => console.log(`   - ${i}`));
+      console.log("AI suggested interests:");
+      parsed.interests.forEach((name) => console.log(`  - ${name}`));
 
-      console.log("\n🔗 Mapped to IDs:");
-      interestIds.forEach(id => console.log(`   - ${id}`));
+      console.log("Mapped IDs:");
+      interestIds.forEach((id) => console.log(`  - ${id}`));
 
       if (interestIds.length === 0) {
-        console.error("\n⚠️ No valid interests mapped. Skipping update.");
+        console.error("❌ No valid interests mapped. Skipping update.");
         continue;
       }
 
-      // 5️⃣ Update category
       await Category.updateOne(
         { _id: category._id },
-        { $set: { interests: interestIds } }
+        { $set: { interests: interestIds } },
       );
 
-      console.log("\n✅ Saved to category.");
-      console.log("------------------------------------------------------------\n");
-
-    } catch (err) {
-      console.error(`❌ Error with category "${category.name}":`, err.message);
+      console.log("Saved to category.");
+    } catch (error) {
+      console.error(`❌ Error with category "${category.name}":`, error.message);
     }
   }
 
-  console.log("\n🎉 Done assigning interests to all categories!");
+  console.log("Done assigning interests to all categories.");
   process.exit(0);
 }
 
