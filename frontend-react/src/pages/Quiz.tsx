@@ -227,6 +227,7 @@ const shuffleArray = <T,>(items: T[]): T[] => {
 interface Question {
   _id: string;
   question: string;
+  image64?: string;
   answers: string[];
   shuffledAnswers?: string[];
   answerCounts?: Array<{
@@ -303,6 +304,51 @@ const normalizeId = (value: unknown): string | null => {
   return normalized;
 };
 
+const inferMimeTypeFromBase64 = (base64: string) => {
+  const sample = base64.slice(0, 32);
+  if (sample.startsWith("/9j/")) return "image/jpeg";
+  if (sample.startsWith("iVBORw0KGgo")) return "image/png";
+  if (sample.startsWith("R0lGOD")) return "image/gif";
+  if (sample.startsWith("UklGR")) return "image/webp";
+  return "image/png";
+};
+
+const getQuestionImageSrc = (image64?: string) => {
+  const raw = String(image64 ?? "")
+    .trim()
+    .replace(/^['"]|['"]$/g, "");
+
+  if (!raw || raw === "null" || raw === "undefined") {
+    return "";
+  }
+
+  if (raw.startsWith("data:image/")) {
+    return raw;
+  }
+
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    return raw;
+  }
+
+  const base64Index = raw.indexOf("base64,");
+  if (base64Index >= 0) {
+    const rawBase64 = raw.slice(base64Index + "base64,".length).replace(/\s+/g, "");
+    if (!rawBase64) return "";
+    const mimeType = inferMimeTypeFromBase64(rawBase64);
+    return `data:${mimeType};base64,${rawBase64}`;
+  }
+
+  const compactBase64 = raw.replace(/\s+/g, "");
+  if (!compactBase64) return "";
+  const mimeType = inferMimeTypeFromBase64(compactBase64);
+  return `data:${mimeType};base64,${compactBase64}`;
+};
+
+const hasImagePayload = (image64?: string) => {
+  const raw = String(image64 ?? "").trim();
+  return Boolean(raw && raw !== "null" && raw !== "undefined");
+};
+
 export default function Quiz() {
   const { categoryId } = useParams();
   const navigate = useNavigate();
@@ -352,6 +398,8 @@ export default function Quiz() {
   const [reportSuccess, setReportSuccess] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState(10);
   const [questionFontSizePx, setQuestionFontSizePx] = useState(28);
+  const questionHasImagePayload = hasImagePayload(quizState.question?.image64);
+  const currentQuestionImageSrc = getQuestionImageSrc(quizState.question?.image64);
 
   const userToken = localStorage.getItem("token");
   const storedUser = localStorage.getItem("user");
@@ -446,8 +494,10 @@ export default function Quiz() {
       const data = await response.json();
 
       if (response.ok && data.question) {
+        const normalizedImage64 = String(data.question.image64 ?? "").trim();
         const questionWithTimer = {
           ...data.question,
+          image64: normalizedImage64,
           timerInSeconds: data.timerInSeconds,
           shuffledAnswers: shuffleArray(data.question.answers || []),
         };
@@ -766,8 +816,10 @@ export default function Quiz() {
       const data = await response.json();
 
       if (response.ok && data.question) {
+        const normalizedImage64 = String(data.question.image64 ?? "").trim();
         const questionWithTimer = {
           ...data.question,
+          image64: normalizedImage64,
           timerInSeconds: data.timerInSeconds,
           shuffledAnswers: shuffleArray(data.question.answers || []),
         };
@@ -1384,6 +1436,32 @@ export default function Quiz() {
                   className="font-bold leading-tight break-words whitespace-pre-wrap"
                 />
               </div>
+              {questionHasImagePayload ? (
+                <div className="mx-auto mt-3 w-fit max-w-[90vw] rounded-2xl border border-cyan-300/45 bg-slate-900/55 p-2 shadow-[0_0_24px_rgba(34,211,238,0.35)]">
+                  <div className="w-fit max-w-[95vw] overflow-hidden rounded-xl bg-slate-950/55">
+                    {currentQuestionImageSrc ? (
+                      <div className="flex h-[173px] items-center justify-center overflow-hidden md:h-[211px]">
+                        <img
+                          src={currentQuestionImageSrc}
+                          alt="Question visual hint"
+                          loading="lazy"
+                          onError={() => {
+                            console.warn("Question image failed to render", {
+                              questionId: quizState.question?._id,
+                              srcPrefix: currentQuestionImageSrc.slice(0, 40),
+                            });
+                          }}
+                          className="block h-[216px] w-auto max-w-none object-cover md:h-[264px]"
+                        />
+                      </div>
+                    ) : (
+                      <p className="px-4 text-center text-xs md:text-sm text-cyan-200/80">
+                        Image payload is present but could not be rendered.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-4">

@@ -16,7 +16,9 @@ const {
 } = require("../services/ollamaClient");
 const { parseJsonObjectOrThrow } = require("./jsonParsingHelper");
 
-const CURRENT_IMAGE_ELIGIBILITY_VERSION = 1;
+const CURRENT_IMAGE_ELIGIBILITY_VERSION = Number(
+  process.env.IMAGE_ELIGIBILITY_VERSION || 2,
+);
 
 function assertSetup() {
   assertOllamaSetup();
@@ -84,6 +86,24 @@ async function populateImageEligibility(categoryId, questionId, options = {}) {
       return false;
     }
 
+    const shouldReprocessAll = Boolean(options?.reprocessAll);
+    const currentVersion = Number(question?.image_eligibility?.version ?? 0);
+    if (!shouldReprocessAll && Number.isFinite(currentVersion) && currentVersion >= CURRENT_IMAGE_ELIGIBILITY_VERSION) {
+      const questionLabel = String(question.text || questionId).trim();
+      const current = Number(options?.progress?.current);
+      const total = Number(options?.progress?.total);
+      const hasProgress =
+        Number.isInteger(current) &&
+        current > 0 &&
+        Number.isInteger(total) &&
+        total > 0;
+      const progressPrefix = hasProgress ? `(${current}/${total}) ` : "";
+      console.log(
+        `${progressPrefix}Skipping image eligibility for "${questionLabel}" (version ${currentVersion} >= ${CURRENT_IMAGE_ELIGIBILITY_VERSION}).`,
+      );
+      return true;
+    }
+
     const prompt = buildImageEligibilityPrompt(question);
     const response = await callOllama({
       prompt,
@@ -133,7 +153,7 @@ async function populateImageEligibility(categoryId, questionId, options = {}) {
 }
 
 async function runFromCli() {
-  const [, , categoryId, questionId] = process.argv;
+  const [, , categoryId, questionId, ...rest] = process.argv;
 
   if (!categoryId || !questionId) {
     console.error("Usage: node scripts/populateImageEligibility.js <categoryId> <questionId>");
@@ -141,9 +161,11 @@ async function runFromCli() {
     process.exit(1);
   }
 
+  const reprocessAll = rest.includes("--all") || rest.includes("--force");
+
   try {
     await connectDB();
-    const ok = await populateImageEligibility(categoryId, questionId);
+    const ok = await populateImageEligibility(categoryId, questionId, { reprocessAll });
     await mongoose.connection.close();
     process.exit(ok ? 0 : 1);
   } catch (err) {

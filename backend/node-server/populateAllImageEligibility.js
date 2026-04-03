@@ -11,10 +11,11 @@ const {
   CURRENT_IMAGE_ELIGIBILITY_VERSION,
   populateImageEligibility,
 } = require("./scripts/populateImageEligibility");
+const { runWithConcurrencyPool } = require("./scripts/concurrencyPool");
 
-const DEFAULT_LIMIT = 1000;
-const DEFAULT_DELAY_MS = 400;
-const DEFAULT_PARALLEL = 1;
+const DEFAULT_LIMIT = 10000;
+const DEFAULT_DELAY_MS = 40;
+const DEFAULT_PARALLEL = 10;
 
 function printUsage() {
   console.log("Usage: node populateAllImageEligibility.js [options]");
@@ -27,7 +28,7 @@ function printUsage() {
     `  --limit=<n>           Max questions to process (${DEFAULT_LIMIT} default, 0 = no limit).`,
   );
   console.log(
-    `  --delay-ms=<n>        Delay between batches in milliseconds (${DEFAULT_DELAY_MS} default).`,
+    `  --delay-ms=<n>        Delay after each processed question in milliseconds (${DEFAULT_DELAY_MS} default).`,
   );
   console.log(
     `  --parallel=<n>        Number of questions to process in parallel (${DEFAULT_PARALLEL} default).`,
@@ -244,37 +245,39 @@ async function batchPopulateImageEligibility(options) {
   let fail = 0;
 
   const indexedQuestions = questions.map((q, index) => ({ q, index }));
-  for (let i = 0; i < indexedQuestions.length; i += options.parallel) {
-    const batch = indexedQuestions.slice(i, i + options.parallel);
-    const results = await Promise.allSettled(
-      batch.map(async ({ q, index }) =>
-        populateImageEligibility(q.categoryId, q.questionId, {
+  const results = await runWithConcurrencyPool(
+    indexedQuestions,
+    options.parallel,
+    async ({ q, index }) => {
+      try {
+        return await populateImageEligibility(q.categoryId, q.questionId, {
+          reprocessAll: options.processAll,
           progress: {
             current: index + 1,
             total: questions.length,
           },
-        }),
-      ),
-    );
-
-    results.forEach((result) => {
-      if (result.status === "fulfilled" && result.value === true) {
-        success += 1;
-        return;
+        });
+      } finally {
+        if (options.delayMs > 0) {
+          await sleep(options.delayMs);
+        }
       }
+    },
+  );
 
-      if (result.status === "rejected") {
-        console.error(
-          `Unhandled image eligibility error: ${result.reason?.message || result.reason}`,
-        );
-      }
-      fail += 1;
-    });
-
-    if (options.delayMs > 0 && i + options.parallel < indexedQuestions.length) {
-      await sleep(options.delayMs);
+  results.forEach((result) => {
+    if (result.status === "fulfilled" && result.value === true) {
+      success += 1;
+      return;
     }
-  }
+
+    if (result.status === "rejected") {
+      console.error(
+        `Unhandled image eligibility error: ${result.reason?.message || result.reason}`,
+      );
+    }
+    fail += 1;
+  });
 
   console.log("");
   console.log("Finished processing image eligibility.");
