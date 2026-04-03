@@ -18,7 +18,6 @@ const tabs = [
 
 export const BottomTabs = () => {
   const location = useLocation();
-  const isProfilePage = location.pathname.startsWith("/profile");
 
   // Hide on quiz playing page (/quiz or /quiz/:categoryId)
   const hideOnQuizPage = location.pathname.startsWith("/quiz");
@@ -31,7 +30,7 @@ export const BottomTabs = () => {
     <div
       className={cn(
         "fixed inset-x-0 bottom-0 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]",
-        isProfilePage ? "z-[120]" : "z-50 lg:hidden",
+        "z-[120]",
       )}
     >
       <div className="relative mx-auto max-w-md rounded-[28px] border border-[#5f77bd]/55 bg-gradient-to-b from-[#37539a] via-[#223a78] to-[#15295a] shadow-[0_-4px_24px_rgba(9,19,52,0.35),0_18px_45px_rgba(6,15,42,0.7)] backdrop-blur-xl">

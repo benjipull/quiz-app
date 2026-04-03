@@ -1,5 +1,7 @@
 require("dotenv").config({ path: __dirname + "/../.env" });
 const mongoose = require("mongoose");
+const { installScriptErrorPrefix } = require("./errorLogger");
+installScriptErrorPrefix();
 const Category = require("../models/categoryModel");
 const connectDB = require("../config/db");
 const { buildDuplicatePrompt } = require("./prompts/duplicatePrompt");
@@ -7,8 +9,9 @@ const {
   assertOllamaSetup,
   callOllamaForText,
 } = require("../services/ollamaClient");
+const { normalizeJsonText, parseJsonObject } = require("./jsonParsingHelper");
 
-const DUPLICATE_VERSION = 0.18;
+const DUPLICATE_VERSION = 0.20;
 const DEFAULT_DUPLICATE_TIMEOUT_MS = 180_000;
 const DEFAULT_DUPLICATE_MAX_ATTEMPTS = 3;
 const DEFAULT_DUPLICATE_RETRY_DELAY_MS = 1_500;
@@ -48,11 +51,11 @@ function sleep(ms) {
 }
 
 function normalizeModelText(raw) {
-  return String(raw || "")
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .replace(/<\/?think>/gi, "")
-    .trim();
+  return normalizeJsonText(raw, {
+    stripMarkdown: true,
+    stripThinkTags: true,
+    normalizeQuotes: false,
+  });
 }
 
 function toDuplicateResult(candidate) {
@@ -68,28 +71,16 @@ function parseDuplicateResult(raw) {
   const cleaned = normalizeModelText(raw);
   if (!cleaned) return null;
 
-  try {
-    const parsed = JSON.parse(cleaned);
-    const normalized = toDuplicateResult(parsed);
-    if (normalized) return normalized;
-  } catch {
-    // Continue with extraction strategies.
-  }
-
-  const objectCandidates = cleaned.match(/\{[\s\S]*?\}/g) || [];
-  for (let index = objectCandidates.length - 1; index >= 0; index--) {
-    const candidate = objectCandidates[index]
-      .replace(/\u201C|\u201D/g, '"')
-      .replace(/,\s*}/g, "}")
-      .trim();
-
-    try {
-      const parsed = JSON.parse(candidate);
-      const normalized = toDuplicateResult(parsed);
-      if (normalized) return normalized;
-    } catch {
-      // Try next candidate.
-    }
+  const parsed = parseJsonObject(cleaned, {
+    normalizeOptions: {
+      stripMarkdown: false,
+      stripThinkTags: false,
+      normalizeQuotes: true,
+    },
+  });
+  const normalized = toDuplicateResult(parsed);
+  if (normalized) {
+    return normalized;
   }
 
   const duplicateMatch = cleaned.match(/\bduplicate\b\s*[:=]\s*(true|false)/i);

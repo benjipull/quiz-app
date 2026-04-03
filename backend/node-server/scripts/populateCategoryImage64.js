@@ -2,6 +2,8 @@ const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 
 const mongoose = require("mongoose");
+const { installScriptErrorPrefix } = require("./errorLogger");
+installScriptErrorPrefix();
 const connectDB = require("../config/db");
 const Category = require("../models/categoryModel");
 const {

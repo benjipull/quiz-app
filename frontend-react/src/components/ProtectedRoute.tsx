@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { getApiBaseUrl } from "@/utils/baseUrl";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-// Define the base URL outside the component
-const BASE_URL = "https://quiz-app-node-606998948537.europe-west4.run.app";
+const BASE_URL = getApiBaseUrl();
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const [isValid, setIsValid] = useState<boolean | null>(null); // null = loading

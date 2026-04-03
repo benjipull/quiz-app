@@ -1,6 +1,8 @@
 // populateInterests.js
 require('dotenv').config({ path: '../.env' });
 const mongoose = require("mongoose");
+const { installScriptErrorPrefix } = require("./errorLogger");
+installScriptErrorPrefix();
 const Interest = require("../models/interest");
 const connectDB = require("../config/db");
 

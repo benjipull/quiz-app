@@ -451,7 +451,14 @@ export default function Quiz() {
           timerInSeconds: data.timerInSeconds,
           shuffledAnswers: shuffleArray(data.question.answers || []),
         };
-        nextQuestionRef.current = questionWithTimer;
+
+        // A parallel "next question" request can return the currently displayed question.
+        // Ignore it so we don't cache a stale duplicate and show it twice.
+        if (quizState.question?._id && questionWithTimer._id === quizState.question._id) {
+          nextQuestionRef.current = null;
+        } else {
+          nextQuestionRef.current = questionWithTimer;
+        }
       } else {
         nextQuestionRef.current = null;
       }
@@ -730,20 +737,24 @@ export default function Quiz() {
         const questionWithTimer = nextQuestionRef.current;
         nextQuestionRef.current = null;
 
-        setQuizState((prev) => {
-          const newIndex = prev.currentQuestionIndex + 1;
-          if (newIndex === 1) {
-            startSound.play().catch(() => { });
-          }
-          return {
-            ...prev,
-            question: questionWithTimer,
-            currentQuestionIndex: newIndex,
-            isAnswerSelected: false,
-          };
-        });
-        setLoading(false);
-        return;
+        if (quizState.question?._id && questionWithTimer._id === quizState.question._id) {
+          // Stale preload; fall through to a fresh server fetch.
+        } else {
+          setQuizState((prev) => {
+            const newIndex = prev.currentQuestionIndex + 1;
+            if (newIndex === 1) {
+              startSound.play().catch(() => { });
+            }
+            return {
+              ...prev,
+              question: questionWithTimer,
+              currentQuestionIndex: newIndex,
+              isAnswerSelected: false,
+            };
+          });
+          setLoading(false);
+          return;
+        }
       }
 
       const response = await fetch(`${BASE_URL}/api/nextQuestion/${userToken}`, {
@@ -760,6 +771,11 @@ export default function Quiz() {
           timerInSeconds: data.timerInSeconds,
           shuffledAnswers: shuffleArray(data.question.answers || []),
         };
+
+        if (quizState.question?._id && questionWithTimer._id === quizState.question._id) {
+          setError("Error fetching the next question.");
+          return;
+        }
 
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1;

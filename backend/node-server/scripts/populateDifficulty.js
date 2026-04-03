@@ -2,6 +2,9 @@ const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 
 const mongoose = require("mongoose");
+const { installScriptErrorPrefix } = require("./errorLogger");
+
+installScriptErrorPrefix();
 
 const connectDB = require("../config/db");
 const Category = require("../models/categoryModel");
@@ -10,6 +13,11 @@ const {
   callOllama,
   getOllamaResponseText,
 } = require("../services/ollamaClient");
+const {
+  normalizeJsonText,
+  parseJsonObjectOrThrow,
+} = require("./jsonParsingHelper");
+const { buildPopulateDifficultyPrompt } = require("./prompts/populateDifficultyPrompt");
 
 const DIFFICULTY_VERSION = 0.01;
 
@@ -17,80 +25,11 @@ function assertSetup() {
   assertOllamaSetup();
 }
 
-function extractFirstJsonObject(text) {
-  const start = text.indexOf("{");
-  if (start < 0) return null;
-
-  let depth = 0;
-  let inString = false;
-  let isEscaped = false;
-
-  for (let i = start; i < text.length; i++) {
-    const char = text[i];
-
-    if (inString) {
-      if (isEscaped) {
-        isEscaped = false;
-        continue;
-      }
-
-      if (char === "\\") {
-        isEscaped = true;
-        continue;
-      }
-
-      if (char === "\"") {
-        inString = false;
-      }
-
-      continue;
-    }
-
-    if (char === "\"") {
-      inString = true;
-      continue;
-    }
-
-    if (char === "{") {
-      depth += 1;
-      continue;
-    }
-
-    if (char === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return text.slice(start, i + 1);
-      }
-    }
-  }
-
-  return null;
-}
-
-function parseModelJson(raw) {
-  const cleaned = String(raw || "")
-    .trim()
-    .replace(/```(\w+)?/g, "")
-    .replace(/\u201C|\u201D/g, "\"")
-    .replace(/\u2018|\u2019/g, "'");
-
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    const extracted = extractFirstJsonObject(cleaned);
-    if (!extracted) {
-      throw new Error("No JSON object found in model response");
-    }
-    return JSON.parse(extracted);
-  }
-}
-
 function salvageDifficultyFromMalformedJson(raw) {
-  const cleaned = String(raw || "")
-    .trim()
-    .replace(/```(\w+)?/g, "")
-    .replace(/\u201C|\u201D/g, "\"")
-    .replace(/\u2018|\u2019/g, "'");
+  const cleaned = normalizeJsonText(raw, {
+    stripMarkdown: true,
+    normalizeQuotes: true,
+  });
 
   const levelMatch = cleaned.match(/["']?difficulty_level["']?\s*:\s*(-?\d+(?:\.\d+)?)/i);
   if (!levelMatch) {
@@ -148,67 +87,17 @@ async function populateDifficulty(categoryId, questionId, options = {}) {
 
     const questionObjectId = new mongoose.Types.ObjectId(questionId);
     const question = category.questions.find(
-      (q) => q._id.equals(questionObjectId) && q.disabled !== true
+      (item) => item._id.equals(questionObjectId) && item.disabled !== true,
     );
 
     if (!question) {
       console.error(`Question not found or disabled: ${questionId}`);
-      const sampleIds = category.questions.slice(0, 5).map((q) => q._id.toString());
+      const sampleIds = category.questions.slice(0, 5).map((item) => item._id.toString());
       console.log("Sample question IDs in this category:", sampleIds, "...");
       return false;
     }
 
-    const prompt = `
-You are an assistant that classifies trivia questions into a single difficulty level from 1 to 10.
-
-=== RULE ===
-Select EXACTLY ONE integer from 1–10.
-
-=== CRITICAL INSTRUCTION ===
-Do NOT default to 5.
-Level 5 should be used ONLY if the question is truly balanced between common and niche knowledge.
-If unsure, choose the closest NON-5 level.
-
-=== DIFFICULTY SCALE ===
-1 — Extremely common knowledge (known by nearly everyone worldwide)
-2 — Very common knowledge
-3 — Common knowledge
-4 — Familiar but not universal
-5 — Balanced midpoint
-6 — Somewhat niche
-7 — Niche knowledge
-8 — Specialist knowledge
-9 — Expert knowledge
-10 — Highly obscure
-
-=== DECISION PROCESS (MANDATORY) ===
-1. Ask: “Would most adults know this?”
-   - Yes → choose 1–4
-2. Else ask: “Would only interested or knowledgeable people know this?”
-   - Yes → choose 6–7
-3. Else ask: “Does this require expertise or deep study?”
-   - Yes → choose 8–10
-4. Use 5 ONLY if it clearly fits none of the above.
-
-=== PRINCIPLES ===
-- Judge the FACT, not the wording.
-- If guessable → lower score.
-- If requires recall or exposure → mid-high.
-- If requires study → high.
-
-Now classify the following trivia question:
-
-Question: ${question.text}
-Answers: ${question.answers.map((a) => a.text).join(", ")}
-Correct Answer: ${question.correct_answer}
-Explanation: ${question.explanation || "N/A"}
-
-Respond in strict JSON:
-{
-  "difficulty_level": <integer 1-10>,
-  "difficulty_rationale": "<string explaining reasoning>"
-}`.trim();
-
+    const prompt = buildPopulateDifficultyPrompt(question);
     const response = await callOllama({
       prompt,
       presetName: "populateDifficulty",
@@ -217,7 +106,13 @@ Respond in strict JSON:
     let parsed;
     const rawModelResponse = getOllamaResponseText(response);
     try {
-      parsed = parseModelJson(rawModelResponse);
+      parsed = parseJsonObjectOrThrow(rawModelResponse, {
+        normalizeOptions: {
+          stripMarkdown: true,
+          stripThinkTags: true,
+          normalizeQuotes: true,
+        },
+      });
     } catch {
       const salvaged = salvageDifficultyFromMalformedJson(rawModelResponse);
       if (!salvaged) {
@@ -235,7 +130,9 @@ Respond in strict JSON:
     }
 
     const difficultyLevel = Math.max(1, Math.min(10, Math.round(parsed.difficulty_level)));
-    const difficultyRationale = String(parsed.difficulty_rationale || "Recovered from malformed model response.").trim();
+    const difficultyRationale = String(
+      parsed.difficulty_rationale || "Recovered from malformed model response.",
+    ).trim();
 
     await Category.updateOne(
       { _id: categoryId, "questions._id": questionId },
@@ -245,18 +142,22 @@ Respond in strict JSON:
           "questions.$.difficulty_rationale": difficultyRationale,
           "questions.$.difficultyConfirmedVersion": DIFFICULTY_VERSION,
         },
-      }
+      },
     );
 
     const questionLabel = String(question.text || questionId).trim();
     const current = Number(options?.progress?.current);
     const total = Number(options?.progress?.total);
-    const hasProgress = Number.isInteger(current) && current > 0 && Number.isInteger(total) && total > 0;
+    const hasProgress =
+      Number.isInteger(current) &&
+      current > 0 &&
+      Number.isInteger(total) &&
+      total > 0;
     const progressPrefix = hasProgress ? `(${current}/${total}) ` : "";
     console.log(`${progressPrefix}Updated question "${questionLabel}" -> level ${difficultyLevel}`);
     return true;
-  } catch (err) {
-    console.error(`Error processing ${questionId}: ${err.message}`);
+  } catch (error) {
+    console.error(`Error processing ${questionId}: ${error.message}`);
     return false;
   }
 }
@@ -275,8 +176,8 @@ async function runFromCli() {
     const ok = await populateDifficulty(categoryId, questionId);
     await mongoose.connection.close();
     process.exit(ok ? 0 : 1);
-  } catch (err) {
-    console.error(`Fatal error: ${err.message}`);
+  } catch (error) {
+    console.error(`Fatal error: ${error.message}`);
     if (mongoose.connection.readyState !== 0) {
       await mongoose.connection.close();
     }

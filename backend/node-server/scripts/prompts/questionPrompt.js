@@ -1,68 +1,164 @@
-
 function buildQuestionPrompt(categoryName, avoidSection = "", difficultySection = "") {
   return `
-You are an international trivia expert creating engaging quiz questions.
+You are an international trivia expert creating engaging, high-quality quiz questions.
 
 Use metric units, global examples, and neutral English spelling.
 
 Output STRICT JSON only. No prose or markdown.
 
 === TASK ===
-Generate ONE engaging factual trivia question based on the provided category.
+Generate ONE engaging, factual trivia question based on the provided category.
 
-The question must:
-- Have exactly 4 distinct answer choices.
-- Have exactly 1 correct answer.
-- Be based on a clear, verifiable fact.
-- Be objectively true according to reputable sources.
+=== CORE RULES ===
+- Exactly 4 distinct answers
+- Exactly 1 correct answer
+- Must be based on a clear, verifiable fact
+- All answers must belong to the same logical context
 
-All answer options must belong to the same logical context.
+=== PRIORITY RULE ===
+When rules conflict, prioritize:
+1. Clarity and factual correctness
+2. Natural, complete sentence
+3. Engagement and creativity
+4. Brevity (≤14 words)
 
 === FACT-FIRST RULE ===
-Before writing the question, internally identify a single verifiable factual statement related to the category.
+Internally identify a single fact first.
 
-The following fields must derive from that same fact:
+Ensure:
 - question
 - correct_answer
 - explanation
 
+are all derived from that same fact.
+
 Do not output the internal fact.
 
-=== TRIVIA QUALITY RULE ===
-Prefer facts that are interesting and suitable for a trivia game.
+=== QUESTION QUALITY ===
+- Maximum 14 words (strict)
+- Must be a complete, natural sentence or prompt
+- Must sound like a human would say it
+- Must not feel truncated, awkward, or robotic
 
-Good topics include:
-- famous discoveries
-- historical events
-- geography
-- science phenomena
-- notable inventions
-- well-known cultural works
-- famous people
+=== FORMAT RULES ===
+- Do NOT include answer options in the question
+- Do NOT use A), B), C), D)
+- Do NOT force endings like "what is it?"
 
-Avoid mundane measurement or unit-conversion questions unless the value is widely known.
+The question can be:
+- a statement
+- a prompt
+- a direct question (only if it improves clarity)
 
-The question should feel like something that could appear in a pub quiz.
+=== STYLE RULE ===
+The question MUST feel engaging and non-generic.
+
+Use ONE of these approaches:
+- curiosity hook
+- playful scenario
+- surprising comparison
+- dramatic framing
+- indirect/reverse logic
+
+Avoid safe or textbook phrasing.
+
+=== ANTI-BORING RULE ===
+If the question feels like a school exam question, rewrite it.
+
+Avoid:
+- "Which of the following..."
+- "What is..."
+- "Who was..."
+
+Avoid vague phrasing like:
+- "known for"
+- "famous for"
+
+Avoid unnecessary or obscure numbers.
+
+
+=== QUESTION OPENING VARIETY ===
+Avoid overusing the same opening word.
+
+Do NOT start most questions with:
+- "Which"
+
+Use a variety of openings such as:
+- "Name the..."
+- "Identify the..."
+- "In which..."
+- "Where would you find..."
+- "This..."
+- "You..."
+- "From these..."
+
+The opening should feel natural and varied across questions.
+
+Use varied and natural phrasing.
+
+
+=== NO VAGUE CONTEXT RULE ===
+Avoid unnecessary or vague qualifiers that do not add meaningful information.
+
+Do NOT use phrases like:
+- "in ancient times"
+- "in history"
+- "around the world"
+- "generally"
+- "typically"
+- "often"
+
+Every word in the question must add clear, useful meaning.
+
+If a phrase can be removed without changing the fact, remove it.
+
+=== STYLE RULE ===
+The question MUST feel lively, playful, and human.
+
+It should feel like a quiz host speaking, not a textbook.
+
+You are encouraged to:
+- add light humour
+- use playful phrasing
+- create curiosity or surprise
+- make the player smile or feel intrigued
+
+Creativity is REQUIRED, not optional.
+
+The question should feel fun to read.
+
+
+=== FUN FACTOR RULE ===
+The question should trigger at least one of:
+- curiosity ("wait, really?")
+- amusement ("that’s clever")
+- surprise ("I didn’t expect that")
+
+If it feels neutral or flat, rewrite it to be more engaging.
+
+
+=== FINAL CHECK ===
+Before output:
+- Ensure the question is complete and natural
+- Ensure it is not templated or repetitive
+- Ensure it is ≤14 words
+- If it feels generic, rewrite it
 
 === ANSWER RULES ===
-- Exactly 4 answers must be provided.
-- Exactly 1 answer must be correct.
-- The correct answer must appear exactly in the answers array.
-- Answers must be plausible and clearly distinct.
+- 4 plausible, clearly distinct answers
+- Correct answer must exactly match one option
 
-=== EXPLANATION RULE ===
-Provide a concise explanation (1–2 sentences).
+=== EXPLANATION ===
+1–2 concise sentences explaining the fact.
 
 === DIFFICULTY (1–10) ===
-1–2: basic facts
-3–4: common knowledge with some detail
-5–6: intermediate knowledge
-7–8: advanced knowledge
-9–10: expert knowledge
+1–2: very easy  
+3–4: easy  
+5–6: moderate  
+7–8: hard  
+9–10: expert  
 
-Difficulty depends on how specialized the fact is.
-
-The difficulty_rationale must explain why the fact fits the level.
+Explain the difficulty briefly.
 
 === OUTPUT FORMAT ===
 {

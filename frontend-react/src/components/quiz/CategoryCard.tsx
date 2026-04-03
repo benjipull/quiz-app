@@ -9,7 +9,7 @@ interface CategoryCardProps {
   id: string;
   title: string;
   description: string;
-  imageUrl?: string;
+  imageSrc?: string;
   difficulty?: "Easy" | "Medium" | "Hard";
   questionCount?: number;
   completions: number;
@@ -24,7 +24,7 @@ export const CategoryCard = ({
   id,
   title,
   description,
-  imageUrl,
+  imageSrc,
   completions,
   rating,
   createdBy,
@@ -44,7 +44,7 @@ export const CategoryCard = ({
       {/* Background Image */}
       <div className="relative h-48 overflow-hidden rounded-t-xl">
         <img
-          src={imageUrl || ""}
+          src={imageSrc || ""}
           alt={title}
           className="w-full h-full object-cover brightness-90 transition-transform duration-500 group-hover:scale-110"
         />

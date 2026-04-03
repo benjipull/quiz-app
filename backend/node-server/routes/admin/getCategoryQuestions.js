@@ -33,6 +33,7 @@ router.get("/:id/questions", auth, adminAuth, async (req, res) => {
       disabled: q.disabled,
       correct_answer: q.correct_answer,
       explanation: q.explanation || "",
+      validation: q.validation || {},
       validation_verdict: q.validation?.final_verdict || "Not validated",
       validation_version: q.validation?.validationVersion ?? 0,
       createdAt: q.createdAt,

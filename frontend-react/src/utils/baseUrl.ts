@@ -3,47 +3,44 @@ import { Capacitor } from "@capacitor/core";
 const ENV_BASE_URL = import.meta.env.VITE_BASE_URL || import.meta.env.VITE_API_BASE_URL;
 const ENV_FALLBACK_BASE_URL =
   import.meta.env.VITE_PRODUCTION_BASE_URL || import.meta.env.VITE_MOBILE_BASE_URL;
+const ENV_LOCAL_BASE_URL = import.meta.env.VITE_LOCAL_API_BASE_URL || "http://localhost:3000";
 
 const normalizeBaseUrl = (value: string) => value.trim().replace(/\/+$/, "");
 
-const isLocalAddressUrl = (value: string) => {
-  if (!value) return false;
+const isLocalHostname = (hostname: string) => {
+  const normalized = String(hostname || "").toLowerCase();
+  return (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "::1" ||
+    normalized === "[::1]"
+  );
+};
 
-  try {
-    const parsed = new URL(value);
-    const hostname = parsed.hostname.toLowerCase();
-    return (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "::1" ||
-      hostname === "[::1]"
-    );
-  } catch {
-    return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|::1)(:\d+)?$/i.test(value);
-  }
+const isBrowserRunningOnLocalhost = () => {
+  if (typeof window === "undefined") return false;
+  return isLocalHostname(window.location.hostname);
 };
 
 export const getApiBaseUrl = () => {
   const configuredBaseUrl = normalizeBaseUrl(String(ENV_BASE_URL || ""));
   const fallbackBaseUrl = normalizeBaseUrl(String(ENV_FALLBACK_BASE_URL || ""));
+  const localBaseUrl = normalizeBaseUrl(String(ENV_LOCAL_BASE_URL || ""));
   const isNativePlatform = Capacitor.isNativePlatform();
-  const isProductionBuild = import.meta.env.PROD;
 
-  if (configuredBaseUrl) {
-    const pointsToLocalhost = isLocalAddressUrl(configuredBaseUrl);
-    const shouldAvoidLocalhost = pointsToLocalhost && (isNativePlatform || isProductionBuild);
-    if (!shouldAvoidLocalhost) {
-      return configuredBaseUrl;
-    }
+  // APK/native app should target cloud endpoints.
+  if (isNativePlatform) {
+    if (fallbackBaseUrl) return fallbackBaseUrl;
+    if (configuredBaseUrl) return configuredBaseUrl;
+    return localBaseUrl;
   }
 
-  if (fallbackBaseUrl) {
-    return fallbackBaseUrl;
+  // Browser on localhost should target the local Node backend.
+  if (isBrowserRunningOnLocalhost()) {
+    return localBaseUrl;
   }
 
-  if (import.meta.env.DEV) {
-    return "http://localhost:3000";
-  }
-
-  return configuredBaseUrl;
+  if (configuredBaseUrl) return configuredBaseUrl;
+  if (fallbackBaseUrl) return fallbackBaseUrl;
+  return localBaseUrl;
 };

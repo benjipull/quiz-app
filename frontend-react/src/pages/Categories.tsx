@@ -24,7 +24,7 @@ interface Category {
   averageRating?: number;
   difficulty?: "Easy" | "Medium" | "Hard";
   image?: string;
-  imageUrl?: string;
+  image64?: string;
   trending?: boolean;
   isNew?: boolean;
   createdAt?: string;
@@ -41,6 +41,21 @@ interface User {
 }
 
 const BASE_URL = getApiBaseUrl();
+const FALLBACK_CATEGORY_IMAGE = "/assets/images/SagaLevelGraphics/Enchanted-Forest.png";
+
+const resolveCategoryImageSrc = (image64?: string, image?: string) => {
+  const normalizedImage = typeof image === "string" ? image.trim() : "";
+  if (normalizedImage) return normalizedImage;
+
+  const normalizedImage64 = typeof image64 === "string" ? image64.trim() : "";
+  if (!normalizedImage64 || normalizedImage64 === "null" || normalizedImage64 === "undefined") {
+    return FALLBACK_CATEGORY_IMAGE;
+  }
+
+  return normalizedImage64.startsWith("data:")
+    ? normalizedImage64
+    : `data:image/png;base64,${normalizedImage64}`;
+};
 
 export default function Categories() {
   const navigate = useNavigate();
@@ -141,8 +156,8 @@ export default function Categories() {
         questionCount: category.questionCount || 10,
         averageRating: category.averageRating ?? (3 + Math.random() * 2),
         difficulty: category.difficulty || (index % 3 === 0 ? "Easy" : index % 3 === 1 ? "Medium" : "Hard"),
-        image: category.imageUrl || category.image,
-        imageUrl: category.imageUrl || category.image,
+        image: resolveCategoryImageSrc(category.image64, category.image),
+        image64: category.image64,
         trending: (category.completionsCount || category.completionCount || 0) > 50,
         isNew: index < 2 || new Date().getTime() - new Date(category.createdAt || 0).getTime() < 7 * 24 * 60 * 60 * 1000,
         timeEstimate: `${Math.ceil((category.questionCount || 10) * 0.6)} min`,
@@ -189,7 +204,8 @@ export default function Categories() {
         questionCount: c.questionCount || 10,
         averageRating: c.averageRating ?? (3 + Math.random() * 2),
         difficulty: c.difficulty || (["Easy", "Medium", "Hard"] as const)[i % 3],
-        imageUrl: c.imageUrl || c.image,
+        image: resolveCategoryImageSrc(c.image64, c.image),
+        image64: c.image64,
         timeEstimate: `${Math.ceil((c.questionCount || 10) * 0.6)} min`,
       }));
       
@@ -367,7 +383,7 @@ export default function Categories() {
                     completions={category.completionCount || category.completionsCount || 0}
                     rating={category.averageRating || 0}
                     timeEstimate={category.timeEstimate || "5 min"}
-                    imageUrl={category.imageUrl || "coming soon"}
+                    imageSrc={category.image || FALLBACK_CATEGORY_IMAGE}
                     createdBy={category.createdBy || "You"}
                     onPlay={handlePlayQuiz}
                   />
@@ -410,7 +426,7 @@ export default function Categories() {
                     completions={category.completionCount || category.completionsCount || 0}
                     rating={category.averageRating || 0}
                     timeEstimate={category.timeEstimate || "5 min"}
-                    imageUrl={category.imageUrl || "coming soon"}
+                    imageSrc={category.image || FALLBACK_CATEGORY_IMAGE}
                     createdBy={category.createdBy || "Quizicle"}
                     onPlay={handlePlayQuiz}
                   />
