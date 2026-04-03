@@ -17,6 +17,7 @@ const {
   buildAmbiguityFixabilityPrompt,
   buildAmbiguityFixPrompt,
 } = require("./prompts/validateQuestionsPrompts");
+const { runWithConcurrencyPool } = require("./concurrencyPool");
 
 const CURRENT_VALIDATION_VERSION = 0.09;
 const LOG_PREFIX = "🔹";
@@ -51,7 +52,7 @@ function logError(...args) {
 try {
   assertOllamaSetup();
 } catch (error) {
-  logError(`ERROR ${error.message}`);
+  logError(error.message);
   process.exit(1);
 }
 
@@ -85,18 +86,15 @@ function parseParallelLimit(args) {
 }
 
 async function processInParallelBatches(items, concurrency, worker) {
-  for (let index = 0; index < items.length; index += concurrency) {
-    const batch = items.slice(index, index + concurrency);
-    const results = await Promise.allSettled(batch.map((item) => worker(item)));
-    results
-      .filter((result) => result.status === "rejected")
-      .forEach((result) => {
-        logError(
-          "Error processing validation batch item:",
-          result.reason?.message ?? result.reason,
-        );
-      });
-  }
+  const results = await runWithConcurrencyPool(items, concurrency, (item) => worker(item));
+  results
+    .filter((result) => result.status === "rejected")
+    .forEach((result) => {
+      logError(
+        "Error processing validation item:",
+        result.reason?.message ?? result.reason,
+      );
+    });
 }
 
 async function callOllama(prompt) {
@@ -189,6 +187,89 @@ function parseAmbiguityFixFallback(raw) {
   return { fixed_question: fixedQuestion };
 }
 
+function parseQuotedArrayItems(value) {
+  const items = [];
+  const regex = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'/g;
+  let match;
+
+  while ((match = regex.exec(String(value || ""))) !== null) {
+    const rawItem = match[1] ?? match[2] ?? "";
+    const normalized = String(rawItem)
+      .replace(/\\"/g, "\"")
+      .replace(/\\'/g, "'")
+      .trim();
+    if (normalized) {
+      items.push(normalized);
+    }
+  }
+
+  return items;
+}
+
+function parseIndependentFallback(raw) {
+  const cleaned = normalizeJsonText(raw, {
+    stripMarkdown: true,
+    stripThinkTags: true,
+    stripIntroPrefix: true,
+    normalizeQuotes: true,
+  });
+  if (!cleaned) return null;
+
+  const factMatch = cleaned.match(
+    /["']?is_factually_correct["']?\s*:\s*(true|false|1|0|"true"|"false")/i,
+  );
+  const verdictMatch = cleaned.match(
+    /["']?verdict["']?\s*:\s*["']?(Correct|Incorrect|Ambiguous)["']?/i,
+  );
+
+  const alternativesMatch = cleaned.match(
+    /["']?alternative_correct_answers["']?\s*:\s*\[([\s\S]*?)\]/i,
+  );
+  const alternativeCorrectAnswers = alternativesMatch
+    ? parseQuotedArrayItems(alternativesMatch[1])
+    : [];
+
+  let reasons = "";
+  const fullReasonsDouble = cleaned.match(/["']?reasons["']?\s*:\s*"([^"]*)"/i);
+  const fullReasonsSingle = cleaned.match(/["']?reasons["']?\s*:\s*'([^']*)'/i);
+  if (fullReasonsDouble && fullReasonsDouble[1]) {
+    reasons = fullReasonsDouble[1].trim();
+  } else if (fullReasonsSingle && fullReasonsSingle[1]) {
+    reasons = fullReasonsSingle[1].trim();
+  } else {
+    const partialReasonsDouble = cleaned.match(/["']?reasons["']?\s*:\s*"([\s\S]*)$/i);
+    const partialReasonsSingle = cleaned.match(/["']?reasons["']?\s*:\s*'([\s\S]*)$/i);
+    const partial = partialReasonsDouble?.[1] || partialReasonsSingle?.[1] || "";
+    reasons = String(partial)
+      .replace(/["']?\s*}\s*$/g, "")
+      .trim();
+  }
+
+  if (!factMatch && !verdictMatch) {
+    return null;
+  }
+
+  const parsedFact = factMatch ? parseBooleanLike(factMatch[1]) : null;
+  const normalizedVerdict = verdictMatch
+    ? String(verdictMatch[1]).trim()
+    : parsedFact === false
+      ? "Incorrect"
+      : alternativeCorrectAnswers.length > 0
+        ? "Ambiguous"
+        : "Correct";
+
+  const isFactuallyCorrect = parsedFact == null
+    ? normalizedVerdict !== "Incorrect"
+    : parsedFact;
+
+  return {
+    is_factually_correct: isFactuallyCorrect,
+    alternative_correct_answers: alternativeCorrectAnswers,
+    reasons,
+    verdict: normalizedVerdict,
+  };
+}
+
 async function runPrompt(prompt, label, questionId, options = {}) {
   const fallbackParser = options?.fallbackParser;
   const questionText = options?.questionText;
@@ -212,7 +293,7 @@ async function runPrompt(prompt, label, questionId, options = {}) {
 
     if (!parsed) {
       logError(
-        `ERROR [${label}] Invalid JSON for ${questionLogContext(questionId, questionText)}. Raw snippet:`,
+        `[${label}] Invalid JSON for ${questionLogContext(questionId, questionText)}. Raw snippet:`,
         String(raw || "").slice(0, 300),
       );
       return null;
@@ -221,7 +302,7 @@ async function runPrompt(prompt, label, questionId, options = {}) {
     return parsed;
   } catch (error) {
     logError(
-      `ERROR [${label}] Error for ${questionLogContext(questionId, questionText)}:`,
+      `[${label}] Error for ${questionLogContext(questionId, questionText)}:`,
       error.message,
     );
     return null;
@@ -325,6 +406,7 @@ async function evaluateQuestion(question) {
 
     const independentPrompt = buildIndependentPrompt(question, authoritative);
     const independent = await runPrompt(independentPrompt, "INDEPENDENT", question._id, {
+      fallbackParser: parseIndependentFallback,
       questionText: question?.text,
     });
 
@@ -404,7 +486,7 @@ async function evaluateQuestion(question) {
     };
   } catch (error) {
     logError(
-      `ERROR Validation failed for ${questionLogContext(question?._id, question?.text)}:`,
+      `Validation failed for ${questionLogContext(question?._id, question?.text)}:`,
       error.message,
     );
     return null;
@@ -603,12 +685,12 @@ function logValidationOutcome(questionId, questionText, parsed, shouldDisable) {
 
 async function validateAndPersistQuestion(categoryId, questionId, questionOverride = null) {
   if (!mongoose.Types.ObjectId.isValid(categoryId)) {
-    logError(`ERROR Invalid categoryId for validation: ${categoryId}`);
+    logError(`Invalid categoryId for validation: ${categoryId}`);
     return { success: false, disabled: true };
   }
 
   if (!mongoose.Types.ObjectId.isValid(questionId)) {
-    logError(`ERROR Invalid ${questionLogContext(questionId, "")} for validation.`);
+    logError(`Invalid ${questionLogContext(questionId, "")} for validation.`);
     return { success: false, disabled: true };
   }
 
@@ -626,7 +708,7 @@ async function validateAndPersistQuestion(categoryId, questionId, questionOverri
 
   if (!question) {
     logError(
-      `ERROR Could not load ${questionLogContext(questionId, "")} in category ${categoryId} for validation.`,
+      `Could not load ${questionLogContext(questionId, "")} in category ${categoryId} for validation.`,
     );
     return { success: false, disabled: true };
   }
@@ -733,7 +815,7 @@ async function validateAllCategories() {
     logInfo("All categories validated.");
     mongoose.connection.close();
   } catch (error) {
-    logError("ERROR Error validating categories:", error.message);
+    logError("Error validating categories:", error.message);
     mongoose.connection.close();
   }
 }

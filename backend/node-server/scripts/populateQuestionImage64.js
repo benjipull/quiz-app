@@ -12,6 +12,7 @@ const {
   generateQuestionImageBase64,
 } = require("../services/imageClient");
 const { optimizeBase64Image } = require("../utils/optimizeBase64Image");
+const { runWithConcurrencyPool } = require("./concurrencyPool");
 
 const QUESTION_IMAGE_VERSION = 1;
 const DEFAULT_LIMIT = 1000;
@@ -38,7 +39,7 @@ function printUsage() {
   console.log("  --pending-only        Process only eligible questions missing current image version (default).");
   console.log("  --category-id=<id>    Process questions only from one category.");
   console.log(`  --limit=<n>           Max questions to process (${DEFAULT_LIMIT} default, 0 = no limit).`);
-  console.log(`  --delay-ms=<n>        Delay between batches in milliseconds (${DEFAULT_DELAY_MS} default).`);
+  console.log(`  --delay-ms=<n>        Delay after each processed question in milliseconds (${DEFAULT_DELAY_MS} default).`);
   console.log(`  --parallel=<n>        Number of questions to process in parallel (${DEFAULT_PARALLEL} default).`);
   console.log("  --concurrency=<n>     Alias for --parallel.");
   console.log("  -n <n>, -p <n>        Shorthand for --parallel.");
@@ -315,29 +316,30 @@ async function populateQuestionImage64(options = {}) {
   let failed = 0;
 
   const indexedQuestions = questions.map((q, index) => ({ q, index }));
-  for (let i = 0; i < indexedQuestions.length; i += options.parallel) {
-    const batch = indexedQuestions.slice(i, i + options.parallel);
-    const results = await Promise.allSettled(
-      batch.map(async ({ q, index }) =>
-        populateQuestionImage(q, {
+  const results = await runWithConcurrencyPool(
+    indexedQuestions,
+    options.parallel,
+    async ({ q, index }) => {
+      try {
+        return await populateQuestionImage(q, {
           current: index + 1,
           total: questions.length,
-        }),
-      ),
-    );
-
-    results.forEach((result) => {
-      if (result.status === "fulfilled" && result.value === true) {
-        updated += 1;
-        return;
+        });
+      } finally {
+        if (options.delayMs > 0) {
+          await sleep(options.delayMs);
+        }
       }
-      failed += 1;
-    });
+    },
+  );
 
-    if (options.delayMs > 0 && i + options.parallel < indexedQuestions.length) {
-      await sleep(options.delayMs);
+  results.forEach((result) => {
+    if (result.status === "fulfilled" && result.value === true) {
+      updated += 1;
+      return;
     }
-  }
+    failed += 1;
+  });
 
   console.log("");
   console.log("Question image64 population complete.");

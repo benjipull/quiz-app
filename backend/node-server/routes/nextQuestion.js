@@ -3,6 +3,36 @@ const router = express.Router();
 const Category = require("../models/categoryModel");
 const { userQuestions } = require("../index");
 
+async function hydrateQuestionImage64IfMissing(question) {
+  if (!question || !question._id) {
+    return question;
+  }
+
+  const hasImage64Field = Object.prototype.hasOwnProperty.call(question, "image64");
+  if (hasImage64Field && question.image64 != null) {
+    return question;
+  }
+
+  const category = await Category.findOne(
+    { "questions._id": question._id },
+    { questions: { $elemMatch: { _id: question._id } } }
+  ).lean();
+
+  const dbImage64 = String(category?.questions?.[0]?.image64 ?? "").trim();
+  return {
+    ...question,
+    image64: dbImage64,
+  };
+}
+
+async function buildQuestionResponsePayload(question) {
+  const hydrated = await hydrateQuestionImage64IfMissing(question);
+  return {
+    ...hydrated,
+    image64: String(hydrated?.image64 ?? ""),
+  };
+}
+
 // Route: Get Current or Next Question for User Token
 router.get("/:userToken", async (req, res) => {
   try {
@@ -16,8 +46,10 @@ router.get("/:userToken", async (req, res) => {
 
     // If user already has a current question, return it
     if (userSession.current) {
+      const responseQuestion = await buildQuestionResponsePayload(userSession.current);
+      userSession.current = responseQuestion;
       return res.status(200).json({
-        question: userSession.current,
+        question: responseQuestion,
         remaining: userSession.queue.length,
       });
     }
@@ -29,7 +61,9 @@ router.get("/:userToken", async (req, res) => {
 
     // Otherwise, set the first one in queue as current (but don't remove it yet)
     const nextQuestion = userSession.queue[0];
-    userSession.current = nextQuestion;
+    const responseQuestion = await buildQuestionResponsePayload(nextQuestion);
+    userSession.current = responseQuestion;
+    userSession.queue[0] = responseQuestion;
 
     // Increment timesLoaded in DB
     await Category.findOneAndUpdate(
@@ -39,7 +73,7 @@ router.get("/:userToken", async (req, res) => {
     );
 
     return res.status(200).json({
-      question: nextQuestion,
+      question: responseQuestion,
       timerInSeconds: 20,
       remaining: userSession.queue.length,
     });

@@ -65,6 +65,15 @@ function salvageDifficultyFromMalformedJson(raw) {
   };
 }
 
+function hasPopulatedImage64(image64) {
+  const normalized = String(image64 ?? "").trim();
+  return Boolean(
+    normalized &&
+      normalized.toLowerCase() !== "null" &&
+      normalized.toLowerCase() !== "undefined",
+  );
+}
+
 async function populateDifficulty(categoryId, questionId, options = {}) {
   try {
     assertSetup();
@@ -129,7 +138,11 @@ async function populateDifficulty(categoryId, questionId, options = {}) {
       return false;
     }
 
-    const difficultyLevel = Math.max(1, Math.min(10, Math.round(parsed.difficulty_level)));
+    const aiDifficultyLevel = Math.max(1, Math.min(10, Math.round(parsed.difficulty_level)));
+    const shouldReduceForImage = hasPopulatedImage64(question.image64);
+    const difficultyLevel = shouldReduceForImage
+      ? Math.max(1, aiDifficultyLevel - 1)
+      : aiDifficultyLevel;
     const difficultyRationale = String(
       parsed.difficulty_rationale || "Recovered from malformed model response.",
     ).trim();
@@ -154,6 +167,11 @@ async function populateDifficulty(categoryId, questionId, options = {}) {
       Number.isInteger(total) &&
       total > 0;
     const progressPrefix = hasProgress ? `(${current}/${total}) ` : "";
+    if (shouldReduceForImage && difficultyLevel < aiDifficultyLevel) {
+      console.log(
+        `${progressPrefix}Reduced difficulty by 1 due to image64 for question "${questionLabel}" (AI=${aiDifficultyLevel} -> Final=${difficultyLevel})`,
+      );
+    }
     console.log(`${progressPrefix}Updated question "${questionLabel}" -> level ${difficultyLevel}`);
     return true;
   } catch (error) {

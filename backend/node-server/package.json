@@ -13,6 +13,8 @@
     "populate:image-eligibility:one": "node scripts/populateImageEligibility.js",
     "populate:question-image64": "node scripts/populateQuestionImage64.js",
     "populate:question-image64:all": "node scripts/populateQuestionImage64.js --all --limit=0",
+    "populate:question-image64:eligibility": "node scripts/populateQuestionImage64FromEligibility.js",
+    "populate:question-image64:eligibility:all": "node scripts/populateQuestionImage64FromEligibility.js --all",
     "populate:image64": "node scripts/populateCategoryImage64.js",
     "populate:image64:all": "node scripts/populateCategoryImage64.js --all"
   },
