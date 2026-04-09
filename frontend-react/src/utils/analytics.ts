@@ -108,3 +108,14 @@ export const trackHomeScreen = (userId?: string) => {
   ReactGA.event("home_screen", params);
   logEventDebug("home_screen", params);
 };
+
+export const trackEnteredSagaMap = (userId?: string) => {
+  trackEvent("Entered_SagaMap", { user_id: userId });
+};
+
+export const trackEnteredSagaLevelMap = (userId?: string, sagaNumber?: number) => {
+  trackEvent("Entered_SagaLevelMap", {
+    user_id: userId,
+    saga_number: sagaNumber,
+  });
+};
