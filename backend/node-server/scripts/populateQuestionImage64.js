@@ -14,7 +14,7 @@ const {
 const { optimizeBase64Image } = require("../utils/optimizeBase64Image");
 const { runWithConcurrencyPool } = require("./concurrencyPool");
 
-const QUESTION_IMAGE_VERSION = 1;
+const QUESTION_IMAGE_VERSION = Number(process.env.QUESTION_IMAGE64_VERSION || 1);
 const DEFAULT_LIMIT = 1000;
 const DEFAULT_DELAY_MS = Number(
   process.env.QUESTION_IMAGE64_REQUEST_DELAY_MS || process.env.IMAGE64_REQUEST_DELAY_MS || 300,
@@ -30,6 +30,31 @@ const OPTIMIZE_BEFORE_SAVE = String(
     process.env.IMAGE64_OPTIMIZE_BEFORE_SAVE ||
     "true",
 ).toLowerCase() !== "false";
+
+function buildPendingImageConditions(pathPrefix = "questions.") {
+  return [
+    { [`${pathPrefix}image64`]: { $exists: false } },
+    { [`${pathPrefix}image64`]: null },
+    { [`${pathPrefix}image64`]: "" },
+    { [`${pathPrefix}image_version`]: { $exists: false } },
+    { [`${pathPrefix}image_version`]: null },
+    { [`${pathPrefix}image_version`]: { $lt: QUESTION_IMAGE_VERSION } },
+  ];
+}
+
+function buildEligibleQuestionWriteMatch(questionId, processAll) {
+  const questionMatch = {
+    _id: questionId,
+    disabled: { $ne: true },
+    "image_eligibility.should_use_image": true,
+  };
+
+  if (!processAll) {
+    questionMatch.$or = buildPendingImageConditions("");
+  }
+
+  return questionMatch;
+}
 
 function printUsage() {
   console.log("Usage: node scripts/populateQuestionImage64.js [options]");
@@ -190,13 +215,7 @@ function buildPipeline(options) {
   }
 
   if (!options.processAll) {
-    match.$or = [
-      { "questions.image64": { $exists: false } },
-      { "questions.image64": "" },
-      { "questions.image_version": { $exists: false } },
-      { "questions.image_version": null },
-      { "questions.image_version": { $lt: QUESTION_IMAGE_VERSION } },
-    ];
+    match.$or = buildPendingImageConditions();
   }
 
   const pipeline = [
@@ -247,7 +266,7 @@ function toPreviewString(value, maxChars = ERROR_OUTPUT_PREVIEW_MAX_CHARS) {
   return `${rendered.slice(0, maxChars)}\n... [truncated ${rendered.length - maxChars} chars]`;
 }
 
-async function populateQuestionImage(item, progress) {
+async function populateQuestionImage(item, progress, options = {}) {
   const question = {
     text: item.questionText,
     correct_answer: item.correctAnswer,
@@ -273,8 +292,16 @@ async function populateQuestionImage(item, progress) {
       }
     }
 
-    await Category.updateOne(
-      { _id: item.categoryId, "questions._id": item.questionId },
+    const updateResult = await Category.updateOne(
+      {
+        _id: item.categoryId,
+        questions: {
+          $elemMatch: buildEligibleQuestionWriteMatch(
+            item.questionId,
+            options.processAll,
+          ),
+        },
+      },
       {
         $set: {
           "questions.$.image64": image64ToSave,
@@ -285,15 +312,20 @@ async function populateQuestionImage(item, progress) {
       },
     );
 
+    if (!updateResult.modifiedCount) {
+      console.log(`Skipped ${label}: no longer eligible or already up-to-date.`);
+      return "skipped";
+    }
+
     console.log(`Saved question image for ${label}.`);
-    return true;
+    return "updated";
   } catch (error) {
     console.error(`Failed ${label}: ${error.message}`);
     const apiOutputPreview = toPreviewString(error?.apiOutput);
     if (apiOutputPreview) {
       console.error(`Image API output for ${label}:\n${apiOutputPreview}`);
     }
-    return false;
+    return "failed";
   }
 }
 
@@ -313,6 +345,7 @@ async function populateQuestionImage64(options = {}) {
   console.log(`Found ${questions.length} question(s) to process.`);
 
   let updated = 0;
+  let skipped = 0;
   let failed = 0;
 
   const indexedQuestions = questions.map((q, index) => ({ q, index }));
@@ -324,7 +357,7 @@ async function populateQuestionImage64(options = {}) {
         return await populateQuestionImage(q, {
           current: index + 1,
           total: questions.length,
-        });
+        }, options);
       } finally {
         if (options.delayMs > 0) {
           await sleep(options.delayMs);
@@ -334,8 +367,12 @@ async function populateQuestionImage64(options = {}) {
   );
 
   results.forEach((result) => {
-    if (result.status === "fulfilled" && result.value === true) {
+    if (result.status === "fulfilled" && result.value === "updated") {
       updated += 1;
+      return;
+    }
+    if (result.status === "fulfilled" && result.value === "skipped") {
+      skipped += 1;
       return;
     }
     failed += 1;
@@ -344,6 +381,7 @@ async function populateQuestionImage64(options = {}) {
   console.log("");
   console.log("Question image64 population complete.");
   console.log(`Updated: ${updated}`);
+  console.log(`Skipped: ${skipped}`);
   console.log(`Failed: ${failed}`);
 }
 

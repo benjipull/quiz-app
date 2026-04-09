@@ -494,8 +494,7 @@
         <th data-key="text">Question</th>
         <th data-key="version">Version</th>
         <th data-key="difficulty_level">Difficulty</th>
-        <th data-key="disabled">Disabled</th>
-        <th data-key="new_question">New</th>
+        <th data-key="image_eligible">Image Eligibility</th>
         <th data-key="validation_verdict">Validation</th>
         <th data-key="correct_answer">Correct Answer</th>
         <th data-key="popularity">Popularity</th>
@@ -547,8 +546,7 @@
         <td>${escapeHtml(q.text)}</td>
         <td>${q.version ?? 1}</td>
         <td>${q.difficulty_level ?? "—"}</td>
-        <td><input type="checkbox" ${q.disabled ? "checked" : ""} /></td>
-        <td><input type="checkbox" ${q.new_question ? "checked" : ""} /></td>
+        <td>${q.image_eligible === true ? "Yes" : q.image_eligible === false ? "No" : "-"}</td>
         <td>${q.validation_verdict}</td>
         <td>${escapeHtml(q.correct_answer)}</td>
         <td>${q.popularity ?? 0}</td>
@@ -556,7 +554,7 @@
         <td><button class="edit-btn">✏️ Edit</button></td>
       </tr>
       <tr class="answers-row" id="answers-${q._id}">
-        <td colspan="10">
+        <td colspan="9">
           <div class="answers-content">
             ${renderAnswers(q.answers, q.correct_answer, q.explanation, q)}
             ${duplicatesHTML}

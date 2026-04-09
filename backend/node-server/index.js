@@ -106,6 +106,7 @@ app.use("/api/admin/questions", require("./routes/admin/getLowSuccessQuestions")
 app.use("/api/admin/questions", require("./routes/admin/deleteQuestionsByVersion"));
 app.use("/api/admin/players", require("./routes/admin/getAllPlayers"));
 app.use("/api/admin/interests", require("./routes/admin/interests"));
+app.use("/api/admin/images", require("./routes/admin/generateImage"));
 
 // Protected Route (Requires Authentication)
 const authenticateToken = require("./middleware/auth");

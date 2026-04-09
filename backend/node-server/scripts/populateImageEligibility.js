@@ -17,7 +17,7 @@ const {
 const { parseJsonObjectOrThrow } = require("./jsonParsingHelper");
 
 const CURRENT_IMAGE_ELIGIBILITY_VERSION = Number(
-  process.env.IMAGE_ELIGIBILITY_VERSION || 2,
+  process.env.IMAGE_ELIGIBILITY_VERSION || 3,
 );
 
 function assertSetup() {

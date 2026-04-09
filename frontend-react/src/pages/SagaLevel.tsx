@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Brain, CircleDollarSign, Lock, Star } from "lucide-react";
+import { ArrowLeft, Brain, CircleDollarSign, Star } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/contexts/UserContext";
 import { getApiBaseUrl } from "@/utils/baseUrl";
 import { useToast } from "@/hooks/use-toast";
+import { trackEnteredSagaLevelMap } from "@/utils/analytics";
 import GameStatsHeader from "@/components/GameStatsHeader";
 import { avatarUrls } from "@/utils/avatarPaths";
 
@@ -16,7 +17,7 @@ const QUIZ_COMPLETION_SIGNAL_MAX_AGE_MS = 2 * 60 * 1000;
 const QUIZ_COMPLETION_SCROLL_TO_COMPLETED_DELAY_MS = 120;
 const QUIZ_COMPLETION_SCROLL_SETTLE_BEFORE_STARS_MS = 820;
 const QUIZ_COMPLETION_STARS_SEQUENCE_MS = 3400;
-const WOODEN_FRAME_SRC = "/assets/images/SagaLevelGraphics/wooden-frame.webp";
+const QUIZ_COMPLETION_PANEL_REVEAL_ANIMATION_MS = 980;
 const DEFAULT_CATEGORY_IMAGE_SRC = "/assets/images/SagaLevelGraphics/Enchanted-Forest.png";
 
 type SagaLevelRow = {
@@ -347,6 +348,7 @@ export default function SagaLevel() {
     rowId: string;
     filledCount: number;
   } | null>(null);
+  const [deferredCompletedStarsRowId, setDeferredCompletedStarsRowId] = useState<string | null>(null);
   const [pathSegments, setPathSegments] = useState<SagaPathSegment[]>([]);
   const [isEconomyBarLowered, setIsEconomyBarLowered] = useState(false);
   const [showCompletionRewardsOverlay, setShowCompletionRewardsOverlay] = useState(false);
@@ -669,6 +671,7 @@ export default function SagaLevel() {
     setShowCompletionFlyInOverlay(false);
     setIsCompletionFlyInInMotion(false);
     setCompletionStarsOverride(null);
+    setDeferredCompletedStarsRowId(null);
     setShowCompletionRewardsOverlay(false);
     setAnimatedCompletionKnowledge(0);
     setAnimatedCompletionCoins(0);
@@ -691,6 +694,11 @@ export default function SagaLevel() {
       document.body.classList.remove("saga-level-no-scrollbar");
     };
   }, []);
+
+  useEffect(() => {
+    if (loading || !user || !hasValidSagaNumber) return;
+    trackEnteredSagaLevelMap(user._id, sagaNumber);
+  }, [loading, user?._id, hasValidSagaNumber, sagaNumber]);
 
   useEffect(() => {
     return () => {
@@ -780,6 +788,7 @@ export default function SagaLevel() {
       rowId: resolvedTargetRowId,
       filledCount: resolvedFilledStars,
     });
+    setDeferredCompletedStarsRowId(resolvedTargetRowId);
     setCompletionStarAnimationRowId(resolvedTargetRowId);
     setIsCompletionStarAnimationActive(false);
     console.info("[SagaCompletion] Target resolved", {
@@ -792,6 +801,7 @@ export default function SagaLevel() {
     let startAnimationTimer: number | null = null;
     let stopAnimationTimer: number | null = null;
     let centerNextPlayableTimer: number | null = null;
+    let finishPanelRevealTimer: number | null = null;
     let startFlyInRafOne: number | null = null;
     let startFlyInRafTwo: number | null = null;
 
@@ -826,10 +836,21 @@ export default function SagaLevel() {
     }, QUIZ_COMPLETION_SCROLL_TO_COMPLETED_DELAY_MS + QUIZ_COMPLETION_SCROLL_SETTLE_BEFORE_STARS_MS);
 
     stopAnimationTimer = window.setTimeout(() => {
-      setIsCompletionStarAnimationActive(false);
       setShowCompletionFlyInOverlay(false);
       setCompletionFlyInStars([]);
       setIsCompletionFlyInInMotion(false);
+      setDeferredCompletedStarsRowId((currentValue) =>
+        currentValue === resolvedTargetRowId ? null : currentValue,
+      );
+      setCompletionStarAnimationRunId((current) => current + 1);
+      setIsCompletionStarAnimationActive(true);
+      if (finishPanelRevealTimer !== null) {
+        window.clearTimeout(finishPanelRevealTimer);
+      }
+      finishPanelRevealTimer = window.setTimeout(() => {
+        setIsCompletionStarAnimationActive(false);
+        finishPanelRevealTimer = null;
+      }, QUIZ_COMPLETION_PANEL_REVEAL_ANIMATION_MS);
       clearCompletionReturnSignal();
       console.info("[SagaCompletion] Star animation finished", {
         rowId: resolvedTargetRowId,
@@ -887,6 +908,9 @@ export default function SagaLevel() {
       }
       if (centerNextPlayableTimer !== null) {
         window.clearTimeout(centerNextPlayableTimer);
+      }
+      if (finishPanelRevealTimer !== null) {
+        window.clearTimeout(finishPanelRevealTimer);
       }
     };
   }, [
@@ -963,17 +987,17 @@ export default function SagaLevel() {
 
           const start: Point = {
             x: lowerFrameRect.left + lowerFrameRect.width / 2 - gridRect.left,
-            y: lowerFrameRect.top - gridRect.top + 60,
+            y: lowerFrameRect.top - gridRect.top + 44,
           };
           const end: Point = {
             x: upperFrameRect.left + upperFrameRect.width / 2 - gridRect.left,
-            y: upperFrameRect.bottom - gridRect.top - 60,
+            y: upperFrameRect.bottom - gridRect.top - 44,
           };
 
           const verticalDistance = Math.abs(start.y - end.y);
           const horizontalDelta = end.x - start.x;
           const bendDirection = horizontalDelta >= 0 ? 1 : -1;
-          const curveLift = Math.max(120, verticalDistance * 0.42);
+          const curveLift = Math.max(82, verticalDistance * 0.4);
           const horizontalBend = Math.max(
             48,
             Math.min(180, Math.abs(horizontalDelta) * 0.45 + verticalDistance * 0.08)
@@ -1259,10 +1283,319 @@ export default function SagaLevel() {
 
   return (
     <div
-      className="relative min-h-[100dvh] px-2 sm:px-4 py-2 sm:py-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] overflow-x-hidden bg-[#0a1730]"
+      className="saga-level-panel-theme relative min-h-[100dvh] px-2 sm:px-4 py-2 sm:py-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] overflow-x-hidden bg-[#0a1730]"
     >
       <style>
         {`
+          .saga-level-panel-theme {
+            --bg-1: #10182f;
+            --bg-2: #19284a;
+            --panel: rgba(14, 24, 48, 0.88);
+            --panel-2: rgba(27, 39, 71, 0.95);
+            --gold-1: #fff2b3;
+            --gold-2: #ffd76a;
+            --gold-3: #d9961a;
+            --gold-4: #7b4d00;
+            --blue-1: #9fe7ff;
+            --blue-2: #46c8ff;
+            --blue-3: #1d74ff;
+            --green-1: #7dffb2;
+            --green-2: #18c46b;
+            --locked-1: #8c94aa;
+            --locked-2: #495066;
+            --radius: 1.25rem;
+            --border-size: clamp(2px, 0.35vw, 4px);
+            --glow-size: clamp(8px, 1vw, 18px);
+          }
+
+          .saga-level-panel-theme .category-card {
+            width: 100%;
+            position: relative;
+            transition: transform 220ms ease, filter 220ms ease;
+          }
+
+          .saga-level-panel-theme .category-card:hover {
+            transform: translateY(-6px) scale(1.01);
+          }
+
+          .saga-level-panel-theme .category-frame {
+            position: relative;
+            border-radius: var(--radius);
+            padding: clamp(0.5rem, 1vw, 0.8rem);
+            background:
+              linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02));
+            overflow: hidden;
+            isolation: isolate;
+          }
+
+          .saga-level-panel-theme .category-frame::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: var(--border-size);
+            background:
+              linear-gradient(
+                135deg,
+                var(--gold-1) 0%,
+                var(--gold-2) 18%,
+                var(--blue-1) 35%,
+                var(--blue-2) 50%,
+                var(--gold-2) 68%,
+                var(--gold-3) 84%,
+                var(--gold-1) 100%
+              );
+            -webkit-mask:
+              linear-gradient(#000 0 0) content-box,
+              linear-gradient(#000 0 0);
+            -webkit-mask-composite: xor;
+                    mask-composite: exclude;
+            animation: sagaPanelBorderFlow 6s linear infinite;
+            z-index: 0;
+          }
+
+          .saga-level-panel-theme .category-frame::after {
+            content: "";
+            position: absolute;
+            inset: -8px;
+            border-radius: calc(var(--radius) + 8px);
+            background:
+              radial-gradient(circle at 50% 50%, rgba(116, 225, 255, 0.18), transparent 60%);
+            filter: blur(var(--glow-size));
+            z-index: -1;
+            opacity: 0.9;
+          }
+
+          .saga-level-panel-theme .category-content {
+            position: relative;
+            display: grid;
+            grid-template-columns: minmax(136px, 34%) 1fr;
+            gap: clamp(0.72rem, 2vw, 1.1rem);
+            background:
+              linear-gradient(180deg, var(--panel-2), var(--panel));
+            border-radius: calc(var(--radius) - 0.3rem);
+            padding: clamp(0.8rem, 2vw, 1.1rem);
+            min-height: clamp(156px, 26vw, 212px);
+            overflow: hidden;
+            z-index: 1;
+          }
+
+          .saga-level-panel-theme .category-content::before {
+            content: "";
+            position: absolute;
+            top: -20%;
+            left: -35%;
+            width: 35%;
+            height: 140%;
+            transform: rotate(18deg);
+            background: linear-gradient(
+              90deg,
+              transparent,
+              rgba(255, 255, 255, 0.08),
+              rgba(255, 255, 255, 0.18),
+              transparent
+            );
+            opacity: 0;
+            pointer-events: none;
+          }
+
+          .saga-level-panel-theme .category-card.current .category-content::before {
+            opacity: 1;
+            animation: sagaPanelShineSweep 4.5s ease-in-out infinite;
+          }
+
+          .saga-level-panel-theme .category-image {
+            position: relative;
+            border-radius: 1rem;
+            min-height: 136px;
+            background:
+              linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+              radial-gradient(circle at 30% 20%, rgba(255, 219, 110, 0.22), transparent 35%),
+              linear-gradient(135deg, #4d6ea8, #223456 60%, #18243d);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow:
+              inset 0 1px 0 rgba(255, 255, 255, 0.12),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+          }
+
+          .saga-level-panel-theme .category-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+          }
+
+          .saga-level-panel-theme .category-info {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-width: 0;
+          }
+
+          .saga-level-panel-theme .category-badge {
+            position: absolute;
+            left: 0.5rem;
+            bottom: 0.5rem;
+            z-index: 2;
+            padding: 0.34rem 0.74rem;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #f8fafc;
+            background: linear-gradient(180deg, #48bfff, #1978ff);
+            box-shadow:
+              0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+              0 8px 20px rgba(50, 130, 255, 0.35);
+            backdrop-filter: blur(4px);
+            pointer-events: none;
+          }
+
+          .saga-level-panel-theme .category-info h3 {
+            margin: 0 0 0.45rem;
+            font-size: clamp(1.12rem, 2.2vw, 1.65rem);
+            line-height: 1.1;
+            color: #f8fafc;
+            text-wrap: balance;
+          }
+
+          .saga-level-panel-theme .category-info p {
+            margin: 0 0 0.9rem;
+            font-size: clamp(0.88rem, 1.45vw, 1rem);
+            color: rgba(255, 255, 255, 0.82);
+          }
+
+          .saga-level-panel-theme .corner {
+            position: absolute;
+            width: clamp(18px, 2.5vw, 26px);
+            aspect-ratio: 1;
+            z-index: 3;
+            pointer-events: none;
+          }
+
+          .saga-level-panel-theme .corner::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, #d6fbff, #67dbff 55%, #1e8fff);
+            clip-path: polygon(50% 0%, 88% 25%, 100% 70%, 50% 100%, 0% 70%, 12% 25%);
+            box-shadow:
+              0 0 14px rgba(90, 220, 255, 0.55),
+              inset 0 1px 3px rgba(255, 255, 255, 0.7);
+          }
+
+          .saga-level-panel-theme .tl { top: 0.3rem; left: 0.3rem; }
+          .saga-level-panel-theme .tr { top: 0.3rem; right: 0.3rem; }
+          .saga-level-panel-theme .bl { bottom: 0.3rem; left: 0.3rem; }
+          .saga-level-panel-theme .br { bottom: 0.3rem; right: 0.3rem; }
+
+          .saga-level-panel-theme .category-card.current .category-frame::after {
+            background:
+              radial-gradient(circle at 50% 50%, rgba(84, 227, 255, 0.28), transparent 60%);
+            animation: sagaPanelPulseGlow 1.8s ease-in-out infinite;
+          }
+
+          .saga-level-panel-theme .category-card.current .category-frame {
+            filter: drop-shadow(0 0 16px rgba(92, 214, 255, 0.35));
+          }
+
+          .saga-level-panel-theme .category-card.completed .category-frame::before {
+            background:
+              linear-gradient(
+                135deg,
+                #e9ffd9 0%,
+                #72ffb0 25%,
+                #2fda7d 50%,
+                #72ffb0 75%,
+                #e9ffd9 100%
+              );
+          }
+
+          .saga-level-panel-theme .category-card.completed .category-badge {
+            background: linear-gradient(180deg, #41d884, #159a53);
+          }
+
+          .saga-level-panel-theme .category-card.locked {
+            filter: grayscale(0.35) saturate(0.7);
+          }
+
+          .saga-level-panel-theme .category-card.locked .category-frame::before {
+            background: linear-gradient(135deg, var(--locked-1), var(--locked-2));
+          }
+
+          .saga-level-panel-theme .category-card.locked .category-badge {
+            background: linear-gradient(180deg, #8d94a8, #586074);
+          }
+
+          .saga-level-panel-theme .category-card.locked .category-content {
+            opacity: 0.78;
+          }
+
+          .saga-level-panel-theme .category-card.loading {
+            opacity: 0.84;
+            filter: saturate(0.65);
+          }
+
+          .saga-level-panel-theme .category-image-loading {
+            width: 100%;
+            height: 100%;
+            animation: pulse 1.6s ease-in-out infinite;
+            background: linear-gradient(
+              120deg,
+              rgba(148, 163, 184, 0.25) 25%,
+              rgba(226, 232, 240, 0.35) 40%,
+              rgba(148, 163, 184, 0.25) 55%
+            );
+          }
+
+          .saga-level-panel-theme .category-image-fallback {
+            display: grid;
+            place-items: center;
+            height: 100%;
+            width: 100%;
+            text-align: center;
+            font-size: 0.8rem;
+            color: rgba(241, 245, 249, 0.85);
+            font-weight: 600;
+          }
+
+          @media (max-width: 640px) {
+            .saga-level-panel-theme .category-content {
+              grid-template-columns: 1fr;
+            }
+
+            .saga-level-panel-theme .category-image {
+              min-height: 124px;
+            }
+          }
+
+          @keyframes sagaPanelBorderFlow {
+            0% { filter: hue-rotate(0deg) brightness(1); }
+            50% { filter: hue-rotate(18deg) brightness(1.08); }
+            100% { filter: hue-rotate(0deg) brightness(1); }
+          }
+
+          @keyframes sagaPanelShineSweep {
+            0% { transform: translateX(-180%) rotate(18deg); }
+            100% { transform: translateX(420%) rotate(18deg); }
+          }
+
+          @keyframes sagaPanelPulseGlow {
+            0%, 100% { opacity: 0.7; transform: scale(0.99); }
+            50% { opacity: 1; transform: scale(1.02); }
+          }
+
+          @keyframes pulse {
+            0%, 100% {
+              opacity: 0.55;
+            }
+            50% {
+              opacity: 1;
+            }
+          }
+
           @keyframes sagaPathGlow {
             0%, 100% {
               opacity: 0.35;
@@ -1293,23 +1626,6 @@ export default function SagaLevel() {
             50% {
               opacity: 0.9;
               filter: drop-shadow(0 0 7px rgba(226, 232, 240, 0.75));
-            }
-          }
-
-          @keyframes sagaFrameAura {
-            0%, 100% {
-              opacity: 0.55;
-              transform: scale(1);
-              filter:
-                drop-shadow(0 0 6px rgba(253, 224, 150, 0.35))
-                drop-shadow(0 0 12px rgba(217, 119, 6, 0.25));
-            }
-            50% {
-              opacity: 0.95;
-              transform: scale(1.015);
-              filter:
-                drop-shadow(0 0 12px rgba(253, 224, 150, 0.55))
-                drop-shadow(0 0 24px rgba(217, 119, 6, 0.4));
             }
           }
 
@@ -1374,10 +1690,18 @@ export default function SagaLevel() {
           }
 
           .saga-rating-star {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             line-height: 1;
-            font-size: clamp(18px, 2.8vw, 25px);
+            font-size: 0;
             animation: sagaStarTwinkle 2.2s ease-in-out infinite;
+          }
+
+          .saga-rating-star::before {
+            content: "\\2605";
+            font-size: clamp(27px, 4.2vw, 38px);
+            line-height: 1;
           }
 
           .saga-rating-star-filled {
@@ -1486,7 +1810,7 @@ export default function SagaLevel() {
         ) : (
           <div
             ref={gridRef}
-            className="relative grid grid-cols-1 gap-[62px] sm:gap-[66px] auto-rows-[minmax(330px,1fr)] sm:auto-rows-[minmax(420px,1fr)] max-w-4xl mx-auto w-full"
+            className="relative grid grid-cols-1 gap-[50px] sm:gap-[56px] auto-rows-[minmax(228px,1fr)] sm:auto-rows-[minmax(258px,1fr)] max-w-4xl mx-auto w-full"
           >
             <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full overflow-visible">
               {pathSegments.map((segment) => (
@@ -1518,7 +1842,7 @@ export default function SagaLevel() {
               const rowId = getRowId(row);
               const categoryIdForRow = getCategoryId(row);
               const frameShift =
-                "max(0px, calc((100vw - clamp(260px, calc(100vw - 200px), 760px) - 40px) / 2))";
+                "max(0px, calc((100vw - clamp(280px, calc(100vw - 48px), 760px) - 40px) / 2))";
               const horizontalOffsetStyle = {
                 transform: `translateX(${(index + 1) % 2 === 0 ? "-" : ""}${frameShift})`,
               };
@@ -1540,16 +1864,12 @@ export default function SagaLevel() {
                 isCategoryDisabled ||
                 startingCategoryId !== null ||
                 !isUnlocked;
-              const nonPlayableVisualClasses = isLoadingPlaceholder
-                ? "grayscale opacity-70"
-                : isVisuallyNotPlayable
-                  ? "grayscale opacity-80"
-                  : "";
               const completionOverrideForRow =
                 rowId && completionStarsOverride?.rowId === rowId
                   ? completionStarsOverride
                   : null;
-              const shouldRenderCompletedStars = Boolean(row?.isCompleted || completionOverrideForRow);
+              const isCompleted = Boolean(row?.isCompleted || completionOverrideForRow);
+              const shouldRenderCompletedStars = isCompleted;
               const filledStars = completionOverrideForRow
                 ? completionOverrideForRow.filledCount
                 : getFilledStarCount(row);
@@ -1564,13 +1884,41 @@ export default function SagaLevel() {
                 completionStarAnimationRowId &&
                 rowId === completionStarAnimationRowId,
               );
+              const shouldDeferCompletedStars = Boolean(
+                rowId &&
+                deferredCompletedStarsRowId &&
+                rowId === deferredCompletedStarsRowId,
+              );
+              const shouldHideCompletedStars =
+                shouldDeferCompletedStars ||
+                (isCompletionAnimationTarget && showCompletionFlyInOverlay);
+              const panelStatusClass = isLoadingPlaceholder
+                ? "loading"
+                : isVisuallyNotPlayable
+                  ? "locked"
+                  : isCompleted
+                    ? "completed"
+                    : shouldShowFrameAura
+                      ? "current"
+                      : "";
+              const badgeLabel = isLoadingPlaceholder
+                ? "Loading"
+                : isCategoryDisabled
+                  ? "Unavailable"
+                  : isLockedByProgress
+                    ? "Locked"
+                    : isCompleted
+                      ? "Play Again"
+                      : shouldShowFrameAura
+                        ? "Next Up"
+                        : "Ready";
               return (
                 <div
                   key={rowId || `placeholder-${index}`}
                   ref={(element) => {
                     frameRefs.current[index] = element;
                   }}
-                  className="relative z-10 mx-auto w-[clamp(260px,calc(100vw-200px),760px)]"
+                  className="relative z-10 mx-auto w-[clamp(280px,calc(100vw-48px),760px)]"
                   style={horizontalOffsetStyle}
                 >
                   <div
@@ -1615,85 +1963,105 @@ export default function SagaLevel() {
                       }
                     }}
                     aria-disabled={isFrameDisabled}
-                    className={`rounded-lg p-1 sm:p-2 transition-transform overflow-hidden ${
+                    className={`rounded-[1.35rem] transition-transform ${
                       isLoadingPlaceholder
                         ? "opacity-90 cursor-default"
                         : categoryIdForRow && !isCategoryDisabled && startingCategoryId === null && isUnlocked
-                        ? "cursor-pointer hover:scale-[1.01]"
+                        ? "cursor-pointer"
                         : categoryIdForRow && (isCategoryDisabled || !isUnlocked)
                           ? "cursor-not-allowed"
                           : "opacity-80 cursor-default"
                     }`}
                   >
-                    <div className="relative mx-auto h-full w-[260px] sm:w-full min-h-[330px] sm:min-h-[420px]">
-                      <div className="h-full w-full">
-                        <div className="absolute left-[calc(53%-5px)] sm:left-[calc(53%-15px)] top-[calc(56%+10px)] z-[8] w-[180px] h-[200px] sm:w-[220px] sm:h-[240px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-sm bg-black/15">
-                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,255,255,0.16),rgba(255,255,255,0)_62%),linear-gradient(180deg,rgba(2,6,23,0.32),rgba(2,6,23,0.58))]" />
-                          {isLoadingPlaceholder ? (
-                            <div className="relative z-10 h-full w-full animate-pulse bg-gradient-to-b from-slate-400/25 via-slate-300/20 to-slate-500/30" />
-                          ) : row && categoryImageSrc ? (
-                            <img
-                              src={categoryImageSrc}
-                              alt={row.category?.name || "Category image"}
-                              className={`relative z-10 h-full w-full object-contain ${nonPlayableVisualClasses}`}
-                              onError={(event) => {
-                                const element = event.currentTarget;
-                                element.src = DEFAULT_CATEGORY_IMAGE_SRC;
-                              }}
-                            />
-                          ) : (
-                            <div className="relative z-10 grid h-full w-full place-items-center text-[10px] sm:text-xs font-semibold text-slate-200/85">
-                              {isCategoryDisabled ? "Unavailable" : isLockedByProgress ? "Locked" : ""}
-                            </div>
-                          )}
+                    <div className={`category-card ${panelStatusClass}`}>
+                      <div className="category-frame">
+                        {!isLoadingPlaceholder ? (
+                          <>
+                            <span className="corner tl" />
+                            <span className="corner tr" />
+                            <span className="corner bl" />
+                            <span className="corner br" />
+                          </>
+                        ) : null}
+                        <div className="category-content">
+                          <div className="category-image">
+                            {isLoadingPlaceholder ? (
+                              <div className="category-image-loading" />
+                            ) : row && categoryImageSrc ? (
+                              <img
+                                src={categoryImageSrc}
+                                alt={row.category?.name || "Category image"}
+                                onError={(event) => {
+                                  const element = event.currentTarget;
+                                  element.src = DEFAULT_CATEGORY_IMAGE_SRC;
+                                }}
+                              />
+                            ) : (
+                              <div className="category-image-fallback">
+                                {isCategoryDisabled ? "Unavailable" : isLockedByProgress ? "Locked" : ""}
+                              </div>
+                            )}
+                            {!isLoadingPlaceholder ? (
+                              <div className="category-badge">{badgeLabel}</div>
+                            ) : null}
+                          </div>
+                          <div className="category-info">
+                            {isLoadingPlaceholder ? (
+                              <div className="mb-2 h-6 w-[72%] rounded-md bg-slate-200/20 animate-pulse" />
+                            ) : (
+                              <>
+                                <h3>{row?.category?.name || "Category"}</h3>
+                                {shouldRenderCompletedStars ? (
+                                  <div
+                                    className="pointer-events-none mt-1.5 flex w-full items-center justify-center gap-1"
+                                    style={shouldHideCompletedStars ? { opacity: 0 } : undefined}
+                                  >
+                                    {Array.from({ length: STAR_COUNT }, (_, starIndex) => {
+                                      const isFilled = starIndex < filledStars;
+                                      const baseDelay = (index * STAR_COUNT + starIndex) * 0.12;
+                                      const dropDelay = starIndex * 0.1;
+                                      return (
+                                        <span
+                                          key={`${rowId || `row-${index}`}-star-${starIndex}-${isCompletionTargetRow ? `run-${completionStarAnimationRunId}` : "steady"}`}
+                                          ref={(element) => {
+                                            if (!rowId) return;
+                                            starSlotRefs.current[getStarSlotRefKey(rowId, starIndex)] = element;
+                                          }}
+                                          aria-hidden="true"
+                                          className={`saga-rating-star ${isFilled ? "saga-rating-star-filled" : "saga-rating-star-empty"}`}
+                                          style={{
+                                            animation: isCompletionAnimationTarget
+                                              ? `sagaStarDropIn 900ms cubic-bezier(0.18,0.9,0.25,1.15) ${dropDelay}s both, sagaStarTwinkle 2.2s ease-in-out ${1.1 + dropDelay}s infinite`
+                                              : undefined,
+                                            animationDelay: isCompletionAnimationTarget
+                                              ? undefined
+                                              : `${baseDelay}s`,
+                                          }}
+                                        >
+                                          {"\u2605"}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                ) : null}
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <div className="absolute left-1/2 top-[calc(18%+20px)] z-20 w-[60%] -translate-x-1/2 pointer-events-none">
-                          {isLoadingPlaceholder ? (
-                            <div className="mx-auto h-4 sm:h-5 w-[72%] rounded-full bg-slate-200/35 animate-pulse" />
-                          ) : (
-                            <p className="text-[#F2E1BF] font-bold text-sm sm:text-base text-center truncate drop-shadow-[0_1px_1px_rgba(0,0,0,0.65)]">
-                              {row?.category?.name || " "}
-                            </p>
-                          )}
-                        </div>
-                        <>
-                          {shouldShowFrameAura ? (
-                            <img
-                              src={WOODEN_FRAME_SRC}
-                              alt=""
-                              aria-hidden="true"
-                              className={`absolute inset-0 z-[9] h-full w-full object-contain pointer-events-none ${nonPlayableVisualClasses}`}
-                              style={{
-                                animation: "sagaFrameAura 2.8s ease-in-out infinite",
-                              }}
-                            />
-                          ) : null}
-                          <img
-                            src={WOODEN_FRAME_SRC}
-                            alt=""
-                            aria-hidden="true"
-                            className={`absolute inset-0 z-10 h-full w-full object-contain pointer-events-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)] ${nonPlayableVisualClasses}`}
-                          />
-                        </>
                       </div>
                       {rowId && isCategoryDisabled ? (
-                        <div className="pointer-events-none absolute inset-x-4 bottom-8 z-30 rounded-md bg-black/75 px-3 py-2 text-center text-[11px] sm:text-sm font-semibold text-slate-200">
+                        <div className="pointer-events-none absolute inset-x-4 bottom-3 z-30 rounded-md bg-black/70 px-3 py-2 text-center text-[11px] sm:text-sm font-semibold text-slate-100">
                           This category is currently disabled.
                         </div>
                       ) : null}
-                      {rowId && isLockedByProgress ? (
-                        <div className="pointer-events-none absolute left-1/2 bottom-8 z-30 -translate-x-1/2 rounded-full bg-black/75 p-2 text-slate-200">
-                          <Lock className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
-                        </div>
-                      ) : null}
                       {rowId && lockedMessageRowId === rowId ? (
-                        <div className="pointer-events-none absolute inset-x-4 bottom-8 z-30 rounded-md bg-black/75 px-3 py-2 text-center text-[11px] sm:text-sm font-semibold text-amber-100">
+                        <div className="pointer-events-none absolute inset-x-4 bottom-3 z-30 rounded-md bg-black/80 px-3 py-2 text-center text-[11px] sm:text-sm font-semibold text-amber-100">
                           You must first complete the previous quiz.
                         </div>
                       ) : null}
                     </div>
                   </div>
-                  {shouldRenderCompletedStars ? (
+                  {false ? (
                     <div
                       className="pointer-events-none absolute left-1/2 bottom-[32px] z-20 -translate-x-1/2 flex items-center gap-1 rounded-full px-2 py-0.5 bg-black/20"
                       style={isCompletionAnimationTarget && showCompletionFlyInOverlay ? { opacity: 0 } : undefined}

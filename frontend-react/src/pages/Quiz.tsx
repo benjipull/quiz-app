@@ -214,6 +214,9 @@ const BASE_URL = getApiBaseUrl();
 const ANSWER_BAR_REVEAL_DELAY_MS = 300;
 const ANSWER_BAR_ANIMATION_DURATION_MS = 400;
 const SCROLL_AFTER_BARS_DELAY_MS = ANSWER_BAR_REVEAL_DELAY_MS + ANSWER_BAR_ANIMATION_DURATION_MS + 50;
+const QUESTION_TEXT_LINE_HEIGHT = 1.25;
+const QUESTION_TEXT_MAX_LINES = 2;
+const QUESTION_TEXT_MIN_FONT_SIZE_PX = 8;
 
 const shuffleArray = <T,>(items: T[]): T[] => {
   const shuffled = [...items];
@@ -635,7 +638,7 @@ export default function Quiz() {
 
       const preferredSize = Math.max(12, Math.round(preferredBaseSize * viewportScale));
       return {
-        min: Math.max(11, preferredSize - 8),
+        min: Math.max(QUESTION_TEXT_MIN_FONT_SIZE_PX, preferredSize - 8),
         max: preferredSize,
       };
     };
@@ -651,7 +654,7 @@ export default function Quiz() {
 
       measurer.style.width = `${availableWidth}px`;
       measurer.style.fontWeight = "700";
-      measurer.style.lineHeight = "1.25";
+      measurer.style.lineHeight = String(QUESTION_TEXT_LINE_HEIGHT);
       measurer.textContent = questionText;
 
       const { min, max } = getCharacterDrivenBounds(questionText.length);
@@ -662,7 +665,10 @@ export default function Quiz() {
       while (low <= high) {
         const mid = Math.floor((low + high) / 2);
         measurer.style.fontSize = `${mid}px`;
-        const fits = measurer.scrollHeight <= availableHeight && measurer.scrollWidth <= availableWidth;
+        const twoLineHeightLimit = mid * QUESTION_TEXT_LINE_HEIGHT * QUESTION_TEXT_MAX_LINES + 0.5;
+        const fitsTwoLines = measurer.scrollHeight <= twoLineHeightLimit;
+        const fitsContainer = measurer.scrollHeight <= availableHeight;
+        const fits = fitsTwoLines && fitsContainer;
 
         if (fits) {
           best = mid;
@@ -1424,7 +1430,11 @@ export default function Quiz() {
                   className="font-bold text-white leading-tight drop-shadow-lg break-words w-full"
                   style={{
                     fontSize: `${questionFontSizePx}px`,
-                    lineHeight: 1.25,
+                    lineHeight: QUESTION_TEXT_LINE_HEIGHT,
+                    display: "-webkit-box",
+                    WebkitLineClamp: QUESTION_TEXT_MAX_LINES,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
                   }}
                 >
                   {quizState.question?.question}
@@ -1437,29 +1447,27 @@ export default function Quiz() {
                 />
               </div>
               {questionHasImagePayload ? (
-                <div className="mx-auto mt-3 w-fit max-w-[90vw] rounded-2xl border border-cyan-300/45 bg-slate-900/55 p-2 shadow-[0_0_24px_rgba(34,211,238,0.35)]">
-                  <div className="w-fit max-w-[95vw] overflow-hidden rounded-xl bg-slate-950/55">
-                    {currentQuestionImageSrc ? (
-                      <div className="flex h-[173px] items-center justify-center overflow-hidden md:h-[211px]">
-                        <img
-                          src={currentQuestionImageSrc}
-                          alt="Question visual hint"
-                          loading="lazy"
-                          onError={() => {
-                            console.warn("Question image failed to render", {
-                              questionId: quizState.question?._id,
-                              srcPrefix: currentQuestionImageSrc.slice(0, 40),
-                            });
-                          }}
-                          className="block h-[216px] w-auto max-w-none object-cover md:h-[264px]"
-                        />
-                      </div>
-                    ) : (
-                      <p className="px-4 text-center text-xs md:text-sm text-cyan-200/80">
-                        Image payload is present but could not be rendered.
-                      </p>
-                    )}
-                  </div>
+                <div className="mx-auto mt-3 w-fit overflow-hidden rounded-2xl border border-cyan-300/45 shadow-[0_0_24px_rgba(34,211,238,0.35)] leading-none">
+                  {currentQuestionImageSrc ? (
+                    <div className="flex h-[130px] items-center justify-center overflow-hidden md:h-[158px]">
+                      <img
+                        src={currentQuestionImageSrc}
+                        alt="Question visual hint"
+                        loading="lazy"
+                        onError={() => {
+                          console.warn("Question image failed to render", {
+                            questionId: quizState.question?._id,
+                            srcPrefix: currentQuestionImageSrc.slice(0, 40),
+                          });
+                        }}
+                        className="block h-[216px] w-auto max-w-[90vw] object-cover md:h-[264px] md:max-w-[95vw]"
+                      />
+                    </div>
+                  ) : (
+                    <p className="px-4 text-center text-xs md:text-sm text-cyan-200/80">
+                      Image payload is present but could not be rendered.
+                    </p>
+                  )}
                 </div>
               ) : null}
             </div>

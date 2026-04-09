@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { trackEnteredSagaMap } from "@/utils/analytics";
 import {
   Dialog,
   DialogContent,
@@ -416,6 +417,11 @@ export default function SagaMap() {
       },
     });
   };
+
+  useEffect(() => {
+    if (loading || !user) return;
+    trackEnteredSagaMap(user._id);
+  }, [loading, user?._id]);
 
   useEffect(() => {
     const updateViewport = () => {

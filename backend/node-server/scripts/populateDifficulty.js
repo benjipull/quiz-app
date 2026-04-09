@@ -19,7 +19,7 @@ const {
 } = require("./jsonParsingHelper");
 const { buildPopulateDifficultyPrompt } = require("./prompts/populateDifficultyPrompt");
 
-const DIFFICULTY_VERSION = 0.01;
+const DIFFICULTY_VERSION = 0.02;
 
 function assertSetup() {
   assertOllamaSetup();
@@ -130,7 +130,6 @@ async function populateDifficulty(categoryId, questionId, options = {}) {
       }
 
       parsed = salvaged;
-      console.warn(`Recovered malformed JSON for ${questionId}; applying salvaged difficulty.`);
     }
 
     if (typeof parsed.difficulty_level !== "number" || Number.isNaN(parsed.difficulty_level)) {
@@ -139,7 +138,9 @@ async function populateDifficulty(categoryId, questionId, options = {}) {
     }
 
     const aiDifficultyLevel = Math.max(1, Math.min(10, Math.round(parsed.difficulty_level)));
-    const shouldReduceForImage = hasPopulatedImage64(question.image64);
+    const detectedImage64 = hasPopulatedImage64(question.image64);
+    const shouldReduceForImage =
+      options.forceHasImage64 === true || detectedImage64;
     const difficultyLevel = shouldReduceForImage
       ? Math.max(1, aiDifficultyLevel - 1)
       : aiDifficultyLevel;
@@ -167,12 +168,10 @@ async function populateDifficulty(categoryId, questionId, options = {}) {
       Number.isInteger(total) &&
       total > 0;
     const progressPrefix = hasProgress ? `(${current}/${total}) ` : "";
-    if (shouldReduceForImage && difficultyLevel < aiDifficultyLevel) {
-      console.log(
-        `${progressPrefix}Reduced difficulty by 1 due to image64 for question "${questionLabel}" (AI=${aiDifficultyLevel} -> Final=${difficultyLevel})`,
-      );
-    }
-    console.log(`${progressPrefix}Updated question "${questionLabel}" -> level ${difficultyLevel}`);
+    const reduction = Math.max(0, aiDifficultyLevel - difficultyLevel);
+    console.log(
+      `${progressPrefix}Updated question "${questionLabel}" -> level ${difficultyLevel} (AI=${aiDifficultyLevel}, reduction=${reduction}, image64=${shouldReduceForImage ? "yes" : "no"})`,
+    );
     return true;
   } catch (error) {
     console.error(`Error processing ${questionId}: ${error.message}`);

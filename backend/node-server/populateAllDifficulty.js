@@ -13,12 +13,36 @@ const DEFAULT_LIMIT = 1000;
 const DEFAULT_DELAY_MS = 500;
 const DEFAULT_PARALLEL = 1;
 
+function buildHasImage64Expr() {
+  return {
+    $let: {
+      vars: {
+        normalizedImage64: {
+          $toLower: {
+            $trim: {
+              input: { $ifNull: ["$questions.image64", ""] },
+            },
+          },
+        },
+      },
+      in: {
+        $and: [
+          { $ne: ["$$normalizedImage64", ""] },
+          { $ne: ["$$normalizedImage64", "null"] },
+          { $ne: ["$$normalizedImage64", "undefined"] },
+        ],
+      },
+    },
+  };
+}
+
 function printUsage() {
   console.log("Usage: node populateAllDifficulty.js [options]");
   console.log("");
   console.log("Options:");
   console.log("  --category-id=<id>    Process questions only from a specific category.");
   console.log("  --difficulty-level=<n> Process questions whose current difficulty_level is n (1-10).");
+  console.log("  --images-only         Process only questions that have a populated image64.");
   console.log("  --all                 Process all enabled questions.");
   console.log("  --pending-only        Process only questions missing difficulty (default).");
   console.log(`  --limit=<n>           Max questions to process (${DEFAULT_LIMIT} default, 0 = no limit).`);
@@ -61,6 +85,7 @@ function parseArgs(args) {
     parallel: DEFAULT_PARALLEL,
     categoryId: null,
     difficultyLevel: null,
+    imagesOnly: false,
     help: false,
   };
 
@@ -79,6 +104,11 @@ function parseArgs(args) {
 
     if (arg === "--help" || arg === "-h") {
       options.help = true;
+      continue;
+    }
+
+    if (arg === "--images-only") {
+      options.imagesOnly = true;
       continue;
     }
 
@@ -204,6 +234,10 @@ function buildPipeline(options) {
   // Always process enabled questions only.
   match["questions.disabled"] = { $ne: true };
 
+  if (options.imagesOnly) {
+    match.$expr = buildHasImage64Expr();
+  }
+
   if (!options.processAll) {
     match.$or = [
       { "questions.difficultyConfirmedVersion": { $exists: false } },
@@ -219,6 +253,7 @@ function buildPipeline(options) {
         categoryId: "$_id",
         questionId: "$questions._id",
         text: "$questions.text",
+        hasImage64: buildHasImage64Expr(),
       },
     },
   ];
@@ -242,9 +277,10 @@ async function batchPopulateDifficulty(options) {
   const categoryLabel = options.categoryId ? options.categoryId : "all categories";
   const difficultyLabel =
     options.difficultyLevel == null ? "all levels" : `level ${options.difficultyLevel}`;
+  const imageFilterLabel = options.imagesOnly ? "images-only" : "with/without images";
   const limitLabel = options.limit > 0 ? String(options.limit) : "none";
   console.log(
-    `Running difficulty population in ${mode} mode (enabled only, category=${categoryLabel}, difficulty=${difficultyLabel}, limit=${limitLabel}, delay=${options.delayMs}ms, parallel=${options.parallel}).`
+    `Running difficulty population in ${mode} mode (enabled only, category=${categoryLabel}, difficulty=${difficultyLabel}, imageFilter=${imageFilterLabel}, limit=${limitLabel}, delay=${options.delayMs}ms, parallel=${options.parallel}).`
   );
 
   const questions = await Category.aggregate(buildPipeline(options));
@@ -270,6 +306,8 @@ async function batchPopulateDifficulty(options) {
             current: index + 1,
             total: questions.length,
           },
+          imagesOnly: options.imagesOnly,
+          forceHasImage64: q.hasImage64 === true,
         });
       } finally {
         if (options.delayMs > 0) {

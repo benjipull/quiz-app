@@ -31,6 +31,7 @@ router.get("/:id/questions", auth, adminAuth, async (req, res) => {
       difficulty_rationale: q.difficulty_rationale || "",
       difficultyConfirmedVersion: q.difficultyConfirmedVersion ?? 0,
       disabled: q.disabled,
+      image_eligible: q.image_eligibility?.should_use_image ?? null,
       correct_answer: q.correct_answer,
       explanation: q.explanation || "",
       validation: q.validation || {},

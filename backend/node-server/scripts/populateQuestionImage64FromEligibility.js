@@ -34,6 +34,31 @@ const INCLUDE_EXISTING_BY_DEFAULT = String(
   process.env.QUESTION_IMAGE64_INCLUDE_EXISTING || "false",
 ).toLowerCase() === "true";
 
+function buildPendingImageConditions(pathPrefix = "questions.") {
+  return [
+    { [`${pathPrefix}image64`]: { $exists: false } },
+    { [`${pathPrefix}image64`]: null },
+    { [`${pathPrefix}image64`]: "" },
+    { [`${pathPrefix}image_version`]: { $exists: false } },
+    { [`${pathPrefix}image_version`]: null },
+    { [`${pathPrefix}image_version`]: { $lt: QUESTION_IMAGE_VERSION } },
+  ];
+}
+
+function buildEligibleQuestionWriteMatch(questionId, includeExistingImages) {
+  const questionMatch = {
+    _id: questionId,
+    disabled: { $ne: true },
+    "image_eligibility.should_use_image": true,
+  };
+
+  if (!includeExistingImages) {
+    questionMatch.$or = buildPendingImageConditions("");
+  }
+
+  return questionMatch;
+}
+
 function printUsage() {
   console.log("Usage: node scripts/populateQuestionImage64FromEligibility.js [--all] [--help]");
   console.log("");
@@ -92,13 +117,7 @@ function buildPipeline(includeExistingImages) {
   };
 
   if (!includeExistingImages) {
-    match.$or = [
-      { "questions.image64": { $exists: false } },
-      { "questions.image64": "" },
-      { "questions.image_version": { $exists: false } },
-      { "questions.image_version": null },
-      { "questions.image_version": { $lt: QUESTION_IMAGE_VERSION } },
-    ];
+    match.$or = buildPendingImageConditions();
   }
 
   return [
@@ -138,6 +157,7 @@ async function populateQuestionImage64FromEligibility(options = {}) {
   }
 
   let updated = 0;
+  let skipped = 0;
   let failed = 0;
 
   for (let index = 0; index < rows.length; index += 1) {
@@ -169,8 +189,16 @@ async function populateQuestionImage64FromEligibility(options = {}) {
         }
       }
 
-      await Category.updateOne(
-        { _id: row.categoryId, "questions._id": row.questionId },
+      const updateResult = await Category.updateOne(
+        {
+          _id: row.categoryId,
+          questions: {
+            $elemMatch: buildEligibleQuestionWriteMatch(
+              row.questionId,
+              includeExistingImages,
+            ),
+          },
+        },
         {
           $set: {
             "questions.$.image64": image64ToSave,
@@ -180,6 +208,12 @@ async function populateQuestionImage64FromEligibility(options = {}) {
           },
         },
       );
+
+      if (!updateResult.modifiedCount) {
+        skipped += 1;
+        console.log(`Skipped ${label}: no longer eligible or already up-to-date.`);
+        continue;
+      }
 
       updated += 1;
       console.log(`Saved question image64 for ${label}.`);
@@ -200,6 +234,7 @@ async function populateQuestionImage64FromEligibility(options = {}) {
   console.log("");
   console.log("Question image64 population (image_eligibility=true) complete.");
   console.log(`Updated: ${updated}`);
+  console.log(`Skipped: ${skipped}`);
   console.log(`Failed: ${failed}`);
 }
 
