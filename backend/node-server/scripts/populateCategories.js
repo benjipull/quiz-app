@@ -24,6 +24,9 @@ const avoidedQuestionSet = new Set();
 const MAX_AVOIDED_QUESTIONS = Number(process.env.POPULATE_MAX_AVOIDED_QUESTIONS || 120);
 const MAX_CONSECUTIVE_NO_ADD = Number(process.env.POPULATE_MAX_CONSECUTIVE_NO_ADD || 5);
 const MAX_SAME_DUPLICATE_STREAK = Number(process.env.POPULATE_MAX_SAME_DUPLICATE_STREAK || 3);
+const DEFAULT_MAX_ENABLED_QUESTIONS_PER_CATEGORY = Number(
+  process.env.POPULATE_MAX_ENABLED_QUESTIONS_PER_CATEGORY || 100
+);
 
 try {
   assertOllamaSetup();
@@ -291,7 +294,19 @@ async function runPostGenerationScripts(categoryId, questionIds) {
   }
 }
 
-async function populateCategory(categoryId, difficultyHint) {
+async function getEnabledQuestionCount(categoryId) {
+  const category = await Category.findById(categoryId)
+    .select("questions.disabled")
+    .lean();
+
+  if (!category) {
+    return null;
+  }
+
+  return (category.questions || []).filter((question) => !question.disabled).length;
+}
+
+async function populateCategory(categoryId, difficultyHint, options = {}) {
   try {
     const category = await Category.findById(categoryId);
     if (!category) {
@@ -299,8 +314,11 @@ async function populateCategory(categoryId, difficultyHint) {
       return { addedCount: 0, duplicateQuestion: null };
     }
 
+    const maxEnabledQuestions = Number(
+      options.maxEnabledQuestions ?? DEFAULT_MAX_ENABLED_QUESTIONS_PER_CATEGORY
+    );
     const activeQuestions = category.questions.filter(q => !q.disabled).length;
-    if (activeQuestions >= 100) {
+    if (activeQuestions >= maxEnabledQuestions) {
       console.log(`🚫 Skipping ${category.name} (already has ${activeQuestions} questions).`);
       return { addedCount: 0, duplicateQuestion: null };
     }
@@ -424,7 +442,10 @@ async function checkQuestionInSameCategory(category, newQuestion) {
 }
 
 
-async function populateCategoryLoop(categoryId, iterations, difficultyHint) {
+async function populateCategoryLoop(categoryId, iterations, difficultyHint, options = {}) {
+  const maxEnabledQuestions = Number(
+    options.maxEnabledQuestions ?? DEFAULT_MAX_ENABLED_QUESTIONS_PER_CATEGORY
+  );
   let totalAdded = 0;
   let consecutiveNoAdd = 0;
   let sameDuplicateStreak = 0;
@@ -432,8 +453,22 @@ async function populateCategoryLoop(categoryId, iterations, difficultyHint) {
 
   try {
     for (let i = 0; i < iterations; i++) {
+      const enabledQuestionCount = await getEnabledQuestionCount(categoryId);
+      if (enabledQuestionCount === null) {
+        console.log(`Stopping early: category ${categoryId} no longer exists.`);
+        break;
+      }
+
+      if (enabledQuestionCount >= maxEnabledQuestions) {
+        console.log(
+          `Category ${categoryId} reached ${enabledQuestionCount}/${maxEnabledQuestions} enabled questions. Moving to next category.`
+        );
+        break;
+      }
       console.log(`\n🔄 Iteration ${i + 1}/${iterations} for category ${categoryId}`);
-      const result = await populateCategory(categoryId, difficultyHint);
+      const result = await populateCategory(categoryId, difficultyHint, {
+        maxEnabledQuestions,
+      });
       const added = Number(result?.addedCount || 0);
       totalAdded += added;
 

@@ -7,6 +7,7 @@
     "start": "node index.js",
     "populate:difficulty": "node populateAllDifficulty.js",
     "populate:difficulty:all": "node populateAllDifficulty.js --all --limit=0",
+    "populate:difficulty:images": "node populateAllDifficulty.js --images-only",
     "populate:difficulty:one": "node scripts/populateDifficulty.js",
     "populate:image-eligibility": "node populateAllImageEligibility.js",
     "populate:image-eligibility:all": "node populateAllImageEligibility.js --all --limit=0",
@@ -16,7 +17,8 @@
     "populate:question-image64:eligibility": "node scripts/populateQuestionImage64FromEligibility.js",
     "populate:question-image64:eligibility:all": "node scripts/populateQuestionImage64FromEligibility.js --all",
     "populate:image64": "node scripts/populateCategoryImage64.js",
-    "populate:image64:all": "node scripts/populateCategoryImage64.js --all"
+    "populate:image64:all": "node scripts/populateCategoryImage64.js --all",
+    "populate:tags": "node scripts/populateTags.js"
   },
   "dependencies": {
     "@sendgrid/mail": "^7.7.0",

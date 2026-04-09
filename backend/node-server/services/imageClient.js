@@ -4,6 +4,9 @@ const axios = require("axios");
 const RUNPOD_IMAGE_URL =
   process.env.RUNPOD_IMAGE_URL || "https://api.runpod.ai/v2/qq0glr1vb5p7y0/runsync";
 const RUNPOD_IMAGE_API_KEY = process.env.RUNPOD_IMAGE_API_KEY || process.env.RUNPOD_API_KEY || "";
+const MIN_IMAGE_SIZE = 512;
+const MAX_IMAGE_SIZE = 5120;
+const IMAGE_SIZE_STEP = 512;
 
 function assertImageSetup() {
   if (!RUNPOD_IMAGE_URL) {
@@ -15,18 +18,39 @@ function assertImageSetup() {
   }
 }
 
-function buildPayloadForPrompt(prompt) {
+function normalizeSquareSize(size) {
+  if (size == null || size === "") {
+    return MIN_IMAGE_SIZE;
+  }
+
+  const numericSize = Number(size);
+  const isValidInteger = Number.isInteger(numericSize);
+  const isInRange = numericSize >= MIN_IMAGE_SIZE && numericSize <= MAX_IMAGE_SIZE;
+  const isStepAligned = numericSize % IMAGE_SIZE_STEP === 0;
+
+  if (!isValidInteger || !isInRange || !isStepAligned) {
+    throw new Error(
+      `Image size must be an integer from ${MIN_IMAGE_SIZE} to ${MAX_IMAGE_SIZE} in steps of ${IMAGE_SIZE_STEP}.`,
+    );
+  }
+
+  return numericSize;
+}
+
+function buildPayloadForPrompt(prompt, size = MIN_IMAGE_SIZE) {
   const safePrompt = String(prompt || "").trim();
   if (!safePrompt) {
     throw new Error("Image prompt cannot be empty.");
   }
 
+  const normalizedSize = normalizeSquareSize(size);
+
   return {
     input: {
       prompt: safePrompt,
       negative_prompt: "blurry, low quality, deformed, ugly, text, watermark, signature",
-      height: 512,
-      width: 512,
+      height: normalizedSize,
+      width: normalizedSize,
       num_inference_steps: 1,
       guidance_scale: 0,
       seed: 1337,
@@ -68,10 +92,23 @@ function attachApiOutput(error, apiOutput) {
   error.apiOutput = apiOutput;
 }
 
-async function generateImageBase64FromPrompt(prompt) {
+function resolveImageGenerationOptions(options) {
+  if (typeof options === "number") {
+    return { size: options };
+  }
+
+  if (options && typeof options === "object") {
+    return options;
+  }
+
+  return {};
+}
+
+async function generateImageBase64FromPrompt(prompt, options = {}) {
   assertImageSetup();
 
-  const payload = buildPayloadForPrompt(prompt);
+  const { size } = resolveImageGenerationOptions(options);
+  const payload = buildPayloadForPrompt(prompt, size);
   let response;
   try {
     response = await axios.post(RUNPOD_IMAGE_URL, payload, {
@@ -101,6 +138,7 @@ async function generateImageBase64FromPrompt(prompt) {
   return {
     base64: imageBase64,
     prompt: String(prompt || "").trim(),
+    size: payload.input.width,
     raw: response.data,
   };
 }
@@ -117,7 +155,11 @@ async function generateQuestionImageBase64(question, categoryName = "") {
 
 module.exports = {
   RUNPOD_IMAGE_URL,
+  MIN_IMAGE_SIZE,
+  MAX_IMAGE_SIZE,
+  IMAGE_SIZE_STEP,
   assertImageSetup,
+  normalizeSquareSize,
   buildQuestionImagePrompt,
   generateImageBase64FromPrompt,
   generateCategoryImageBase64,

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Image Generator</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: radial-gradient(circle at top left, #111 0%, #000 100%);
+      color: #eee;
+      margin: 0;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1.5rem;
+      color: #5ea6ff;
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    .page {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 1.5rem;
+      color: #5ea6ff;
+      text-align: center;
+    }
+
+    .panel {
+      background: #1b1b1b;
+      border: 1px solid #2c2c2c;
+      border-radius: 12px;
+      padding: 1rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 200px auto;
+      gap: 0.75rem;
+      align-items: end;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.4rem;
+      color: #ccc;
+      font-size: 0.9rem;
+    }
+
+    textarea,
+    select,
+    button {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid #333;
+      color: #eee;
+      background: #111;
+      font: inherit;
+    }
+
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+      padding: 0.7rem 0.75rem;
+      line-height: 1.4;
+    }
+
+    select {
+      padding: 0.7rem;
+    }
+
+    button {
+      cursor: pointer;
+      border: 1px solid #3d7ed1;
+      background: #2a6fd2;
+      font-weight: 600;
+      padding: 0.72rem 1rem;
+      transition: background 0.2s ease;
+    }
+
+    button:hover:enabled {
+      background: #1f5db3;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    #status {
+      min-height: 1.2rem;
+      margin: 0.75rem 0 0;
+      color: #c6d9ff;
+      font-size: 0.95rem;
+    }
+
+    .preview-wrap {
+      margin-top: 1rem;
+      display: none;
+    }
+
+    .meta {
+      color: #bbb;
+      font-size: 0.9rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .preview-box {
+      width: 100%;
+      overflow: auto;
+      background: #0f0f0f;
+      border: 1px solid #2e2e2e;
+      border-radius: 10px;
+      padding: 0.75rem;
+    }
+
+    #generatedImage {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+    }
+
+    @media (max-width: 840px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a href="/admin/pages/admin-content-management.html" class="back-link">&larr; Back to Content Management</a>
+
+  <div class="page">
+    <h1>Image Generator</h1>
+
+    <div class="panel">
+      <div class="form-grid">
+        <div>
+          <label for="promptInput">Prompt</label>
+          <textarea id="promptInput" placeholder="Describe the image you want to generate..."></textarea>
+        </div>
+
+        <div>
+          <label for="sizeSelect">Image Size (px)</label>
+          <select id="sizeSelect">
+            <option value="512">512 x 512</option>
+            <option value="1024">1024 x 1024</option>
+            <option value="1536">1536 x 1536</option>
+            <option value="2048">2048 x 2048</option>
+            <option value="2560">2560 x 2560</option>
+            <option value="3072">3072 x 3072</option>
+            <option value="3584">3584 x 3584</option>
+            <option value="4096">4096 x 4096</option>
+            <option value="4608">4608 x 4608</option>
+            <option value="5120">5120 x 5120</option>
+          </select>
+        </div>
+
+        <div>
+          <label>&nbsp;</label>
+          <button id="generateBtn" type="button">Generate</button>
+        </div>
+      </div>
+
+      <div id="status"></div>
+
+      <div class="preview-wrap" id="previewWrap">
+        <div class="meta" id="imageMeta"></div>
+        <div class="preview-box">
+          <img id="generatedImage" alt="Generated result" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const token = localStorage.getItem("token");
+    const userType = (localStorage.getItem("userType") || "").toLowerCase();
+    if (!token || userType !== "admin") {
+      window.location.href = "/admin/pages/admin-login.html";
+    }
+
+    const promptInput = document.getElementById("promptInput");
+    const sizeSelect = document.getElementById("sizeSelect");
+    const generateBtn = document.getElementById("generateBtn");
+    const statusEl = document.getElementById("status");
+    const previewWrap = document.getElementById("previewWrap");
+    const imageMeta = document.getElementById("imageMeta");
+    const generatedImage = document.getElementById("generatedImage");
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.style.color = isError ? "#ff9494" : "#c6d9ff";
+    }
+
+    async function generateImage() {
+      const prompt = promptInput.value.trim();
+      const size = Number(sizeSelect.value);
+
+      if (!prompt) {
+        setStatus("Please enter a prompt before generating.", true);
+        return;
+      }
+
+      generateBtn.disabled = true;
+      setStatus("Generating image...");
+
+      try {
+        const response = await fetch("/api/admin/images/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ prompt, size }),
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.message || `Request failed (${response.status})`);
+        }
+
+        const encoded = String(payload.imageBase64 || "");
+        if (!encoded) {
+          throw new Error("Image was generated but no image data was returned.");
+        }
+
+        generatedImage.src = `data:image/png;base64,${encoded}`;
+        generatedImage.alt = `Generated image for prompt: ${prompt}`;
+        imageMeta.textContent = `Prompt: "${payload.prompt}" | Size: ${payload.size} x ${payload.size}px`;
+        previewWrap.style.display = "block";
+        setStatus("Image generated successfully.");
+      } catch (error) {
+        setStatus(error.message || "Failed to generate image.", true);
+      } finally {
+        generateBtn.disabled = false;
+      }
+    }
+
+    generateBtn.addEventListener("click", generateImage);
+  </script>
+</body>
+</html>

@@ -47,7 +47,6 @@ Examples where image SHOULD be false:
 - definitions
 - processes or theories
 - units or measurements
-- generic categories (e.g. "mammal")
 - anything where an image would not meaningfully help answer
 
 === IMPORTANT ===
