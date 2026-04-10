@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -214,9 +214,6 @@ const BASE_URL = getApiBaseUrl();
 const ANSWER_BAR_REVEAL_DELAY_MS = 300;
 const ANSWER_BAR_ANIMATION_DURATION_MS = 400;
 const SCROLL_AFTER_BARS_DELAY_MS = ANSWER_BAR_REVEAL_DELAY_MS + ANSWER_BAR_ANIMATION_DURATION_MS + 50;
-const QUESTION_TEXT_LINE_HEIGHT = 1.25;
-const QUESTION_TEXT_MAX_LINES = 2;
-const QUESTION_TEXT_MIN_FONT_SIZE_PX = 8;
 
 const shuffleArray = <T,>(items: T[]): T[] => {
   const shuffled = [...items];
@@ -358,8 +355,6 @@ export default function Quiz() {
   const location = useLocation();
   const locationState = (location.state as QuizLocationState) || null;
   const explanationRef = useRef<HTMLDivElement>(null);
-  const questionTextContainerRef = useRef<HTMLDivElement>(null);
-  const questionTextMeasureRef = useRef<HTMLDivElement>(null);
   const timerInSecondsRef = useRef<NodeJS.Timeout | null>(null);
   // FIX: hasStartedRef is the key to prevent double execution in React Strict Mode
   const hasStartedRef = useRef(false);
@@ -400,7 +395,6 @@ export default function Quiz() {
   const [isReporting, setIsReporting] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState(10);
-  const [questionFontSizePx, setQuestionFontSizePx] = useState(28);
   const questionHasImagePayload = hasImagePayload(quizState.question?.image64);
   const currentQuestionImageSrc = getQuestionImageSrc(quizState.question?.image64);
 
@@ -615,85 +609,6 @@ export default function Quiz() {
     setShowBars(false);
     setAnswerResponse(null);
   }, [quizState.question, quizState.currentQuestionIndex]);
-
-  useLayoutEffect(() => {
-    const questionText = quizState.question?.question?.trim();
-    if (!questionText) return;
-
-    const getCharacterDrivenBounds = (characterCount: number) => {
-      const viewportWidth = window.innerWidth;
-      const viewportScale =
-        viewportWidth < 360 ? 0.8 :
-          viewportWidth < 480 ? 0.9 :
-            viewportWidth < 768 ? 1 :
-              viewportWidth < 1024 ? 1.1 : 1.2;
-
-      let preferredBaseSize = 18;
-      if (characterCount <= 35) preferredBaseSize = 34;
-      else if (characterCount <= 55) preferredBaseSize = 30;
-      else if (characterCount <= 80) preferredBaseSize = 26;
-      else if (characterCount <= 110) preferredBaseSize = 23;
-      else if (characterCount <= 150) preferredBaseSize = 20;
-      else preferredBaseSize = 17;
-
-      const preferredSize = Math.max(12, Math.round(preferredBaseSize * viewportScale));
-      return {
-        min: Math.max(QUESTION_TEXT_MIN_FONT_SIZE_PX, preferredSize - 8),
-        max: preferredSize,
-      };
-    };
-
-    const fitQuestionText = () => {
-      const container = questionTextContainerRef.current;
-      const measurer = questionTextMeasureRef.current;
-      if (!container || !measurer) return;
-
-      const availableWidth = container.clientWidth;
-      const availableHeight = container.clientHeight;
-      if (availableWidth <= 0 || availableHeight <= 0) return;
-
-      measurer.style.width = `${availableWidth}px`;
-      measurer.style.fontWeight = "700";
-      measurer.style.lineHeight = String(QUESTION_TEXT_LINE_HEIGHT);
-      measurer.textContent = questionText;
-
-      const { min, max } = getCharacterDrivenBounds(questionText.length);
-      let low = min;
-      let high = max;
-      let best = min;
-
-      while (low <= high) {
-        const mid = Math.floor((low + high) / 2);
-        measurer.style.fontSize = `${mid}px`;
-        const twoLineHeightLimit = mid * QUESTION_TEXT_LINE_HEIGHT * QUESTION_TEXT_MAX_LINES + 0.5;
-        const fitsTwoLines = measurer.scrollHeight <= twoLineHeightLimit;
-        const fitsContainer = measurer.scrollHeight <= availableHeight;
-        const fits = fitsTwoLines && fitsContainer;
-
-        if (fits) {
-          best = mid;
-          low = mid + 1;
-        } else {
-          high = mid - 1;
-        }
-      }
-
-      setQuestionFontSizePx(best);
-    };
-
-    let frameId = window.requestAnimationFrame(fitQuestionText);
-
-    const handleResize = () => {
-      window.cancelAnimationFrame(frameId);
-      frameId = window.requestAnimationFrame(fitQuestionText);
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [quizState.question?.question]);
 
   useEffect(() => {
     if (quizState.currentQuestionIndex > 0) {
@@ -1420,33 +1335,16 @@ export default function Quiz() {
         </div>
 
         <div className="flex-1 px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-4xl">
-          <div className="space-y-6">
-            <div className="px-1 py-1 md:py-2 text-center">
-              <div
-                ref={questionTextContainerRef}
-                className="h-[clamp(48px,9vh,95px)] md:h-[clamp(62px,10vh,115px)] flex items-center justify-center px-1"
-              >
-                <h2
-                  className="font-bold text-white leading-tight drop-shadow-lg break-words w-full"
-                  style={{
-                    fontSize: `${questionFontSizePx}px`,
-                    lineHeight: QUESTION_TEXT_LINE_HEIGHT,
-                    display: "-webkit-box",
-                    WebkitLineClamp: QUESTION_TEXT_MAX_LINES,
-                    WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
-                  }}
-                >
-                  {quizState.question?.question}
-                </h2>
-              </div>
-              <div className="fixed -left-[9999px] top-0 pointer-events-none opacity-0" aria-hidden="true">
-                <div
-                  ref={questionTextMeasureRef}
-                  className="font-bold leading-tight break-words whitespace-pre-wrap"
-                />
-              </div>
-              {questionHasImagePayload ? (
+            <div className="space-y-6">
+              <div className="px-1 py-1 md:py-2 text-center">
+                <div className="flex items-start justify-center px-1">
+                  <h2
+                    className="w-full break-words whitespace-pre-wrap text-[1.15rem] font-bold leading-tight text-white drop-shadow-lg md:text-[1.45rem]"
+                  >
+                    {quizState.question?.question}
+                  </h2>
+                </div>
+                {questionHasImagePayload ? (
                 <div className="mx-auto mt-3 w-fit overflow-hidden rounded-2xl border border-cyan-300/45 shadow-[0_0_24px_rgba(34,211,238,0.35)] leading-none">
                   {currentQuestionImageSrc ? (
                     <div className="flex h-[130px] items-center justify-center overflow-hidden md:h-[158px]">

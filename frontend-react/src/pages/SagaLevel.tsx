@@ -212,7 +212,7 @@ const getPointAtArcDistance = (table: CubicArcSample[], targetDistance: number):
 };
 
 export default function SagaLevel() {
-  const { user, loading, updateCoins, markUserStale } = useUser();
+  const { user, loading, refreshUser, updateCoins, markUserStale } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const { sagaNumber: sagaNumberParam } = useParams();
@@ -360,6 +360,7 @@ export default function SagaLevel() {
   const lockMessageTimerRef = useRef<number | null>(null);
   const hasAutoScrolledRef = useRef(false);
   const hasHandledCompletionReturnRef = useRef(false);
+  const hasAppliedCompletionCoinsRef = useRef(false);
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const sagaLevelUserToken =
     typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
@@ -675,6 +676,7 @@ export default function SagaLevel() {
     setShowCompletionRewardsOverlay(false);
     setAnimatedCompletionKnowledge(0);
     setAnimatedCompletionCoins(0);
+    hasAppliedCompletionCoinsRef.current = false;
   }, [sagaNumber]);
 
   useEffect(() => {
@@ -699,6 +701,28 @@ export default function SagaLevel() {
     if (loading || !user || !hasValidSagaNumber) return;
     trackEnteredSagaLevelMap(user._id, sagaNumber);
   }, [loading, user?._id, hasValidSagaNumber, sagaNumber]);
+
+  useEffect(() => {
+    if (loading || !user || !isReturningFromQuizCompletion) return;
+    if (hasAppliedCompletionCoinsRef.current) return;
+
+    hasAppliedCompletionCoinsRef.current = true;
+    if (completedCoinsEarnedFromQuizReturn <= 0) return;
+
+    const nextCoins = Math.max(0, (user.coins ?? 0) + completedCoinsEarnedFromQuizReturn);
+    updateCoins(nextCoins);
+    markUserStale();
+    void refreshUser();
+  }, [
+    loading,
+    user?._id,
+    user?.coins,
+    isReturningFromQuizCompletion,
+    completedCoinsEarnedFromQuizReturn,
+    refreshUser,
+    updateCoins,
+    markUserStale,
+  ]);
 
   useEffect(() => {
     return () => {
