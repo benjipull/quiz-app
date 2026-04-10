@@ -1,6 +1,8 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
 const crypto = require("crypto");
+const { installScriptErrorPrefix } = require("./errorLogger");
+installScriptErrorPrefix();
 const Category = require("../models/categoryModel");
 const {
   OLLAMA_URL,
@@ -10,6 +12,9 @@ const {
 } = require("../services/ollamaClient");
 
 const { buildQuestionPrompt } = require("./prompts/questionPrompt");
+const { validateAndPersistQuestion } = require("./validateQuestions");
+const { populateDifficulty } = require("./populateDifficulty");
+const { normalizeJsonText, parseJsonObject } = require("./jsonParsingHelper");
 //const { processSingleQuestion } = require("./validateDuplicateQuestions");
 
 
@@ -19,6 +24,9 @@ const avoidedQuestionSet = new Set();
 const MAX_AVOIDED_QUESTIONS = Number(process.env.POPULATE_MAX_AVOIDED_QUESTIONS || 120);
 const MAX_CONSECUTIVE_NO_ADD = Number(process.env.POPULATE_MAX_CONSECUTIVE_NO_ADD || 5);
 const MAX_SAME_DUPLICATE_STREAK = Number(process.env.POPULATE_MAX_SAME_DUPLICATE_STREAK || 3);
+const DEFAULT_MAX_ENABLED_QUESTIONS_PER_CATEGORY = Number(
+  process.env.POPULATE_MAX_ENABLED_QUESTIONS_PER_CATEGORY || 100
+);
 
 try {
   assertOllamaSetup();
@@ -78,6 +86,25 @@ function normalizeQuestion(raw) {
   };
 }
 
+function sanitizeGeneratedQuestionText(text) {
+  const normalized = String(text ?? "");
+  return normalized
+    .replace(/\s*[—-]\s*(where is it|what is it)\??/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function sanitizeGeneratedQuestion(question) {
+  if (!question || typeof question !== "object") {
+    return question;
+  }
+
+  return {
+    ...question,
+    question: sanitizeGeneratedQuestionText(question.question),
+  };
+}
+
 function validateQuestionShape(question) {
   if (!question || typeof question !== "object") {
     return { isValid: false, reason: "empty question payload" };
@@ -109,23 +136,39 @@ function validateQuestionShape(question) {
 }
 
 function parseOllamaResponse(rawResponse) {
+  const rawText = String(rawResponse ?? "");
+  const cleaned = normalizeJsonText(rawText, {
+    stripMarkdown: true,
+    normalizeQuotes: true,
+  });
+
   try {
-    return JSON.parse(rawResponse);
+    return JSON.parse(rawText);
   } catch (rawParseError) {
-    const cleaned = rawResponse
-      .replace(/```(\w+)?/g, "")
-      .replace(/\u201C|\u201D/g, '"')
-      .replace(/\u2019/g, "'");
-    try {
-      return JSON.parse(cleaned);
-    } catch (cleanedParseError) {
-      const parseError = new Error(
-        `Failed to parse Ollama JSON. Raw parse error: ${rawParseError.message}. Cleaned parse error: ${cleanedParseError.message}`
-      );
-      parseError.rawResponse = rawResponse;
-      parseError.cleanedResponse = cleaned;
-      throw parseError;
+    const parsed = parseJsonObject(rawText, {
+      normalizeOptions: {
+        stripMarkdown: true,
+        stripThinkTags: true,
+        normalizeQuotes: true,
+      },
+    });
+    if (parsed) {
+      return parsed;
     }
+
+    let cleanedParseError;
+    try {
+      JSON.parse(cleaned);
+    } catch (error) {
+      cleanedParseError = error;
+    }
+
+    const parseError = new Error(
+      `Failed to parse Ollama JSON. Raw parse error: ${rawParseError.message}. Cleaned parse error: ${cleanedParseError?.message || "Unable to extract JSON object from response."}`
+    );
+    parseError.rawResponse = rawResponse;
+    parseError.cleanedResponse = cleaned;
+    throw parseError;
   }
 }
 
@@ -197,10 +240,73 @@ async function fetchQuestions(categoryName, difficultyHint) {
   const prompt = buildQuestionPrompt(categoryName, avoidSection, difficultySection);
 
   const question = await queryOllama(prompt);
-  return question ? [question] : [];
+  if (!question) return [];
+
+  const parsedQuestion = sanitizeGeneratedQuestion(question);
+  return [parsedQuestion];
 }
 
-async function populateCategory(categoryId, difficultyHint) {
+async function runPostGenerationScripts(categoryId, questionIds) {
+  const disableQuestionOnValidationFailure = async (questionId, reason) => {
+    await Category.updateOne(
+      { _id: categoryId, "questions._id": questionId },
+      {
+        $set: {
+          "questions.$.disabled": true,
+          "questions.$.disabled_reason": reason,
+        },
+      }
+    );
+  };
+
+  for (const questionId of questionIds) {
+    try {
+      const validationResult = await validateAndPersistQuestion(categoryId, questionId);
+      if (!validationResult.success) {
+        await disableQuestionOnValidationFailure(
+          questionId,
+          "Disabled automatically because validation failed during populate flow."
+        );
+        console.log(`Validation failed for question ${questionId}. Skipping difficulty population.`);
+        continue;
+      }
+
+      if (validationResult.disabled) {
+        console.log(`Question ${questionId} was disabled by validation. Skipping difficulty population.`);
+        continue;
+      }
+
+      await populateDifficulty(String(categoryId), String(questionId));
+    } catch (error) {
+      try {
+        await disableQuestionOnValidationFailure(
+          questionId,
+          "Disabled automatically because validation errored during populate flow."
+        );
+      } catch (disableError) {
+        console.error(
+          `Failed to disable question ${questionId} after validation error:`,
+          disableError.message
+        );
+      }
+      console.error(`Post-generation pipeline failed for question ${questionId}:`, error.message);
+    }
+  }
+}
+
+async function getEnabledQuestionCount(categoryId) {
+  const category = await Category.findById(categoryId)
+    .select("questions.disabled")
+    .lean();
+
+  if (!category) {
+    return null;
+  }
+
+  return (category.questions || []).filter((question) => !question.disabled).length;
+}
+
+async function populateCategory(categoryId, difficultyHint, options = {}) {
   try {
     const category = await Category.findById(categoryId);
     if (!category) {
@@ -208,8 +314,11 @@ async function populateCategory(categoryId, difficultyHint) {
       return { addedCount: 0, duplicateQuestion: null };
     }
 
+    const maxEnabledQuestions = Number(
+      options.maxEnabledQuestions ?? DEFAULT_MAX_ENABLED_QUESTIONS_PER_CATEGORY
+    );
     const activeQuestions = category.questions.filter(q => !q.disabled).length;
-    if (activeQuestions >= 100) {
+    if (activeQuestions >= maxEnabledQuestions) {
       console.log(`🚫 Skipping ${category.name} (already has ${activeQuestions} questions).`);
       return { addedCount: 0, duplicateQuestion: null };
     }
@@ -224,7 +333,7 @@ async function populateCategory(categoryId, difficultyHint) {
     }
 
     // 🧠 Step 2: Add them to category object
-    const addedCount = await addQuestionsToCategory(category, fetchedQuestions);
+    const { addedCount, addedQuestionIds } = await addQuestionsToCategory(category, fetchedQuestions);
     if (addedCount === 0) {
       console.log("⚠️ No new question added (duplicate hash skipped).");
       const generatedQuestion = String(fetchedQuestions[0]?.question || "").trim();
@@ -242,6 +351,7 @@ async function populateCategory(categoryId, difficultyHint) {
     // 🧠 Step 3: Save the updated category to MongoDB
     category.disabled = false;
     await category.save();
+    await runPostGenerationScripts(category._id, addedQuestionIds);
     console.log(`✅ Added ${addedCount} question(s) to ${category.name}.`);
     return { addedCount, duplicateQuestion: null };
 
@@ -267,6 +377,7 @@ async function populateCategory(categoryId, difficultyHint) {
 
 async function addQuestionsToCategory(category, questions) {
   let added = 0;
+  const addedQuestionIds = [];
 
   for (const q of questions) {
     const validation = validateQuestionShape(q);
@@ -283,8 +394,9 @@ async function addQuestionsToCategory(category, questions) {
       continue;
     }
 
+    const newQuestionId = new mongoose.Types.ObjectId();
     category.questions.push({
-      _id: new mongoose.Types.ObjectId(),
+      _id: newQuestionId,
       text: q.question,
       answers: q.answers.map(a => ({ text: a, correctCount: 0, incorrectCount: 0 })),
       correct_answer: q.correct_answer,
@@ -300,13 +412,14 @@ async function addQuestionsToCategory(category, questions) {
       timesAnsweredCorrectly: 0,
       timesAnsweredIncorrectly: 0,
       hash,
-      version: 3.10
+      version: 3.30
     });
 
     added++;
+    addedQuestionIds.push(newQuestionId.toString());
   }
 
-  return added;
+  return { addedCount: added, addedQuestionIds };
 }
 
 async function checkQuestionInSameCategory(category, newQuestion) {
@@ -329,7 +442,10 @@ async function checkQuestionInSameCategory(category, newQuestion) {
 }
 
 
-async function populateCategoryLoop(categoryId, iterations, difficultyHint) {
+async function populateCategoryLoop(categoryId, iterations, difficultyHint, options = {}) {
+  const maxEnabledQuestions = Number(
+    options.maxEnabledQuestions ?? DEFAULT_MAX_ENABLED_QUESTIONS_PER_CATEGORY
+  );
   let totalAdded = 0;
   let consecutiveNoAdd = 0;
   let sameDuplicateStreak = 0;
@@ -337,8 +453,22 @@ async function populateCategoryLoop(categoryId, iterations, difficultyHint) {
 
   try {
     for (let i = 0; i < iterations; i++) {
+      const enabledQuestionCount = await getEnabledQuestionCount(categoryId);
+      if (enabledQuestionCount === null) {
+        console.log(`Stopping early: category ${categoryId} no longer exists.`);
+        break;
+      }
+
+      if (enabledQuestionCount >= maxEnabledQuestions) {
+        console.log(
+          `Category ${categoryId} reached ${enabledQuestionCount}/${maxEnabledQuestions} enabled questions. Moving to next category.`
+        );
+        break;
+      }
       console.log(`\n🔄 Iteration ${i + 1}/${iterations} for category ${categoryId}`);
-      const result = await populateCategory(categoryId, difficultyHint);
+      const result = await populateCategory(categoryId, difficultyHint, {
+        maxEnabledQuestions,
+      });
       const added = Number(result?.addedCount || 0);
       totalAdded += added;
 

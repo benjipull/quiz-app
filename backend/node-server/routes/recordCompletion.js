@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const Category = require("../models/categoryModel");
 const User = require("../models/user");
 const WisdomPointsLedger = require("../models/WisdomPointsLedger"); 
+const SagaLevelProgression = require("../models/SagaLevelProgression");
 const authenticateToken = require("../middleware/auth");
 
 const router = express.Router();
@@ -46,7 +47,7 @@ const calculateKnowledgePoints = (correct) => {
 router.post("/:categoryId/completion", authenticateToken, async (req, res) => {
     try {
         const { categoryId } = req.params;
-        const { questionsAttempted, correctAnswers, incorrectAnswers } = req.body;
+        const { questionsAttempted, correctAnswers, incorrectAnswers, sagaLevelId, sagaNumber } = req.body;
         const userId = req.user.id;
 
         console.log("✅ Received categoryId:", categoryId);
@@ -62,6 +63,11 @@ router.post("/:categoryId/completion", authenticateToken, async (req, res) => {
         if (questionsAttempted <= 0) {
             return res.status(400).json({ message: "Questions attempted must be greater than zero." });
         }
+        const parsedSagaNumber = Number.parseInt(String(sagaNumber || ""), 10);
+        const requestedSagaNumber =
+            Number.isInteger(parsedSagaNumber) && parsedSagaNumber > 0
+                ? parsedSagaNumber
+                : null;
 
         const user = await User.findById(userId);
         const category = await Category.findById(categoryId);
@@ -111,6 +117,86 @@ router.post("/:categoryId/completion", authenticateToken, async (req, res) => {
         };
         category.completions.push(newCompletion);
         await category.save();
+        
+        // ✅ If this category is part of a saga level for the player,
+        // mark the first matching saga-level entry as completed.
+        const hasValidSagaLevelId =
+            sagaLevelId != null &&
+            sagaLevelId !== "" &&
+            mongoose.Types.ObjectId.isValid(sagaLevelId);
+        const sagaLevelObjectId = hasValidSagaLevelId
+            ? new mongoose.Types.ObjectId(sagaLevelId)
+            : null;
+        const sagaProgression = await SagaLevelProgression.findOne({ player: userId });
+
+        if (sagaProgression && Array.isArray(sagaProgression.sagas)) {
+            let updatedSagaLevel = false;
+
+            const orderedSagas = [...sagaProgression.sagas].sort(
+                (a, b) => Number(a?.sagaNumber || 0) - Number(b?.sagaNumber || 0)
+            );
+            const prioritizedSagas = requestedSagaNumber
+                ? [
+                    ...orderedSagas.filter(
+                        (saga) => Number(saga?.sagaNumber || 0) === requestedSagaNumber
+                    ),
+                    ...orderedSagas.filter(
+                        (saga) => Number(saga?.sagaNumber || 0) !== requestedSagaNumber
+                    ),
+                  ]
+                : [...orderedSagas].reverse();
+
+            for (const saga of prioritizedSagas) {
+                if (!Array.isArray(saga.sagaLevels)) continue;
+
+                let matchingLevel = null;
+
+                if (sagaLevelObjectId) {
+                    matchingLevel =
+                        saga.sagaLevels.find((level) =>
+                            String(level?._id) === String(sagaLevelObjectId) &&
+                            String(level?.category) === String(categoryId)
+                        ) || null;
+                }
+
+                if (!matchingLevel) {
+                    matchingLevel =
+                        saga.sagaLevels.find(
+                            (level) =>
+                                String(level?.category) === String(categoryId) && !level?.isCompleted
+                        ) ||
+                        saga.sagaLevels.find(
+                            (level) => String(level?.category) === String(categoryId)
+                        ) ||
+                        null;
+                }
+
+                // If an explicit sagaLevelId was provided but not found in its saga,
+                // allow a broader category-based fallback in other sagas.
+                if (!matchingLevel && sagaLevelObjectId && !requestedSagaNumber) {
+                    matchingLevel =
+                        saga.sagaLevels.find(
+                            (level) =>
+                                String(level?.category) === String(categoryId) && !level?.isCompleted
+                        ) ||
+                        saga.sagaLevels.find(
+                            (level) => String(level?.category) === String(categoryId)
+                        ) ||
+                        null;
+                }
+
+                if (matchingLevel) {
+                    matchingLevel.isCompleted = true;
+                    matchingLevel.completionRating = Number(correctAnswers) || 0;
+                    updatedSagaLevel = true;
+                    break;
+                }
+            }
+
+            if (updatedSagaLevel) {
+                await sagaProgression.save();
+            }
+        }
 
 
         // ✅ Build response

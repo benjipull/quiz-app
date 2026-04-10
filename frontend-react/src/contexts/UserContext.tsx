@@ -50,8 +50,6 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
   return fetch(url, { ...options, headers });
 };
 
-let hasInitializedUserFetch = false;
-
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,6 +57,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const isRefreshingRef = useRef(false);
   const lastFetchTime = useRef<number>(0);
   const isStaleRef = useRef(false);
+  const hasInitializedUserFetchRef = useRef(false);
 
   // Cache settings
   const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
@@ -148,10 +147,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           // Ignore non-JSON response body
         }
 
-        if (errorMessage.toLowerCase().includes("token expired")) {
-          console.warn("Token expired from getUserDetails. Logging out user.");
-          logoutUser();
-        }
+        console.warn(
+          `Unauthorized from getUserDetails (${errorMessage || "no details"}). Logging out user.`
+        );
+        logoutUser();
       }
     } catch (error) {
       console.error("❌ Error refreshing user:", error);
@@ -180,10 +179,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 
   useEffect(() => {
-    if (hasInitializedUserFetch) {
+    if (hasInitializedUserFetchRef.current) {
       return;
     }
-    hasInitializedUserFetch = true;
+    hasInitializedUserFetchRef.current = true;
 
     const init = async () => {
       const cached = loadUserFromStorage();

@@ -3,46 +3,84 @@ const router = express.Router();
 const Category = require("../models/categoryModel");
 const { userQuestions } = require("../index");
 
+async function hydrateQuestionImage64IfMissing(question) {
+  if (!question || !question._id) {
+    return question;
+  }
+
+  const hasImage64Field = Object.prototype.hasOwnProperty.call(question, "image64");
+  if (hasImage64Field && question.image64 != null) {
+    return question;
+  }
+
+  const category = await Category.findOne(
+    { "questions._id": question._id },
+    { questions: { $elemMatch: { _id: question._id } } }
+  ).lean();
+
+  const dbImage64 = String(category?.questions?.[0]?.image64 ?? "").trim();
+  return {
+    ...question,
+    image64: dbImage64,
+  };
+}
+
+async function buildQuestionResponsePayload(question) {
+  const hydrated = await hydrateQuestionImage64IfMissing(question);
+  return {
+    ...hydrated,
+    image64: String(hydrated?.image64 ?? ""),
+  };
+}
+
 // Route: Get Current or Next Question for User Token
 router.get("/:userToken", async (req, res) => {
-    try {
-        const { userToken } = req.params;
+  try {
+    const { userToken } = req.params;
+    const userSession = userQuestions[userToken];
 
-        // Ensure structure exists
-        if (!userQuestions[userToken] || userQuestions[userToken].length === 0) {
-            console.warn(`⚠️ No more questions available for token: ${userToken}`);
-            return res.status(404).json({ message: "❌ No more questions available for this token." });
-        }
-
-        // If user already has a current question, return it
-        if (userQuestions[userToken].current) {
-            return res.status(200).json({
-                question: userQuestions[userToken].current,
-                remaining: userQuestions[userToken].queue.length
-            });
-        }
-
-        // Otherwise, set the first one in queue as current (but don't remove it yet)
-        const nextQuestion = userQuestions[userToken].queue[0];
-        userQuestions[userToken].current = nextQuestion;
-
-        // Increment timesLoaded in DB
-        await Category.findOneAndUpdate(
-            { "questions._id": nextQuestion._id },
-            { $inc: { "questions.$.timesLoaded": 1 } },
-            { new: true }
-        );
-
-        return res.status(200).json({
-            question: nextQuestion,
-            timerInSeconds: 20,
-            remaining: userQuestions[userToken].queue.length
-        });
-
-    } catch (error) {
-        console.error("⚠️ Error processing next question request:", error.message);
-        return res.status(500).json({ message: "⚠️ Server error", error: error.message });
+    if (!userSession) {
+      console.warn(`No active quiz session for token: ${userToken}`);
+      return res.status(404).json({ message: "No more questions available for this token." });
     }
+
+    // If user already has a current question, return it
+    if (userSession.current) {
+      const responseQuestion = await buildQuestionResponsePayload(userSession.current);
+      userSession.current = responseQuestion;
+      return res.status(200).json({
+        question: responseQuestion,
+        remaining: userSession.queue.length,
+      });
+    }
+
+    if (!Array.isArray(userSession.queue) || userSession.queue.length === 0) {
+      console.warn(`Question queue exhausted for token: ${userToken}`);
+      return res.status(404).json({ message: "No more questions available for this token." });
+    }
+
+    // Otherwise, set the first one in queue as current (but don't remove it yet)
+    const nextQuestion = userSession.queue[0];
+    const responseQuestion = await buildQuestionResponsePayload(nextQuestion);
+    userSession.current = responseQuestion;
+    userSession.queue[0] = responseQuestion;
+
+    // Increment timesLoaded in DB
+    await Category.findOneAndUpdate(
+      { "questions._id": nextQuestion._id },
+      { $inc: { "questions.$.timesLoaded": 1 } },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      question: responseQuestion,
+      timerInSeconds: 20,
+      remaining: userSession.queue.length,
+    });
+  } catch (error) {
+    console.error("Error processing next question request:", error.message);
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
 });
 
 module.exports = router;

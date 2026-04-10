@@ -148,6 +148,68 @@
       margin-right: .3rem;
     }
 
+    .validation-meta {
+      margin-top: .75rem;
+      padding: .75rem 1rem;
+      background: #24201a;
+      border-left: 4px solid #e3b86a;
+      border-radius: 6px;
+      color: #f3e9d6;
+      font-size: .92em;
+    }
+
+    .validation-meta .title {
+      font-weight: 700;
+      color: #ffd590;
+      margin-bottom: .5rem;
+    }
+
+    .validation-grid {
+      display: grid;
+      grid-template-columns: minmax(190px, 240px) 1fr;
+      gap: .45rem .75rem;
+      align-items: start;
+    }
+
+    .validation-label {
+      color: #ffdea7;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    .validation-value {
+      color: #f5ead8;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .validation-bool {
+      display: inline-block;
+      padding: .1rem .45rem;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: .85em;
+    }
+
+    .validation-bool.true {
+      background: #1f5e32;
+      color: #dbffe5;
+    }
+
+    .validation-bool.false {
+      background: #5f2525;
+      color: #ffe1e1;
+    }
+
+    .validation-list {
+      margin: 0;
+      padding-left: 1rem;
+    }
+
+    .validation-list li {
+      margin: .15rem 0;
+    }
+
     /* === VALIDATION NEEDED PANEL === */
     .validation-needed {
       margin-top: 1rem;
@@ -432,8 +494,7 @@
         <th data-key="text">Question</th>
         <th data-key="version">Version</th>
         <th data-key="difficulty_level">Difficulty</th>
-        <th data-key="disabled">Disabled</th>
-        <th data-key="new_question">New</th>
+        <th data-key="image_eligible">Image Eligibility</th>
         <th data-key="validation_verdict">Validation</th>
         <th data-key="correct_answer">Correct Answer</th>
         <th data-key="popularity">Popularity</th>
@@ -485,8 +546,7 @@
         <td>${escapeHtml(q.text)}</td>
         <td>${q.version ?? 1}</td>
         <td>${q.difficulty_level ?? "—"}</td>
-        <td><input type="checkbox" ${q.disabled ? "checked" : ""} /></td>
-        <td><input type="checkbox" ${q.new_question ? "checked" : ""} /></td>
+        <td>${q.image_eligible === true ? "Yes" : q.image_eligible === false ? "No" : "-"}</td>
         <td>${q.validation_verdict}</td>
         <td>${escapeHtml(q.correct_answer)}</td>
         <td>${q.popularity ?? 0}</td>
@@ -494,7 +554,7 @@
         <td><button class="edit-btn">✏️ Edit</button></td>
       </tr>
       <tr class="answers-row" id="answers-${q._id}">
-        <td colspan="10">
+        <td colspan="9">
           <div class="answers-content">
             ${renderAnswers(q.answers, q.correct_answer, q.explanation, q)}
             ${duplicatesHTML}
@@ -555,6 +615,8 @@
           <div style="margin-top:.4rem;"><span class="label">Difficulty Rationale:</span>${difficultyRationale ? escapeHtml(difficultyRationale) : "—"}</div>
         </div>`;
 
+      const validationMetaHTML = renderValidationMeta(q);
+
       const validationHTML = q.needs_validation
         ? `<div class="validation-needed">
          <div class="dup-header">⚠️ Validation Needed</div>
@@ -564,7 +626,112 @@
        </div>`
         : "";
 
-      return answersHTML + explanationHTML + difficultyMetaHTML + validationHTML;
+      return answersHTML + explanationHTML + difficultyMetaHTML + validationMetaHTML + validationHTML;
+    }
+
+    function renderValidationMeta(q = {}) {
+      const validation = q.validation && typeof q.validation === "object"
+        ? { ...q.validation }
+        : {};
+
+      if (!("final_verdict" in validation) && q.validation_verdict) {
+        validation.final_verdict = q.validation_verdict;
+      }
+      if (!("validationVersion" in validation) && q.validation_version !== undefined) {
+        validation.validationVersion = q.validation_version;
+      }
+
+      const preferredKeys = [
+        "final_verdict",
+        "is_correct_answer_valid",
+        "explanation_consistent",
+        "correct_answer_reasoning",
+        "explanation_reasoning",
+        "other_answers_possible",
+        "ambiguity_fix_attempted",
+        "can_be_fixed_by_rewording",
+        "ambiguity_type",
+        "ambiguity_reasoning",
+        "ambiguity_fix_applied",
+        "fixed_question",
+        "ambiguity_fix_failure_reason",
+        "validationVersion"
+      ];
+
+      const entries = [];
+      preferredKeys.forEach((key) => {
+        if (key in validation) {
+          entries.push([key, validation[key]]);
+        }
+      });
+
+      Object.keys(validation)
+        .filter((key) => !preferredKeys.includes(key))
+        .sort()
+        .forEach((key) => entries.push([key, validation[key]]));
+
+      if (entries.length === 0) {
+        return `<div class="validation-meta"><div class="title">Validation Details</div><div class="validation-value">No validation metadata available.</div></div>`;
+      }
+
+      const rows = entries
+        .map(([key, value]) => `
+          <div class="validation-label">${escapeHtml(humanizeKey(key))}</div>
+          <div class="validation-value">${renderValidationValue(key, value)}</div>
+        `)
+        .join("");
+
+      return `
+        <div class="validation-meta">
+          <div class="title">Validation Details</div>
+          <div class="validation-grid">${rows}</div>
+        </div>
+      `;
+    }
+
+    function renderValidationValue(key, value) {
+      if (value === null || value === undefined) return "—";
+
+      if (typeof value === "boolean") {
+        return `<span class="validation-bool ${value ? "true" : "false"}">${value ? "Yes" : "No"}</span>`;
+      }
+
+      if (Array.isArray(value)) {
+        if (!value.length) return "—";
+        return `<ul class="validation-list">${value.map(item => {
+          const rendered = item && typeof item === "object" ? JSON.stringify(item) : item;
+          return `<li>${escapeHtml(rendered)}</li>`;
+        }).join("")}</ul>`;
+      }
+
+      if (typeof value === "number") {
+        return escapeHtml(value);
+      }
+
+      if (typeof value === "object") {
+        return `<code>${escapeHtml(JSON.stringify(value))}</code>`;
+      }
+
+      const text = String(value).trim();
+      if (!text) return "—";
+
+      if (key.toLowerCase().endsWith("_at") || key.toLowerCase().endsWith("at")) {
+        const parsed = new Date(text);
+        if (!Number.isNaN(parsed.getTime())) {
+          return escapeHtml(parsed.toLocaleString());
+        }
+      }
+
+      return escapeHtml(text);
+    }
+
+    function humanizeKey(key) {
+      return String(key || "")
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/_/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/\b\w/g, c => c.toUpperCase());
     }
 
 

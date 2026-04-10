@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom"; 
 import { Home, Grid3X3, User, Info, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createPortal } from "react-dom";
 
 const tabs = [
   // 1. Profile
@@ -20,43 +21,58 @@ export const BottomTabs = () => {
 
   // Hide on quiz playing page (/quiz or /quiz/:categoryId)
   const hideOnQuizPage = location.pathname.startsWith("/quiz");
+  const hideOnSagaLevelPage = location.pathname.startsWith("/saga-level");
 
-  if (hideOnQuizPage) return null;
+  if (hideOnQuizPage || hideOnSagaLevelPage) return null;
+  if (typeof document === "undefined") return null;
 
-  return (
-    <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-card/95 to-card/80 backdrop-blur-lg border-t border-border z-50 lg:hidden">
-      <div className="flex items-center justify-around h-20 px-2 max-w-full mx-auto">
+  return createPortal(
+    <div
+      className={cn(
+        "fixed inset-x-0 bottom-0 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]",
+        "z-[120]",
+      )}
+    >
+      <div className="relative mx-auto max-w-md rounded-[28px] border border-[#5f77bd]/55 bg-gradient-to-b from-[#37539a] via-[#223a78] to-[#15295a] shadow-[0_-4px_24px_rgba(9,19,52,0.35),0_18px_45px_rgba(6,15,42,0.7)] backdrop-blur-xl">
+        <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent" />
+        <div className="flex h-[82px] items-end justify-between px-2 pb-2 pt-3">
         {tabs.map((tab, index) => {
-          const isActive = location.pathname === tab.path;
+          const isActive =
+            tab.path === "/"
+              ? location.pathname === "/" || location.pathname === "/saga-map"
+              : location.pathname === tab.path;
           const isCenter = index === 2;
+          const isHome = isCenter;
+
           return (
             <NavLink
               key={tab.path}
               to={tab.path}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 transition-all duration-300",
-                isCenter ? "transform -translate-y-2" : ""
+                "flex flex-1 flex-col items-center justify-end gap-1.5 transition-transform duration-300",
+                isCenter ? "translate-y-0" : ""
               )}
             >
               <div
                 className={cn(
-                  "flex items-center justify-center rounded-full transition-all duration-300 shadow-lg",
-                  isCenter
+                  "flex items-center justify-center rounded-full transition-all duration-300",
+                  isHome
                     ? isActive
-                      ? "w-16 h-16 bg-gradient-to-r from-primary to-accent text-primary-foreground scale-110 shadow-xl"
-                      : "w-16 h-16 bg-background border-2 border-primary/30 text-primary hover:scale-105 shadow-xl"
+                      ? "h-[72px] w-[72px] border-2 border-[#decfff] bg-gradient-to-b from-[#ad7dff] to-[#613ecf] text-white shadow-[0_0_0_6px_rgba(86,123,219,0.35),0_16px_34px_rgba(69,42,160,0.72)]"
+                      : "h-[72px] w-[72px] border-2 border-[#b9adef]/70 bg-gradient-to-b from-[#7661d4] to-[#4b3b9b] text-white shadow-[0_0_0_6px_rgba(86,123,219,0.25),0_12px_28px_rgba(52,34,121,0.62)]"
                     : isActive
-                    ? "w-12 h-12 bg-primary text-primary-foreground"
-                    : "w-12 h-12 bg-muted/60 text-muted-foreground hover:bg-primary/20 hover:text-primary hover:scale-105"
+                    ? "h-12 w-12 border border-[#93b6ff]/80 bg-gradient-to-b from-[#4b66b4] to-[#304a90] text-white shadow-[0_8px_20px_rgba(44,86,178,0.48)]"
+                    : "h-12 w-12 border border-[#7b9ade]/35 bg-gradient-to-b from-[#273f7d]/95 to-[#1b2f66]/95 text-[#bdd0ff] shadow-[0_7px_18px_rgba(7,15,41,0.45)]"
                 )}
               >
-                <tab.icon className={cn("transition-all duration-300", isCenter ? "h-6 w-6" : "h-5 w-5")} />
+                <tab.icon className={cn("transition-all duration-300", isCenter ? "h-7 w-7" : "h-5 w-5")} />
               </div>
               <span
                 className={cn(
-                  "text-xs font-medium transition-all duration-300",
-                  isActive ? "text-primary font-semibold" : "text-muted-foreground",
-                  isCenter && isActive ? "font-bold" : ""
+                  "text-[11px] leading-none transition-colors duration-300",
+                  isHome ? "font-semibold tracking-[0.01em]" : "font-medium",
+                  isActive ? "text-white" : "text-[#b4c7f3]",
+                  isHome && isActive ? "text-[#f2eaff] font-bold" : ""
                 )}
               >
                 {tab.label}
@@ -64,8 +80,10 @@ export const BottomTabs = () => {
             </NavLink>
           );
         })}
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

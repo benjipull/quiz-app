@@ -68,7 +68,23 @@ async function callOllama({ prompt, presetName, overrides = {} }) {
 }
 
 function getOllamaResponseText(response) {
-  return String(response?.data?.output?.[0]?.choices?.[0]?.text || "").trim();
+  const data = response?.data || {};
+  const output = data.output;
+
+  if (Array.isArray(output)) {
+    const candidate = output?.[0]?.choices?.[0]?.text ?? output?.[0]?.text ?? output?.[0];
+    if (candidate !== undefined && candidate !== null) {
+      return String(candidate).trim();
+    }
+  }
+
+  const text =
+    data?.output?.text ??
+    data?.response ??
+    data?.message?.content ??
+    "";
+
+  return String(text).trim();
 }
 
 async function callOllamaForText({ prompt, presetName, overrides = {} }) {

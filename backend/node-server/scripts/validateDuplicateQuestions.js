@@ -1,5 +1,7 @@
 require("dotenv").config({ path: __dirname + "/../.env" });
 const mongoose = require("mongoose");
+const { installScriptErrorPrefix } = require("./errorLogger");
+installScriptErrorPrefix();
 const Category = require("../models/categoryModel");
 const connectDB = require("../config/db");
 const { buildDuplicatePrompt } = require("./prompts/duplicatePrompt");
@@ -7,73 +9,166 @@ const {
   assertOllamaSetup,
   callOllamaForText,
 } = require("../services/ollamaClient");
+const { normalizeJsonText, parseJsonObject } = require("./jsonParsingHelper");
 
-const DUPLICATE_VERSION = 0.18;
+const DUPLICATE_VERSION = 0.20;
+const DEFAULT_DUPLICATE_TIMEOUT_MS = 180_000;
+const DEFAULT_DUPLICATE_MAX_ATTEMPTS = 3;
+const DEFAULT_DUPLICATE_RETRY_DELAY_MS = 1_500;
+
+function parsePositiveInt(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.floor(parsed);
+}
+
+const DUPLICATE_TIMEOUT_MS = parsePositiveInt(
+  process.env.DUPLICATE_CHECK_TIMEOUT_MS ?? process.env.OLLAMA_DUPLICATE_TIMEOUT_MS,
+  DEFAULT_DUPLICATE_TIMEOUT_MS
+);
+const DUPLICATE_MAX_ATTEMPTS = parsePositiveInt(
+  process.env.DUPLICATE_CHECK_MAX_ATTEMPTS,
+  DEFAULT_DUPLICATE_MAX_ATTEMPTS
+);
+const DUPLICATE_RETRY_DELAY_MS = parsePositiveInt(
+  process.env.DUPLICATE_CHECK_RETRY_DELAY_MS,
+  DEFAULT_DUPLICATE_RETRY_DELAY_MS
+);
 
 try {
   assertOllamaSetup();
 } catch (error) {
-  console.error(`❌ ${error.message}`);
+  console.error(`ERROR ${error.message}`);
   process.exit(1);
 }
 
-async function queryOllama(prompt) {
-  try {
-    const raw = await callOllamaForText({
-      prompt,
-      presetName: "validateDuplicateQuestions",
-    });
-
-    // Extract everything from the first { to the end
-    const jsonMatch = raw.match(/\{[\s\S]*?\}/);
-    if (!jsonMatch) {
-      console.error("⚠️ Invalid JSON from model:", raw.slice(0, 200));
-      return { duplicate: false, reason: "Invalid JSON (no { found)" };
-    }
-
-    // Try to repair truncated JSON (missing closing brace, curly quotes, etc.)
-    let text = jsonMatch[0]
-      .replace(/“|”/g, '"') // replace fancy quotes
-      .replace(/,\s*$/, "") // trailing commas
-      .trim();
-
-    if (!text.endsWith("}")) text += "}"; // add closing brace if missing
-
-    let parsedObj;
-    try {
-      parsedObj = JSON.parse(text);
-    } catch (e) {
-      console.error("⚠️ JSON parse error:", e.message, raw.slice(0, 200));
-      return { duplicate: false, reason: "Parse error" };
-    }
-
-    // Validate parsed object
-    if (typeof parsedObj.duplicate !== "boolean") parsedObj.duplicate = false;
-    if (typeof parsedObj.reason !== "string") parsedObj.reason = "";
-
-    return {
-      duplicate: parsedObj.duplicate,
-      reason: parsedObj.reason,
-    };
-
-  } catch (err) {
-    console.error("❌ Ollama duplicate check failed:", err.response?.data || err.message);
-    return { duplicate: false, reason: "Request failed" };
-  }
+function isTimeoutError(error) {
+  return error?.code === "ECONNABORTED" || /timeout/i.test(String(error?.message || ""));
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-// =========================
-// 🔹 Duplicate Checking
-// =========================
+function normalizeModelText(raw) {
+  return normalizeJsonText(raw, {
+    stripMarkdown: true,
+    stripThinkTags: true,
+    normalizeQuotes: false,
+  });
+}
+
+function toDuplicateResult(candidate) {
+  if (!candidate || typeof candidate !== "object") return null;
+  if (typeof candidate.duplicate !== "boolean") return null;
+  return {
+    duplicate: candidate.duplicate,
+    reason: typeof candidate.reason === "string" ? candidate.reason : "",
+  };
+}
+
+function parseDuplicateResult(raw) {
+  const cleaned = normalizeModelText(raw);
+  if (!cleaned) return null;
+
+  const parsed = parseJsonObject(cleaned, {
+    normalizeOptions: {
+      stripMarkdown: false,
+      stripThinkTags: false,
+      normalizeQuotes: true,
+    },
+  });
+  const normalized = toDuplicateResult(parsed);
+  if (normalized) {
+    return normalized;
+  }
+
+  const duplicateMatch = cleaned.match(/\bduplicate\b\s*[:=]\s*(true|false)/i);
+  if (duplicateMatch) {
+    const duplicateValue = String(duplicateMatch[1]).toLowerCase() === "true";
+    const reasonMatch = cleaned.match(/\breason\b\s*[:=]\s*"([^"]*)"/i);
+    return {
+      duplicate: duplicateValue,
+      reason: reasonMatch ? reasonMatch[1] : "",
+    };
+  }
+
+  return null;
+}
+
+async function queryOllama(prompt) {
+  let lastError = null;
+  let lastRaw = "";
+
+  for (let attempt = 1; attempt <= DUPLICATE_MAX_ATTEMPTS; attempt++) {
+    try {
+      const raw = await callOllamaForText({
+        prompt,
+        presetName: "validateDuplicateQuestions",
+        overrides: {
+          timeoutMs: DUPLICATE_TIMEOUT_MS,
+        },
+      });
+
+      lastRaw = String(raw || "");
+      const parsed = parseDuplicateResult(lastRaw);
+      if (parsed) {
+        return parsed;
+      }
+
+      if (attempt < DUPLICATE_MAX_ATTEMPTS) {
+        const delayMs = DUPLICATE_RETRY_DELAY_MS * attempt;
+        const normalizedPreview = normalizeModelText(lastRaw).slice(0, 200);
+        const rawPreview = String(lastRaw || "").slice(0, 200);
+        const preview = normalizedPreview || rawPreview;
+        console.warn(
+          `WARN Invalid duplicate-check response (attempt ${attempt}/${DUPLICATE_MAX_ATTEMPTS}). Retrying in ${delayMs}ms...`
+        );
+        console.warn(`WARN Model output preview: ${preview || "<empty>"}`);
+        await sleep(delayMs);
+        continue;
+      }
+
+      break;
+    } catch (error) {
+      lastError = error;
+      const timedOut = isTimeoutError(error);
+      const shouldRetry = timedOut && attempt < DUPLICATE_MAX_ATTEMPTS;
+
+      if (shouldRetry) {
+        const delayMs = DUPLICATE_RETRY_DELAY_MS * attempt;
+        console.warn(
+          `WARN Ollama duplicate check timed out (attempt ${attempt}/${DUPLICATE_MAX_ATTEMPTS}, timeout ${DUPLICATE_TIMEOUT_MS}ms). Retrying in ${delayMs}ms...`
+        );
+        await sleep(delayMs);
+        continue;
+      }
+
+      break;
+    }
+  }
+
+  if (lastError) {
+    console.error(
+      "ERROR Ollama duplicate check failed:",
+      lastError?.response?.data || lastError?.message
+    );
+  } else {
+    const normalizedPreview = normalizeModelText(lastRaw).slice(0, 200);
+    const rawPreview = String(lastRaw || "").slice(0, 200);
+    const preview = normalizedPreview || rawPreview;
+    console.error("ERROR Ollama duplicate check failed: invalid model response.");
+    console.error(`ERROR Model output preview: ${preview || "<empty>"}`);
+  }
+
+  return { duplicate: false, reason: "Request failed" };
+}
+
 async function isDuplicate(q1, q2) {
   const prompt = buildDuplicatePrompt(q1, q2);
   return queryOllama(prompt);
 }
 
-// =========================
-// 🔹 Database Update Helpers
-// =========================
 async function updateDuplicateGroup(categoryId, questionIds, groupId) {
   await Category.updateOne(
     { _id: categoryId },
@@ -83,7 +178,7 @@ async function updateDuplicateGroup(categoryId, questionIds, groupId) {
         "questions.$[elem].duplicate.duplicate_group_id": groupId,
         "questions.$[elem].duplicate.last_checked_at": new Date(),
         "questions.$[elem].needs_validation": true,
-        "questions.$[elem].duplicate.reasoning": "Potential duplicate — requires validation",
+        "questions.$[elem].duplicate.reasoning": "Potential duplicate - requires validation",
       },
     },
     {
@@ -108,7 +203,7 @@ async function clearQuestionDuplicateFlag(questionId) {
 }
 
 async function processCategory(category) {
-  console.log(`\n🔹 Category: ${category.name}`);
+  console.log(`\nCategory: ${category.name}`);
 
   let questions = category.questions.filter((q) => {
     if (q.disabled) return false;
@@ -116,14 +211,12 @@ async function processCategory(category) {
     return Number(version) < DUPLICATE_VERSION;
   });
 
-  if (questions.length <= 1) {
-    return;
-  }
+  if (questions.length <= 1) return;
 
   const checked = new Set();
 
   while (questions.length > 0) {
-    const qI = questions.shift(); // take the first question out
+    const qI = questions.shift();
     if (checked.has(qI._id.toString())) continue;
 
     const group = [qI];
@@ -135,16 +228,15 @@ async function processCategory(category) {
 
       const { duplicate, reason } = await isDuplicate(qI, qJ);
       if (duplicate) {
-        console.log(`   🔁 "${qI.text}" ↔ "${qJ.text}"`);
-        console.log(`      🤖 Reason: ${reason}`);
+        console.log(`   DUPLICATE "${qI.text}" <-> "${qJ.text}"`);
+        console.log(`      Reason: ${reason}`);
         group.push(qJ);
         checked.add(qJ._id.toString());
       }
     }
 
     if (group.length > 1) {
-      // 🧹 Remove this group’s members from future checks
-      const groupIds = new Set(group.map((g) => g._id.toString()));
+      const groupIds = new Set(group.map((item) => item._id.toString()));
       questions = questions.filter((q) => !groupIds.has(q._id.toString()));
 
       const groupId = new mongoose.Types.ObjectId().toString();
@@ -152,26 +244,25 @@ async function processCategory(category) {
       await updateDuplicateGroup(category._id, ids, groupId);
 
       console.log(
-        `⚠️ Duplicate group (${group.length}) saved for category "${category.name}" (GroupID: ${groupId}).`
+        `WARN Duplicate group (${group.length}) saved for category "${category.name}" (GroupID: ${groupId}).`
       );
-      group.forEach((q) => console.log(`   ↳ ${q.text}`));
+      group.forEach((q) => console.log(`   -> ${q.text}`));
     } else {
       await clearQuestionDuplicateFlag(qI._id);
-      console.log(`✅ Cleared question: "${qI.text}"`);
+      console.log(`OK Cleared question: "${qI.text}"`);
     }
   }
 
-  console.log(`✅ Category "${category.name}" complete.`);
+  console.log(`OK Category "${category.name}" complete.`);
 }
 
-
-// =========================
-// 🔹 Main Entry
-// =========================
 async function findDuplicatesAndMarkChecked() {
   try {
     await connectDB();
-    console.log("✅ Connected to MongoDB");
+    console.log("OK Connected to MongoDB");
+    console.log(
+      `INFO Duplicate-check settings: timeout=${DUPLICATE_TIMEOUT_MS}ms attempts=${DUPLICATE_MAX_ATTEMPTS} retryDelay=${DUPLICATE_RETRY_DELAY_MS}ms`
+    );
 
     const categories = await Category.find(
       { "questions.disabled": false },
@@ -182,9 +273,9 @@ async function findDuplicatesAndMarkChecked() {
       await processCategory(category);
     }
 
-    console.log("\n🎉 Duplicate detection complete!");
-  } catch (err) {
-    console.error("❌ Error:", err.message);
+    console.log("\nDuplicate detection complete.");
+  } catch (error) {
+    console.error("ERROR:", error.message);
   } finally {
     mongoose.connection.close();
   }
@@ -193,6 +284,5 @@ async function findDuplicatesAndMarkChecked() {
 if (require.main === module && process.env.RUN_DUPLICATE_CHECK === "true") {
   findDuplicatesAndMarkChecked();
 }
-
 
 module.exports = { processSingleQuestion: null };

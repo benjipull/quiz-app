@@ -215,10 +215,21 @@ const ANSWER_BAR_REVEAL_DELAY_MS = 300;
 const ANSWER_BAR_ANIMATION_DURATION_MS = 400;
 const SCROLL_AFTER_BARS_DELAY_MS = ANSWER_BAR_REVEAL_DELAY_MS + ANSWER_BAR_ANIMATION_DURATION_MS + 50;
 
+const shuffleArray = <T,>(items: T[]): T[] => {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
 interface Question {
   _id: string;
   question: string;
+  image64?: string;
   answers: string[];
+  shuffledAnswers?: string[];
   answerCounts?: Array<{
     text: string;
     count: number;
@@ -264,10 +275,85 @@ interface QuizState {
   }>;
 }
 
+type QuizLocationState = {
+  from?: string;
+  sagaLevelId?: string | null;
+} | null;
+
+const normalizeId = (value: unknown): string | null => {
+  if (value == null) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === "null" || trimmed === "undefined") return null;
+    return trimmed;
+  }
+  if (typeof value === "object") {
+    const asRecord = value as Record<string, unknown>;
+    const normalizedOid = normalizeId(asRecord.$oid);
+    if (normalizedOid) return normalizedOid;
+    const normalizedNestedId = normalizeId(asRecord._id);
+    if (normalizedNestedId) return normalizedNestedId;
+    const normalizedIdField = normalizeId(asRecord.id);
+    if (normalizedIdField) return normalizedIdField;
+
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  if (!normalized || normalized === "null" || normalized === "undefined") return null;
+  return normalized;
+};
+
+const inferMimeTypeFromBase64 = (base64: string) => {
+  const sample = base64.slice(0, 32);
+  if (sample.startsWith("/9j/")) return "image/jpeg";
+  if (sample.startsWith("iVBORw0KGgo")) return "image/png";
+  if (sample.startsWith("R0lGOD")) return "image/gif";
+  if (sample.startsWith("UklGR")) return "image/webp";
+  return "image/png";
+};
+
+const getQuestionImageSrc = (image64?: string) => {
+  const raw = String(image64 ?? "")
+    .trim()
+    .replace(/^['"]|['"]$/g, "");
+
+  if (!raw || raw === "null" || raw === "undefined") {
+    return "";
+  }
+
+  if (raw.startsWith("data:image/")) {
+    return raw;
+  }
+
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    return raw;
+  }
+
+  const base64Index = raw.indexOf("base64,");
+  if (base64Index >= 0) {
+    const rawBase64 = raw.slice(base64Index + "base64,".length).replace(/\s+/g, "");
+    if (!rawBase64) return "";
+    const mimeType = inferMimeTypeFromBase64(rawBase64);
+    return `data:${mimeType};base64,${rawBase64}`;
+  }
+
+  const compactBase64 = raw.replace(/\s+/g, "");
+  if (!compactBase64) return "";
+  const mimeType = inferMimeTypeFromBase64(compactBase64);
+  return `data:${mimeType};base64,${compactBase64}`;
+};
+
+const hasImagePayload = (image64?: string) => {
+  const raw = String(image64 ?? "").trim();
+  return Boolean(raw && raw !== "null" && raw !== "undefined");
+};
+
 export default function Quiz() {
   const { categoryId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const locationState = (location.state as QuizLocationState) || null;
   const explanationRef = useRef<HTMLDivElement>(null);
   const timerInSecondsRef = useRef<NodeJS.Timeout | null>(null);
   // FIX: hasStartedRef is the key to prevent double execution in React Strict Mode
@@ -309,10 +395,22 @@ export default function Quiz() {
   const [isReporting, setIsReporting] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState(10);
+  const questionHasImagePayload = hasImagePayload(quizState.question?.image64);
+  const currentQuestionImageSrc = getQuestionImageSrc(quizState.question?.image64);
 
   const userToken = localStorage.getItem("token");
   const storedUser = localStorage.getItem("user");
   const userId = storedUser ? JSON.parse(storedUser)._id : null;
+  const returnPath = locationState?.from || "";
+  const sagaLevelMatch = typeof returnPath === "string"
+    ? returnPath.match(/^\/saga-level\/(\d+)/)
+    : null;
+  const sagaNumberFromReturnPath = sagaLevelMatch
+    ? Number.parseInt(sagaLevelMatch[1], 10)
+    : null;
+  const shouldReturnToSagaLevelAfterCompletion =
+    typeof returnPath === "string" && returnPath.startsWith("/saga-level/");
+  const normalizedSagaLevelId = normalizeId(locationState?.sagaLevelId);
 
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
 
@@ -325,8 +423,8 @@ export default function Quiz() {
   };
 
   const confirmExit = () => {
-    if (location.state?.from) {
-      navigate(location.state.from);
+    if (locationState?.from) {
+      navigate(locationState.from);
     } else {
       navigate("/");
     }
@@ -393,11 +491,21 @@ export default function Quiz() {
       const data = await response.json();
 
       if (response.ok && data.question) {
+        const normalizedImage64 = String(data.question.image64 ?? "").trim();
         const questionWithTimer = {
           ...data.question,
+          image64: normalizedImage64,
           timerInSeconds: data.timerInSeconds,
+          shuffledAnswers: shuffleArray(data.question.answers || []),
         };
-        nextQuestionRef.current = questionWithTimer;
+
+        // A parallel "next question" request can return the currently displayed question.
+        // Ignore it so we don't cache a stale duplicate and show it twice.
+        if (quizState.question?._id && questionWithTimer._id === quizState.question._id) {
+          nextQuestionRef.current = null;
+        } else {
+          nextQuestionRef.current = questionWithTimer;
+        }
       } else {
         nextQuestionRef.current = null;
       }
@@ -530,7 +638,7 @@ export default function Quiz() {
   setQuizState({
     started: true, // Set this IMMEDIATELY
     completed: false,
-    selectedCategory: null,
+    selectedCategory: { id: categoryId, name: "Quiz" },
     question: null,
     currentQuestionIndex: 0,
     correctAnswers: 0,
@@ -539,30 +647,12 @@ export default function Quiz() {
     isAnswerSelected: false,
     userAnswers: [],
   });
+  setCategoryTitle("Quiz");
   setCategoryImage(undefined);
   setTotalQuestions(10);
   nextQuestionRef.current = null;
 
   try {
-    const categoryResponse = await fetch(`${BASE_URL}/api/categories`, {
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${userToken}`,
-      },
-    });
-    if (categoryResponse.ok) {
-      const categories = await categoryResponse.json();
-      const category = categories.find((cat: any) => cat._id === categoryId);
-      if (category) {
-        setCategoryTitle(category.name);
-        setCategoryImage(category.imageUrl || category.image);
-        setQuizState(prev => ({
-          ...prev,
-          selectedCategory: { id: categoryId, name: category.name }
-        }));
-      }
-    }
-
     const startResponse = await fetch(`${BASE_URL}/api/startQuiz`, {
       method: "POST",
       headers: {
@@ -618,20 +708,24 @@ export default function Quiz() {
         const questionWithTimer = nextQuestionRef.current;
         nextQuestionRef.current = null;
 
-        setQuizState((prev) => {
-          const newIndex = prev.currentQuestionIndex + 1;
-          if (newIndex === 1) {
-            startSound.play().catch(() => { });
-          }
-          return {
-            ...prev,
-            question: questionWithTimer,
-            currentQuestionIndex: newIndex,
-            isAnswerSelected: false,
-          };
-        });
-        setLoading(false);
-        return;
+        if (quizState.question?._id && questionWithTimer._id === quizState.question._id) {
+          // Stale preload; fall through to a fresh server fetch.
+        } else {
+          setQuizState((prev) => {
+            const newIndex = prev.currentQuestionIndex + 1;
+            if (newIndex === 1) {
+              startSound.play().catch(() => { });
+            }
+            return {
+              ...prev,
+              question: questionWithTimer,
+              currentQuestionIndex: newIndex,
+              isAnswerSelected: false,
+            };
+          });
+          setLoading(false);
+          return;
+        }
       }
 
       const response = await fetch(`${BASE_URL}/api/nextQuestion/${userToken}`, {
@@ -643,10 +737,18 @@ export default function Quiz() {
       const data = await response.json();
 
       if (response.ok && data.question) {
+        const normalizedImage64 = String(data.question.image64 ?? "").trim();
         const questionWithTimer = {
           ...data.question,
+          image64: normalizedImage64,
           timerInSeconds: data.timerInSeconds,
+          shuffledAnswers: shuffleArray(data.question.answers || []),
         };
+
+        if (quizState.question?._id && questionWithTimer._id === quizState.question._id) {
+          setError("Error fetching the next question.");
+          return;
+        }
 
         setQuizState((prev) => {
           const newIndex = prev.currentQuestionIndex + 1;
@@ -801,6 +903,11 @@ export default function Quiz() {
         questionsAttempted: totalQuestions,
         correctAnswers,
         incorrectAnswers: totalQuestions - correctAnswers,
+        sagaLevelId: normalizedSagaLevelId || undefined,
+        sagaNumber:
+          sagaNumberFromReturnPath && sagaNumberFromReturnPath > 0
+            ? sagaNumberFromReturnPath
+            : undefined,
       };
 
       const response = await fetch(
@@ -817,7 +924,69 @@ export default function Quiz() {
 
       if (response.ok) {
         const completionData = await response.json();
+        const completionResults =
+          completionData && typeof completionData === "object"
+            ? (completionData.results as Record<string, unknown> | undefined)
+            : undefined;
+        const completedKnowledgeGainedRaw = Number(
+          completionResults?.knowledgeGained ?? 0,
+        );
+        const completedCoinsEarnedRaw = Number(
+          completionResults?.coinsEarned ?? 0,
+        );
+        const completedKnowledgeGained = Number.isFinite(completedKnowledgeGainedRaw)
+          ? Math.max(0, Math.round(completedKnowledgeGainedRaw))
+          : 0;
+        const completedCoinsEarned = Number.isFinite(completedCoinsEarnedRaw)
+          ? Math.max(0, Math.round(completedCoinsEarnedRaw))
+          : 0;
         trackQuizComplete(quizState.selectedCategory.id, quizState.correctAnswers, userId);
+
+        if (shouldReturnToSagaLevelAfterCompletion) {
+          const completionTimestamp = Date.now();
+          const completedCategoryId = normalizeId(quizState.selectedCategory.id);
+          const completionParams = new URLSearchParams({
+            fromQuizCompletion: "1",
+            completedSagaLevelId: normalizedSagaLevelId || "",
+            completedCategoryId: completedCategoryId || "",
+            completedStarCount: String(correctAnswers),
+            completedKnowledgeGained: String(completedKnowledgeGained),
+            completedCoinsEarned: String(completedCoinsEarned),
+            completedAt: String(completionTimestamp),
+          });
+
+          try {
+            sessionStorage.setItem(
+              "saga_level_completion_return",
+              JSON.stringify({
+                path: returnPath,
+                completedSagaLevelId: normalizedSagaLevelId || null,
+                completedCategoryId: completedCategoryId || null,
+                completedStarCount: correctAnswers,
+                completedKnowledgeGained,
+                completedCoinsEarned,
+                completedAt: completionTimestamp,
+              }),
+            );
+          } catch {
+            // Non-blocking fallback; navigation state still carries this info.
+          }
+
+          navigate(`${returnPath}?${completionParams.toString()}`, {
+            replace: true,
+            state: {
+              fromQuizCompletion: true,
+              completedSagaLevelId: normalizedSagaLevelId || null,
+              completedCategoryId: completedCategoryId || null,
+              completedStarCount: correctAnswers,
+              completedKnowledgeGained,
+              completedCoinsEarned,
+              completedAt: completionTimestamp,
+            },
+          });
+          return;
+        }
+
         setQuizState((prev) => ({
           ...prev,
           completed: true,
@@ -1166,15 +1335,43 @@ export default function Quiz() {
         </div>
 
         <div className="flex-1 px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-4xl">
-          <div className="space-y-6">
-            <div className="px-1 py-3 md:py-6 text-center">
-              <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-white leading-relaxed drop-shadow-lg">
-                {quizState.question?.question}
-              </h2>
+            <div className="space-y-6">
+              <div className="px-1 py-1 md:py-2 text-center">
+                <div className="flex items-start justify-center px-1">
+                  <h2
+                    className="w-full break-words whitespace-pre-wrap text-[1.15rem] font-bold leading-tight text-white drop-shadow-lg md:text-[1.45rem]"
+                  >
+                    {quizState.question?.question}
+                  </h2>
+                </div>
+                {questionHasImagePayload ? (
+                <div className="mx-auto mt-3 w-fit overflow-hidden rounded-2xl border border-cyan-300/45 shadow-[0_0_24px_rgba(34,211,238,0.35)] leading-none">
+                  {currentQuestionImageSrc ? (
+                    <div className="flex h-[130px] items-center justify-center overflow-hidden md:h-[158px]">
+                      <img
+                        src={currentQuestionImageSrc}
+                        alt="Question visual hint"
+                        loading="lazy"
+                        onError={() => {
+                          console.warn("Question image failed to render", {
+                            questionId: quizState.question?._id,
+                            srcPrefix: currentQuestionImageSrc.slice(0, 40),
+                          });
+                        }}
+                        className="block h-[216px] w-auto max-w-[90vw] object-cover md:h-[264px] md:max-w-[95vw]"
+                      />
+                    </div>
+                  ) : (
+                    <p className="px-4 text-center text-xs md:text-sm text-cyan-200/80">
+                      Image payload is present but could not be rendered.
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-4">
-              {quizState.question?.answers.map((answer, index) => {
+              {(quizState.question?.shuffledAnswers || quizState.question?.answers || []).map((answer, index) => {
                 const getFontSize = (text: string) => {
                   const length = text.length;
                   if (length > 60) return 'text-xs md:text-base';
@@ -1185,7 +1382,7 @@ export default function Quiz() {
 
                 return (
                   <Card
-                    key={index}
+                    key={`${answer}-${index}`}
                     className={`p-6 md:p-8 transition-all duration-300 ${getOptionStyle(answer)} relative overflow-hidden cursor-pointer`}
                     onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
                     style={{ 

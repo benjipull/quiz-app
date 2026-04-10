@@ -12,6 +12,17 @@ const ValidationSchema = new mongoose.Schema({
     explanation_reasoning: { type: String, default: "" },
     other_answers_possible: [{ type: String, default: [] }],
     final_verdict: { type: String, enum: ["Correct", "Incorrect", "Ambiguous"], default: "Ambiguous" },
+    ambiguity_fix_attempted: { type: Boolean, default: false },
+    can_be_fixed_by_rewording: { type: Boolean, default: false },
+    ambiguity_type: {
+        type: String,
+        enum: ["scope", "approximation", "vague_wording", "subjective", "multiple_valid_answers", "other"],
+        default: "other"
+    },
+    ambiguity_reasoning: { type: String, default: "" },
+    ambiguity_fix_applied: { type: Boolean, default: false },
+    fixed_question: { type: String, default: "" },
+    ambiguity_fix_failure_reason: { type: String, default: "" },
     validationVersion: { type: Number, default: 0 }
 }, { _id: false });
 
@@ -22,6 +33,13 @@ const DuplicateSchema = new mongoose.Schema({
     reasoning: { type: String, default: "" },                // optional explanation
     confidence: { type: Number, default: null },             // for future AI scoring
     last_checked_at: { type: Date, default: null }           // timestamp
+}, { _id: false });
+
+const ImageEligibilitySchema = new mongoose.Schema({
+    should_use_image: { type: Boolean, default: false },
+    reason: { type: String, default: "" },
+    version: { type: Number, default: 0 },
+    processed_at: { type: Date, default: null }
 }, { _id: false });
 
 
@@ -54,6 +72,11 @@ const QuestionSchema = new mongoose.Schema({
     needs_validation: { type: Boolean, default: false },
     new_question: { type: Boolean, default: true },
     duplicate: { type: DuplicateSchema, default: {} },
+    image_eligibility: { type: ImageEligibilitySchema, default: {} },
+    image64: { type: String, default: "" },
+    image_prompt: { type: String, default: "" },
+    image_version: { type: Number, default: 0 },
+    image_generated_at: { type: Date, default: null },
 
     hash: { type: String, required: true, unique: true },
     version: { type: Number, default: 1, required: true }
@@ -72,7 +95,7 @@ const CategorySchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
     description: { type: String, default: "" },
     disabled: { type: Boolean, default: false },
-    imageUrl: { type: String },
+    image64: { type: String, default: "" },
     createdAt: { type: Date, default: Date.now },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     completions: [CompletionSchema],

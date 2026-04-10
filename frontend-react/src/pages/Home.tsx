@@ -34,7 +34,7 @@ import { avatarUrls } from "@/utils/avatarPaths";
 const avatars = avatarUrls;
 
 const BASE_URL = getApiBaseUrl();
-const QUIZ_COST = 50;
+const QUIZ_COST = 100;
 const API_TIMEOUT = 15000; // 15 second timeout for API calls
 const HOME_BACKGROUND_SRC = "/assets/images/homebg1.jpg";
 
@@ -131,6 +131,7 @@ export default function Home() {
   const { toast } = useToast();
   
   const currentCoins = user?.coins ?? 0;
+  const isAdminUser = user?.userType === "Admin";
 
   const trackHomeScreenIfNeeded = (resolvedUserId?: string) => {
     if (hasTrackedHomeRef.current) return;
@@ -874,6 +875,17 @@ export default function Home() {
               </>
             )}
           </Button>
+
+          {isAdminUser && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate("/saga-map")}
+              className="w-full h-11 sm:h-12 rounded-2xl border-cyan-300/70 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20"
+            >
+              Open Saga Map
+            </Button>
+          )}
 
           {nextCategoryPreview?.name && (
             <div className="w-full flex items-center justify-center">

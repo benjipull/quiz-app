@@ -56,14 +56,27 @@ const OLLAMA_PRESETS = Object.freeze({
     },
   },
   validateDuplicateQuestions: {
-    timeoutMs: 60_000,
+    timeoutMs: 180_000,
+    format: "json",
     options: {
       temperature: 0.0,
       top_p: 0.8,
       top_k: 20,
       repeat_penalty: 1.2,
-      num_ctx: 4096,
-      num_predict: 60,
+      num_ctx: 2048,
+      num_predict: 40,
+    },
+  },
+  populateImageEligibility: {
+    timeoutMs: 180_000,
+    format: "json",
+    options: {
+      temperature: 0.0,
+      top_p: 0.9,
+      top_k: 40,
+      num_ctx: 2048,
+      num_predict: 180,
+      repeat_penalty: 1.1,
     },
   },
 });
