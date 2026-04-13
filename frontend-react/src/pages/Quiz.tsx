@@ -1339,26 +1339,31 @@ export default function Quiz() {
               <div className="px-1 py-1 md:py-2 text-center">
                 <div className="flex items-start justify-center px-1">
                   <h2
-                    className="w-full break-words whitespace-pre-wrap text-[1.15rem] font-bold leading-tight text-white drop-shadow-lg md:text-[1.45rem]"
+                    className="font-quiz w-full break-words whitespace-pre-wrap text-[1.15rem] font-bold leading-tight text-white drop-shadow-lg md:text-[1.45rem]"
                   >
                     {quizState.question?.question}
                   </h2>
                 </div>
                 {questionHasImagePayload ? (
-                <div className="mx-auto mt-3 w-fit overflow-hidden rounded-2xl border border-cyan-300/45 shadow-[0_0_24px_rgba(34,211,238,0.35)] leading-none">
+                <div className="mx-auto mt-3 w-[80%] overflow-hidden rounded-2xl border border-cyan-300/45 shadow-[0_0_24px_rgba(34,211,238,0.35)] leading-none">
                   {currentQuestionImageSrc ? (
-                    <div className="flex h-[130px] items-center justify-center overflow-hidden md:h-[158px]">
+                    <div className="flex items-center justify-center overflow-hidden">
                       <img
                         src={currentQuestionImageSrc}
                         alt="Question visual hint"
                         loading="lazy"
+                        style={{
+                          clipPath: "inset(15% 0 15% 0)",
+                          marginTop: "-15%",
+                          marginBottom: "-15%",
+                        }}
                         onError={() => {
                           console.warn("Question image failed to render", {
                             questionId: quizState.question?._id,
                             srcPrefix: currentQuestionImageSrc.slice(0, 40),
                           });
                         }}
-                        className="block h-[216px] w-auto max-w-[90vw] object-cover md:h-[264px] md:max-w-[95vw]"
+                        className="block h-auto w-full object-contain"
                       />
                     </div>
                   ) : (
@@ -1382,17 +1387,22 @@ export default function Quiz() {
 
                 return (
                   <Card
-                    key={`${answer}-${index}`}
-                    className={`p-6 md:p-8 transition-all duration-300 ${getOptionStyle(answer)} relative overflow-hidden cursor-pointer`}
+                    key={`${quizState.question?._id || "question"}-${answer}-${index}`}
+                    className={`px-6 py-[18px] md:px-8 md:py-6 transition-all duration-300 ${getOptionStyle(answer)} relative overflow-hidden cursor-pointer`}
                     onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
                     style={{ 
-                      borderRadius: '1.5rem',
+                      borderRadius: '0.875rem',
+                      animationName: "answer-enter",
+                      animationDuration: "500ms",
+                      animationTimingFunction: "ease-out",
+                      animationDelay: `${index * 100}ms`,
+                      animationFillMode: "both",
                       ...getInitialOptionAuraStyle(answer)
                     }}
                   >
                     {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
                       <div
-                        className={`absolute top-0 left-0 h-full animate-bar-fill rounded-l-3xl ${answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
+                        className={`absolute top-0 left-0 h-full animate-bar-fill rounded-l-lg ${answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
                             ? 'bg-green-500/30 border-r-4 border-green-400'
                             : answer === selectedAnswer
                               ? 'bg-red-500/30 border-r-4 border-red-400'
@@ -1408,7 +1418,7 @@ export default function Quiz() {
 
                     <div className="flex items-center gap-3 relative z-10">
                       <div className="flex-1 min-w-0 flex items-center justify-between">
-                        <span className={`${getFontSize(answer)} leading-tight break-words w-full font-semibold text-left text-white`}>
+                        <span className={`font-quiz ${getFontSize(answer)} leading-tight break-words w-full font-semibold text-left text-white`}>
                           {answer}
                         </span>
                       </div>
@@ -1576,6 +1586,17 @@ export default function Quiz() {
           from {
             opacity: 0;
             transform: translateX(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+
+        @keyframes answer-enter {
+          from {
+            opacity: 0;
+            transform: translateX(-100vw);
           }
           to {
             opacity: 1;

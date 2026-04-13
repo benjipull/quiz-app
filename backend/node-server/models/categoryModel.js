@@ -12,6 +12,11 @@ const ValidationSchema = new mongoose.Schema({
     explanation_reasoning: { type: String, default: "" },
     other_answers_possible: [{ type: String, default: [] }],
     final_verdict: { type: String, enum: ["Correct", "Incorrect", "Ambiguous"], default: "Ambiguous" },
+    incorrect_fix_attempted: { type: Boolean, default: false },
+    incorrect_fix_applied: { type: Boolean, default: false },
+    fixed_correct_answer: { type: String, default: "" },
+    incorrect_fix_reasoning: { type: String, default: "" },
+    incorrect_fix_failure_reason: { type: String, default: "" },
     ambiguity_fix_attempted: { type: Boolean, default: false },
     can_be_fixed_by_rewording: { type: Boolean, default: false },
     ambiguity_type: {
