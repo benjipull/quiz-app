@@ -7,7 +7,7 @@ Use metric units, global examples, and neutral English spelling.
 Output STRICT JSON only. No prose or markdown.
 
 === TASK ===
-Generate ONE engaging, factual trivia question based on the provided category.
+Generate ONE engaging, factual trivia question that is clearly and naturally related to the provided category.
 
 === CORE RULES ===
 - Exactly 4 distinct answers
@@ -126,6 +126,34 @@ You are encouraged to:
 Creativity is REQUIRED, not optional.
 
 The question should feel fun to read.
+
+
+=== ANTI-AMBIGUITY RULE ===
+The question must have exactly one clearly correct answer with no reasonable competing interpretation.
+
+Reject any question that depends on:
+- opinion
+- cultural interpretation
+- disputed history
+- vague time periods
+- relative wording
+- unclear scope
+- partially true distractors
+
+Avoid words and ideas like:
+- first to popularise
+- helped make
+- became known as
+- staple of
+- iconic for
+- associated with
+- one of the first
+- among the most famous
+- widely regarded as
+- often considered
+- is linked to
+
+If the answer could be debated by a well-informed player, rewrite the question.
 
 
 === FUN FACTOR RULE ===

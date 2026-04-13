@@ -19,7 +19,7 @@ const {
 } = require("./jsonParsingHelper");
 const { buildPopulateDifficultyPrompt } = require("./prompts/populateDifficultyPrompt");
 
-const DIFFICULTY_VERSION = 0.02;
+const DIFFICULTY_VERSION = 0.03;
 
 function assertSetup() {
   assertOllamaSetup();
@@ -72,6 +72,34 @@ function hasPopulatedImage64(image64) {
       normalized.toLowerCase() !== "null" &&
       normalized.toLowerCase() !== "undefined",
   );
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isCorrectAnswerInQuestionText(question) {
+  const questionText = String(question?.text ?? question?.question ?? "").trim();
+  const correctAnswer = String(question?.correct_answer ?? question?.correctAnswer ?? "").trim();
+
+  if (!questionText || !correctAnswer) {
+    return false;
+  }
+
+  const escapedAnswer = escapeRegExp(correctAnswer);
+  const answerInQuestionRegex = new RegExp(`(^|\\W)${escapedAnswer}(?=\\W|$)`, "i");
+  return answerInQuestionRegex.test(questionText);
+}
+
+function calculateFinalDifficultyLevel(
+  aiDifficultyLevel,
+  { reduceForImage = false, reduceForAnswerInQuestion = false } = {},
+) {
+  const normalizedAiDifficultyLevel = Math.max(1, Math.min(10, Math.round(aiDifficultyLevel)));
+  const difficultyReduction =
+    (reduceForImage ? 1 : 0) +
+    (reduceForAnswerInQuestion ? 2 : 0);
+  return Math.max(1, normalizedAiDifficultyLevel - difficultyReduction);
 }
 
 async function populateDifficulty(categoryId, questionId, options = {}) {
@@ -141,9 +169,11 @@ async function populateDifficulty(categoryId, questionId, options = {}) {
     const detectedImage64 = hasPopulatedImage64(question.image64);
     const shouldReduceForImage =
       options.forceHasImage64 === true || detectedImage64;
-    const difficultyLevel = shouldReduceForImage
-      ? Math.max(1, aiDifficultyLevel - 1)
-      : aiDifficultyLevel;
+    const shouldReduceForAnswerInQuestion = isCorrectAnswerInQuestionText(question);
+    const difficultyLevel = calculateFinalDifficultyLevel(aiDifficultyLevel, {
+      reduceForImage: shouldReduceForImage,
+      reduceForAnswerInQuestion: shouldReduceForAnswerInQuestion,
+    });
     const difficultyRationale = String(
       parsed.difficulty_rationale || "Recovered from malformed model response.",
     ).trim();
@@ -170,7 +200,7 @@ async function populateDifficulty(categoryId, questionId, options = {}) {
     const progressPrefix = hasProgress ? `(${current}/${total}) ` : "";
     const reduction = Math.max(0, aiDifficultyLevel - difficultyLevel);
     console.log(
-      `${progressPrefix}Updated question "${questionLabel}" -> level ${difficultyLevel} (AI=${aiDifficultyLevel}, reduction=${reduction}, image64=${shouldReduceForImage ? "yes" : "no"})`,
+      `${progressPrefix}Updated question "${questionLabel}" -> level ${difficultyLevel} (AI=${aiDifficultyLevel}, reduction=${reduction}, image64=${shouldReduceForImage ? "yes" : "no"}, answerInQuestion=${shouldReduceForAnswerInQuestion ? "yes" : "no"})`,
     );
     return true;
   } catch (error) {
@@ -206,4 +236,8 @@ if (require.main === module) {
   runFromCli();
 }
 
-module.exports = { populateDifficulty };
+module.exports = {
+  populateDifficulty,
+  isCorrectAnswerInQuestionText,
+  calculateFinalDifficultyLevel,
+};

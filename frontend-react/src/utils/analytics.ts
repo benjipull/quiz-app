@@ -8,6 +8,42 @@ function logEventDebug(eventName: string, params: Record<string, any>) {
 
 const FIRST_INTERACTION_SESSION_KEY = "ga_first_interaction_tracked";
 const ENTERED_GAME_SESSION_KEY = "ga_entered_game_tracked";
+const QUIZ_SESSION_COUNT_KEY = "ga_quiz_session_count";
+let inMemoryQuizSessionCount = 0;
+
+const readSessionQuizCount = () => {
+  if (typeof window === "undefined") return inMemoryQuizSessionCount;
+  try {
+    const raw = sessionStorage.getItem(QUIZ_SESSION_COUNT_KEY);
+    const parsed = Number.parseInt(raw ?? "0", 10);
+    if (!Number.isFinite(parsed) || parsed < 0) return 0;
+    inMemoryQuizSessionCount = parsed;
+    return parsed;
+  } catch {
+    return inMemoryQuizSessionCount;
+  }
+};
+
+const getCurrentSessionQuizNumber = () => {
+  const currentCount = readSessionQuizCount();
+  return currentCount > 0 ? currentCount : 1;
+};
+
+const incrementSessionQuizCount = () => {
+  const nextCount = readSessionQuizCount() + 1;
+  inMemoryQuizSessionCount = nextCount;
+  if (typeof window !== "undefined") {
+    try {
+      sessionStorage.setItem(QUIZ_SESSION_COUNT_KEY, String(nextCount));
+    } catch {
+      // Ignore sessionStorage failures and use the in-memory count.
+    }
+  }
+  return nextCount;
+};
+
+const withQuizSessionSuffix = (baseEventName: string, quizNumber: number) =>
+  `${baseEventName}_${quizNumber}`;
 
 // === NEW GENERIC TRACKING FUNCTION ===
 export const trackEvent = (eventName: string, params: Record<string, any> = {}) => {
@@ -57,9 +93,15 @@ export const trackEnteredGame = (userId?: string, identificationMethod: string =
 
 export const trackQuizStart = (categoryId: string, userId?: string) => {
   if (!isGAEnabled) return;
-  const params = { quiz_category_id: categoryId, user_id: userId };
-  ReactGA.event("quiz_start", params);
-  logEventDebug("quiz_start", params);
+  const quizNumber = incrementSessionQuizCount();
+  const eventName = withQuizSessionSuffix("quiz_start", quizNumber);
+  const params = {
+    quiz_category_id: categoryId,
+    user_id: userId,
+    quiz_session_number: quizNumber,
+  };
+  ReactGA.event(eventName, params);
+  logEventDebug(eventName, params);
 };
 
 export const trackNextQuiz = (categoryId: string, userId?: string) => {
@@ -70,20 +112,30 @@ export const trackNextQuiz = (categoryId: string, userId?: string) => {
 
 export const trackQuestionAnswered = (questionId: string, isCorrect: boolean, userId?: string) => {
   if (!isGAEnabled) return;
+  const quizNumber = getCurrentSessionQuizNumber();
+  const eventName = withQuizSessionSuffix("question_answered", quizNumber);
   const params = {
     question_id: questionId,
     result: isCorrect ? "correct" : "incorrect",
     user_id: userId,
+    quiz_session_number: quizNumber,
   };
-  ReactGA.event("question_answered", params);
-  logEventDebug("question_answered", params);
+  ReactGA.event(eventName, params);
+  logEventDebug(eventName, params);
 };
 
 export const trackQuizComplete = (categoryId: string, score: number, userId?: string) => {
   if (!isGAEnabled) return;
-  const params = { quiz_category_id: categoryId, score, user_id: userId };
-  ReactGA.event("quiz_complete", params);
-  logEventDebug("quiz_complete", params);
+  const quizNumber = getCurrentSessionQuizNumber();
+  const eventName = withQuizSessionSuffix("quiz_complete", quizNumber);
+  const params = {
+    quiz_category_id: categoryId,
+    score,
+    user_id: userId,
+    quiz_session_number: quizNumber,
+  };
+  ReactGA.event(eventName, params);
+  logEventDebug(eventName, params);
 };
 
 export const trackLogin = (method: string, userId?: string) => {
