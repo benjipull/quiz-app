@@ -251,6 +251,48 @@ Reason for ambiguity: ${fixReasoning}
   `.trim();
 }
 
+function buildIncorrectAnswerFixPrompt(question, reasoning) {
+  const questionText = String(question?.text ?? "").trim();
+  const answers = Array.isArray(question?.answers)
+    ? question.answers
+        .map((answer) => {
+          if (answer && typeof answer === "object") return String(answer.text ?? "").trim();
+          return String(answer ?? "").trim();
+        })
+        .filter(Boolean)
+    : [];
+  const correctAnswer = String(question?.correct_answer ?? "").trim();
+  const explanation = String(question?.explanation ?? "N/A").trim();
+  const fixReasoning = String(reasoning ?? "").trim();
+
+  return `
+You are a trivia quality fixer.
+
+The validator marked the current correct answer as factually incorrect.
+Your task is to select the corrected answer.
+
+STRICT RULES:
+- Choose the corrected answer from the provided answer options only.
+- Return the answer text exactly as written in the options.
+- Do NOT rewrite the question text.
+- Do NOT rewrite answer options.
+- If no option can be defended as correct, return an empty string.
+
+Return STRICT JSON only:
+
+{
+  "fixed_correct_answer": "<exact answer option text or empty string>",
+  "reasoning": "<short factual explanation>"
+}
+
+Question: ${questionText}
+Answers: ${answers.join(", ")}
+Current Correct Answer: ${correctAnswer}
+Explanation: ${explanation || "N/A"}
+Validation Reasoning: ${fixReasoning}
+  `.trim();
+}
+
 module.exports = {
   buildDomainPrompt,
   buildPrimaryPrompt,
@@ -258,4 +300,5 @@ module.exports = {
   buildIndependentPrompt,
   buildAmbiguityFixabilityPrompt,
   buildAmbiguityFixPrompt,
+  buildIncorrectAnswerFixPrompt,
 };
