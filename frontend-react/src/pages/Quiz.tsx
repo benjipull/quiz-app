@@ -278,6 +278,10 @@ interface QuizState {
 type QuizLocationState = {
   from?: string;
   sagaLevelId?: string | null;
+  prestartedQuiz?: {
+    categoryId?: string;
+    totalQuestions?: number;
+  } | null;
 } | null;
 
 const normalizeId = (value: unknown): string | null => {
@@ -363,6 +367,9 @@ export default function Quiz() {
   const nextQuestionRef = useRef<Question | null>(null);
   const isPreloadingRef = useRef(false);
   const answerSyncPromiseRef = useRef<Promise<void> | null>(null);
+  const questionActivationPromiseRef = useRef<Promise<number | null> | null>(null);
+  const remainingAfterAnswerRef = useRef<number | null>(null);
+  const remainingQueueCountRef = useRef<number | null>(null);
 
   const [quizState, setQuizState] = useState<QuizState>({
     started: false,
@@ -411,6 +418,11 @@ export default function Quiz() {
   const shouldReturnToSagaLevelAfterCompletion =
     typeof returnPath === "string" && returnPath.startsWith("/saga-level/");
   const normalizedSagaLevelId = normalizeId(locationState?.sagaLevelId);
+  const prestartedQuiz =
+    locationState?.prestartedQuiz &&
+    locationState.prestartedQuiz.categoryId === categoryId
+      ? locationState.prestartedQuiz
+      : null;
 
   const isLastQuestion = quizState.currentQuestionIndex >= totalQuestions;
 
@@ -479,10 +491,12 @@ export default function Quiz() {
 
   const preloadNextQuestion = async () => {
     if (!userToken || isPreloadingRef.current || isLastQuestion) return;
+    if (questionActivationPromiseRef.current) return;
+    if (remainingQueueCountRef.current !== null && remainingQueueCountRef.current <= 1) return;
 
     isPreloadingRef.current = true;
     try {
-      const response = await fetch(`${BASE_URL}/api/nextQuestion/${userToken}`, {
+      const response = await fetch(`${BASE_URL}/api/nextQuestion/${userToken}?peek=true`, {
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${userToken}`,
@@ -517,6 +531,36 @@ export default function Quiz() {
     }
   };
 
+  const activateQuestionSession = async (expectedQuestionId: string): Promise<number | null> => {
+    if (!userToken) return null;
+
+    const response = await fetch(`${BASE_URL}/api/nextQuestion/${userToken}`, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${userToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to activate next question session.");
+    }
+
+    const data = await response.json();
+    const remainingRaw = Number(data?.remaining);
+    const remainingCount = Number.isFinite(remainingRaw)
+      ? Math.max(remainingRaw, 0)
+      : null;
+    remainingQueueCountRef.current = remainingCount;
+    const activatedQuestionId = data?.question?._id;
+    if (activatedQuestionId && expectedQuestionId && activatedQuestionId !== expectedQuestionId) {
+      console.warn(
+        "Activated question mismatch during preload consume.",
+        { expectedQuestionId, activatedQuestionId },
+      );
+    }
+    return remainingCount;
+  };
+
   useEffect(() => {
   let isSubscribed = true;
   let isMounted = true;
@@ -539,7 +583,10 @@ export default function Quiz() {
     
     // Check one more time after setting the ref
     if (isSubscribed && isMounted) {
-      await startQuiz(categoryId);
+      await startQuiz(categoryId, {
+        skipStartRequest: Boolean(prestartedQuiz),
+        prestartedTotalQuestions: Number(prestartedQuiz?.totalQuestions) || 0,
+      });
     }
   };
   
@@ -550,7 +597,7 @@ export default function Quiz() {
     isSubscribed = false;
     isMounted = false;
   };
-}, [categoryId, userToken]); 
+}, [categoryId, userToken, prestartedQuiz]); 
 
   useEffect(() => {
     if (timerInSecondsRef.current) {
@@ -611,6 +658,25 @@ export default function Quiz() {
   }, [quizState.question, quizState.currentQuestionIndex]);
 
   useEffect(() => {
+    if (!userToken) return;
+    if (!quizState.question?._id) return;
+    if (quizState.completed || isCompletingQuiz) return;
+    if (quizState.isAnswerSelected) return;
+    if (quizState.currentQuestionIndex >= totalQuestions) return;
+    if (remainingQueueCountRef.current !== null && remainingQueueCountRef.current <= 1) return;
+
+    void preloadNextQuestion();
+  }, [
+    userToken,
+    quizState.question?._id,
+    quizState.currentQuestionIndex,
+    quizState.isAnswerSelected,
+    quizState.completed,
+    isCompletingQuiz,
+    totalQuestions,
+  ]);
+
+  useEffect(() => {
     if (quizState.currentQuestionIndex > 0) {
       window.scrollTo({
         top: 0,
@@ -619,7 +685,13 @@ export default function Quiz() {
     }
   }, [quizState.currentQuestionIndex]);
 
-  const startQuiz = async (categoryId: string) => {
+  const startQuiz = async (
+    categoryId: string,
+    options?: {
+      skipStartRequest?: boolean;
+      prestartedTotalQuestions?: number;
+    },
+  ) => {
   if (!userToken) {
     console.log("You must be logged in to play.");
     return;
@@ -651,8 +723,21 @@ export default function Quiz() {
   setCategoryImage(undefined);
   setTotalQuestions(10);
   nextQuestionRef.current = null;
+  answerSyncPromiseRef.current = null;
+  questionActivationPromiseRef.current = null;
+  remainingAfterAnswerRef.current = null;
+  remainingQueueCountRef.current = null;
 
   try {
+    if (options?.skipStartRequest) {
+      if (options.prestartedTotalQuestions && options.prestartedTotalQuestions > 0) {
+        setTotalQuestions(options.prestartedTotalQuestions);
+      }
+      trackQuizStart(categoryId, userId);
+      await fetchNextQuestion({ force: true });
+      return;
+    }
+
     const startResponse = await fetch(`${BASE_URL}/api/startQuiz`, {
       method: "POST",
       headers: {
@@ -711,6 +796,25 @@ export default function Quiz() {
         if (quizState.question?._id && questionWithTimer._id === quizState.question._id) {
           // Stale preload; fall through to a fresh server fetch.
         } else {
+          const activationPromise = activateQuestionSession(questionWithTimer._id)
+            .then((remainingCount) => {
+              if (remainingCount !== null && remainingCount > 1) {
+                void preloadNextQuestion();
+              } else {
+                nextQuestionRef.current = null;
+              }
+            })
+            .catch((activationError) => {
+              console.error("Error activating preloaded question:", activationError);
+              nextQuestionRef.current = null;
+            })
+            .finally(() => {
+              if (questionActivationPromiseRef.current === activationPromise) {
+                questionActivationPromiseRef.current = null;
+              }
+            });
+          questionActivationPromiseRef.current = activationPromise;
+
           setQuizState((prev) => {
             const newIndex = prev.currentQuestionIndex + 1;
             if (newIndex === 1) {
@@ -737,6 +841,10 @@ export default function Quiz() {
       const data = await response.json();
 
       if (response.ok && data.question) {
+        const remainingRaw = Number(data?.remaining);
+        remainingQueueCountRef.current = Number.isFinite(remainingRaw)
+          ? Math.max(remainingRaw, 0)
+          : null;
         const normalizedImage64 = String(data.question.image64 ?? "").trim();
         const questionWithTimer = {
           ...data.question,
@@ -763,6 +871,7 @@ export default function Quiz() {
           };
         });
       } else {
+        remainingQueueCountRef.current = 0;
         await completeQuiz();
       }
     } catch (error) {
@@ -817,27 +926,41 @@ export default function Quiz() {
       return Promise.resolve();
     }
 
-    const request = fetch(`${BASE_URL}/api/answerQuestion/${userToken}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${userToken}`,
-      },
-      body: JSON.stringify({ answer }),
-    }).then(async (response) => {
-      if (!response.ok) {
-        let errorMessage = "Failed to submit answer.";
-        try {
-          const errorData = await response.json();
-          if (errorData?.message) {
-            errorMessage = String(errorData.message);
-          }
-        } catch {
-          // Ignore JSON parsing errors and keep the fallback message.
+    const request = Promise.resolve()
+      .then(async () => {
+        if (questionActivationPromiseRef.current) {
+          await questionActivationPromiseRef.current;
         }
-        throw new Error(errorMessage);
-      }
-    });
+
+        const response = await fetch(`${BASE_URL}/api/answerQuestion/${userToken}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${userToken}`,
+          },
+          body: JSON.stringify({ answer }),
+        });
+
+        let responseData: Record<string, unknown> | null = null;
+        try {
+          responseData = await response.json();
+        } catch {
+          responseData = null;
+        }
+
+        if (!response.ok) {
+          let errorMessage = "Failed to submit answer.";
+          if (responseData?.message) {
+            errorMessage = String(responseData.message);
+          }
+          throw new Error(errorMessage);
+        }
+
+        const remainingRaw = Number(responseData?.remaining);
+        remainingAfterAnswerRef.current = Number.isFinite(remainingRaw)
+          ? Math.max(remainingRaw, 0)
+          : null;
+      });
 
     const trackedRequest = request.finally(() => {
       if (answerSyncPromiseRef.current === trackedRequest) {
@@ -875,12 +998,7 @@ export default function Quiz() {
       setShowBars(true);
     }, ANSWER_BAR_REVEAL_DELAY_MS);
 
-    submitAnswerInBackground("")
-      .then(() => {
-        if (!isLastQuestion) {
-          return preloadNextQuestion();
-        }
-      })
+    void submitAnswerInBackground("")
       .catch((error) => {
         console.error("Error handling timeout submission:", error);
         setError("Failed to submit answer. Please try again.");
@@ -1074,12 +1192,7 @@ export default function Quiz() {
 
     setShowExplanation(true);
 
-    submitAnswerInBackground(answer)
-      .then(() => {
-        if (!isLastQuestion) {
-          return preloadNextQuestion();
-        }
-      })
+    void submitAnswerInBackground(answer)
       .catch((error) => {
         console.error("Error submitting answer:", error);
         setError("Failed to submit answer. Please try again.");
@@ -1087,11 +1200,6 @@ export default function Quiz() {
   };
 
   const handleNextQuestion = async () => {
-    if (isLastQuestion) {
-      completeQuiz();
-      return;
-    }
-
     if (answerSyncPromiseRef.current) {
       try {
         await answerSyncPromiseRef.current;
@@ -1102,6 +1210,13 @@ export default function Quiz() {
       }
     }
 
+    const remainingAfterAnswer = remainingAfterAnswerRef.current;
+    if (remainingAfterAnswer === 0 || isLastQuestion) {
+      await completeQuiz();
+      return;
+    }
+
+    remainingAfterAnswerRef.current = null;
     fetchNextQuestion();
   };
 
