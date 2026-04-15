@@ -1,5 +1,4 @@
-import ReactGA from "react-ga4";
-import { isGAEnabled } from "@/utils/gaClient";
+import { isGAEnabled, sendGAEvent } from "@/utils/gaClient";
 
 function logEventDebug(eventName: string, params: Record<string, any>) {
   const userId = params.user_id || "guest";
@@ -48,7 +47,7 @@ const withQuizSessionSuffix = (baseEventName: string, quizNumber: number) =>
 // === NEW GENERIC TRACKING FUNCTION ===
 export const trackEvent = (eventName: string, params: Record<string, any> = {}) => {
   if (isGAEnabled) {
-    ReactGA.event(eventName, params);
+    void sendGAEvent(eventName, params);
   }
   logEventDebug(eventName, params);
 };
@@ -70,8 +69,7 @@ export const trackFirstSessionInteraction = (params: Record<string, any> = {}) =
     ...params,
   };
 
-  ReactGA.event("first_session_interaction", payload);
-  logEventDebug("first_session_interaction", payload);
+  trackEvent("first_session_interaction", payload);
 };
 
 export const trackEnteredGame = (userId?: string, identificationMethod: string = "unknown") => {
@@ -100,14 +98,11 @@ export const trackQuizStart = (categoryId: string, userId?: string) => {
     user_id: userId,
     quiz_session_number: quizNumber,
   };
-  ReactGA.event(eventName, params);
-  logEventDebug(eventName, params);
+  trackEvent(eventName, params);
 };
 
 export const trackNextQuiz = (categoryId: string, userId?: string) => {
-  const params = { quiz_category_id: categoryId, user_id: userId };
-  ReactGA.event("next_quiz", params);
-  logEventDebug("next_quiz", params);
+  trackEvent("next_quiz", { quiz_category_id: categoryId, user_id: userId });
 };
 
 export const trackQuestionAnswered = (questionId: string, isCorrect: boolean, userId?: string) => {
@@ -120,8 +115,7 @@ export const trackQuestionAnswered = (questionId: string, isCorrect: boolean, us
     user_id: userId,
     quiz_session_number: quizNumber,
   };
-  ReactGA.event(eventName, params);
-  logEventDebug(eventName, params);
+  trackEvent(eventName, params);
 };
 
 export const trackQuizComplete = (categoryId: string, score: number, userId?: string) => {
@@ -134,31 +128,20 @@ export const trackQuizComplete = (categoryId: string, score: number, userId?: st
     user_id: userId,
     quiz_session_number: quizNumber,
   };
-  ReactGA.event(eventName, params);
-  logEventDebug(eventName, params);
+  trackEvent(eventName, params);
 };
 
 export const trackLogin = (method: string, userId?: string) => {
-  if (!isGAEnabled) return;
-  const params = { method, user_id: userId };
-  ReactGA.event("login", params);
-  logEventDebug("login", params);
+  trackEvent("login", { method, user_id: userId });
 };
 
 export const trackSignup = (userId?: string) => {
-  if (!isGAEnabled) return;
-  const params = { user_id: userId };
-  ReactGA.event("signup", params);
-  logEventDebug("signup", params);
+  trackEvent("signup", { user_id: userId });
 };
 
 export const trackHomeScreen = (userId?: string) => {
-  if (!isGAEnabled) return;
-  const params = { user_id: userId };
-  ReactGA.event("home_page", params);
-  logEventDebug("home_page", params);
-  ReactGA.event("home_screen", params);
-  logEventDebug("home_screen", params);
+  trackEvent("home_page", { user_id: userId });
+  trackEvent("home_screen", { user_id: userId });
 };
 
 export const trackEnteredSagaMap = (userId?: string) => {

@@ -35,13 +35,6 @@ const DUPLICATE_RETRY_DELAY_MS = parsePositiveInt(
   DEFAULT_DUPLICATE_RETRY_DELAY_MS
 );
 
-try {
-  assertOllamaSetup();
-} catch (error) {
-  console.error(`ERROR ${error.message}`);
-  process.exit(1);
-}
-
 function isTimeoutError(error) {
   return error?.code === "ECONNABORTED" || /timeout/i.test(String(error?.message || ""));
 }
@@ -187,6 +180,95 @@ async function updateDuplicateGroup(categoryId, questionIds, groupId) {
   );
 }
 
+function normalizeQuestionVersion(question) {
+  const parsed = Number(question?.version);
+  if (!Number.isFinite(parsed)) return Number.MAX_SAFE_INTEGER;
+  return parsed;
+}
+
+function pickOldestVersionQuestion(group) {
+  if (!Array.isArray(group) || group.length === 0) return null;
+
+  let selected = group[0];
+  let selectedVersion = normalizeQuestionVersion(selected);
+
+  for (let i = 1; i < group.length; i++) {
+    const candidate = group[i];
+    const candidateVersion = normalizeQuestionVersion(candidate);
+    if (candidateVersion < selectedVersion) {
+      selected = candidate;
+      selectedVersion = candidateVersion;
+    }
+  }
+
+  return selected;
+}
+
+function buildDisableDuplicateGroupUpdate(questionIds, keepQuestionId) {
+  return {
+    $set: {
+      "questions.$[elem].disabled": true,
+      "questions.$[elem].disabled_reason": "Marked as duplicate",
+    },
+    arrayFilters: [
+      {
+        "elem._id": {
+          $in: questionIds,
+          $ne: keepQuestionId,
+        },
+      },
+    ],
+  };
+}
+
+async function disableDuplicateGroupExceptKeep(categoryId, questionIds, keepQuestionId) {
+  const payload = buildDisableDuplicateGroupUpdate(questionIds, keepQuestionId);
+  await Category.updateOne(
+    { _id: categoryId },
+    {
+      $set: payload.$set,
+    },
+    {
+      arrayFilters: payload.arrayFilters,
+    }
+  );
+}
+
+async function disableQuestionAsDuplicate(categoryId, questionId, groupId, reason, duplicateOfQuestionId) {
+  await Category.updateOne(
+    { _id: categoryId, "questions._id": questionId },
+    {
+      $set: {
+        "questions.$.disabled": true,
+        "questions.$.disabled_reason": "Marked as duplicate",
+        "questions.$.duplicate.duplicate_checked_version": DUPLICATE_VERSION,
+        "questions.$.duplicate.duplicate_group_id": groupId,
+        "questions.$.duplicate.last_checked_at": new Date(),
+        "questions.$.duplicate.reasoning": reason || "Potential duplicate - requires validation",
+        "questions.$.needs_validation": true,
+      },
+      $addToSet: {
+        "questions.$.duplicate.duplicate_of": duplicateOfQuestionId,
+      },
+    }
+  );
+}
+
+async function markQuestionComparedNoDuplicate(questionId) {
+  await Category.updateOne(
+    { "questions._id": questionId },
+    {
+      $set: {
+        "questions.$.duplicate.duplicate_checked_version": DUPLICATE_VERSION,
+        "questions.$.duplicate.duplicate_group_id": null,
+        "questions.$.duplicate.last_checked_at": new Date(),
+        "questions.$.duplicate.reasoning": "",
+        "questions.$.needs_validation": false,
+      },
+    }
+  );
+}
+
 async function clearQuestionDuplicateFlag(questionId) {
   await Category.updateOne(
     { "questions._id": questionId },
@@ -200,6 +282,100 @@ async function clearQuestionDuplicateFlag(questionId) {
       },
     }
   );
+}
+
+async function processSingleQuestion(categoryId, questionId) {
+  const category = await Category.findOne(
+    { _id: categoryId, "questions._id": questionId },
+    { name: 1, questions: 1 }
+  );
+  if (!category) {
+    return {
+      success: false,
+      duplicateFound: false,
+      comparedCount: 0,
+      reason: "Category or question not found.",
+    };
+  }
+
+  const sourceQuestion = category.questions.find(
+    (question) => question._id.toString() === String(questionId)
+  );
+  if (!sourceQuestion) {
+    return {
+      success: false,
+      duplicateFound: false,
+      comparedCount: 0,
+      reason: "Question not found in category.",
+    };
+  }
+
+  if (sourceQuestion.disabled) {
+    return {
+      success: true,
+      duplicateFound: false,
+      comparedCount: 0,
+      reason: "Question is already disabled.",
+    };
+  }
+
+  const otherEnabledQuestions = category.questions.filter(
+    (question) =>
+      !question.disabled &&
+      question._id.toString() !== sourceQuestion._id.toString()
+  );
+
+  if (otherEnabledQuestions.length === 0) {
+    await markQuestionComparedNoDuplicate(sourceQuestion._id);
+    return {
+      success: true,
+      duplicateFound: false,
+      comparedCount: 0,
+      reason: "No other enabled questions available for duplicate comparison.",
+    };
+  }
+
+  let comparedCount = 0;
+  for (const candidateQuestion of otherEnabledQuestions) {
+    comparedCount += 1;
+    const { duplicate, reason } = await isDuplicate(sourceQuestion, candidateQuestion);
+    if (!duplicate) {
+      continue;
+    }
+
+    const groupId = new mongoose.Types.ObjectId().toString();
+    await updateDuplicateGroup(
+      category._id,
+      [sourceQuestion._id, candidateQuestion._id],
+      groupId
+    );
+    await disableQuestionAsDuplicate(
+      category._id,
+      sourceQuestion._id,
+      groupId,
+      reason,
+      candidateQuestion._id
+    );
+
+    console.log(
+      `❌ WARN Duplicate found in category "${category.name}" for "${sourceQuestion.text}" against "${candidateQuestion.text}". Source question disabled.`
+    );
+    return {
+      success: true,
+      duplicateFound: true,
+      comparedCount,
+      reason: reason || "",
+      matchedQuestionId: candidateQuestion._id.toString(),
+      groupId,
+    };
+  }
+
+  await markQuestionComparedNoDuplicate(sourceQuestion._id);
+  return {
+    success: true,
+    duplicateFound: false,
+    comparedCount,
+  };
 }
 
 async function processCategory(category) {
@@ -241,11 +417,20 @@ async function processCategory(category) {
 
       const groupId = new mongoose.Types.ObjectId().toString();
       const ids = group.map((q) => q._id);
+      const keepQuestion = pickOldestVersionQuestion(group);
       await updateDuplicateGroup(category._id, ids, groupId);
+      if (keepQuestion?._id) {
+        await disableDuplicateGroupExceptKeep(category._id, ids, keepQuestion._id);
+      }
 
       console.log(
         `WARN Duplicate group (${group.length}) saved for category "${category.name}" (GroupID: ${groupId}).`
       );
+      if (keepQuestion) {
+        console.log(
+          `INFO Keeping enabled: "${keepQuestion.text}" (version ${Number(keepQuestion.version) || 0}).`
+        );
+      }
       group.forEach((q) => console.log(`   -> ${q.text}`));
     } else {
       await clearQuestionDuplicateFlag(qI._id);
@@ -256,8 +441,22 @@ async function processCategory(category) {
   console.log(`OK Category "${category.name}" complete.`);
 }
 
+function ensureOllamaSetupOrExit() {
+  try {
+    assertOllamaSetup();
+    return true;
+  } catch (error) {
+    console.error(`ERROR ${error.message}`);
+    process.exitCode = 1;
+    return false;
+  }
+}
+
 async function findDuplicatesAndMarkChecked() {
   try {
+    const hasValidSetup = ensureOllamaSetupOrExit();
+    if (!hasValidSetup) return;
+
     await connectDB();
     console.log("OK Connected to MongoDB");
     console.log(
@@ -285,4 +484,8 @@ if (require.main === module && process.env.RUN_DUPLICATE_CHECK === "true") {
   findDuplicatesAndMarkChecked();
 }
 
-module.exports = { processSingleQuestion: null };
+module.exports = {
+  processSingleQuestion,
+  pickOldestVersionQuestion,
+  buildDisableDuplicateGroupUpdate,
+};

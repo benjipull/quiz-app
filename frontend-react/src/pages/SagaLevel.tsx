@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Brain, CircleDollarSign, Star } from "lucide-react";
+import { ArrowLeft, Star } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/contexts/UserContext";
@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { trackEnteredSagaLevelMap } from "@/utils/analytics";
 import GameStatsHeader from "@/components/GameStatsHeader";
 import { avatarUrls } from "@/utils/avatarPaths";
+import { playSound } from "@/utils/soundCache";
 
 const BASE_URL = getApiBaseUrl();
 const QUIZ_COST = 100;
@@ -16,8 +17,20 @@ const STAR_COUNT = 5;
 const QUIZ_COMPLETION_SIGNAL_MAX_AGE_MS = 2 * 60 * 1000;
 const QUIZ_COMPLETION_SCROLL_TO_COMPLETED_DELAY_MS = 120;
 const QUIZ_COMPLETION_SCROLL_SETTLE_BEFORE_STARS_MS = 820;
-const QUIZ_COMPLETION_STARS_SEQUENCE_MS = 3400;
+const QUIZ_COMPLETION_STARS_SEQUENCE_MS = 4110;
 const QUIZ_COMPLETION_PANEL_REVEAL_ANIMATION_MS = 980;
+const QUIZ_COMPLETION_CENTER_COIN_LAUNCH_DELAY_MS = 680;
+const QUIZ_COMPLETION_CENTER_COIN_FLIGHT_MS = 1180;
+const QUIZ_COMPLETION_CENTER_COIN_STAGGER_MS = 110;
+const QUIZ_COMPLETION_CENTER_MINI_COIN_COUNT = 15;
+const QUIZ_COMPLETION_CENTER_MINI_COIN_SIZE_PX = 72;
+const QUIZ_COMPLETION_CENTER_COIN_HIDE_TAIL_MS = 290;
+const QUIZ_COMPLETION_COIN_PHASE_TOTAL_MS =
+  QUIZ_COMPLETION_CENTER_COIN_LAUNCH_DELAY_MS +
+  QUIZ_COMPLETION_CENTER_COIN_FLIGHT_MS +
+  QUIZ_COMPLETION_CENTER_COIN_STAGGER_MS * (QUIZ_COMPLETION_CENTER_MINI_COIN_COUNT - 1) +
+  QUIZ_COMPLETION_CENTER_COIN_HIDE_TAIL_MS;
+const QUIZ_PANEL_SWAY_DURATION_MS = 500;
 const DEFAULT_CATEGORY_IMAGE_SRC = "/assets/images/SagaLevelGraphics/Enchanted-Forest.png";
 
 type SagaLevelRow = {
@@ -87,6 +100,19 @@ type CompletionFlyInStar = {
   endX: number;
   endY: number;
   delay: number;
+};
+
+type CompletionMiniCoin = {
+  id: string;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  delay: number;
+  startScale: number;
+  endScale: number;
+  startRotateDeg: number;
+  endRotateDeg: number;
 };
 
 const normalizeId = (value: unknown): string | null => {
@@ -318,13 +344,6 @@ export default function SagaLevel() {
             completionReturnFromStorage?.completedStarCount,
         )
       : null;
-  const completedKnowledgeGainedFromQuizReturn = isReturningFromQuizCompletion
-    ? toNonNegativeInt(
-        locationState?.completedKnowledgeGained ??
-          completionReturnFromQuery?.completedKnowledgeGained ??
-          completionReturnFromStorage?.completedKnowledgeGained,
-      )
-    : 0;
   const completedCoinsEarnedFromQuizReturn = isReturningFromQuizCompletion
     ? toNonNegativeInt(
         locationState?.completedCoinsEarned ??
@@ -337,9 +356,11 @@ export default function SagaLevel() {
   const [isLoadingRows, setIsLoadingRows] = useState(!preloadedRowsFromSagaMap);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [startingCategoryId, setStartingCategoryId] = useState<string | null>(null);
+  const [swayingCategoryId, setSwayingCategoryId] = useState<string | null>(null);
   const [lockedMessageRowId, setLockedMessageRowId] = useState<string | null>(null);
   const [completionStarAnimationRowId, setCompletionStarAnimationRowId] = useState<string | null>(null);
   const [isCompletionStarAnimationActive, setIsCompletionStarAnimationActive] = useState(false);
+  const [isCompletionCoinAnimationActive, setIsCompletionCoinAnimationActive] = useState(false);
   const [completionStarAnimationRunId, setCompletionStarAnimationRunId] = useState(0);
   const [completionFlyInStars, setCompletionFlyInStars] = useState<CompletionFlyInStar[]>([]);
   const [showCompletionFlyInOverlay, setShowCompletionFlyInOverlay] = useState(false);
@@ -351,16 +372,23 @@ export default function SagaLevel() {
   const [deferredCompletedStarsRowId, setDeferredCompletedStarsRowId] = useState<string | null>(null);
   const [pathSegments, setPathSegments] = useState<SagaPathSegment[]>([]);
   const [isEconomyBarLowered, setIsEconomyBarLowered] = useState(false);
-  const [showCompletionRewardsOverlay, setShowCompletionRewardsOverlay] = useState(false);
-  const [animatedCompletionKnowledge, setAnimatedCompletionKnowledge] = useState(0);
-  const [animatedCompletionCoins, setAnimatedCompletionCoins] = useState(0);
+  const [showCompletionCoinOverlay, setShowCompletionCoinOverlay] = useState(false);
+  const [isCompletionCenterCoinVisible, setIsCompletionCenterCoinVisible] = useState(false);
+  const [completionMiniCoins, setCompletionMiniCoins] = useState<CompletionMiniCoin[]>([]);
+  const [isCompletionMiniCoinsInMotion, setIsCompletionMiniCoinsInMotion] = useState(false);
+  const [edgeCenterSpacerHeights, setEdgeCenterSpacerHeights] = useState({
+    top: 0,
+    bottom: 0,
+  });
   const gridRef = useRef<HTMLDivElement | null>(null);
   const frameRefs = useRef<Array<HTMLDivElement | null>>([]);
   const starSlotRefs = useRef<Record<string, HTMLSpanElement | null>>({});
   const lockMessageTimerRef = useRef<number | null>(null);
+  const panelSwayTimerRef = useRef<number | null>(null);
   const hasAutoScrolledRef = useRef(false);
   const hasHandledCompletionReturnRef = useRef(false);
   const hasAppliedCompletionCoinsRef = useRef(false);
+  const hasTriggeredCompletionCoinSequenceRef = useRef(false);
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const sagaLevelUserToken =
     typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
@@ -576,8 +604,46 @@ export default function SagaLevel() {
 
     return stars;
   };
+  const buildCompletionMiniCoins = (): CompletionMiniCoin[] => {
+    const coinTargetElement =
+      (document.querySelector("[data-coin-header-icon]") as HTMLElement | null) ||
+      (document.querySelector("[data-coin-header]") as HTMLElement | null);
+    if (!coinTargetElement) {
+      return [];
+    }
 
-  const handleStartCategoryQuiz = (categoryId: string, sagaLevelId?: string) => {
+    const targetRect = coinTargetElement.getBoundingClientRect();
+    const halfMiniCoinSize = QUIZ_COMPLETION_CENTER_MINI_COIN_SIZE_PX / 2;
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight * 0.56;
+    const endX = targetRect.left + targetRect.width / 2 - halfMiniCoinSize;
+    const endY = targetRect.top + targetRect.height / 2 - halfMiniCoinSize;
+    const baseRadius = Math.min(72, Math.max(42, window.innerWidth * 0.1));
+
+    return Array.from({ length: QUIZ_COMPLETION_CENTER_MINI_COIN_COUNT }, (_, index) => {
+      const angle =
+        (index / QUIZ_COMPLETION_CENTER_MINI_COIN_COUNT) * Math.PI * 2 - Math.PI / 2;
+      const jitter = (Math.random() - 0.5) * 16;
+      const radialDistance = baseRadius + jitter;
+      const startX = centerX + Math.cos(angle) * radialDistance - halfMiniCoinSize;
+      const startY = centerY + Math.sin(angle) * radialDistance - halfMiniCoinSize;
+
+      return {
+        id: `completion-mini-coin-${Date.now()}-${index}`,
+        startX,
+        startY,
+        endX,
+        endY,
+        delay: index * QUIZ_COMPLETION_CENTER_COIN_STAGGER_MS,
+        startScale: 0.78 + Math.random() * 0.18,
+        endScale: 0.42 + Math.random() * 0.14,
+        startRotateDeg: (Math.random() - 0.5) * 32,
+        endRotateDeg: (Math.random() - 0.5) * 100,
+      };
+    });
+  };
+
+  const handleStartCategoryQuiz = async (categoryId: string, sagaLevelId?: string) => {
     if (!categoryId || startingCategoryId) return;
 
     if (currentCoins < QUIZ_COST) {
@@ -589,15 +655,80 @@ export default function SagaLevel() {
       return;
     }
 
+    const userToken =
+      typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+    if (!userToken) {
+      toast({
+        title: "Authentication Error",
+        description: "Please log in again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setStartingCategoryId(categoryId);
     updateCoins(currentCoins - QUIZ_COST);
-    markUserStale();
-    navigate(`/quiz/${categoryId}`, {
-      state: {
-        from: `/saga-level/${sagaNumber}`,
-        sagaLevelId: normalizeId(sagaLevelId) || null,
-      },
+
+    if (panelSwayTimerRef.current !== null) {
+      window.clearTimeout(panelSwayTimerRef.current);
+    }
+    setSwayingCategoryId(categoryId);
+    panelSwayTimerRef.current = window.setTimeout(() => {
+      setSwayingCategoryId((currentValue) =>
+        currentValue === categoryId ? null : currentValue,
+      );
+      panelSwayTimerRef.current = null;
+    }, QUIZ_PANEL_SWAY_DURATION_MS);
+
+    const animationDelayPromise = new Promise<void>((resolve) => {
+      window.setTimeout(() => resolve(), QUIZ_PANEL_SWAY_DURATION_MS);
     });
+
+    try {
+      const startQuizPromise = fetch(`${BASE_URL}/api/startQuiz`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({ categoryId }),
+      }).then(async (response) => {
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData?.message || "Failed to start quiz session.");
+        }
+
+        return response.json();
+      });
+
+      const [startData] = await Promise.all([startQuizPromise, animationDelayPromise]);
+      const resolvedUserCoins = Number(startData?.userCoins);
+      if (Number.isFinite(resolvedUserCoins)) {
+        updateCoins(Math.max(0, resolvedUserCoins));
+      }
+      markUserStale();
+
+      navigate(`/quiz/${categoryId}`, {
+        state: {
+          from: `/saga-level/${sagaNumber}`,
+          sagaLevelId: normalizeId(sagaLevelId) || null,
+          prestartedQuiz: {
+            categoryId,
+            totalQuestions: Number(startData?.total) || 0,
+          },
+        },
+      });
+    } catch (error) {
+      updateCoins(currentCoins);
+      setStartingCategoryId(null);
+      setSwayingCategoryId(null);
+      toast({
+        title: "Unable to start quiz",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   useEffect(() => {
@@ -667,16 +798,19 @@ export default function SagaLevel() {
     hasHandledCompletionReturnRef.current = false;
     setCompletionStarAnimationRowId(null);
     setIsCompletionStarAnimationActive(false);
+    setIsCompletionCoinAnimationActive(false);
     setCompletionStarAnimationRunId(0);
     setCompletionFlyInStars([]);
     setShowCompletionFlyInOverlay(false);
     setIsCompletionFlyInInMotion(false);
     setCompletionStarsOverride(null);
     setDeferredCompletedStarsRowId(null);
-    setShowCompletionRewardsOverlay(false);
-    setAnimatedCompletionKnowledge(0);
-    setAnimatedCompletionCoins(0);
+    setShowCompletionCoinOverlay(false);
+    setIsCompletionCenterCoinVisible(false);
+    setCompletionMiniCoins([]);
+    setIsCompletionMiniCoinsInMotion(false);
     hasAppliedCompletionCoinsRef.current = false;
+    hasTriggeredCompletionCoinSequenceRef.current = false;
   }, [sagaNumber]);
 
   useEffect(() => {
@@ -705,20 +839,37 @@ export default function SagaLevel() {
   useEffect(() => {
     if (loading || !user || !isReturningFromQuizCompletion) return;
     if (hasAppliedCompletionCoinsRef.current) return;
+    if (completedCoinsEarnedFromQuizReturn <= 0) {
+      hasAppliedCompletionCoinsRef.current = true;
+      return;
+    }
+    if (isCompletionMiniCoinsInMotion) return;
 
-    hasAppliedCompletionCoinsRef.current = true;
-    if (completedCoinsEarnedFromQuizReturn <= 0) return;
+    const fallbackDelayMs =
+      QUIZ_COMPLETION_SCROLL_TO_COMPLETED_DELAY_MS +
+      QUIZ_COMPLETION_SCROLL_SETTLE_BEFORE_STARS_MS +
+      QUIZ_COMPLETION_STARS_SEQUENCE_MS +
+      QUIZ_COMPLETION_COIN_PHASE_TOTAL_MS +
+      400;
+    const fallbackTimer = window.setTimeout(() => {
+      if (hasAppliedCompletionCoinsRef.current) return;
+      hasAppliedCompletionCoinsRef.current = true;
+      const nextCoins = Math.max(0, (user.coins ?? 0) + completedCoinsEarnedFromQuizReturn);
+      updateCoins(nextCoins);
+      markUserStale();
+      void refreshUser();
+    }, fallbackDelayMs);
 
-    const nextCoins = Math.max(0, (user.coins ?? 0) + completedCoinsEarnedFromQuizReturn);
-    updateCoins(nextCoins);
-    markUserStale();
-    void refreshUser();
+    return () => {
+      window.clearTimeout(fallbackTimer);
+    };
   }, [
     loading,
     user?._id,
     user?.coins,
     isReturningFromQuizCompletion,
     completedCoinsEarnedFromQuizReturn,
+    isCompletionMiniCoinsInMotion,
     refreshUser,
     updateCoins,
     markUserStale,
@@ -728,6 +879,9 @@ export default function SagaLevel() {
     return () => {
       if (lockMessageTimerRef.current !== null) {
         window.clearTimeout(lockMessageTimerRef.current);
+      }
+      if (panelSwayTimerRef.current !== null) {
+        window.clearTimeout(panelSwayTimerRef.current);
       }
     };
   }, []);
@@ -815,6 +969,7 @@ export default function SagaLevel() {
     setDeferredCompletedStarsRowId(resolvedTargetRowId);
     setCompletionStarAnimationRowId(resolvedTargetRowId);
     setIsCompletionStarAnimationActive(false);
+    setIsCompletionCoinAnimationActive(false);
     console.info("[SagaCompletion] Target resolved", {
       targetRowIndex,
       resolvedTargetRowId,
@@ -824,6 +979,7 @@ export default function SagaLevel() {
     let centerCompletedRowTimer: number | null = null;
     let startAnimationTimer: number | null = null;
     let stopAnimationTimer: number | null = null;
+    let finalizeCompletionTimer: number | null = null;
     let centerNextPlayableTimer: number | null = null;
     let finishPanelRevealTimer: number | null = null;
     let startFlyInRafOne: number | null = null;
@@ -867,51 +1023,61 @@ export default function SagaLevel() {
         currentValue === resolvedTargetRowId ? null : currentValue,
       );
       setCompletionStarAnimationRunId((current) => current + 1);
-      setIsCompletionStarAnimationActive(true);
-      if (finishPanelRevealTimer !== null) {
-        window.clearTimeout(finishPanelRevealTimer);
-      }
-      finishPanelRevealTimer = window.setTimeout(() => {
-        setIsCompletionStarAnimationActive(false);
-        finishPanelRevealTimer = null;
-      }, QUIZ_COMPLETION_PANEL_REVEAL_ANIMATION_MS);
-      clearCompletionReturnSignal();
       console.info("[SagaCompletion] Star animation finished", {
         rowId: resolvedTargetRowId,
       });
 
-      if (areAllAvailableLevelsCompleted(resolvedTargetRowId)) {
-        console.info("[SagaCompletion] All levels completed, returning to saga map", {
-          sagaNumber,
-        });
-        navigate("/saga-map", {
-          replace: true,
-          state: {
-            fromSagaLevelCompletion: true,
-            unlockedSagaLevel: sagaNumber + 1,
-            completedSagaNumber: sagaNumber,
-            completedAt: Date.now(),
-          },
-        });
-        return;
+      const hasCoinPhase = completedCoinsEarnedFromQuizReturn > 0;
+      setIsCompletionCoinAnimationActive(hasCoinPhase);
+
+      if (finalizeCompletionTimer !== null) {
+        window.clearTimeout(finalizeCompletionTimer);
       }
+      finalizeCompletionTimer = window.setTimeout(() => {
+        setIsCompletionCoinAnimationActive(false);
+        setIsCompletionStarAnimationActive(true);
+        if (finishPanelRevealTimer !== null) {
+          window.clearTimeout(finishPanelRevealTimer);
+        }
+        finishPanelRevealTimer = window.setTimeout(() => {
+          setIsCompletionStarAnimationActive(false);
+          finishPanelRevealTimer = null;
+        }, QUIZ_COMPLETION_PANEL_REVEAL_ANIMATION_MS);
+        clearCompletionReturnSignal();
 
-      centerNextPlayableTimer = window.setTimeout(() => {
-        const nextPlayableRowIndex = getNextPlayableRowIndex();
-        if (nextPlayableRowIndex === null) {
+        if (areAllAvailableLevelsCompleted(resolvedTargetRowId)) {
+          console.info("[SagaCompletion] All levels completed, returning to saga map", {
+            sagaNumber,
+          });
+          navigate("/saga-map", {
+            replace: true,
+            state: {
+              fromSagaLevelCompletion: true,
+              unlockedSagaLevel: sagaNumber + 1,
+              completedSagaNumber: sagaNumber,
+              completedAt: Date.now(),
+            },
+          });
           return;
         }
 
-        const nextPlayableFrame = frameRefs.current[nextPlayableRowIndex];
-        if (!nextPlayableFrame) {
-          return;
-        }
+        centerNextPlayableTimer = window.setTimeout(() => {
+          const nextPlayableRowIndex = getNextPlayableRowIndex();
+          if (nextPlayableRowIndex === null) {
+            return;
+          }
 
-        scrollFrameToVerticalCenter(nextPlayableFrame, "smooth");
-        console.info("[SagaCompletion] Centered next playable row", {
-          nextPlayableRowIndex,
-        });
-      }, 500);
+          const nextPlayableFrame = frameRefs.current[nextPlayableRowIndex];
+          if (!nextPlayableFrame) {
+            return;
+          }
+
+          scrollFrameToVerticalCenter(nextPlayableFrame, "smooth");
+          console.info("[SagaCompletion] Centered next playable row", {
+            nextPlayableRowIndex,
+          });
+        }, 500);
+      }, hasCoinPhase ? QUIZ_COMPLETION_COIN_PHASE_TOTAL_MS : 0);
     }, QUIZ_COMPLETION_SCROLL_TO_COMPLETED_DELAY_MS + QUIZ_COMPLETION_SCROLL_SETTLE_BEFORE_STARS_MS + QUIZ_COMPLETION_STARS_SEQUENCE_MS);
 
     return () => {
@@ -930,6 +1096,9 @@ export default function SagaLevel() {
       if (stopAnimationTimer !== null) {
         window.clearTimeout(stopAnimationTimer);
       }
+      if (finalizeCompletionTimer !== null) {
+        window.clearTimeout(finalizeCompletionTimer);
+      }
       if (centerNextPlayableTimer !== null) {
         window.clearTimeout(centerNextPlayableTimer);
       }
@@ -944,6 +1113,7 @@ export default function SagaLevel() {
     completedSagaLevelIdFromQuizReturn,
     completedCategoryIdFromQuizReturn,
     completedStarCountFromQuizReturn,
+    completedCoinsEarnedFromQuizReturn,
     sagaNumber,
   ]);
 
@@ -973,6 +1143,44 @@ export default function SagaLevel() {
       window.clearTimeout(scrollTimer);
     };
   }, [isLoadingRows, rows, isReturningFromQuizCompletion]);
+
+  useEffect(() => {
+    const updateEdgeCenterSpacers = () => {
+      const viewportHeight = window.innerHeight || 0;
+      if (viewportHeight <= 0) return;
+
+      const fallbackFrameHeight = window.innerWidth >= 640 ? 194 : 171;
+      const lastIndex = Math.max(0, gridCells.length - 1);
+      const firstFrameHeight =
+        frameRefs.current[0]?.getBoundingClientRect().height ?? fallbackFrameHeight;
+      const lastFrameHeight =
+        frameRefs.current[lastIndex]?.getBoundingClientRect().height ?? fallbackFrameHeight;
+
+      const nextTop = Math.max(0, viewportHeight / 2 - firstFrameHeight / 2);
+      const nextBottom = Math.max(0, viewportHeight / 2 - lastFrameHeight / 2);
+
+      setEdgeCenterSpacerHeights((current) => {
+        if (
+          Math.abs(current.top - nextTop) < 1 &&
+          Math.abs(current.bottom - nextBottom) < 1
+        ) {
+          return current;
+        }
+        return {
+          top: nextTop,
+          bottom: nextBottom,
+        };
+      });
+    };
+
+    const rafId = window.requestAnimationFrame(updateEdgeCenterSpacers);
+    window.addEventListener("resize", updateEdgeCenterSpacers);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", updateEdgeCenterSpacers);
+    };
+  }, [gridCells.length, rows]);
 
   useEffect(() => {
     if (!isShowingLoadingSkeleton && rows.length < 2) {
@@ -1011,20 +1219,20 @@ export default function SagaLevel() {
 
           const start: Point = {
             x: lowerFrameRect.left + lowerFrameRect.width / 2 - gridRect.left,
-            y: lowerFrameRect.top - gridRect.top + 44,
+            y: lowerFrameRect.top - gridRect.top + 33,
           };
           const end: Point = {
             x: upperFrameRect.left + upperFrameRect.width / 2 - gridRect.left,
-            y: upperFrameRect.bottom - gridRect.top - 44,
+            y: upperFrameRect.bottom - gridRect.top - 33,
           };
 
           const verticalDistance = Math.abs(start.y - end.y);
           const horizontalDelta = end.x - start.x;
           const bendDirection = horizontalDelta >= 0 ? 1 : -1;
-          const curveLift = Math.max(82, verticalDistance * 0.4);
+          const curveLift = Math.max(62, verticalDistance * 0.4);
           const horizontalBend = Math.max(
-            48,
-            Math.min(180, Math.abs(horizontalDelta) * 0.45 + verticalDistance * 0.08)
+            36,
+            Math.min(135, Math.abs(horizontalDelta) * 0.45 + verticalDistance * 0.08)
           );
           const control1: Point = {
             x: start.x + bendDirection * horizontalBend,
@@ -1121,51 +1329,98 @@ export default function SagaLevel() {
   }, [isCompletionStarAnimationActive]);
 
   useEffect(() => {
-    if (!isCompletionStarAnimationActive) {
-      setShowCompletionRewardsOverlay(false);
-      setAnimatedCompletionKnowledge(0);
-      setAnimatedCompletionCoins(0);
+    if (
+      !isCompletionCoinAnimationActive ||
+      !isReturningFromQuizCompletion ||
+      completedCoinsEarnedFromQuizReturn <= 0
+    ) {
+      setShowCompletionCoinOverlay(false);
+      setIsCompletionCenterCoinVisible(false);
+      setCompletionMiniCoins([]);
+      setIsCompletionMiniCoinsInMotion(false);
       return;
     }
 
-    const targetKnowledge = completedKnowledgeGainedFromQuizReturn;
-    const targetCoins = completedCoinsEarnedFromQuizReturn;
-    if (targetKnowledge <= 0 && targetCoins <= 0) {
-      setShowCompletionRewardsOverlay(false);
+    if (hasTriggeredCompletionCoinSequenceRef.current) {
       return;
     }
+    hasTriggeredCompletionCoinSequenceRef.current = true;
 
-    setShowCompletionRewardsOverlay(true);
-    setAnimatedCompletionKnowledge(0);
-    setAnimatedCompletionCoins(0);
+    setShowCompletionCoinOverlay(true);
+    setIsCompletionCenterCoinVisible(false);
+    setCompletionMiniCoins([]);
+    setIsCompletionMiniCoinsInMotion(false);
 
-    const animationDurationMs = Math.max(900, QUIZ_COMPLETION_STARS_SEQUENCE_MS - 600);
-    const startTime = performance.now();
-    let rafId = 0;
+    let fadeInRafOne: number | null = null;
+    let fadeInRafTwo: number | null = null;
+    let launchMiniCoinsTimer: number | null = null;
+    let launchMotionRafOne: number | null = null;
+    let launchMotionRafTwo: number | null = null;
+    let hideOverlayTimer: number | null = null;
 
-    const animateCounts = (timestamp: number) => {
-      const elapsed = timestamp - startTime;
-      const progress = Math.max(0, Math.min(1, elapsed / animationDurationMs));
-      const easedProgress = 1 - Math.pow(1 - progress, 3);
-      setAnimatedCompletionKnowledge(Math.round(targetKnowledge * easedProgress));
-      setAnimatedCompletionCoins(Math.round(targetCoins * easedProgress));
+    fadeInRafOne = window.requestAnimationFrame(() => {
+      fadeInRafTwo = window.requestAnimationFrame(() => {
+        setIsCompletionCenterCoinVisible(true);
+      });
+    });
 
-      if (progress < 1) {
-        rafId = window.requestAnimationFrame(animateCounts);
-      }
-    };
+    launchMiniCoinsTimer = window.setTimeout(() => {
+      const miniCoins = buildCompletionMiniCoins();
+      setCompletionMiniCoins(miniCoins);
 
-    rafId = window.requestAnimationFrame(animateCounts);
+      launchMotionRafOne = window.requestAnimationFrame(() => {
+        launchMotionRafTwo = window.requestAnimationFrame(() => {
+          setIsCompletionMiniCoinsInMotion(true);
+          if (!hasAppliedCompletionCoinsRef.current) {
+            hasAppliedCompletionCoinsRef.current = true;
+            const nextCoins = Math.max(0, (user?.coins ?? 0) + completedCoinsEarnedFromQuizReturn);
+            updateCoins(nextCoins);
+            markUserStale();
+            void refreshUser();
+          }
+        });
+      });
+    }, QUIZ_COMPLETION_CENTER_COIN_LAUNCH_DELAY_MS);
+
+    hideOverlayTimer = window.setTimeout(() => {
+      setShowCompletionCoinOverlay(false);
+      setIsCompletionCenterCoinVisible(false);
+      setCompletionMiniCoins([]);
+      setIsCompletionMiniCoinsInMotion(false);
+      setIsCompletionCoinAnimationActive(false);
+    }, QUIZ_COMPLETION_CENTER_COIN_LAUNCH_DELAY_MS +
+      QUIZ_COMPLETION_CENTER_COIN_FLIGHT_MS +
+      QUIZ_COMPLETION_CENTER_COIN_STAGGER_MS * (QUIZ_COMPLETION_CENTER_MINI_COIN_COUNT - 1) +
+      QUIZ_COMPLETION_CENTER_COIN_HIDE_TAIL_MS);
 
     return () => {
-      if (rafId) {
-        window.cancelAnimationFrame(rafId);
+      if (fadeInRafOne !== null) {
+        window.cancelAnimationFrame(fadeInRafOne);
+      }
+      if (fadeInRafTwo !== null) {
+        window.cancelAnimationFrame(fadeInRafTwo);
+      }
+      if (launchMiniCoinsTimer !== null) {
+        window.clearTimeout(launchMiniCoinsTimer);
+      }
+      if (launchMotionRafOne !== null) {
+        window.cancelAnimationFrame(launchMotionRafOne);
+      }
+      if (launchMotionRafTwo !== null) {
+        window.cancelAnimationFrame(launchMotionRafTwo);
+      }
+      if (hideOverlayTimer !== null) {
+        window.clearTimeout(hideOverlayTimer);
       }
     };
   }, [
-    isCompletionStarAnimationActive,
-    completedKnowledgeGainedFromQuizReturn,
+    isCompletionCoinAnimationActive,
+    isReturningFromQuizCompletion,
     completedCoinsEarnedFromQuizReturn,
+    user?.coins,
+    updateCoins,
+    markUserStale,
+    refreshUser,
   ]);
 
   if (loading) {
@@ -1196,9 +1451,14 @@ export default function SagaLevel() {
             size="icon"
             variant="ghost"
             onClick={() => navigate("/saga-map")}
+            disabled={isCompletionStarAnimationActive}
             aria-label="Back to Saga Map"
             title="Back to Saga Map"
-            className="fixed top-[max(0.5rem,env(safe-area-inset-top))] left-2 sm:left-4 z-[10010] h-11 w-11 sm:h-12 sm:w-12 rounded-full border border-cyan-200/75 bg-slate-950/45 text-cyan-50 backdrop-blur-md shadow-[0_10px_24px_rgba(8,47,73,0.45),0_0_16px_rgba(34,211,238,0.3)] transition-all duration-200 hover:scale-[1.05] hover:border-cyan-100 hover:bg-cyan-500/22 hover:shadow-[0_14px_28px_rgba(8,47,73,0.55),0_0_22px_rgba(103,232,249,0.45)] active:scale-[0.98]"
+            className={`fixed top-[max(0.5rem,env(safe-area-inset-top))] left-2 sm:left-4 z-[10010] h-11 w-11 sm:h-12 sm:w-12 rounded-full border border-cyan-200/75 bg-slate-950/45 text-cyan-50 backdrop-blur-md shadow-[0_10px_24px_rgba(8,47,73,0.45),0_0_16px_rgba(34,211,238,0.3)] transition-all duration-500 hover:scale-[1.05] hover:border-cyan-100 hover:bg-cyan-500/22 hover:shadow-[0_14px_28px_rgba(8,47,73,0.55),0_0_22px_rgba(103,232,249,0.45)] active:scale-[0.98] ${
+              isCompletionStarAnimationActive
+                ? "opacity-0 pointer-events-none scale-95"
+                : "opacity-100 pointer-events-auto scale-100"
+            }`}
           >
             <ArrowLeft className="h-5 w-5 sm:h-6 sm:w-6" />
             <span className="sr-only">Back</span>
@@ -1232,38 +1492,59 @@ export default function SagaLevel() {
           document.body,
         )
       : null;
-  const completionRewardsOverlay =
-    showCompletionRewardsOverlay && typeof document !== "undefined"
+  const completionCoinOverlay =
+    showCompletionCoinOverlay &&
+    completedCoinsEarnedFromQuizReturn > 0 &&
+    typeof document !== "undefined"
       ? createPortal(
-          <div className="pointer-events-none fixed inset-x-0 top-0 z-[10008] flex justify-center px-3 pt-[max(5.8rem,env(safe-area-inset-top)+4.8rem)]">
-            <div className="saga-reward-overlay-enter flex w-full max-w-md items-center justify-center gap-2 rounded-2xl border border-amber-200/40 bg-slate-950/70 px-3 py-2 backdrop-blur-md shadow-[0_10px_30px_rgba(2,6,23,0.5)] sm:gap-3 sm:px-4 sm:py-3">
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-cyan-200/35 bg-cyan-900/25 px-2 py-2 sm:px-3">
-                <div className="rounded-full bg-cyan-200/20 p-1.5 text-cyan-100">
-                  <Brain className="h-4 w-4 sm:h-5 sm:w-5" />
+          <div className="pointer-events-none fixed inset-0 z-[10009]">
+            <div className="absolute left-1/2 top-[56%] -translate-x-1/2 -translate-y-1/2">
+              <div className="flex flex-col items-center gap-2">
+                <div
+                  className={`saga-completion-center-coin rounded-full border border-amber-200/70 bg-amber-200/15 shadow-[0_0_32px_rgba(250,204,21,0.42),0_0_54px_rgba(251,191,36,0.32)] transition-all duration-500 ${
+                    isCompletionCenterCoinVisible
+                      ? "opacity-100 scale-100"
+                      : "opacity-0 scale-75"
+                  }`}
+                >
+                  <img
+                    src="/assets/images/icons/coin.png"
+                    alt="Coin reward"
+                    className="h-40 w-40 rounded-full sm:h-48 sm:w-48"
+                  />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200/80 sm:text-xs">
-                    KP Earned
-                  </p>
-                  <p className="saga-reward-value text-base font-extrabold leading-none text-cyan-100 tabular-nums sm:text-xl">
-                    +{animatedCompletionKnowledge}
-                  </p>
-                </div>
-              </div>
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-amber-200/35 bg-amber-900/20 px-2 py-2 sm:px-3">
-                <div className="rounded-full bg-amber-200/20 p-1.5 text-amber-100">
-                  <CircleDollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-200/80 sm:text-xs">
-                    Coins Earned
-                  </p>
-                  <p className="saga-reward-value text-base font-extrabold leading-none text-amber-100 tabular-nums sm:text-xl">
-                    +{animatedCompletionCoins}
-                  </p>
-                </div>
+                <p
+                  className={`saga-completion-coin-label text-center text-sm font-black tracking-wide text-amber-100 drop-shadow-[0_2px_8px_rgba(0,0,0,0.65)] transition-all duration-500 sm:text-base ${
+                    isCompletionCenterCoinVisible
+                      ? "opacity-100 translate-y-0"
+                      : "opacity-0 translate-y-2"
+                  }`}
+                >
+                  +{completedCoinsEarnedFromQuizReturn.toLocaleString("en-US")} Coins Won
+                </p>
               </div>
             </div>
+            {completionMiniCoins.map((coin) => (
+              <span
+                key={coin.id}
+                className="fixed block"
+                style={{
+                  left: 0,
+                  top: 0,
+                  opacity: isCompletionMiniCoinsInMotion ? 0.98 : 0,
+                  transform: `translate(${isCompletionMiniCoinsInMotion ? coin.endX : coin.startX}px, ${isCompletionMiniCoinsInMotion ? coin.endY : coin.startY}px) scale(${isCompletionMiniCoinsInMotion ? coin.endScale : coin.startScale}) rotate(${isCompletionMiniCoinsInMotion ? coin.endRotateDeg : coin.startRotateDeg}deg)`,
+                  transition: `transform ${QUIZ_COMPLETION_CENTER_COIN_FLIGHT_MS}ms cubic-bezier(0.2,0.86,0.26,1.05) ${coin.delay}ms, opacity 180ms ease-out ${coin.delay}ms`,
+                  willChange: "transform, opacity",
+                }}
+              >
+                <img
+                  src="/assets/images/icons/coin.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-[4.5rem] w-[4.5rem] rounded-full shadow-[0_0_18px_rgba(250,204,21,0.58)]"
+                />
+              </span>
+            ))}
           </div>,
           document.body,
         )
@@ -1304,6 +1585,41 @@ export default function SagaLevel() {
         )
       : null;
   const lastPlayableRowIndex = getNextPlayableRowIndex();
+  const progressRows = displayRows.filter((row) => Boolean(getCategoryId(row)));
+  const totalProgressRows = progressRows.length;
+  const completedProgressRows = progressRows.reduce((count, row) => {
+    const rowId = getRowId(row);
+    const hasCompletionOverride = Boolean(
+      rowId && completionStarsOverride?.rowId === rowId,
+    );
+    return row.isCompleted || hasCompletionOverride ? count + 1 : count;
+  }, 0);
+  const progressPercent = totalProgressRows > 0
+    ? Math.min(100, Math.max(0, (completedProgressRows / totalProgressRows) * 100))
+    : 0;
+  const sagaProgressOverlay =
+    typeof document !== "undefined"
+      ? createPortal(
+          <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[10006]">
+            <div className="mx-auto w-full max-w-5xl px-3 pb-[max(0.6rem,env(safe-area-inset-bottom)+0.4rem)]">
+              <div className="relative mx-auto w-full max-w-[14rem] rounded-[28px] border border-[#5f77bd]/55 bg-gradient-to-b from-[#37539a] via-[#223a78] to-[#15295a] px-4 py-3 shadow-[0_-4px_24px_rgba(9,19,52,0.35),0_18px_45px_rgba(6,15,42,0.7)] backdrop-blur-xl">
+                <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent" />
+                <div className="flex items-center justify-between text-[11px] font-semibold text-[#e5edff] sm:text-xs">
+                  <span>Progress</span>
+                  <span>{completedProgressRows}/{totalProgressRows || 0}</span>
+                </div>
+                <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-[#162b5d]/80 ring-1 ring-[#93b6ff]/35">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-green-400 shadow-[0_0_16px_rgba(74,222,128,0.6)] transition-[width] duration-500 ease-out"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
 
   return (
     <div
@@ -1342,10 +1658,35 @@ export default function SagaLevel() {
             transform: translateY(-6px) scale(1.01);
           }
 
+          @keyframes sagaPanelWindSway {
+            0% {
+              transform: perspective(980px) rotateY(0deg) translateX(0);
+            }
+            24% {
+              transform: perspective(980px) rotateY(-8deg) translateX(-3px);
+            }
+            50% {
+              transform: perspective(980px) rotateY(9deg) translateX(4px);
+            }
+            76% {
+              transform: perspective(980px) rotateY(-5deg) translateX(-2px);
+            }
+            100% {
+              transform: perspective(980px) rotateY(0deg) translateX(0);
+            }
+          }
+
+          .saga-level-panel-theme .saga-level-panel-wind-sway {
+            animation: sagaPanelWindSway 500ms cubic-bezier(0.22, 0.92, 0.3, 1) both;
+            transform-origin: 50% 50%;
+            transform-style: preserve-3d;
+            will-change: transform;
+          }
+
           .saga-level-panel-theme .category-frame {
             position: relative;
             border-radius: var(--radius);
-            padding: clamp(0.5rem, 1vw, 0.8rem);
+            padding: clamp(0.38rem, 0.75vw, 0.6rem);
             background:
               linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02));
             overflow: hidden;
@@ -1393,13 +1734,13 @@ export default function SagaLevel() {
           .saga-level-panel-theme .category-content {
             position: relative;
             display: grid;
-            grid-template-columns: minmax(136px, 34%) 1fr;
-            gap: clamp(0.72rem, 2vw, 1.1rem);
+            grid-template-columns: minmax(102px, 34%) 1fr;
+            gap: clamp(0.54rem, 1.5vw, 0.82rem);
             background:
               linear-gradient(180deg, var(--panel-2), var(--panel));
             border-radius: calc(var(--radius) - 0.3rem);
-            padding: clamp(0.8rem, 2vw, 1.1rem);
-            min-height: clamp(156px, 26vw, 212px);
+            padding: clamp(0.6rem, 1.5vw, 0.82rem);
+            min-height: clamp(117px, 19.5vw, 159px);
             overflow: hidden;
             z-index: 1;
           }
@@ -1431,7 +1772,7 @@ export default function SagaLevel() {
           .saga-level-panel-theme .category-image {
             position: relative;
             border-radius: 1rem;
-            min-height: 136px;
+            min-height: 102px;
             background:
               linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
               radial-gradient(circle at 30% 20%, rgba(255, 219, 110, 0.22), transparent 35%),
@@ -1459,12 +1800,12 @@ export default function SagaLevel() {
 
           .saga-level-panel-theme .category-badge {
             position: absolute;
-            left: 0.5rem;
-            bottom: 0.5rem;
+            left: 0.38rem;
+            bottom: 0.38rem;
             z-index: 2;
-            padding: 0.34rem 0.74rem;
+            padding: 0.26rem 0.56rem;
             border-radius: 999px;
-            font-size: 0.72rem;
+            font-size: 0.62rem;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -1479,21 +1820,21 @@ export default function SagaLevel() {
 
           .saga-level-panel-theme .category-info h3 {
             margin: 0 0 0.45rem;
-            font-size: clamp(1.12rem, 2.2vw, 1.65rem);
+            font-size: clamp(0.9rem, 1.65vw, 1.24rem);
             line-height: 1.1;
             color: #f8fafc;
             text-wrap: balance;
           }
 
           .saga-level-panel-theme .category-info p {
-            margin: 0 0 0.9rem;
-            font-size: clamp(0.88rem, 1.45vw, 1rem);
+            margin: 0 0 0.68rem;
+            font-size: clamp(0.72rem, 1.08vw, 0.84rem);
             color: rgba(255, 255, 255, 0.82);
           }
 
           .saga-level-panel-theme .corner {
             position: absolute;
-            width: clamp(18px, 2.5vw, 26px);
+            width: clamp(14px, 1.9vw, 20px);
             aspect-ratio: 1;
             z-index: 3;
             pointer-events: none;
@@ -1510,10 +1851,10 @@ export default function SagaLevel() {
               inset 0 1px 3px rgba(255, 255, 255, 0.7);
           }
 
-          .saga-level-panel-theme .tl { top: 0.3rem; left: 0.3rem; }
-          .saga-level-panel-theme .tr { top: 0.3rem; right: 0.3rem; }
-          .saga-level-panel-theme .bl { bottom: 0.3rem; left: 0.3rem; }
-          .saga-level-panel-theme .br { bottom: 0.3rem; right: 0.3rem; }
+          .saga-level-panel-theme .tl { top: 0.22rem; left: 0.22rem; }
+          .saga-level-panel-theme .tr { top: 0.22rem; right: 0.22rem; }
+          .saga-level-panel-theme .bl { bottom: 0.22rem; left: 0.22rem; }
+          .saga-level-panel-theme .br { bottom: 0.22rem; right: 0.22rem; }
 
           .saga-level-panel-theme .category-card.current .category-frame::after {
             background:
@@ -1591,7 +1932,7 @@ export default function SagaLevel() {
             }
 
             .saga-level-panel-theme .category-image {
-              min-height: 124px;
+              min-height: 93px;
             }
           }
 
@@ -1683,34 +2024,25 @@ export default function SagaLevel() {
             }
           }
 
-          @keyframes sagaRewardOverlayIn {
-            0% {
-              opacity: 0;
-              transform: translateY(-12px) scale(0.97);
-            }
-            100% {
-              opacity: 1;
-              transform: translateY(0) scale(1);
-            }
-          }
-
-          @keyframes sagaRewardValuePulse {
+          @keyframes sagaCompletionCoinPulse {
             0%, 100% {
-              transform: scale(1);
-              text-shadow: 0 0 6px rgba(255, 255, 255, 0.15);
+              transform: translateY(0) scale(1);
+              filter: drop-shadow(0 0 10px rgba(250, 204, 21, 0.45));
             }
             50% {
-              transform: scale(1.05);
-              text-shadow: 0 0 14px rgba(255, 255, 255, 0.32);
+              transform: translateY(-2px) scale(1.045);
+              filter: drop-shadow(0 0 18px rgba(250, 204, 21, 0.72));
             }
           }
 
-          .saga-reward-overlay-enter {
-            animation: sagaRewardOverlayIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          .saga-completion-center-coin {
+            animation: sagaCompletionCoinPulse 1.1s ease-in-out infinite;
           }
 
-          .saga-reward-value {
-            animation: sagaRewardValuePulse 0.9s ease-in-out infinite;
+          .saga-completion-coin-label {
+            text-shadow:
+              0 0 12px rgba(250, 204, 21, 0.26),
+              0 0 18px rgba(245, 158, 11, 0.3);
           }
 
           .saga-rating-star {
@@ -1812,7 +2144,8 @@ export default function SagaLevel() {
       </div>
       {backButtonOverlay}
       {economyBarOverlay}
-      {completionRewardsOverlay}
+      {sagaProgressOverlay}
+      {completionCoinOverlay}
       <div className="relative z-10 mx-auto min-h-[100dvh] w-full max-w-5xl flex flex-col gap-2 sm:gap-3">
         <div className="relative flex-1 min-h-0">
         {isShowingLoadingSkeleton ? (
@@ -1832,41 +2165,46 @@ export default function SagaLevel() {
             No categories found for this saga level.
           </div>
         ) : (
-          <div
-            ref={gridRef}
-            className="relative grid grid-cols-1 gap-[50px] sm:gap-[56px] auto-rows-[minmax(228px,1fr)] sm:auto-rows-[minmax(258px,1fr)] max-w-4xl mx-auto w-full"
-          >
-            <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full overflow-visible">
-              {pathSegments.map((segment) => (
-                <g key={segment.id}>
-                  <path
-                    d={segment.d}
-                    fill="none"
-                    stroke={segment.strokeColor}
-                    strokeWidth={1.4}
-                    strokeLinecap="round"
-                  />
-                  {segment.dots.map((dot, dotIndex) => (
-                    <circle
-                      key={`${segment.id}-dot-${dotIndex}`}
-                      cx={dot.x}
-                      cy={dot.y}
-                      r={dot.radius}
-                      fill={segment.dotColor}
-                      style={{
-                        opacity: dot.opacity,
-                        animation: `${segment.dotAnimationName} ${dot.duration}s ease-in-out ${dot.delay}s infinite`,
-                      }}
+          <>
+            <div
+              aria-hidden="true"
+              style={{ height: `${edgeCenterSpacerHeights.top}px` }}
+            />
+            <div
+              ref={gridRef}
+              className="relative grid grid-cols-1 gap-[38px] sm:gap-[42px] auto-rows-[minmax(171px,1fr)] sm:auto-rows-[minmax(194px,1fr)] max-w-4xl mx-auto w-full"
+            >
+              <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full overflow-visible">
+                {pathSegments.map((segment) => (
+                  <g key={segment.id}>
+                    <path
+                      d={segment.d}
+                      fill="none"
+                      stroke={segment.strokeColor}
+                      strokeWidth={1.4}
+                      strokeLinecap="round"
                     />
-                  ))}
-                </g>
-              ))}
-            </svg>
-            {gridCells.map((row, index) => {
+                    {segment.dots.map((dot, dotIndex) => (
+                      <circle
+                        key={`${segment.id}-dot-${dotIndex}`}
+                        cx={dot.x}
+                        cy={dot.y}
+                        r={dot.radius}
+                        fill={segment.dotColor}
+                        style={{
+                          opacity: dot.opacity,
+                          animation: `${segment.dotAnimationName} ${dot.duration}s ease-in-out ${dot.delay}s infinite`,
+                        }}
+                      />
+                    ))}
+                  </g>
+                ))}
+              </svg>
+              {gridCells.map((row, index) => {
               const rowId = getRowId(row);
               const categoryIdForRow = getCategoryId(row);
               const frameShift =
-                "max(0px, calc((100vw - clamp(280px, calc(100vw - 48px), 760px) - 40px) / 2))";
+                "max(0px, calc((100vw - clamp(210px, calc((100vw - 48px) * 0.75), 570px) - 30px) / 2))";
               const horizontalOffsetStyle = {
                 transform: `translateX(${(index + 1) % 2 === 0 ? "-" : ""}${frameShift})`,
               };
@@ -1888,6 +2226,9 @@ export default function SagaLevel() {
                 isCategoryDisabled ||
                 startingCategoryId !== null ||
                 !isUnlocked;
+              const isPanelSwaying = Boolean(
+                categoryIdForRow && swayingCategoryId === categoryIdForRow,
+              );
               const completionOverrideForRow =
                 rowId && completionStarsOverride?.rowId === rowId
                   ? completionStarsOverride
@@ -1942,7 +2283,7 @@ export default function SagaLevel() {
                   ref={(element) => {
                     frameRefs.current[index] = element;
                   }}
-                  className="relative z-10 mx-auto w-[clamp(280px,calc(100vw-48px),760px)]"
+                  className="relative z-10 mx-auto w-[clamp(210px,calc((100vw-48px)*0.75),570px)]"
                   style={horizontalOffsetStyle}
                 >
                   <div
@@ -1964,7 +2305,8 @@ export default function SagaLevel() {
                         showLockedMessage(rowId || undefined);
                         return;
                       }
-                      handleStartCategoryQuiz(categoryId, rowId || undefined);
+                      playSound("/clicksound.m4a", 0.35);
+                      void handleStartCategoryQuiz(categoryId, rowId || undefined);
                     }}
                     onKeyDown={(event) => {
                       if (isLoadingPlaceholder) return;
@@ -1983,7 +2325,8 @@ export default function SagaLevel() {
                           showLockedMessage(rowId || undefined);
                           return;
                         }
-                        handleStartCategoryQuiz(categoryId, rowId || undefined);
+                        playSound("/clicksound.m4a", 0.35);
+                        void handleStartCategoryQuiz(categoryId, rowId || undefined);
                       }
                     }}
                     aria-disabled={isFrameDisabled}
@@ -1995,7 +2338,7 @@ export default function SagaLevel() {
                         : categoryIdForRow && (isCategoryDisabled || !isUnlocked)
                           ? "cursor-not-allowed"
                           : "opacity-80 cursor-default"
-                    }`}
+                    } ${isPanelSwaying ? "saga-level-panel-wind-sway" : ""}`}
                   >
                     <div className={`category-card ${panelStatusClass}`}>
                       <div className="category-frame">
@@ -2120,8 +2463,13 @@ export default function SagaLevel() {
                   ) : null}
                 </div>
               );
-            })}
-          </div>
+              })}
+            </div>
+            <div
+              aria-hidden="true"
+              style={{ height: `${edgeCenterSpacerHeights.bottom}px` }}
+            />
+          </>
         )}
         </div>
         <div ref={bottomAnchorRef} />

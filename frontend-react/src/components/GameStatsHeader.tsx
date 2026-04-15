@@ -14,6 +14,7 @@ interface GameStatsHeaderProps {
   userGem1: number;
   userGem2: number;
   compactMode?: boolean;
+  panelVariant?: "default" | "saga3d";
   centerImageSrc?: string;
   centerSubLabel?: string;
   onCenterClick?: () => void;
@@ -29,6 +30,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
   userGem1,
   userGem2,
   compactMode = false,
+  panelVariant = "default",
   centerImageSrc = "/assets/images/q.jpg",
   centerSubLabel,
   onCenterClick,
@@ -145,6 +147,30 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
   };
 
   const compact = compactMode;
+  const useSaga3dPanels = panelVariant === "saga3d";
+  const panelInteractionClass = useSaga3dPanels
+    ? "hover:-translate-y-[1px] active:translate-y-[1px] hover:brightness-[1.03]"
+    : "hover:scale-105";
+  const getPanel3DStyle = (tone: "blue" | "green"): React.CSSProperties | undefined => {
+    if (!useSaga3dPanels) return undefined;
+    if (tone === "blue") {
+      return {
+        boxShadow:
+          "inset 0 2px 0 rgba(255,255,255,0.6), inset 0 -3px 0 rgba(8,47,73,0.36), 0 6px 0 rgba(12,74,110,0.55), 0 11px 16px rgba(2,6,23,0.35)",
+      };
+    }
+
+    return {
+      boxShadow:
+        "inset 0 2px 0 rgba(255,255,255,0.55), inset 0 -3px 0 rgba(5,84,63,0.34), 0 6px 0 rgba(6,95,70,0.52), 0 11px 16px rgba(2,6,23,0.33)",
+    };
+  };
+  const icon3DStyle: React.CSSProperties | undefined = useSaga3dPanels
+    ? {
+        boxShadow:
+          "inset 0 1px 0 rgba(255,255,255,0.42), inset 0 -2px 0 rgba(15,23,42,0.25), 0 3px 7px rgba(2,6,23,0.35)",
+      }
+    : undefined;
 
   return (
     <div className={`w-full px-2 ${compact ? "py-0.5" : "py-1.5 sm:py-2"}`}>
@@ -158,12 +184,17 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
               compact
                 ? "gap-1 px-2 py-1"
                 : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
-            } bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full border-2 border-blue-300 shadow-lg w-full transition-all hover:scale-105`}
+            } bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full border-2 border-blue-300 ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
+            style={getPanel3DStyle("blue")}
           >
             <div className={`${compact ? "text-sm" : "text-base sm:text-lg md:text-xl lg:text-2xl"} font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate`}>
               {formatNumber(animatedCoins)}
             </div>
-            <div className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-yellow-400 rounded-full flex items-center justify-center shadow-md`}>
+            <div
+              data-coin-header-icon=""
+              className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-yellow-400 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
+              style={icon3DStyle}
+            >
               <svg
                 viewBox="0 0 24 24"
                 className={compact ? "w-3 h-3" : "w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6"}
@@ -190,11 +221,16 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
             compact
               ? "gap-1 px-2 py-1"
               : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
-          } bg-gradient-to-r from-emerald-400 to-green-400 rounded-full border-2 border-green-300 shadow-lg w-full transition-all hover:scale-105`}>
+          } bg-gradient-to-r from-emerald-400 to-green-400 rounded-full border-2 border-green-300 ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
+            style={getPanel3DStyle("green")}
+          >
             <div className={`${compact ? "text-sm" : "text-base sm:text-lg md:text-xl lg:text-2xl"} font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate`}>
               {formatNumber(userGem1)}
             </div>
-            <div className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-green-400 rounded-full flex items-center justify-center shadow-md`}>
+            <div
+              className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-green-400 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
+              style={icon3DStyle}
+            >
               <svg
                 viewBox="0 0 24 24"
                 className={compact ? "w-3 h-3 text-slate-800" : "w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-slate-800"}
@@ -255,8 +291,13 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
             compact
               ? "gap-1 px-2 py-1"
               : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
-          } bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full border-2 border-blue-300 shadow-lg w-full transition-all hover:scale-105`}>
-            <div className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-amber-200 rounded-full flex items-center justify-center shadow-md`}>
+          } bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full border-2 border-blue-300 ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
+            style={getPanel3DStyle("blue")}
+          >
+            <div
+              className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-amber-200 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
+              style={icon3DStyle}
+            >
               <svg
                 viewBox="0 0 24 24"
                 fill="currentColor"
@@ -278,8 +319,13 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
             compact
               ? "gap-1 px-2 py-1"
               : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
-          } bg-gradient-to-r from-emerald-400 to-green-400 rounded-full border-2 border-green-300 shadow-lg w-full transition-all hover:scale-105`}>
-            <div className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-emerald-500 rounded-full flex items-center justify-center shadow-md`}>
+          } bg-gradient-to-r from-emerald-400 to-green-400 rounded-full border-2 border-green-300 ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
+            style={getPanel3DStyle("green")}
+          >
+            <div
+              className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-emerald-500 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
+              style={icon3DStyle}
+            >
               <svg
                 viewBox="0 0 24 24"
                 className={compact ? "w-3 h-3 text-slate-800" : "w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-slate-800"}
