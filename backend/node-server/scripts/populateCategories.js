@@ -15,14 +15,13 @@ const { buildQuestionPrompt } = require("./prompts/questionPrompt");
 const { validateAndPersistQuestion } = require("./validateQuestions");
 const { populateDifficulty } = require("./populateDifficulty");
 const { normalizeJsonText, parseJsonObject } = require("./jsonParsingHelper");
-//const { processSingleQuestion } = require("./validateDuplicateQuestions");
+const { processSingleQuestion } = require("./validateDuplicateQuestions");
 
 
 // ==== GLOBAL CONFIG ====
 const avoidedQuestions = [];
 const avoidedQuestionSet = new Set();
 const MAX_AVOIDED_QUESTIONS = Number(process.env.POPULATE_MAX_AVOIDED_QUESTIONS || 120);
-const MAX_CONSECUTIVE_NO_ADD = Number(process.env.POPULATE_MAX_CONSECUTIVE_NO_ADD || 5);
 const MAX_SAME_DUPLICATE_STREAK = Number(process.env.POPULATE_MAX_SAME_DUPLICATE_STREAK || 3);
 const DEFAULT_MAX_ENABLED_QUESTIONS_PER_CATEGORY = Number(
   process.env.POPULATE_MAX_ENABLED_QUESTIONS_PER_CATEGORY || 100
@@ -48,10 +47,6 @@ function buildAvoidSection() {
   return `Do NOT generate any of these questions (nor semantically similar ones).
 Use a different fact/subtopic from all items below:
 ${avoidedQuestions.map(q => `- ${q}`).join("\n")}\n\n`;
-}
-
-function buildDifficultySection(hint) {
-  return hint ? `\nDifficulty requested: ${hint}. Generate the question at this difficulty.\n` : "";
 }
 
 function rememberAvoidedQuestion(text) {
@@ -232,12 +227,11 @@ function logOllamaErrorVerbose(error) {
 
 // ==== MAIN FUNCTIONALITY ====
 
-async function fetchQuestions(categoryName, difficultyHint) {
+async function fetchQuestions(categoryName) {
   console.log(`🔹 Generating for category: "${categoryName}" from Ollama`);
 
   const avoidSection = buildAvoidSection();
-  const difficultySection = buildDifficultySection(difficultyHint);
-  const prompt = buildQuestionPrompt(categoryName, avoidSection, difficultySection);
+  const prompt = buildQuestionPrompt(categoryName, avoidSection);
 
   const question = await queryOllama(prompt);
   if (!question) return [];
@@ -247,7 +241,10 @@ async function fetchQuestions(categoryName, difficultyHint) {
 }
 
 async function runPostGenerationScripts(categoryId, questionIds) {
-  const disableQuestionOnValidationFailure = async (questionId, reason) => {
+  let enabledQuestionCount = 0;
+  let disabledQuestionCount = 0;
+
+  const disableQuestionOnPostGenerationFailure = async (questionId, reason) => {
     await Category.updateOne(
       { _id: categoryId, "questions._id": questionId },
       {
@@ -263,25 +260,43 @@ async function runPostGenerationScripts(categoryId, questionIds) {
     try {
       const validationResult = await validateAndPersistQuestion(categoryId, questionId);
       if (!validationResult.success) {
-        await disableQuestionOnValidationFailure(
+        await disableQuestionOnPostGenerationFailure(
           questionId,
           "Disabled automatically because validation failed during populate flow."
         );
+        disabledQuestionCount += 1;
         console.log(`Validation failed for question ${questionId}. Skipping difficulty population.`);
         continue;
       }
 
       if (validationResult.disabled) {
+        disabledQuestionCount += 1;
         console.log(`Question ${questionId} was disabled by validation. Skipping difficulty population.`);
         continue;
       }
 
+      const duplicateResult = await processSingleQuestion(categoryId, questionId);
+      if (!duplicateResult?.success) {
+        throw new Error(
+          `Duplicate check failed for question ${questionId}: ${duplicateResult?.reason || "Unknown duplicate-check error."}`
+        );
+      }
+
+      if (duplicateResult.duplicateFound) {
+        disabledQuestionCount += 1;
+        console.log(
+          `❌ Question ${questionId} was disabled by duplicate check after ${duplicateResult.comparedCount} comparison(s). Skipping remaining pipeline steps.`
+        );
+        continue;
+      }
+
       await populateDifficulty(String(categoryId), String(questionId));
+      enabledQuestionCount += 1;
     } catch (error) {
       try {
-        await disableQuestionOnValidationFailure(
+        await disableQuestionOnPostGenerationFailure(
           questionId,
-          "Disabled automatically because validation errored during populate flow."
+          "Disabled automatically because post-generation checks errored during populate flow."
         );
       } catch (disableError) {
         console.error(
@@ -289,9 +304,15 @@ async function runPostGenerationScripts(categoryId, questionIds) {
           disableError.message
         );
       }
+      disabledQuestionCount += 1;
       console.error(`Post-generation pipeline failed for question ${questionId}:`, error.message);
     }
   }
+
+  return {
+    enabledQuestionCount,
+    disabledQuestionCount,
+  };
 }
 
 async function getEnabledQuestionCount(categoryId) {
@@ -323,10 +344,10 @@ async function populateCategory(categoryId, difficultyHint, options = {}) {
       return { addedCount: 0, duplicateQuestion: null };
     }
 
-    console.log(`🔹 ${category.name}: ${activeQuestions} questions. Fetching a ${difficultyHint} one.`);
+    console.log(`🔹 ${category.name}: ${activeQuestions} questions. Fetching a new one.`);
 
     // 🧠 Step 1: Generate new question(s)
-    const fetchedQuestions = await fetchQuestions(category.name, difficultyHint);
+    const fetchedQuestions = await fetchQuestions(category.name);
     if (!fetchedQuestions?.length) {
       console.log("⚠️ No question returned from Ollama.");
       return { addedCount: 0, duplicateQuestion: null };
@@ -351,9 +372,27 @@ async function populateCategory(categoryId, difficultyHint, options = {}) {
     // 🧠 Step 3: Save the updated category to MongoDB
     category.disabled = false;
     await category.save();
-    await runPostGenerationScripts(category._id, addedQuestionIds);
-    console.log(`✅ Added ${addedCount} question(s) to ${category.name}.`);
-    return { addedCount, duplicateQuestion: null };
+    const postGenerationResult = await runPostGenerationScripts(category._id, addedQuestionIds);
+    const enabledAddedCount = Number(postGenerationResult?.enabledQuestionCount || 0);
+    const disabledInPipelineCount = Number(postGenerationResult?.disabledQuestionCount || 0);
+
+    if (disabledInPipelineCount > 0) {
+      if (enabledAddedCount > 0) {
+        console.warn(
+          `⚠️ ${disabledInPipelineCount} generated question(s) were disabled in pipeline. Only ${enabledAddedCount} question(s) remained enabled in ${category.name}.`
+        );
+      } else {
+        const questionNoun = addedCount === 1 ? "question" : "questions";
+        const wasWere = addedCount === 1 ? "was" : "were";
+        console.warn(
+          `⚠️ Generated ${questionNoun} ${wasWere} not added to ${category.name} because ${questionNoun} ${wasWere} disabled in pipeline.`
+        );
+      }
+    } else {
+      console.log(`✅ Added ${enabledAddedCount} question(s) to ${category.name}.`);
+    }
+
+    return { addedCount: enabledAddedCount, duplicateQuestion: null };
 
     /*
     // 🧠 Step 4: Re-fetch category to ensure IDs are present
@@ -412,7 +451,7 @@ async function addQuestionsToCategory(category, questions) {
       timesAnsweredCorrectly: 0,
       timesAnsweredIncorrectly: 0,
       hash,
-      version: 3.30
+      version: 3.40
     });
 
     added++;
@@ -436,7 +475,7 @@ async function checkQuestionInSameCategory(category, newQuestion) {
   }
 
   // 🔥 Reuse your existing processSingleQuestion() helper
-  await processSingleQuestion(category, newQuestion);
+  await processSingleQuestion(category._id, newQuestion._id);
 
   console.log(`✅ Finished duplicate check within "${category.name}"`);
 }
@@ -447,7 +486,6 @@ async function populateCategoryLoop(categoryId, iterations, difficultyHint, opti
     options.maxEnabledQuestions ?? DEFAULT_MAX_ENABLED_QUESTIONS_PER_CATEGORY
   );
   let totalAdded = 0;
-  let consecutiveNoAdd = 0;
   let sameDuplicateStreak = 0;
   let lastDuplicateHash = null;
 
@@ -473,13 +511,11 @@ async function populateCategoryLoop(categoryId, iterations, difficultyHint, opti
       totalAdded += added;
 
       if (added > 0) {
-        consecutiveNoAdd = 0;
         sameDuplicateStreak = 0;
         lastDuplicateHash = null;
         continue;
       }
 
-      consecutiveNoAdd++;
       const duplicateQuestion = String(result?.duplicateQuestion || "").trim();
 
       if (duplicateQuestion) {
@@ -502,12 +538,6 @@ async function populateCategoryLoop(categoryId, iterations, difficultyHint, opti
         lastDuplicateHash = null;
       }
 
-      if (consecutiveNoAdd >= MAX_CONSECUTIVE_NO_ADD) {
-        console.log(
-          `🛑 Stopping early: no new question added for ${consecutiveNoAdd} consecutive iterations.`
-        );
-        break;
-      }
     }
 
     return totalAdded;

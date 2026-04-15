@@ -1,6 +1,6 @@
-function buildQuestionPrompt(categoryName, avoidSection = "", difficultySection = "") {
+function buildQuestionPrompt(categoryName, avoidSection = "") {
   return `
-You are an international trivia expert creating engaging, high-quality quiz questions.
+You are an international trivia expert creating fun, engaging and high-quality quiz questions.
 
 Use metric units, global examples, and neutral English spelling.
 
@@ -35,7 +35,7 @@ are all derived from that same fact.
 Do not output the internal fact.
 
 === QUESTION QUALITY ===
-- Maximum 14 words (strict)
+- Ideally not more than 14 words
 - Must be a complete, natural sentence or prompt
 - Must sound like a human would say it
 - Must not feel truncated, awkward, or robotic
@@ -179,23 +179,12 @@ Before output:
 === EXPLANATION ===
 1–2 concise sentences explaining the fact.
 
-=== DIFFICULTY (1–10) ===
-1–2: very easy  
-3–4: easy  
-5–6: moderate  
-7–8: hard  
-9–10: expert  
-
-Explain the difficulty briefly.
-
 === OUTPUT FORMAT ===
 {
   "question": string,
   "answers": [string, string, string, string],
   "correct_answer": string,
-  "explanation": string,
-  "difficulty_level": integer,
-  "difficulty_rationale": string
+  "explanation": string
 }
 
 If any requirement cannot be satisfied, output {}.
@@ -205,7 +194,6 @@ ${categoryName}
 
 ${avoidSection}
 
-${difficultySection}
   `.trim();
 }
 

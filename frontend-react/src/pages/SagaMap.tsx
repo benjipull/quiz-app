@@ -650,6 +650,7 @@ export default function SagaMap() {
           userGem1={user.wisdomGems ?? 0}
           userGem2={user.enlightenmentCrystals ?? 0}
           compactMode={isCompactEconomyResolution}
+          panelVariant="saga3d"
           centerImageSrc={userAvatarImage}
           centerSubLabel={user.alias || ""}
           centerBadgeValue={user.level ?? 1}

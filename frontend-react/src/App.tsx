@@ -34,11 +34,19 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const About = lazy(() => import("./pages/About"));
 const Claim = lazy(() => import("./components/dummy"));
 
+const RouteLoadingScreen = () => (
+  <div className="min-h-[100dvh] grid place-items-center bg-[#0b1325] text-slate-200">
+    Loading...
+  </div>
+);
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading, refreshUser } = useUser();
+  const location = useLocation();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [guestLoginFailed, setGuestLoginFailed] = useState(false);
   const isBootstrappingSessionRef = useRef(false);
+  const isSagaMapPath = location.pathname === "/" || location.pathname === "/saga-map";
 
   useEffect(() => {
     if (loading) {
@@ -105,7 +113,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }, [loading, user?._id]);
 
   if (loading || isCheckingAuth) {
-    return <SplashScreen dataLoaded={false} />;
+    return isSagaMapPath ? <SplashScreen dataLoaded={false} /> : <RouteLoadingScreen />;
   }
 
   if (guestLoginFailed) {
@@ -162,7 +170,7 @@ const AppContent = () => {
   }, [location.pathname]);
 
   return (
-    <Suspense fallback={<SplashScreen dataLoaded={false} />}>
+    <Suspense fallback={<RouteLoadingScreen />}>
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={location.key}

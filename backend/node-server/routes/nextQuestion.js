@@ -37,11 +37,35 @@ async function buildQuestionResponsePayload(question) {
 router.get("/:userToken", async (req, res) => {
   try {
     const { userToken } = req.params;
+    const peekParam = String(req.query.peek || "").toLowerCase();
+    const isPeekMode = peekParam === "1" || peekParam === "true";
     const userSession = userQuestions[userToken];
 
     if (!userSession) {
       console.warn(`No active quiz session for token: ${userToken}`);
       return res.status(404).json({ message: "No more questions available for this token." });
+    }
+
+    if (isPeekMode) {
+      const hasCurrentQuestion = Boolean(userSession.current);
+      const peekIndex = hasCurrentQuestion ? 1 : 0;
+      const peekQuestion = Array.isArray(userSession.queue) ? userSession.queue[peekIndex] : null;
+
+      if (!peekQuestion) {
+        return res.status(404).json({ message: "No upcoming question available to preload." });
+      }
+
+      const responseQuestion = await buildQuestionResponsePayload(peekQuestion);
+      const remainingAfterPeek = hasCurrentQuestion
+        ? Math.max(userSession.queue.length - 1, 0)
+        : userSession.queue.length;
+
+      return res.status(200).json({
+        question: responseQuestion,
+        timerInSeconds: 20,
+        remaining: remainingAfterPeek,
+        peek: true,
+      });
     }
 
     // If user already has a current question, return it
