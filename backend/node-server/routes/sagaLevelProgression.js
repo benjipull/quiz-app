@@ -23,6 +23,18 @@ const parseSagaNumber = (value) => {
   return parsed;
 };
 
+const parseCategoryIdsQuery = (value) => {
+  if (!value) return [];
+
+  const tokens = Array.isArray(value)
+    ? value.flatMap((item) => String(item).split(","))
+    : String(value).split(",");
+
+  return tokens
+    .map((token) => token.trim())
+    .filter(Boolean);
+};
+
 const shuffle = (array) => {
   const copy = [...array];
   for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -183,26 +195,11 @@ const mapSagasForResponse = (sagas = []) =>
       };
     });
 
-const buildSagaLevelRows = async (playerId, sagaNumber, sagaLevels = []) => {
+const buildSagaLevelRows = (playerId, sagaNumber, sagaLevels = []) => {
   const orderedLevels = sortSagaLevels(sagaLevels);
-  const categoryIds = orderedLevels
-    .map((sagaLevel) => toObjectId(sagaLevel?.category?._id || sagaLevel?.category))
-    .filter(Boolean);
-
-  const categories = categoryIds.length
-    ? await Category.find({ _id: { $in: categoryIds } })
-        .select("_id name image64 disabled")
-        .lean()
-    : [];
-
-  const categoryMap = new Map(
-    categories.map((category) => [String(category._id), category]),
-  );
 
   return orderedLevels.map((sagaLevel) => {
     const categoryId = toObjectId(sagaLevel?.category?._id || sagaLevel?.category);
-    const category = categoryId ? categoryMap.get(String(categoryId)) : null;
-    const isUnavailableCategory = Boolean(categoryId) && !category;
 
     return {
       _id: String(sagaLevel?._id || `${sagaNumber}-${String(categoryId || "")}`),
@@ -210,21 +207,7 @@ const buildSagaLevelRows = async (playerId, sagaNumber, sagaLevels = []) => {
       sagaNumber,
       isCompleted: Boolean(sagaLevel?.isCompleted),
       completionRating: Number(sagaLevel?.completionRating || 0),
-      category: category
-        ? {
-            _id: category._id,
-            name: category.name,
-            image64: category.image64 || "",
-            disabled: Boolean(category.disabled),
-          }
-        : isUnavailableCategory
-          ? {
-              _id: categoryId,
-              name: "Category unavailable",
-              image64: "",
-              disabled: true,
-            }
-        : null,
+      category: categoryId ? String(categoryId) : null,
       createdAt: sagaLevel?.createdAt || null,
     };
   });
@@ -385,6 +368,49 @@ router.get("/progression", authenticateToken, async (req, res) => {
   }
 });
 
+router.get("/categories", authenticateToken, async (req, res) => {
+  try {
+    const playerId = req.user?.id;
+    if (!playerId || !mongoose.Types.ObjectId.isValid(playerId)) {
+      return res.status(400).json({ message: "Invalid player ID." });
+    }
+
+    const requestedCategoryIds = parseCategoryIdsQuery(req.query.ids);
+    const uniqueCategoryIds = Array.from(
+      new Set(
+        requestedCategoryIds
+          .map((categoryId) => toObjectId(categoryId))
+          .filter(Boolean)
+          .map((categoryId) => String(categoryId)),
+      ),
+    );
+
+    if (!uniqueCategoryIds.length) {
+      return res.status(200).json({ categories: [] });
+    }
+
+    const objectIds = uniqueCategoryIds.map((categoryId) => new mongoose.Types.ObjectId(categoryId));
+    const categories = await Category.find({ _id: { $in: objectIds } })
+      .select("_id name image64 disabled")
+      .lean();
+
+    return res.status(200).json({
+      categories: categories.map((category) => ({
+        _id: String(category._id),
+        name: category.name || "",
+        image64: category.image64 || "",
+        disabled: Boolean(category.disabled),
+      })),
+    });
+  } catch (error) {
+    console.error("Failed to load saga category details:", error);
+    return res.status(500).json({
+      message: "Server error while loading saga category details.",
+      error: error.message,
+    });
+  }
+});
+
 router.post("/levels/:sagaNumber/bootstrap", authenticateToken, async (req, res) => {
   try {
     const playerId = req.user?.id;
@@ -451,7 +477,7 @@ router.post("/levels/:sagaNumber/bootstrap", authenticateToken, async (req, res)
       saga = findSagaByNumber(progression.sagas, sagaNumber);
     }
 
-    const rows = await buildSagaLevelRows(
+    const rows = buildSagaLevelRows(
       playerId,
       sagaNumber,
       saga?.sagaLevels || [],
@@ -486,7 +512,7 @@ router.get("/levels/:sagaNumber", authenticateToken, async (req, res) => {
 
     const { sagas } = await getCanonicalProgression(playerId, { migrate: false });
     const saga = findSagaByNumber(sagas, sagaNumber);
-    const rows = await buildSagaLevelRows(
+    const rows = buildSagaLevelRows(
       playerId,
       sagaNumber,
       saga?.sagaLevels || [],

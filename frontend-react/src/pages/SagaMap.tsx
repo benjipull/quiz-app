@@ -649,6 +649,7 @@ export default function SagaMap() {
           userXP={user.knowledgePoints ?? 0}
           userGem1={user.wisdomGems ?? 0}
           userGem2={user.enlightenmentCrystals ?? 0}
+          showSecondaryEconomyItems={false}
           compactMode={isCompactEconomyResolution}
           panelVariant="saga3d"
           centerImageSrc={userAvatarImage}
@@ -793,22 +794,75 @@ export default function SagaMap() {
 
       <style>{`
         @keyframes sagaNextPlayablePulse {
-          0%, 100% {
+          0% {
+            transform: translateX(0) rotate(0deg) scale(1);
             box-shadow:
               0 0 20px rgba(250, 204, 21, 0.65),
               0 0 36px rgba(6, 182, 212, 0.45);
             filter: saturate(1) brightness(1);
           }
+          12.5% {
+            transform: translateX(-5px) rotate(-4deg) scale(1.05);
+            box-shadow:
+              0 0 24px rgba(250, 204, 21, 0.74),
+              0 0 40px rgba(6, 182, 212, 0.52);
+            filter: saturate(1.08) brightness(1.03);
+          }
+          25% {
+            transform: translateX(-8px) rotate(-6deg) scale(1.08);
+            box-shadow:
+              0 0 28px rgba(250, 204, 21, 0.82),
+              0 0 46px rgba(6, 182, 212, 0.6);
+            filter: saturate(1.15) brightness(1.05);
+          }
+          37.5% {
+            transform: translateX(-3px) rotate(-2deg) scale(1.1);
+            box-shadow:
+              0 0 30px rgba(250, 204, 21, 0.86),
+              0 0 50px rgba(6, 182, 212, 0.65);
+            filter: saturate(1.2) brightness(1.06);
+          }
           50% {
+            transform: translateX(0) rotate(0deg) scale(1.12);
             box-shadow:
               0 0 34px rgba(250, 204, 21, 0.92),
               0 0 58px rgba(6, 182, 212, 0.72);
             filter: saturate(1.25) brightness(1.08);
           }
+          62.5% {
+            transform: translateX(3px) rotate(2deg) scale(1.1);
+            box-shadow:
+              0 0 30px rgba(250, 204, 21, 0.86),
+              0 0 50px rgba(6, 182, 212, 0.65);
+            filter: saturate(1.2) brightness(1.06);
+          }
+          75% {
+            transform: translateX(8px) rotate(6deg) scale(1.08);
+            box-shadow:
+              0 0 28px rgba(250, 204, 21, 0.82),
+              0 0 46px rgba(6, 182, 212, 0.6);
+            filter: saturate(1.15) brightness(1.05);
+          }
+          87.5% {
+            transform: translateX(5px) rotate(4deg) scale(1.05);
+            box-shadow:
+              0 0 24px rgba(250, 204, 21, 0.74),
+              0 0 40px rgba(6, 182, 212, 0.52);
+            filter: saturate(1.08) brightness(1.03);
+          }
+          100% {
+            transform: translateX(0) rotate(0deg) scale(1);
+            box-shadow:
+              0 0 20px rgba(250, 204, 21, 0.65),
+              0 0 36px rgba(6, 182, 212, 0.45);
+            filter: saturate(1) brightness(1);
+          }
         }
 
         .saga-next-playable-bubble {
-          animation: sagaNextPlayablePulse 1.5s ease-in-out infinite;
+          animation: sagaNextPlayablePulse 1.45s linear infinite;
+          transform-origin: 50% 56%;
+          will-change: transform, box-shadow, filter;
         }
 
         @keyframes sagaUnlockBubbleEntry {

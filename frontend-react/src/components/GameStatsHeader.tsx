@@ -13,6 +13,11 @@ interface GameStatsHeaderProps {
   userXP: number;
   userGem1: number;
   userGem2: number;
+  showSecondaryEconomyItems?: boolean;
+  showKpProgressBar?: boolean;
+  kpProgressPercent?: number;
+  kpProgressLabel?: string;
+  kpProgressMeta?: string;
   compactMode?: boolean;
   panelVariant?: "default" | "saga3d";
   centerImageSrc?: string;
@@ -29,6 +34,11 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
   userXP,
   userGem1,
   userGem2,
+  showSecondaryEconomyItems = true,
+  showKpProgressBar = false,
+  kpProgressPercent = 0,
+  kpProgressLabel = "",
+  kpProgressMeta = "",
   compactMode = false,
   panelVariant = "default",
   centerImageSrc = "/assets/images/q.jpg",
@@ -171,176 +181,209 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
           "inset 0 1px 0 rgba(255,255,255,0.42), inset 0 -2px 0 rgba(15,23,42,0.25), 0 3px 7px rgba(2,6,23,0.35)",
       }
     : undefined;
+  const normalizedKpProgressPercent = Number.isFinite(kpProgressPercent)
+    ? Math.max(0, Math.min(100, kpProgressPercent))
+    : 0;
+  const shouldShowKpProgress = showKpProgressBar && userToken && !isParentLoading;
 
   return (
     <div className={`w-full px-2 ${compact ? "py-0.5" : "py-1.5 sm:py-2"}`}>
-      <div className={`flex items-center justify-between ${compact ? "gap-1.5 max-w-sm" : "gap-2 sm:gap-3 md:gap-4 max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-3xl"} mx-auto`}>
-        {/* Left Stats - Coins & Gem1 */}
-        <div className={`flex flex-col ${compact ? "gap-1" : "gap-1.5 sm:gap-2"} flex-1`}>
-          {/* Coins */}
-          <div 
-            data-coin-header=""
-            className={`flex items-center justify-end ${
+      <div className={`${compact ? "max-w-sm" : "max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-3xl"} mx-auto`}>
+        <div className={`flex items-center justify-between ${compact ? "gap-1.5" : "gap-2 sm:gap-3 md:gap-4"}`}>
+          {/* Left Stats - Coins & Gem1 */}
+          <div className={`flex flex-col ${compact ? "gap-1" : "gap-1.5 sm:gap-2"} flex-1`}>
+            {/* Coins */}
+            <div 
+              data-coin-header=""
+              className={`flex items-center justify-end ${
+                compact
+                  ? "gap-1 px-2 py-1"
+                  : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
+              } bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full border-2 border-blue-300 ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
+              style={getPanel3DStyle("blue")}
+            >
+              <div className={`${compact ? "text-sm" : "text-base sm:text-lg md:text-xl lg:text-2xl"} font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate`}>
+                {formatNumber(animatedCoins)}
+              </div>
+              <div
+                data-coin-header-icon=""
+                className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-yellow-400 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
+                style={icon3DStyle}
+              >
+                <img
+                  src="/assets/images/icons/coin.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-full w-full rounded-full object-cover"
+                />
+              </div>
+            </div>
+
+            {showSecondaryEconomyItems ? (
+              <div className={`flex items-center justify-end ${
+                compact
+                  ? "gap-1 px-2 py-1"
+                  : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
+              } bg-gradient-to-r from-emerald-400 to-green-400 rounded-full border-2 border-green-300 ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
+                style={icon3DStyle}
+              >
+                <div className={`${compact ? "text-sm" : "text-base sm:text-lg md:text-xl lg:text-2xl"} font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate`}>
+                  {formatNumber(userGem1)}
+                </div>
+                <div
+                  className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-green-400 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
+                  style={icon3DStyle}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className={compact ? "w-3 h-3 text-slate-800" : "w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-slate-800"}
+                    fill="currentColor"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M12 2L5 21l7-3 7 3L12 2z" />
+                  </svg>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Middle - User Icon  */}
+          <div
+            className={`flex-shrink-0 flex flex-col items-center ${onCenterClick ? "cursor-pointer" : ""}`}
+            onClick={onCenterClick}
+            onKeyDown={(event) => {
+              if (!onCenterClick) return;
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onCenterClick();
+              }
+            }}
+            role={onCenterClick ? "button" : undefined}
+            tabIndex={onCenterClick ? 0 : undefined}
+            aria-label={onCenterClick ? centerAriaLabel : undefined}
+          >
+            <div className="relative">
+              <div className={`${compact ? "w-[3.75rem] h-[3.75rem] border-2" : "w-20 h-20 sm:w-[6.25rem] sm:h-[6.25rem] md:w-[7.5rem] md:h-[7.5rem] lg:w-[8.75rem] lg:h-[8.75rem] border-4"} rounded-full border-slate-300 shadow-2xl overflow-hidden`}>
+                <img
+                  src={centerImageSrc}
+                  alt="center icon"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              {centerBadgeValue !== null && centerBadgeValue !== undefined && centerBadgeValue !== "" ? (
+                <div
+                  className={`absolute -right-1 -bottom-1 ${
+                    compact ? "min-w-5 h-5 text-[10px] px-1" : "min-w-6 h-6 sm:min-w-7 sm:h-7 text-[11px] sm:text-xs px-1.5"
+                  } rounded-full bg-emerald-400 border-2 border-white text-slate-900 font-black flex items-center justify-center shadow-lg leading-none`}
+                  aria-label={`Level ${centerBadgeValue}`}
+                >
+                  {centerBadgeValue}
+                </div>
+              ) : null}
+            </div>
+            {centerSubLabel ? (
+              <p className={`${compact ? "text-[11px] mt-0.5 max-w-[84px]" : "text-xs sm:text-sm mt-1 max-w-[128px]"} text-cyan-100 font-semibold leading-none truncate text-center drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]`}>
+                {centerSubLabel}
+              </p>
+            ) : null}
+          </div>
+
+          {/* Right Stats - XP & Gem2 */}
+          <div className={`flex flex-col ${compact ? "gap-1" : "gap-1.5 sm:gap-2"} flex-1`}>
+            {/* XP (Knowledge Points) */}
+            <div className={`flex items-center justify-start ${
               compact
                 ? "gap-1 px-2 py-1"
                 : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
             } bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full border-2 border-blue-300 ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
-            style={getPanel3DStyle("blue")}
-          >
-            <div className={`${compact ? "text-sm" : "text-base sm:text-lg md:text-xl lg:text-2xl"} font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate`}>
-              {formatNumber(animatedCoins)}
-            </div>
-            <div
-              data-coin-header-icon=""
-              className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-yellow-400 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
-              style={icon3DStyle}
+              style={getPanel3DStyle("blue")}
             >
-              <svg
-                viewBox="0 0 24 24"
-                className={compact ? "w-3 h-3" : "w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6"}
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <circle cx="12" cy="12" r="10" fill="#f59e0b" />
-                <circle cx="12" cy="12" r="8" fill="#fbbf24" />
-                <text
-                  x="12"
-                  y="16"
-                  fontSize="10"
-                  fontWeight="bold"
-                  fill="#d97706"
-                  textAnchor="middle"
-                >
-                  $
-                </text>
-              </svg>
-            </div>
-          </div>
-
-          {/* Gem 1 (Wisdom Gems) */}
-          <div className={`flex items-center justify-end ${
-            compact
-              ? "gap-1 px-2 py-1"
-              : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
-          } bg-gradient-to-r from-emerald-400 to-green-400 rounded-full border-2 border-green-300 ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
-            style={getPanel3DStyle("green")}
-          >
-            <div className={`${compact ? "text-sm" : "text-base sm:text-lg md:text-xl lg:text-2xl"} font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate`}>
-              {formatNumber(userGem1)}
-            </div>
-            <div
-              className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-green-400 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
-              style={icon3DStyle}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className={compact ? "w-3 h-3 text-slate-800" : "w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-slate-800"}
-                fill="currentColor"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path d="M12 2L5 21l7-3 7 3L12 2z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Middle - User Icon  */}
-        <div
-          className={`flex-shrink-0 flex flex-col items-center ${onCenterClick ? "cursor-pointer" : ""}`}
-          onClick={onCenterClick}
-          onKeyDown={(event) => {
-            if (!onCenterClick) return;
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              onCenterClick();
-            }
-          }}
-          role={onCenterClick ? "button" : undefined}
-          tabIndex={onCenterClick ? 0 : undefined}
-          aria-label={onCenterClick ? centerAriaLabel : undefined}
-        >
-          <div className="relative">
-            <div className={`${compact ? "w-12 h-12 border-2" : "w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 border-4"} rounded-full border-slate-300 shadow-2xl overflow-hidden`}>
-              <img
-                src={centerImageSrc}
-                alt="center icon"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            {centerBadgeValue !== null && centerBadgeValue !== undefined && centerBadgeValue !== "" ? (
               <div
-                className={`absolute -right-1 -bottom-1 ${
-                  compact ? "min-w-5 h-5 text-[10px] px-1" : "min-w-6 h-6 sm:min-w-7 sm:h-7 text-[11px] sm:text-xs px-1.5"
-                } rounded-full bg-emerald-400 border-2 border-white text-slate-900 font-black flex items-center justify-center shadow-lg leading-none`}
-                aria-label={`Level ${centerBadgeValue}`}
+                className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-amber-200 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
+                style={icon3DStyle}
               >
-                {centerBadgeValue}
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className={compact ? "w-3 h-3 text-amber-500" : "w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-amber-500"}
+                >
+                  <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
+                  <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
+                  <circle cx="12" cy="9" r="2" fill="#fff" />
+                </svg>
+              </div>
+              <div className={`${compact ? "text-sm" : "text-base sm:text-lg md:text-xl lg:text-2xl"} font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate`}>
+                {formatNumber(animatedXP)}
+              </div>
+            </div>
+
+            {showSecondaryEconomyItems ? (
+              <div className={`flex items-center justify-start ${
+                compact
+                  ? "gap-1 px-2 py-1"
+                  : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
+              } bg-gradient-to-r from-emerald-400 to-green-400 rounded-full border-2 border-green-300 ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
+                style={getPanel3DStyle("green")}
+              >
+                <div
+                  className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-emerald-500 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
+                  style={icon3DStyle}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className={compact ? "w-3 h-3 text-slate-800" : "w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-slate-800"}
+                    fill="currentColor"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
+                  </svg>
+                </div>
+                <div className={`${compact ? "text-sm" : "text-base sm:text-lg md:text-xl lg:text-2xl"} font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate`}>
+                  {formatNumber(userGem2)}
+                </div>
               </div>
             ) : null}
           </div>
-          {centerSubLabel ? (
-            <p className={`${compact ? "text-[9px] mt-0.5 max-w-[72px]" : "text-[10px] sm:text-xs mt-1 max-w-[110px]"} text-cyan-100 font-semibold leading-none truncate text-center drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]`}>
-              {centerSubLabel}
-            </p>
-          ) : null}
         </div>
-
-        {/* Right Stats - XP & Gem2 */}
-        <div className={`flex flex-col ${compact ? "gap-1" : "gap-1.5 sm:gap-2"} flex-1`}>
-          {/* XP (Knowledge Points) */}
-          <div className={`flex items-center justify-start ${
-            compact
-              ? "gap-1 px-2 py-1"
-              : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
-          } bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full border-2 border-blue-300 ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
-            style={getPanel3DStyle("blue")}
-          >
-            <div
-              className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-amber-200 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
-              style={icon3DStyle}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                xmlns="http://www.w3.org/2000/svg"
-                className={compact ? "w-3 h-3 text-amber-500" : "w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-amber-500"}
-              >
-                <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
-                <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
-                <circle cx="12" cy="9" r="2" fill="#fff" />
-              </svg>
-            </div>
-            <div className={`${compact ? "text-sm" : "text-base sm:text-lg md:text-xl lg:text-2xl"} font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate`}>
-              {formatNumber(animatedXP)}
+        {shouldShowKpProgress ? (
+          <div className={`${compact ? "mt-1 px-1.5" : "mt-2 px-2"}`}>
+            <div className="rounded-full border border-cyan-200/45 bg-slate-900/55 px-2 py-1.5 backdrop-blur-md shadow-[0_8px_18px_rgba(8,47,73,0.35)]">
+              <div className="flex items-center justify-between text-[10px] sm:text-xs font-semibold text-cyan-100/95">
+                <span>KP</span>
+                <span>{kpProgressLabel}</span>
+              </div>
+              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800/80 ring-1 ring-cyan-200/30">
+                <div
+                  className="relative h-full rounded-full bg-gradient-to-r from-cyan-300 via-cyan-400 to-sky-300 transition-[width] duration-500 ease-out shadow-[0_0_10px_rgba(34,211,238,0.75)]"
+                  style={{ width: `${normalizedKpProgressPercent}%` }}
+                >
+                  <span className="game-stats-kp-shine absolute inset-y-0 left-[-32%] w-[32%] bg-gradient-to-r from-transparent via-white/80 to-transparent" />
+                </div>
+              </div>
+              {kpProgressMeta ? (
+                <p className="mt-1 text-right text-[9px] sm:text-[10px] font-semibold tracking-wide text-cyan-100/85">
+                  {kpProgressMeta}
+                </p>
+              ) : null}
             </div>
           </div>
-
-          {/* Gem 2 (Enlightenment Crystals) */}
-          <div className={`flex items-center justify-start ${
-            compact
-              ? "gap-1 px-2 py-1"
-              : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
-          } bg-gradient-to-r from-emerald-400 to-green-400 rounded-full border-2 border-green-300 ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
-            style={getPanel3DStyle("green")}
-          >
-            <div
-              className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-emerald-500 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
-              style={icon3DStyle}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className={compact ? "w-3 h-3 text-slate-800" : "w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-slate-800"}
-                fill="currentColor"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
-              </svg>
-            </div>
-            <div className={`${compact ? "text-sm" : "text-base sm:text-lg md:text-xl lg:text-2xl"} font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate`}>
-              {formatNumber(userGem2)}
-            </div>
-          </div>
-        </div>
+        ) : null}
       </div>
+      {shouldShowKpProgress ? (
+        <style>{`
+          @keyframes gameStatsKpShineSweep {
+            0% { transform: translateX(-130%); opacity: 0; }
+            20% { opacity: 0.9; }
+            100% { transform: translateX(390%); opacity: 0; }
+          }
+
+          .game-stats-kp-shine {
+            animation: gameStatsKpShineSweep 1.35s linear infinite;
+            filter: blur(0.5px);
+          }
+        `}</style>
+      ) : null}
     </div>
   );
 };

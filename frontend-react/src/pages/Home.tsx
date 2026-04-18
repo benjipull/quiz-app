@@ -663,6 +663,7 @@ export default function Home() {
             userXP={user.knowledgePoints ?? 0}
             userGem1={user.wisdomGems ?? 0}
             userGem2={user.enlightenmentCrystals ?? 0}
+            showSecondaryEconomyItems={false}
             compactMode={isCompactEconomyResolution}
           />
 
