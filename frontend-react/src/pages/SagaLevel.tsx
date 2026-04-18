@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Star } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -10,6 +10,7 @@ import { trackEnteredSagaLevelMap } from "@/utils/analytics";
 import GameStatsHeader from "@/components/GameStatsHeader";
 import { avatarUrls } from "@/utils/avatarPaths";
 import { playSound } from "@/utils/soundCache";
+import { loadLevelConfig, resolveLevelProgress, type LevelConfigEntry } from "@/utils/levelConfig";
 
 const BASE_URL = getApiBaseUrl();
 const QUIZ_COST = 100;
@@ -23,7 +24,7 @@ const QUIZ_COMPLETION_CENTER_COIN_LAUNCH_DELAY_MS = 680;
 const QUIZ_COMPLETION_CENTER_COIN_FLIGHT_MS = 1180;
 const QUIZ_COMPLETION_CENTER_COIN_STAGGER_MS = 110;
 const QUIZ_COMPLETION_CENTER_MINI_COIN_COUNT = 15;
-const QUIZ_COMPLETION_CENTER_MINI_COIN_SIZE_PX = 72;
+const QUIZ_COMPLETION_CENTER_MINI_COIN_SIZE_PX = 60;
 const QUIZ_COMPLETION_CENTER_COIN_HIDE_TAIL_MS = 290;
 const QUIZ_COMPLETION_COIN_PHASE_TOTAL_MS =
   QUIZ_COMPLETION_CENTER_COIN_LAUNCH_DELAY_MS +
@@ -32,19 +33,37 @@ const QUIZ_COMPLETION_COIN_PHASE_TOTAL_MS =
   QUIZ_COMPLETION_CENTER_COIN_HIDE_TAIL_MS;
 const QUIZ_PANEL_SWAY_DURATION_MS = 500;
 const DEFAULT_CATEGORY_IMAGE_SRC = "/assets/images/SagaLevelGraphics/Enchanted-Forest.png";
+const SAGA_CATEGORY_CACHE_STORAGE_KEY = "saga_category_cache_v1";
+const SAGA_CATEGORY_CACHE_MAX_ITEMS = 90;
+const SAGA_CATEGORY_CACHE_MAX_BYTES = 3_500_000;
+
+type SagaLevelCategory = {
+  _id: string;
+  name?: string;
+  image64?: string;
+  disabled?: boolean;
+};
 
 type SagaLevelRow = {
   _id: string;
   sagaNumber: number;
   isCompleted?: boolean;
   completionRating?: number;
-  category: {
-    _id: string;
-    name: string;
-    image64: string;
-    disabled?: boolean;
-  } | null;
+  category: SagaLevelCategory | null;
 };
+
+type SagaCategoryPayload = {
+  _id: string;
+  name: string;
+  image64: string;
+  disabled: boolean;
+};
+
+type SagaCategoryCacheEntry = SagaCategoryPayload & {
+  cachedAt: number;
+};
+
+type SagaCategoryCacheMap = Record<string, SagaCategoryCacheEntry>;
 
 type Point = { x: number; y: number };
 type SagaPathDot = {
@@ -237,6 +256,414 @@ const getPointAtArcDistance = (table: CubicArcSample[], targetDistance: number):
   };
 };
 
+const normalizeSagaLevelCategory = (value: unknown): SagaLevelCategory | null => {
+  const categoryId = normalizeId(
+    typeof value === "object" && value !== null
+      ? (value as Record<string, unknown>)._id ?? value
+      : value,
+  );
+  if (!categoryId) return null;
+
+  if (typeof value !== "object" || value === null) {
+    return { _id: categoryId };
+  }
+
+  const asRecord = value as Record<string, unknown>;
+  const name = typeof asRecord.name === "string" ? asRecord.name : undefined;
+  const image64 = typeof asRecord.image64 === "string" ? asRecord.image64 : undefined;
+  const disabled = typeof asRecord.disabled === "boolean" ? asRecord.disabled : undefined;
+
+  return {
+    _id: categoryId,
+    name,
+    image64,
+    disabled,
+  };
+};
+
+const normalizeSagaLevelRows = (rowsValue: unknown): SagaLevelRow[] => {
+  if (!Array.isArray(rowsValue)) return [];
+
+  return rowsValue.map((rowValue, index) => {
+    const rowRecord =
+      typeof rowValue === "object" && rowValue !== null
+        ? (rowValue as Record<string, unknown>)
+        : {};
+    const category = normalizeSagaLevelCategory(rowRecord.category);
+    const fallbackRowId = `${Number(rowRecord.sagaNumber || 0)}-${category?._id || index}`;
+    const normalizedRowId = normalizeId(rowRecord._id) || fallbackRowId;
+    const normalizedSagaNumber = Number(rowRecord.sagaNumber || 0);
+    const normalizedCompletionRating = Number(rowRecord.completionRating || 0);
+
+    return {
+      _id: normalizedRowId,
+      sagaNumber:
+        Number.isFinite(normalizedSagaNumber) && normalizedSagaNumber > 0
+          ? normalizedSagaNumber
+          : 0,
+      isCompleted: Boolean(rowRecord.isCompleted),
+      completionRating: Number.isFinite(normalizedCompletionRating)
+        ? normalizedCompletionRating
+        : 0,
+      category,
+    };
+  });
+};
+
+const toPersistableSagaCategory = (
+  category: SagaLevelCategory | null | undefined,
+): SagaCategoryPayload | null => {
+  const categoryId = normalizeId(category?._id);
+  if (!categoryId) return null;
+
+  const name = typeof category?.name === "string" ? category.name : "";
+  const image64 = typeof category?.image64 === "string" ? category.image64 : "";
+  const disabled = Boolean(category?.disabled);
+  const hasPayload = Boolean(name.trim() || image64.trim() || category?.disabled === true);
+  if (!hasPayload) return null;
+
+  return {
+    _id: categoryId,
+    name,
+    image64,
+    disabled,
+  };
+};
+
+const collectSagaCategoriesFromRows = (rows: SagaLevelRow[]): SagaCategoryPayload[] => {
+  const seenIds = new Set<string>();
+  const categories: SagaCategoryPayload[] = [];
+
+  rows.forEach((row) => {
+    const payload = toPersistableSagaCategory(row.category);
+    if (!payload || seenIds.has(payload._id)) return;
+    seenIds.add(payload._id);
+    categories.push(payload);
+  });
+
+  return categories;
+};
+
+const trimSagaCategoryCache = (cache: SagaCategoryCacheMap): SagaCategoryCacheMap => {
+  const sortedEntries = Object.values(cache).sort(
+    (left, right) => (right.cachedAt || 0) - (left.cachedAt || 0),
+  );
+  const trimmedByCount = sortedEntries.slice(0, SAGA_CATEGORY_CACHE_MAX_ITEMS);
+  const trimmedByBytes: SagaCategoryCacheMap = {};
+  let estimatedSize = 2;
+
+  for (const entry of trimmedByCount) {
+    const normalizedId = normalizeId(entry._id);
+    if (!normalizedId) continue;
+    const normalizedEntry: SagaCategoryCacheEntry = {
+      _id: normalizedId,
+      name: typeof entry.name === "string" ? entry.name : "",
+      image64: typeof entry.image64 === "string" ? entry.image64 : "",
+      disabled: Boolean(entry.disabled),
+      cachedAt: Number.isFinite(entry.cachedAt) ? entry.cachedAt : 0,
+    };
+    const serializedEntry = JSON.stringify({ [normalizedId]: normalizedEntry });
+    if (estimatedSize + serializedEntry.length > SAGA_CATEGORY_CACHE_MAX_BYTES) {
+      break;
+    }
+
+    trimmedByBytes[normalizedId] = normalizedEntry;
+    estimatedSize += serializedEntry.length;
+  }
+
+  return trimmedByBytes;
+};
+
+const readSagaCategoryCache = (): SagaCategoryCacheMap => {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = localStorage.getItem(SAGA_CATEGORY_CACHE_STORAGE_KEY);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object") return {};
+
+    const cache: SagaCategoryCacheMap = {};
+    Object.entries(parsed).forEach(([key, value]) => {
+      if (!value || typeof value !== "object") return;
+      const asRecord = value as Record<string, unknown>;
+      const categoryId = normalizeId(asRecord._id ?? key);
+      if (!categoryId) return;
+
+      cache[categoryId] = {
+        _id: categoryId,
+        name: typeof asRecord.name === "string" ? asRecord.name : "",
+        image64: typeof asRecord.image64 === "string" ? asRecord.image64 : "",
+        disabled: Boolean(asRecord.disabled),
+        cachedAt: Number(asRecord.cachedAt || 0),
+      };
+    });
+
+    return trimSagaCategoryCache(cache);
+  } catch {
+    return {};
+  }
+};
+
+const writeSagaCategoryCache = (cache: SagaCategoryCacheMap) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.setItem(
+      SAGA_CATEGORY_CACHE_STORAGE_KEY,
+      JSON.stringify(trimSagaCategoryCache(cache)),
+    );
+  } catch (error) {
+    console.warn("Failed to persist saga category cache:", error);
+  }
+};
+
+const upsertSagaCategoryCache = (
+  currentCache: SagaCategoryCacheMap,
+  categories: SagaCategoryPayload[],
+): SagaCategoryCacheMap => {
+  if (!categories.length) return currentCache;
+
+  const now = Date.now();
+  const nextCache: SagaCategoryCacheMap = { ...currentCache };
+
+  categories.forEach((category) => {
+    const categoryId = normalizeId(category._id);
+    if (!categoryId) return;
+
+    nextCache[categoryId] = {
+      _id: categoryId,
+      name: category.name || "",
+      image64: category.image64 || "",
+      disabled: Boolean(category.disabled),
+      cachedAt: now,
+    };
+  });
+
+  return trimSagaCategoryCache(nextCache);
+};
+
+const hydrateRowsWithSagaCategoryCache = (
+  rows: SagaLevelRow[],
+  categoryCache: SagaCategoryCacheMap,
+): { rows: SagaLevelRow[]; missingCategoryIds: string[] } => {
+  const missingCategoryIds = new Set<string>();
+  const hydratedRows = rows.map((row) => {
+    const categoryId = normalizeId(row.category?._id);
+    if (!categoryId) {
+      return {
+        ...row,
+        category: null,
+      };
+    }
+
+    const cachedCategory = categoryCache[categoryId];
+    if (!cachedCategory) {
+      missingCategoryIds.add(categoryId);
+      return {
+        ...row,
+        category: {
+          _id: categoryId,
+          name: row.category?.name,
+          image64: row.category?.image64,
+          disabled: row.category?.disabled,
+        },
+      };
+    }
+
+    return {
+      ...row,
+      category: {
+        _id: categoryId,
+        name: cachedCategory.name,
+        image64: cachedCategory.image64,
+        disabled: cachedCategory.disabled,
+      },
+    };
+  });
+
+  return {
+    rows: hydratedRows,
+    missingCategoryIds: Array.from(missingCategoryIds),
+  };
+};
+
+const fetchSagaCategoriesByIds = async (
+  userToken: string,
+  categoryIds: string[],
+): Promise<SagaCategoryPayload[]> => {
+  if (!categoryIds.length) return [];
+
+  const response = await fetch(
+    `${BASE_URL}/api/saga/categories?ids=${encodeURIComponent(categoryIds.join(","))}`,
+    {
+      headers: {
+        Authorization: `Bearer ${userToken}`,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  if (!Array.isArray(data?.categories)) return [];
+
+  return data.categories
+    .map((categoryValue: unknown) => {
+      if (!categoryValue || typeof categoryValue !== "object") return null;
+      const categoryRecord = categoryValue as Record<string, unknown>;
+      const categoryId = normalizeId(categoryRecord._id);
+      if (!categoryId) return null;
+
+      return {
+        _id: categoryId,
+        name: typeof categoryRecord.name === "string" ? categoryRecord.name : "",
+        image64: typeof categoryRecord.image64 === "string" ? categoryRecord.image64 : "",
+        disabled: Boolean(categoryRecord.disabled),
+      };
+    })
+    .filter(Boolean) as SagaCategoryPayload[];
+};
+
+type SagaLevelTransitionScreenProps = {
+  sagaNumber: number | null;
+  isRestoringSession: boolean;
+};
+
+const SagaLevelTransitionScreen = ({
+  sagaNumber,
+  isRestoringSession,
+}: SagaLevelTransitionScreenProps) => {
+  const orbitNodes = Array.from({ length: 8 }, (_, index) => ({
+    id: index,
+    delay: index * 0.12,
+    angle: index * 45,
+  }));
+
+  return (
+    <div className="relative min-h-[100dvh] overflow-hidden bg-[#0a1730] text-slate-100">
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 saga-level-transition-bg" />
+        <div className="absolute inset-0 saga-level-transition-vignette" />
+      </div>
+
+      <div className="relative z-10 min-h-[100dvh] grid place-items-center px-6">
+        <div className="flex flex-col items-center gap-6">
+          <div className="relative h-40 w-40">
+            <div className="absolute inset-0 rounded-full border border-cyan-200/40 saga-level-transition-ring-a" />
+            <div className="absolute inset-[14%] rounded-full border border-blue-200/35 saga-level-transition-ring-b" />
+            <div className="absolute inset-[29%] rounded-full border border-amber-200/40 saga-level-transition-ring-c" />
+            <div className="absolute left-1/2 top-1/2 h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-amber-200 via-amber-300 to-yellow-500 shadow-[0_0_24px_rgba(250,204,21,0.58)]" />
+            {orbitNodes.map((node) => (
+              <span
+                key={node.id}
+                className="absolute left-1/2 top-1/2 h-2.5 w-2.5 rounded-full bg-cyan-200 shadow-[0_0_10px_rgba(125,211,252,0.8)] saga-level-transition-orb"
+                style={
+                  {
+                    "--orb-angle": `${node.angle}deg`,
+                    animationDelay: `${node.delay}s`,
+                  } as CSSProperties
+                }
+              />
+            ))}
+          </div>
+
+          <div className="text-center">
+            <p className="text-lg sm:text-xl font-extrabold tracking-wide text-cyan-100 drop-shadow-[0_2px_12px_rgba(34,211,238,0.35)]">
+              {isRestoringSession
+                ? "Restoring your session..."
+                : sagaNumber
+                ? `Preparing Saga ${sagaNumber}`
+                : "Preparing Saga Level"}
+            </p>
+            <p className="mt-2 text-xs sm:text-sm text-cyan-100/80 saga-level-transition-dots">
+              Entering the map
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        .saga-level-transition-bg {
+          background:
+            radial-gradient(64% 44% at 50% 38%, rgba(56, 189, 248, 0.34) 0%, rgba(56, 189, 248, 0.05) 58%, rgba(56, 189, 248, 0) 100%),
+            radial-gradient(46% 36% at 72% 68%, rgba(250, 204, 21, 0.2) 0%, rgba(250, 204, 21, 0.02) 62%, rgba(250, 204, 21, 0) 100%),
+            linear-gradient(180deg, #0a1730 0%, #12274a 48%, #0a1730 100%);
+          animation: sagaLevelTransitionBgPulse 2.8s ease-in-out infinite;
+        }
+
+        .saga-level-transition-vignette {
+          background: radial-gradient(ellipse at center, rgba(0,0,0,0) 35%, rgba(0,0,0,0.45) 100%);
+        }
+
+        .saga-level-transition-ring-a {
+          animation: sagaLevelTransitionSpinA 3.2s linear infinite;
+        }
+
+        .saga-level-transition-ring-b {
+          animation: sagaLevelTransitionSpinB 2.2s linear infinite;
+        }
+
+        .saga-level-transition-ring-c {
+          animation: sagaLevelTransitionPulse 1.4s ease-in-out infinite;
+        }
+
+        .saga-level-transition-orb {
+          transform-origin: 0 0;
+          animation: sagaLevelTransitionOrbit 1.8s ease-in-out infinite;
+        }
+
+        .saga-level-transition-dots::after {
+          content: "";
+          animation: sagaLevelTransitionDots 1.3s steps(4, end) infinite;
+        }
+
+        @keyframes sagaLevelTransitionSpinA {
+          0% { transform: rotate(0deg) scale(1); }
+          100% { transform: rotate(360deg) scale(1); }
+        }
+
+        @keyframes sagaLevelTransitionSpinB {
+          0% { transform: rotate(360deg) scale(1); }
+          100% { transform: rotate(0deg) scale(1); }
+        }
+
+        @keyframes sagaLevelTransitionPulse {
+          0%, 100% { transform: scale(0.92); opacity: 0.55; }
+          50% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes sagaLevelTransitionOrbit {
+          0%, 100% {
+            transform: rotate(var(--orb-angle)) translateX(63px) scale(0.7);
+            opacity: 0.5;
+          }
+          50% {
+            transform: rotate(calc(var(--orb-angle) + 26deg)) translateX(72px) scale(1.15);
+            opacity: 1;
+          }
+        }
+
+        @keyframes sagaLevelTransitionBgPulse {
+          0%, 100% { filter: saturate(1) brightness(1); }
+          50% { filter: saturate(1.16) brightness(1.08); }
+        }
+
+        @keyframes sagaLevelTransitionDots {
+          0% { content: ""; }
+          25% { content: "."; }
+          50% { content: ".."; }
+          75% { content: "..."; }
+          100% { content: ""; }
+        }
+      `}</style>
+    </div>
+  );
+};
+
 export default function SagaLevel() {
   const { user, loading, refreshUser, updateCoins, markUserStale } = useUser();
   const navigate = useNavigate();
@@ -352,7 +779,10 @@ export default function SagaLevel() {
       )
     : 0;
 
-  const [rows, setRows] = useState<SagaLevelRow[]>(preloadedRowsFromSagaMap || []);
+  const [rows, setRows] = useState<SagaLevelRow[]>(
+    () => normalizeSagaLevelRows(preloadedRowsFromSagaMap || []),
+  );
+  const [levelConfig, setLevelConfig] = useState<LevelConfigEntry[] | null>(null);
   const [isLoadingRows, setIsLoadingRows] = useState(!preloadedRowsFromSagaMap);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [startingCategoryId, setStartingCategoryId] = useState<string | null>(null);
@@ -393,6 +823,17 @@ export default function SagaLevel() {
   const sagaLevelUserToken =
     typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
   const currentCoins = user?.coins ?? 0;
+  const knowledgePoints = Math.max(0, Number(user?.knowledgePoints ?? 0));
+  const levelProgress = levelConfig ? resolveLevelProgress(knowledgePoints, levelConfig) : null;
+  const levelProgressPoints = levelProgress?.progressIntoLevel ?? 0;
+  const levelProgressTarget = levelProgress?.progressToNextLevel ?? 0;
+  const levelProgressPercent = levelProgressTarget > 0
+    ? Math.min(100, (levelProgressPoints / levelProgressTarget) * 100)
+    : levelProgress?.isMaxLevel
+      ? 100
+      : 0;
+  const remainingKpToNextLevel = levelProgress?.remainingKpToNextLevel ?? 0;
+  const nextLevel = levelProgress?.nextLevel ?? Math.max(1, Number(user?.level ?? 1));
   const selectedAvatarIndex = Math.max(0, (user?.avatar || 1) - 1);
   const userAvatarImage = avatarUrls[selectedAvatarIndex] || avatarUrls[0];
   const displayRows = rows.slice(0, 6);
@@ -734,13 +1175,6 @@ export default function SagaLevel() {
   useEffect(() => {
     if (loading || !user || !hasValidSagaNumber) return;
 
-    if (preloadedRowsFromSagaMap) {
-      setRows(preloadedRowsFromSagaMap);
-      setIsLoadingRows(false);
-      setErrorMessage(null);
-      return;
-    }
-
     let isMounted = true;
     const userToken =
       typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
@@ -748,14 +1182,59 @@ export default function SagaLevel() {
     if (!userToken) {
       setIsLoadingRows(false);
       setErrorMessage("Missing session token.");
-      return;
+      return () => {
+        isMounted = false;
+      };
     }
 
-    const fetchSagaLevel = async () => {
+    const hydrateRowsWithCategoryCache = async (rowsValue: unknown) => {
+      const normalizedRows = normalizeSagaLevelRows(rowsValue);
+      let categoryCache = readSagaCategoryCache();
+      const categoriesFromRows = collectSagaCategoriesFromRows(normalizedRows);
+
+      if (categoriesFromRows.length) {
+        categoryCache = upsertSagaCategoryCache(categoryCache, categoriesFromRows);
+        writeSagaCategoryCache(categoryCache);
+      }
+
+      const {
+        rows: cachedRows,
+        missingCategoryIds,
+      } = hydrateRowsWithSagaCategoryCache(normalizedRows, categoryCache);
+
+      if (!isMounted) return;
+      setRows(cachedRows);
+
+      if (!missingCategoryIds.length) return;
+
+      try {
+        const fetchedCategories = await fetchSagaCategoriesByIds(userToken, missingCategoryIds);
+        if (!fetchedCategories.length) return;
+        categoryCache = upsertSagaCategoryCache(categoryCache, fetchedCategories);
+        writeSagaCategoryCache(categoryCache);
+
+        if (!isMounted) return;
+        const { rows: fullyHydratedRows } = hydrateRowsWithSagaCategoryCache(
+          normalizedRows,
+          categoryCache,
+        );
+        setRows(fullyHydratedRows);
+      } catch (categoryError) {
+        console.error("Failed to hydrate missing saga categories:", categoryError);
+      }
+    };
+
+    const fetchSagaLevel = async (rowsOverride?: unknown) => {
       setIsLoadingRows(true);
       setErrorMessage(null);
-      setRows([]);
+
       try {
+        if (rowsOverride) {
+          await hydrateRowsWithCategoryCache(rowsOverride);
+          return;
+        }
+
+        setRows([]);
         const shouldBootstrap = cameFromSagaMap;
         const endpoint = shouldBootstrap
           ? `${BASE_URL}/api/saga/levels/${sagaNumber}/bootstrap`
@@ -773,7 +1252,7 @@ export default function SagaLevel() {
 
         const data = await response.json();
         if (!isMounted) return;
-        setRows(Array.isArray(data?.rows) ? data.rows : []);
+        await hydrateRowsWithCategoryCache(data?.rows);
       } catch (error) {
         console.error("Failed to load saga level:", error);
         if (!isMounted) return;
@@ -786,7 +1265,11 @@ export default function SagaLevel() {
       }
     };
 
-    fetchSagaLevel();
+    if (preloadedRowsFromSagaMap) {
+      void fetchSagaLevel(preloadedRowsFromSagaMap);
+    } else {
+      void fetchSagaLevel();
+    }
 
     return () => {
       isMounted = false;
@@ -835,6 +1318,23 @@ export default function SagaLevel() {
     if (loading || !user || !hasValidSagaNumber) return;
     trackEnteredSagaLevelMap(user._id, sagaNumber);
   }, [loading, user?._id, hasValidSagaNumber, sagaNumber]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadLevelConfig()
+      .then((config) => {
+        if (!isMounted) return;
+        setLevelConfig(config);
+      })
+      .catch((error) => {
+        console.error("Failed to load level config for saga level:", error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (loading || !user || !isReturningFromQuizCompletion) return;
@@ -1423,24 +1923,18 @@ export default function SagaLevel() {
     refreshUser,
   ]);
 
-  if (loading) {
-    return (
-      <div className="min-h-[100dvh] grid place-items-center bg-[#0b1325] text-slate-200">
-        Loading Saga Level...
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-[100dvh] grid place-items-center bg-[#0b1325] text-slate-200">
-        Restoring your session...
-      </div>
-    );
-  }
-
   if (!hasValidSagaNumber) {
     return <Navigate to="/saga-map" replace />;
+  }
+
+  const showSagaLevelTransition = loading || !user || isLoadingRows;
+  if (showSagaLevelTransition) {
+    return (
+      <SagaLevelTransitionScreen
+        sagaNumber={sagaNumber}
+        isRestoringSession={!loading && !user}
+      />
+    );
   }
 
   const backButtonOverlay =
@@ -1482,6 +1976,19 @@ export default function SagaLevel() {
                 userXP={user.knowledgePoints ?? 0}
                 userGem1={user.wisdomGems ?? 0}
                 userGem2={user.enlightenmentCrystals ?? 0}
+                showSecondaryEconomyItems={false}
+                showKpProgressBar
+                kpProgressPercent={levelProgressPercent}
+                kpProgressLabel={
+                  levelProgressTarget > 0
+                    ? `${levelProgressPoints}/${levelProgressTarget}`
+                    : `${knowledgePoints}`
+                }
+                kpProgressMeta={
+                  levelProgress?.isMaxLevel
+                    ? "Max level reached"
+                    : `${remainingKpToNextLevel} KP to Level ${nextLevel}`
+                }
                 compactMode
                 centerImageSrc={userAvatarImage}
                 centerSubLabel={user.alias || ""}
@@ -1501,16 +2008,20 @@ export default function SagaLevel() {
             <div className="absolute left-1/2 top-[56%] -translate-x-1/2 -translate-y-1/2">
               <div className="flex flex-col items-center gap-2">
                 <div
-                  className={`saga-completion-center-coin rounded-full border border-amber-200/70 bg-amber-200/15 shadow-[0_0_32px_rgba(250,204,21,0.42),0_0_54px_rgba(251,191,36,0.32)] transition-all duration-500 ${
+                  className={`saga-completion-center-coin relative transition-all duration-500 ${
                     isCompletionCenterCoinVisible
                       ? "opacity-100 scale-100"
                       : "opacity-0 scale-75"
                   }`}
                 >
+                  <span
+                    aria-hidden="true"
+                    className="saga-completion-center-coin-glow absolute left-1/2 top-1/2 block -translate-x-1/2 -translate-y-1/2 rounded-full"
+                  />
                   <img
                     src="/assets/images/icons/coin.png"
                     alt="Coin reward"
-                    className="h-40 w-40 rounded-full sm:h-48 sm:w-48"
+                    className="relative z-10 h-[8.5rem] w-[8.5rem] sm:h-[10rem] sm:w-[10rem] drop-shadow-[0_0_20px_rgba(251,146,60,0.72)]"
                   />
                 </div>
                 <p
@@ -1541,7 +2052,7 @@ export default function SagaLevel() {
                   src="/assets/images/icons/coin.png"
                   alt=""
                   aria-hidden="true"
-                  className="h-[4.5rem] w-[4.5rem] rounded-full shadow-[0_0_18px_rgba(250,204,21,0.58)]"
+                  className="h-[3.75rem] w-[3.75rem] rounded-full shadow-[0_0_18px_rgba(250,204,21,0.58)]"
                 />
               </span>
             ))}
@@ -2037,6 +2548,41 @@ export default function SagaLevel() {
 
           .saga-completion-center-coin {
             animation: sagaCompletionCoinPulse 1.1s ease-in-out infinite;
+          }
+
+          .saga-completion-center-coin-glow {
+            width: 7.2rem;
+            height: 7.2rem;
+            background:
+              radial-gradient(
+                circle,
+                rgba(251, 146, 60, 0.48) 0%,
+                rgba(249, 115, 22, 0.36) 42%,
+                rgba(245, 158, 11, 0.12) 68%,
+                rgba(245, 158, 11, 0) 100%
+              );
+            filter: blur(11px);
+            box-shadow: 0 0 42px rgba(249, 115, 22, 0.34);
+            animation: sagaCompletionCoinGlowPulse 1.1s ease-in-out infinite;
+            z-index: 0;
+          }
+
+          @media (min-width: 640px) {
+            .saga-completion-center-coin-glow {
+              width: 8.6rem;
+              height: 8.6rem;
+            }
+          }
+
+          @keyframes sagaCompletionCoinGlowPulse {
+            0%, 100% {
+              opacity: 0.66;
+              transform: translate(-50%, -50%) scale(0.94);
+            }
+            50% {
+              opacity: 1;
+              transform: translate(-50%, -50%) scale(1.05);
+            }
           }
 
           .saga-completion-coin-label {
