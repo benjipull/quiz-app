@@ -15,6 +15,7 @@ export const PRELOAD_CONFIG: PreloadConfig = {
     "/assets/images/moon.jpg",
     "/assets/images/q.jpg",
     "/assets/images/icons/coin gift.png",
+    "/assets/images/icons/coin.png",
     "/assets/images/icons/edit-icon.png",
     "/assets/images/icons/play-icon.png",
   ],
