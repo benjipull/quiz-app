@@ -1,7 +1,8 @@
 import { isGAEnabled, sendGAEvent } from "@/utils/gaClient";
 
-function logEventDebug(eventName: string, params: Record<string, any>) {
-  const userId = params.user_id || "guest";
+function logEventDebug(eventName: string, params: Record<string, unknown>) {
+  const rawUserId = params.user_id;
+  const userId = typeof rawUserId === "string" && rawUserId.length > 0 ? rawUserId : "guest";
   console.log(`[GA] Event: ${eventName}`, { userId, ...params });
 }
 
@@ -28,6 +29,13 @@ const getCurrentSessionQuizNumber = () => {
   return currentCount > 0 ? currentCount : 1;
 };
 
+const getQuizIndexedEventName = (baseEventName: string, quizNumber: number) => {
+  const normalizedQuizNumber = Number.isFinite(quizNumber) && quizNumber > 0
+    ? Math.floor(quizNumber)
+    : 1;
+  return `${baseEventName}_${normalizedQuizNumber}`;
+};
+
 const incrementSessionQuizCount = () => {
   const nextCount = readSessionQuizCount() + 1;
   inMemoryQuizSessionCount = nextCount;
@@ -41,11 +49,8 @@ const incrementSessionQuizCount = () => {
   return nextCount;
 };
 
-const withQuizSessionSuffix = (baseEventName: string, quizNumber: number) =>
-  `${baseEventName}_${quizNumber}`;
-
 // === NEW GENERIC TRACKING FUNCTION ===
-export const trackEvent = (eventName: string, params: Record<string, any> = {}) => {
+export const trackEvent = (eventName: string, params: Record<string, unknown> = {}) => {
   if (isGAEnabled) {
     void sendGAEvent(eventName, params);
   }
@@ -53,7 +58,7 @@ export const trackEvent = (eventName: string, params: Record<string, any> = {}) 
 };
 // ======================================
 
-export const trackFirstSessionInteraction = (params: Record<string, any> = {}) => {
+export const trackFirstSessionInteraction = (params: Record<string, unknown> = {}) => {
   if (!isGAEnabled) return;
   if (typeof window === "undefined") return;
 
@@ -92,13 +97,12 @@ export const trackEnteredGame = (userId?: string, identificationMethod: string =
 export const trackQuizStart = (categoryId: string, userId?: string) => {
   if (!isGAEnabled) return;
   const quizNumber = incrementSessionQuizCount();
-  const eventName = withQuizSessionSuffix("quiz_start", quizNumber);
   const params = {
     quiz_category_id: categoryId,
     user_id: userId,
     quiz_session_number: quizNumber,
   };
-  trackEvent(eventName, params);
+  trackEvent(getQuizIndexedEventName("quiz_start", quizNumber), params);
 };
 
 export const trackNextQuiz = (categoryId: string, userId?: string) => {
@@ -108,27 +112,25 @@ export const trackNextQuiz = (categoryId: string, userId?: string) => {
 export const trackQuestionAnswered = (questionId: string, isCorrect: boolean, userId?: string) => {
   if (!isGAEnabled) return;
   const quizNumber = getCurrentSessionQuizNumber();
-  const eventName = withQuizSessionSuffix("question_answered", quizNumber);
   const params = {
     question_id: questionId,
     result: isCorrect ? "correct" : "incorrect",
     user_id: userId,
     quiz_session_number: quizNumber,
   };
-  trackEvent(eventName, params);
+  trackEvent(getQuizIndexedEventName("question_answered", quizNumber), params);
 };
 
 export const trackQuizComplete = (categoryId: string, score: number, userId?: string) => {
   if (!isGAEnabled) return;
   const quizNumber = getCurrentSessionQuizNumber();
-  const eventName = withQuizSessionSuffix("quiz_complete", quizNumber);
   const params = {
     quiz_category_id: categoryId,
     score,
     user_id: userId,
     quiz_session_number: quizNumber,
   };
-  trackEvent(eventName, params);
+  trackEvent(getQuizIndexedEventName("quiz_complete", quizNumber), params);
 };
 
 export const trackLogin = (method: string, userId?: string) => {

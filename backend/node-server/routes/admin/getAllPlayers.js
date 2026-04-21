@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const User = require("../../models/user");
 const Category = require("../../models/categoryModel");
+const SagaLevelProgression = require("../../models/SagaLevelProgression");
 const auth = require("../../middleware/auth");
 const adminAuth = require("../../middleware/adminauth");
 const { getLevelForKnowledgePoints } = require("../../config/levelConfig");
@@ -85,6 +86,8 @@ router.patch("/:playerId/reset-progress", auth, adminAuth, async (req, res) => {
     if (!updatedPlayer) {
       return res.status(404).json({ error: "Player not found." });
     }
+
+    await SagaLevelProgression.deleteMany({ player: updatedPlayer._id });
 
     return res.status(200).json({
       message: "Player progress reset successfully.",

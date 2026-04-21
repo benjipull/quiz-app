@@ -25,6 +25,9 @@ interface GameStatsHeaderProps {
   onCenterClick?: () => void;
   centerAriaLabel?: string;
   centerBadgeValue?: string | number | null;
+  economyNumberStyle?: "default" | "whiteOutline";
+  economyValueTextSize?: "default" | "large";
+  sagaKpOverlayOnly?: boolean;
 }
 
 const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
@@ -46,6 +49,9 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
   onCenterClick,
   centerAriaLabel = "Open profile editor",
   centerBadgeValue = null,
+  economyNumberStyle = "default",
+  economyValueTextSize = "default",
+  sagaKpOverlayOnly = false,
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [animatedXP, setAnimatedXP] = useState(userXP);
@@ -184,7 +190,31 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
   const normalizedKpProgressPercent = Number.isFinite(kpProgressPercent)
     ? Math.max(0, Math.min(100, kpProgressPercent))
     : 0;
+  const useSagaEconomyTileStyle = useSaga3dPanels && !showSecondaryEconomyItems;
+  const economyTileRadiusClass = useSagaEconomyTileStyle ? "rounded-xl sm:rounded-2xl" : "rounded-full";
+  const useWhiteOutlinedEconomyNumbers = economyNumberStyle === "whiteOutline";
+  const useLargeEconomyValueText = economyValueTextSize === "large";
+  const outlinedEconomyNumberStyle: React.CSSProperties | undefined =
+    useWhiteOutlinedEconomyNumbers
+      ? {
+          WebkitTextStroke: "0.7px #000",
+          textShadow:
+            "-0.6px -0.6px 0 #000, 0.6px -0.6px 0 #000, -0.6px 0.6px 0 #000, 0.6px 0.6px 0 #000",
+        }
+      : undefined;
   const shouldShowKpProgress = showKpProgressBar && userToken && !isParentLoading;
+  const shouldUseSaga3dKpStyle = shouldShowKpProgress && useSaga3dPanels;
+  const kpMetaText = kpProgressMeta.trim();
+  const kpMetaMatch = /^(\d+)\s+KP to Level\s+(\d+)$/i.exec(kpMetaText);
+  const remainingKpLabel = kpMetaMatch?.[1] || null;
+  const nextLevelLabel = kpMetaMatch?.[2] || null;
+  const sagaKpMetaTextClass = sagaKpOverlayOnly
+    ? "text-[12px] sm:text-[14px]"
+    : "text-[9px] sm:text-[10px]";
+  const sagaKpBarHeightRem = compact ? 0.52 : 0.68;
+  const resolvedSagaKpBarHeightRem = sagaKpOverlayOnly
+    ? sagaKpBarHeightRem * 1.5
+    : sagaKpBarHeightRem;
 
   return (
     <div className={`w-full px-2 ${compact ? "py-0.5" : "py-1.5 sm:py-2"}`}>
@@ -199,24 +229,64 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
                 compact
                   ? "gap-1 px-2 py-1"
                   : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
-              } bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full border-2 border-blue-300 ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
-              style={getPanel3DStyle("blue")}
+              } ${
+                useSagaEconomyTileStyle
+                  ? `${compact ? "justify-center py-[0.16rem] pr-8 pl-3" : "justify-center py-[0.26rem] pr-12 pl-4"} relative bg-gradient-to-b from-[#40c7ef] via-[#20ace2] to-[#1792d3] border-2 border-[#6fe6ff] shadow-[inset_0_2px_0_rgba(255,255,255,0.36),inset_0_-2px_0_rgba(8,56,116,0.6),0_8px_18px_rgba(5,18,58,0.45)]`
+                  : "bg-gradient-to-r from-cyan-400 to-blue-400 border-2 border-blue-300"
+              } ${economyTileRadiusClass} ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
+              style={useSagaEconomyTileStyle ? undefined : getPanel3DStyle("blue")}
             >
-              <div className={`${compact ? "text-sm" : "text-base sm:text-lg md:text-xl lg:text-2xl"} font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate`}>
-                {formatNumber(animatedCoins)}
+              <div className={`${
+                compact
+                  ? useSagaEconomyTileStyle
+                    ? useLargeEconomyValueText
+                      ? "text-[0.72rem] sm:text-[0.82rem]"
+                      : "text-[0.5rem]"
+                    : useLargeEconomyValueText
+                      ? "text-base sm:text-lg"
+                      : "text-sm"
+                  : useSagaEconomyTileStyle
+                    ? useLargeEconomyValueText
+                      ? "text-[1.35rem] sm:text-[1.5rem]"
+                      : "text-[1rem] sm:text-[1.075rem]"
+                    : useLargeEconomyValueText
+                      ? "text-lg sm:text-xl md:text-2xl lg:text-3xl"
+                      : "text-base sm:text-lg md:text-xl lg:text-2xl"
+              } font-black ${
+                useWhiteOutlinedEconomyNumbers
+                  ? `${useSagaEconomyTileStyle ? "text-center w-full" : "flex-1 min-w-0 truncate"} text-white tracking-tight`
+                  : useSagaEconomyTileStyle
+                    ? "text-white drop-shadow-[0_3px_0_rgba(5,42,89,0.95)] tracking-[0.02em] text-center w-full"
+                    : "text-slate-800 tracking-tight flex-1 min-w-0 truncate"
+              } tabular-nums`}>
+                <span style={outlinedEconomyNumberStyle}>{formatNumber(animatedCoins)}</span>
               </div>
-              <div
-                data-coin-header-icon=""
-                className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-yellow-400 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
-                style={icon3DStyle}
-              >
+              {useSagaEconomyTileStyle ? (
                 <img
+                  data-coin-header-icon=""
+                  className={`absolute top-1/2 ${
+                    compact ? "-right-2 h-9 w-9" : "-right-4 h-14 w-14 sm:h-16 sm:w-16"
+                  } -translate-y-1/2 rounded-full object-contain`}
                   src="/assets/images/icons/coin.png"
                   alt=""
                   aria-hidden="true"
-                  className="h-full w-full rounded-full object-cover"
+                  style={{ imageRendering: "auto", backfaceVisibility: "hidden" }}
                 />
-              </div>
+              ) : (
+                <div
+                  data-coin-header-icon=""
+                  className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-yellow-400 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
+                  style={icon3DStyle}
+                >
+                  <img
+                    src="/assets/images/icons/coin.png"
+                    alt=""
+                    aria-hidden="true"
+                    className="h-full w-full rounded-full object-contain"
+                    style={{ imageRendering: "auto", backfaceVisibility: "hidden" }}
+                  />
+                </div>
+              )}
             </div>
 
             {showSecondaryEconomyItems ? (
@@ -249,7 +319,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
 
           {/* Middle - User Icon  */}
           <div
-            className={`flex-shrink-0 flex flex-col items-center ${onCenterClick ? "cursor-pointer" : ""}`}
+            className={`flex-shrink-0 flex flex-col items-center ${onCenterClick ? "cursor-pointer" : ""} ${useSagaEconomyTileStyle ? "mx-2 sm:mx-3 md:mx-4" : ""}`}
             onClick={onCenterClick}
             onKeyDown={(event) => {
               if (!onCenterClick) return;
@@ -268,6 +338,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
                   src={centerImageSrc}
                   alt="center icon"
                   className="w-full h-full object-cover"
+                  style={{ imageRendering: "auto", backfaceVisibility: "hidden" }}
                 />
               </div>
               {centerBadgeValue !== null && centerBadgeValue !== undefined && centerBadgeValue !== "" ? (
@@ -295,26 +366,65 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
               compact
                 ? "gap-1 px-2 py-1"
                 : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
-            } bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full border-2 border-blue-300 ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
-              style={getPanel3DStyle("blue")}
+            } ${
+              useSagaEconomyTileStyle
+                ? `${compact ? "justify-center py-[0.16rem] pl-8 pr-3" : "justify-center py-[0.26rem] pl-12 pr-4"} relative bg-gradient-to-b from-[#40c7ef] via-[#20ace2] to-[#1792d3] border-2 border-[#6fe6ff] shadow-[inset_0_2px_0_rgba(255,255,255,0.36),inset_0_-2px_0_rgba(8,56,116,0.6),0_8px_18px_rgba(5,18,58,0.45)]`
+                : "bg-gradient-to-r from-cyan-400 to-blue-400 border-2 border-blue-300"
+            } ${economyTileRadiusClass} ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
+              style={useSagaEconomyTileStyle ? undefined : getPanel3DStyle("blue")}
             >
-              <div
-                className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-amber-200 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
-                style={icon3DStyle}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className={compact ? "w-3 h-3 text-amber-500" : "w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-amber-500"}
+              {useSagaEconomyTileStyle ? (
+                <img
+                  data-coin-header-icon=""
+                  className={`absolute top-1/2 ${
+                    compact ? "-left-2 h-9 w-9" : "-left-4 h-14 w-14 sm:h-16 sm:w-16"
+                  } -translate-y-1/2 z-10 rounded-full object-contain`}
+                  src="/assets/images/icons/KP Icon.png"
+                  alt=""
+                  aria-hidden="true"
+                  style={{ imageRendering: "auto", backfaceVisibility: "hidden" }}
+                />
+              ) : (
+                <div
+                  className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-amber-200 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
+                  style={icon3DStyle}
                 >
-                  <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
-                  <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
-                  <circle cx="12" cy="9" r="2" fill="#fff" />
-                </svg>
-              </div>
-              <div className={`${compact ? "text-sm" : "text-base sm:text-lg md:text-xl lg:text-2xl"} font-black text-slate-800 tabular-nums tracking-tight flex-1 min-w-0 truncate`}>
-                {formatNumber(animatedXP)}
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={compact ? "w-3 h-3 text-amber-500" : "w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-amber-500"}
+                  >
+                    <path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.4 1-1v-1H9v1z" />
+                    <path d="M12 2C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .6.4 1 1 1h6c.6 0 1-.4 1-1v-2.3c1.8-1.2 3-3.3 3-5.7 0-3.9-3.1-7-7-7z" />
+                    <circle cx="12" cy="9" r="2" fill="#fff" />
+                  </svg>
+                </div>
+              )}
+              <div className={`${
+                compact
+                  ? useSagaEconomyTileStyle
+                    ? useLargeEconomyValueText
+                      ? "text-[0.72rem] sm:text-[0.82rem]"
+                      : "text-[0.5rem]"
+                    : useLargeEconomyValueText
+                      ? "text-base sm:text-lg"
+                      : "text-sm"
+                  : useSagaEconomyTileStyle
+                    ? useLargeEconomyValueText
+                      ? "text-[1.35rem] sm:text-[1.5rem]"
+                      : "text-[1rem] sm:text-[1.075rem]"
+                    : useLargeEconomyValueText
+                      ? "text-lg sm:text-xl md:text-2xl lg:text-3xl"
+                      : "text-base sm:text-lg md:text-xl lg:text-2xl"
+              } font-black ${
+                useWhiteOutlinedEconomyNumbers
+                  ? `${useSagaEconomyTileStyle ? "text-center w-full" : "flex-1 min-w-0 truncate"} text-white tracking-tight`
+                  : useSagaEconomyTileStyle
+                    ? "text-white drop-shadow-[0_3px_0_rgba(5,42,89,0.95)] tracking-[0.02em] text-center w-full"
+                    : "text-slate-800 tracking-tight flex-1 min-w-0 truncate"
+              } tabular-nums`}>
+                <span style={outlinedEconomyNumberStyle}>{formatNumber(animatedXP)}</span>
               </div>
             </div>
 
@@ -347,27 +457,78 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
           </div>
         </div>
         {shouldShowKpProgress ? (
-          <div className={`${compact ? "mt-1 px-1.5" : "mt-2 px-2"}`}>
-            <div className="rounded-full border border-cyan-200/45 bg-slate-900/55 px-2 py-1.5 backdrop-blur-md shadow-[0_8px_18px_rgba(8,47,73,0.35)]">
-              <div className="flex items-center justify-between text-[10px] sm:text-xs font-semibold text-cyan-100/95">
-                <span>KP</span>
-                <span>{kpProgressLabel}</span>
-              </div>
-              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800/80 ring-1 ring-cyan-200/30">
-                <div
-                  className="relative h-full rounded-full bg-gradient-to-r from-cyan-300 via-cyan-400 to-sky-300 transition-[width] duration-500 ease-out shadow-[0_0_10px_rgba(34,211,238,0.75)]"
-                  style={{ width: `${normalizedKpProgressPercent}%` }}
-                >
-                  <span className="game-stats-kp-shine absolute inset-y-0 left-[-32%] w-[32%] bg-gradient-to-r from-transparent via-white/80 to-transparent" />
+          shouldUseSaga3dKpStyle ? (
+            <div className={`${compact ? "mt-1 px-1" : "mt-2 px-1.5"}`}>
+              <div
+                className={
+                  sagaKpOverlayOnly
+                    ? "relative px-0.5 py-0"
+                    : "relative overflow-hidden rounded-[1.1rem] border-2 border-[#2f86ff] bg-gradient-to-b from-[#1a4695] via-[#173f87] to-[#123677] px-1.5 py-1 shadow-[0_0_0_1px_rgba(111,174,255,0.2)_inset,0_10px_24px_rgba(5,16,48,0.62)]"
+                }
+              >
+                {!sagaKpOverlayOnly ? (
+                  <div className="pointer-events-none absolute left-2 right-2 top-0.5 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent" />
+                ) : null}
+                {!sagaKpOverlayOnly ? (
+                  <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-black tracking-wide text-[#f3f8ff] drop-shadow-[0_1px_2px_rgba(6,15,42,0.85)]">
+                    <span>KP</span>
+                    <span>{kpProgressLabel}</span>
+                  </div>
+                ) : null}
+                <div className={`${sagaKpOverlayOnly ? "mt-0.5" : "mt-1"} rounded-full border-2 border-[#2f86ff] bg-[#0f3576] p-px shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]`}>
+                  <div
+                    className="h-6 w-full overflow-hidden rounded-full bg-[#0d2f69]"
+                    style={{ height: `${resolvedSagaKpBarHeightRem}rem` }}
+                  >
+                    <div
+                      className="relative h-full rounded-full bg-gradient-to-r from-[#4fe8ff] via-[#38d8ff] to-[#2cb7ff] transition-[width] duration-500 ease-out shadow-[0_0_16px_rgba(79,232,255,0.7)]"
+                      style={{ width: `${normalizedKpProgressPercent}%` }}
+                    >
+                      <span className="game-stats-kp-shine absolute inset-y-0 left-[-24%] w-[28%] bg-gradient-to-r from-transparent via-white/80 to-transparent" />
+                    </div>
+                  </div>
                 </div>
+                {kpMetaText ? (
+                  <div className="mt-1 flex items-center justify-center gap-1">
+                    <span className="game-stats-kp-dot-line" aria-hidden="true" />
+                    {remainingKpLabel && nextLevelLabel ? (
+                      <p className={`${sagaKpMetaTextClass} font-black tracking-wide leading-none drop-shadow-[0_1px_2px_rgba(6,15,42,0.7)]`}>
+                        <span className="text-[#26e4ff]">{remainingKpLabel} KP</span>
+                        <span className="text-[#d5e5ff]"> to Level {nextLevelLabel}</span>
+                      </p>
+                    ) : (
+                      <p className={`${sagaKpMetaTextClass} font-black tracking-wide leading-none text-[#d5e5ff] drop-shadow-[0_1px_2px_rgba(6,15,42,0.7)]`}>
+                        {kpMetaText}
+                      </p>
+                    )}
+                    <span className="game-stats-kp-dot-line" aria-hidden="true" />
+                  </div>
+                ) : null}
               </div>
-              {kpProgressMeta ? (
-                <p className="mt-1 text-right text-[9px] sm:text-[10px] font-semibold tracking-wide text-cyan-100/85">
-                  {kpProgressMeta}
-                </p>
-              ) : null}
             </div>
-          </div>
+          ) : (
+            <div className={`${compact ? "mt-1 px-1.5" : "mt-2 px-2"}`}>
+              <div className="rounded-full border border-cyan-200/45 bg-slate-900/55 px-2 py-1.5 backdrop-blur-md shadow-[0_8px_18px_rgba(8,47,73,0.35)]">
+                <div className="flex items-center justify-between text-[10px] sm:text-xs font-semibold text-cyan-100/95">
+                  <span>KP</span>
+                  <span>{kpProgressLabel}</span>
+                </div>
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800/80 ring-1 ring-cyan-200/30">
+                  <div
+                    className="relative h-full rounded-full bg-gradient-to-r from-cyan-300 via-cyan-400 to-sky-300 transition-[width] duration-500 ease-out shadow-[0_0_10px_rgba(34,211,238,0.75)]"
+                    style={{ width: `${normalizedKpProgressPercent}%` }}
+                  >
+                    <span className="game-stats-kp-shine absolute inset-y-0 left-[-32%] w-[32%] bg-gradient-to-r from-transparent via-white/80 to-transparent" />
+                  </div>
+                </div>
+                {kpProgressMeta ? (
+                  <p className="mt-1 text-right text-[9px] sm:text-[10px] font-semibold tracking-wide text-cyan-100/85">
+                    {kpProgressMeta}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          )
         ) : null}
       </div>
       {shouldShowKpProgress ? (
@@ -381,6 +542,15 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
           .game-stats-kp-shine {
             animation: gameStatsKpShineSweep 1.35s linear infinite;
             filter: blur(0.5px);
+          }
+
+          .game-stats-kp-dot-line {
+            display: block;
+            width: clamp(28px, 8vw, 61px);
+            height: 4px;
+            opacity: 0.8;
+            background:
+              radial-gradient(circle, rgba(169, 201, 255, 0.8) 0.72px, transparent 0.8px) center / 5px 4px repeat-x;
           }
         `}</style>
       ) : null}
