@@ -11,6 +11,7 @@ const MIN_QUESTIONS_FOR_PLAY = 5;
 const REQUIRED_LEVEL_RECORDS = 10;
 const LEVEL_ROWS_LIMIT = 6;
 const COMPLETED_ROWS_TO_UNLOCK_NEXT_SAGA = 6;
+const SAGA_COMPLETION_REWARD_COINS = 500;
 
 const getDifficultyWindow = (userLevel) => ({
   minDifficulty: Math.max(1, userLevel),
@@ -182,6 +183,8 @@ const mapSagasForResponse = (sagas = []) =>
 
       return {
         sagaNumber,
+        completionRewardClaimed: Boolean(saga?.completionRewardClaimed),
+        completionRewardClaimedAt: saga?.completionRewardClaimedAt || null,
         sagaLevels: sagaLevels.map((sagaLevel) => {
           const categoryId = sagaLevel?.category?._id || sagaLevel?.category || null;
           return {
@@ -211,6 +214,48 @@ const buildSagaLevelRows = (playerId, sagaNumber, sagaLevels = []) => {
       createdAt: sagaLevel?.createdAt || null,
     };
   });
+};
+
+const calculateUnlockedSagaNumber = (sagas = []) => {
+  const maxSagaNumber = sagas.length
+    ? Math.max(...sagas.map((saga) => Number(saga?.sagaNumber) || 0))
+    : 0;
+
+  let sagaNumber = maxSagaNumber > 0 ? maxSagaNumber : 0;
+  if (maxSagaNumber > 0) {
+    const latestSaga = findSagaByNumber(sagas, maxSagaNumber);
+    const completedCount = (latestSaga?.sagaLevels || []).reduce(
+      (count, sagaLevel) => count + (sagaLevel?.isCompleted ? 1 : 0),
+      0,
+    );
+
+    if (completedCount >= COMPLETED_ROWS_TO_UNLOCK_NEXT_SAGA) {
+      sagaNumber += 1;
+    }
+  }
+
+  return sagaNumber;
+};
+
+const getCompletedLevelsCount = (saga) =>
+  (saga?.sagaLevels || []).reduce(
+    (count, sagaLevel) => count + (sagaLevel?.isCompleted ? 1 : 0),
+    0,
+  );
+
+const buildProgressionSummary = (sagas = []) => {
+  const sagaNumber = calculateUnlockedSagaNumber(sagas);
+  const currentSaga = findSagaByNumber(sagas, sagaNumber);
+  const completedLevelsInCurrentSaga = Math.min(
+    COMPLETED_ROWS_TO_UNLOCK_NEXT_SAGA,
+    Math.max(0, getCompletedLevelsCount(currentSaga)),
+  );
+
+  return {
+    sagaNumber,
+    completedLevelsInCurrentSaga,
+    levelsPerSaga: COMPLETED_ROWS_TO_UNLOCK_NEXT_SAGA,
+  };
 };
 
 const getCanonicalProgression = async (playerId, { migrate = false } = {}) => {
@@ -337,32 +382,94 @@ router.get("/progression", authenticateToken, async (req, res) => {
     }
 
     const { sagas } = await getCanonicalProgression(playerId, { migrate: false });
-    const maxSagaNumber = sagas.length
-      ? Math.max(...sagas.map((saga) => Number(saga?.sagaNumber) || 0))
-      : 0;
-
-    let sagaNumber = maxSagaNumber > 0 ? maxSagaNumber : 0;
-    if (maxSagaNumber > 0) {
-      const latestSaga = findSagaByNumber(sagas, maxSagaNumber);
-      const completedCount = (latestSaga?.sagaLevels || []).reduce(
-        (count, sagaLevel) => count + (sagaLevel?.isCompleted ? 1 : 0),
-        0,
-      );
-
-      if (completedCount >= COMPLETED_ROWS_TO_UNLOCK_NEXT_SAGA) {
-        sagaNumber += 1;
-      }
-    }
+    const progressionSummary = buildProgressionSummary(sagas);
 
     return res.status(200).json({
       playerId,
-      sagaNumber,
+      sagaNumber: progressionSummary.sagaNumber,
+      completedLevelsInCurrentSaga: progressionSummary.completedLevelsInCurrentSaga,
+      levelsPerSaga: progressionSummary.levelsPerSaga,
       sagas: mapSagasForResponse(sagas),
     });
   } catch (error) {
     console.error("Failed to load saga progression:", error);
     return res.status(500).json({
       message: "Server error while loading saga progression.",
+      error: error.message,
+    });
+  }
+});
+
+router.post("/claim-unlock-reward", authenticateToken, async (req, res) => {
+  try {
+    const playerId = req.user?.id;
+    const sagaNumber = parseSagaNumber(req.body?.sagaNumber);
+
+    if (!playerId || !mongoose.Types.ObjectId.isValid(playerId)) {
+      return res.status(400).json({ message: "Invalid player ID." });
+    }
+
+    if (!sagaNumber) {
+      return res.status(400).json({ message: "Invalid saga number." });
+    }
+
+    if (sagaNumber !== 1) {
+      return res.status(409).json({
+        message: "Saga completion chest reward is only available for saga 1.",
+      });
+    }
+
+    const { doc: progression } = await getCanonicalProgression(playerId, { migrate: true });
+    if (!progression) {
+      return res.status(404).json({ message: "Saga progression not found." });
+    }
+
+    const saga = findSagaByNumber(progression.sagas, sagaNumber);
+    if (!saga) {
+      return res.status(404).json({ message: "Saga not found." });
+    }
+
+    const completedCount = getCompletedLevelsCount(saga);
+    if (completedCount < COMPLETED_ROWS_TO_UNLOCK_NEXT_SAGA) {
+      return res.status(409).json({
+        message: "Saga completion reward is not available yet.",
+        requiredCompletedLevels: COMPLETED_ROWS_TO_UNLOCK_NEXT_SAGA,
+        completedLevels: completedCount,
+      });
+    }
+
+    const user = await User.findById(playerId).select("coins");
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    if (saga.completionRewardClaimed) {
+      return res.status(200).json({
+        message: "Saga completion reward already claimed.",
+        sagaNumber,
+        alreadyClaimed: true,
+        coinsEarned: 0,
+        totalCoins: Number(user.coins || 0),
+      });
+    }
+
+    saga.completionRewardClaimed = true;
+    saga.completionRewardClaimedAt = new Date();
+    user.coins = Number(user.coins || 0) + SAGA_COMPLETION_REWARD_COINS;
+
+    await Promise.all([progression.save(), user.save()]);
+
+    return res.status(200).json({
+      message: "Saga completion reward claimed successfully.",
+      sagaNumber,
+      alreadyClaimed: false,
+      coinsEarned: SAGA_COMPLETION_REWARD_COINS,
+      totalCoins: Number(user.coins || 0),
+    });
+  } catch (error) {
+    console.error("Failed to claim saga unlock reward:", error);
+    return res.status(500).json({
+      message: "Server error while claiming saga unlock reward.",
       error: error.message,
     });
   }

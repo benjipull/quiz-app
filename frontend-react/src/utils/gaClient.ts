@@ -86,7 +86,6 @@ export const initGA = (userId?: string) => {
   ReactGA.initialize(GA_ID);
   if (userId) ReactGA.set({ userId });
   initialized = true;
-  void dispatchPageViewNow(window.location.pathname + window.location.search, document.title);
   flushPendingPayloads();
 };
 

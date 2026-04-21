@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "@/contexts/UserContext";
 import { getApiBaseUrl } from "@/utils/baseUrl";
@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { trackEnteredSagaMap } from "@/utils/analytics";
+import SplashScreen from "@/components/SplashScreen";
+import { loadLevelConfig, resolveLevelProgress, type LevelConfigEntry } from "@/utils/levelConfig";
 import {
   Dialog,
   DialogContent,
@@ -17,13 +19,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-const LEVEL_GAP = 170;
+const LEVEL_GAP = 170 * 1.25 * 1.5;
 const TOP_PADDING = 120;
 const LOAD_BATCH = 30;
 const LOAD_THRESHOLD_PX = 320;
 const OVERSCAN_PX = LEVEL_GAP * 2;
 const UNLOCK_ANIMATION_SIGNAL_MAX_AGE_MS = 2 * 60 * 1000;
 const UNLOCK_ENTRY_ANIMATION_DURATION_MS = 900;
+const DEFAULT_LEVELS_PER_SAGA = 6;
+const SAGA_CHEST_SEQUENCE_TOTAL_MS = 4000;
+const SAGA_CHEST_MOVE_TO_CENTER_MS = 1300;
+const SAGA_CHEST_TREMOR_MS = 500;
+const SAGA_CHEST_RETURN_MS = 1000;
+const SAGA_UNLOCK_REWARD_COINS = 500;
 const BASE_URL = getApiBaseUrl();
 
 type BubblePoint = {
@@ -68,6 +76,11 @@ type SagaMapLocationState = {
   unlockedSagaLevel?: number;
   completedSagaNumber?: number;
   completedAt?: number;
+};
+
+type SagaChestCoinToken = {
+  id: number;
+  delayMs: number;
 };
 
 const STAR_TILE_HEIGHT = 960;
@@ -185,15 +198,20 @@ export default function SagaMap() {
   const isAppendingRef = useRef(false);
   const centeredPlayableLevelRef = useRef<number | null>(null);
   const hasConsumedUnlockAnimationRef = useRef(false);
+  const hasConsumedChestSequenceRef = useRef(false);
   const economyBarSlideTimerRef = useRef<number | null>(null);
+  const chestSequenceTimerRefs = useRef<number[]>([]);
 
   const [maxLevel, setMaxLevel] = useState(40);
   const [scrollTop, setScrollTop] = useState(0);
   const [isGeneratingMore, setIsGeneratingMore] = useState(false);
   const [playerSagaNumber, setPlayerSagaNumber] = useState(0);
+  const [completedLevelsInCurrentSaga, setCompletedLevelsInCurrentSaga] = useState(0);
+  const [levelsPerSaga, setLevelsPerSaga] = useState(DEFAULT_LEVELS_PER_SAGA);
   const [isProgressLoading, setIsProgressLoading] = useState(true);
   const [selectedSagaLevel, setSelectedSagaLevel] = useState<number | null>(null);
   const [creatingSagaLevel, setCreatingSagaLevel] = useState<number | null>(null);
+  const [levelConfig, setLevelConfig] = useState<LevelConfigEntry[] | null>(null);
   const [editAlias, setEditAlias] = useState("");
   const [editAvatarIndex, setEditAvatarIndex] = useState(0);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -201,6 +219,14 @@ export default function SagaMap() {
   const [unlockAnimatingLevel, setUnlockAnimatingLevel] = useState<number | null>(null);
   const [isEconomyBarSliding, setIsEconomyBarSliding] = useState(false);
   const [isInitialMapReady, setIsInitialMapReady] = useState(false);
+  const [isChestSequenceActive, setIsChestSequenceActive] = useState(false);
+  const [isChestOpen, setIsChestOpen] = useState(false);
+  const [isChestTremoring, setIsChestTremoring] = useState(false);
+  const [chestOverlayCenter, setChestOverlayCenter] = useState<{ x: number; y: number } | null>(null);
+  const [chestOverlayScale, setChestOverlayScale] = useState(1);
+  const [chestOverlayTransitionMs, setChestOverlayTransitionMs] = useState(0);
+  const [showChestCoinBurst, setShowChestCoinBurst] = useState(false);
+  const [chestCoinTokens, setChestCoinTokens] = useState<SagaChestCoinToken[]>([]);
   const [viewport, setViewport] = useState({
     width: typeof window !== "undefined" ? window.innerWidth : 390,
     height: typeof window !== "undefined" ? window.innerHeight : 780,
@@ -234,6 +260,10 @@ export default function SagaMap() {
     typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
   const currentCoins = user?.coins ?? 0;
   const locationState = (location.state as SagaMapLocationState | null) ?? null;
+  const completedSagaNumberFromReturn = Math.max(
+    0,
+    Number(locationState?.completedSagaNumber) || 0,
+  );
   const unlockCompletedAt = Number(locationState?.completedAt ?? 0);
   const unlockSignalAgeMs = Date.now() - unlockCompletedAt;
   const hasFreshUnlockSignal =
@@ -245,8 +275,25 @@ export default function SagaMap() {
   );
   const requestedUnlockedLevel = Math.max(0, Number(locationState?.unlockedSagaLevel) || 0);
   const isCompactEconomyResolution = viewport.height <= 700 || viewport.width <= 360;
+  const normalizedLevelsPerSaga = Math.max(1, Number(levelsPerSaga) || DEFAULT_LEVELS_PER_SAGA);
+  const nextPlayableBubbleFillPercent = Math.min(
+    100,
+    (Math.max(0, completedLevelsInCurrentSaga) / normalizedLevelsPerSaga) * 100,
+  );
+  const knowledgePoints = Math.max(0, Number(user?.knowledgePoints ?? 0));
+  const levelProgress = levelConfig ? resolveLevelProgress(knowledgePoints, levelConfig) : null;
+  const levelProgressPoints = levelProgress?.progressIntoLevel ?? 0;
+  const levelProgressTarget = levelProgress?.progressToNextLevel ?? 0;
+  const levelProgressPercent = levelProgressTarget > 0
+    ? Math.min(100, (levelProgressPoints / levelProgressTarget) * 100)
+    : levelProgress?.isMaxLevel
+      ? 100
+      : 0;
+  const remainingKpToNextLevel = levelProgress?.remainingKpToNextLevel ?? 0;
+  const nextLevel = levelProgress?.nextLevel ?? Math.max(1, Number(user?.level ?? 1));
   const selectedAvatarIndex = Math.max(0, (user?.avatar || 1) - 1);
   const userAvatarImage = avatarUrls[selectedAvatarIndex] || avatarUrls[0];
+  const shouldShowOpenedChestByProgress = nextPlayableSagaLevel >= 2;
 
   const openEditDialog = () => {
     const avatarIndex = user?.avatar ? user.avatar - 1 : 0;
@@ -359,6 +406,109 @@ export default function SagaMap() {
     });
   }
 
+  const firstBubbleCenter = getBubbleCenter(1);
+  const secondBubbleCenter = getBubbleCenter(2);
+  const treasureChestWidth = viewport.width < 420 ? 84 : 104;
+  const treasureChestCenterX = ((firstBubbleCenter.x + secondBubbleCenter.x) / 2) - treasureChestWidth;
+  const treasureChestCenterY =
+    ((firstBubbleCenter.y + secondBubbleCenter.y) / 2) + (viewport.width < 420 ? 6 : 8);
+  const treasureChestCenterXClamped = clamp(
+    treasureChestCenterX,
+    treasureChestWidth / 2,
+    Math.max(treasureChestWidth / 2, mapWidth - treasureChestWidth / 2),
+  );
+
+  const clearChestSequenceTimers = () => {
+    chestSequenceTimerRefs.current.forEach((timerId) => {
+      window.clearTimeout(timerId);
+    });
+    chestSequenceTimerRefs.current = [];
+  };
+
+  const scheduleChestSequenceStep = (delayMs: number, callback: () => void) => {
+    const timerId = window.setTimeout(callback, delayMs);
+    chestSequenceTimerRefs.current.push(timerId);
+  };
+
+  const getChestStartViewportCenter = () => {
+    const container = scrollRef.current;
+    if (!container) return null;
+
+    const containerRect = container.getBoundingClientRect();
+    const mapLeft = containerRect.left + (container.clientWidth - mapWidth) / 2;
+
+    return {
+      x: mapLeft + treasureChestCenterXClamped,
+      y: containerRect.top + (treasureChestCenterY - container.scrollTop),
+    };
+  };
+
+  const triggerChestCoinBurst = (startX: number, startY: number) => {
+    const coinHeaderElement = document.querySelector("[data-coin-header]");
+    const headerRect = coinHeaderElement?.getBoundingClientRect();
+
+    if (!headerRect) {
+      return;
+    }
+
+    const endX = headerRect.left + headerRect.width / 2;
+    const endY = headerRect.top + headerRect.height / 2;
+
+    document.documentElement.style.setProperty("--saga-chest-coin-start-x", `${startX}px`);
+    document.documentElement.style.setProperty("--saga-chest-coin-start-y", `${startY}px`);
+    document.documentElement.style.setProperty("--saga-chest-coin-end-x", `${endX}px`);
+    document.documentElement.style.setProperty("--saga-chest-coin-end-y", `${endY}px`);
+
+    const tokens: SagaChestCoinToken[] = Array.from({ length: 14 }, (_, index) => ({
+      id: index,
+      delayMs: index * 60,
+    }));
+
+    setChestCoinTokens(tokens);
+    setShowChestCoinBurst(true);
+
+    scheduleChestSequenceStep(1250, () => {
+      setShowChestCoinBurst(false);
+    });
+  };
+
+  const claimSagaUnlockReward = async (sagaNumber: number) => {
+    if (!userToken || sagaNumber !== 1) return;
+
+    try {
+      const response = await fetch(`${BASE_URL}/api/saga/claim-unlock-reward`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${userToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sagaNumber }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.message || `Failed with status ${response.status}`);
+      }
+
+      const coinsEarned = Math.max(0, Number(payload?.coinsEarned) || 0);
+      const serverTotalCoins = Number(payload?.totalCoins);
+
+      if (coinsEarned > 0) {
+        const nextCoins = Number.isFinite(serverTotalCoins)
+          ? serverTotalCoins
+          : currentCoins + coinsEarned;
+        updateUserLocally({ coins: nextCoins });
+      }
+    } catch (error) {
+      console.error("Failed to claim saga unlock reward:", error);
+      updateUserLocally({ coins: currentCoins + SAGA_UNLOCK_REWARD_COINS });
+      toast({
+        title: "Reward Sync Delayed",
+        description: "Added +500 coins locally. Server sync will retry on next refresh.",
+      });
+    }
+  };
+
   const appendMoreLevels = () => {
     if (isAppendingRef.current) return;
     isAppendingRef.current = true;
@@ -422,6 +572,23 @@ export default function SagaMap() {
     if (loading || !user) return;
     trackEnteredSagaMap(user._id);
   }, [loading, user?._id]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadLevelConfig()
+      .then((config) => {
+        if (!isMounted) return;
+        setLevelConfig(config);
+      })
+      .catch((error) => {
+        console.error("Failed to load level config for saga map:", error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const updateViewport = () => {
@@ -489,6 +656,8 @@ export default function SagaMap() {
     if (!userToken) {
       if (isMounted) {
         setPlayerSagaNumber(0);
+        setCompletedLevelsInCurrentSaga(0);
+        setLevelsPerSaga(DEFAULT_LEVELS_PER_SAGA);
         setIsProgressLoading(false);
       }
       return;
@@ -513,7 +682,19 @@ export default function SagaMap() {
         const data = await response.json();
         if (!isMounted) return;
         const resolvedSagaNumber = Math.max(0, Number(data?.sagaNumber) || 0);
+        const resolvedCompletedLevels = Math.max(
+          0,
+          Number(data?.completedLevelsInCurrentSaga) || 0,
+        );
+        const resolvedLevelsPerSaga = Math.max(
+          1,
+          Number(data?.levelsPerSaga) || DEFAULT_LEVELS_PER_SAGA,
+        );
         setPlayerSagaNumber(resolvedSagaNumber);
+        setCompletedLevelsInCurrentSaga(
+          Math.min(resolvedLevelsPerSaga, resolvedCompletedLevels),
+        );
+        setLevelsPerSaga(resolvedLevelsPerSaga);
         setMaxLevel((previous) =>
           Math.max(previous, Math.max(40, resolvedSagaNumber + LOAD_BATCH)),
         );
@@ -521,6 +702,8 @@ export default function SagaMap() {
         console.error("Failed to fetch saga progression:", error);
         if (!isMounted) return;
         setPlayerSagaNumber(0);
+        setCompletedLevelsInCurrentSaga(0);
+        setLevelsPerSaga(DEFAULT_LEVELS_PER_SAGA);
       } finally {
         if (isMounted) {
           setIsProgressLoading(false);
@@ -561,6 +744,80 @@ export default function SagaMap() {
   ]);
 
   useEffect(() => {
+    if (
+      isProgressLoading ||
+      !isInitialMapReady ||
+      !shouldAnimateUnlockOnEntry ||
+      completedSagaNumberFromReturn !== 1 ||
+      hasConsumedChestSequenceRef.current
+    ) {
+      return;
+    }
+
+    const startPosition = getChestStartViewportCenter();
+    if (!startPosition) {
+      return;
+    }
+
+    hasConsumedChestSequenceRef.current = true;
+    clearChestSequenceTimers();
+    setIsChestSequenceActive(true);
+    setIsChestOpen(false);
+    setIsChestTremoring(false);
+    setShowChestCoinBurst(false);
+    setChestOverlayTransitionMs(0);
+    setChestOverlayScale(1);
+    setChestOverlayCenter(startPosition);
+
+    const centerTarget = {
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    };
+
+    window.requestAnimationFrame(() => {
+      setChestOverlayTransitionMs(SAGA_CHEST_MOVE_TO_CENTER_MS);
+      setChestOverlayScale(2);
+      setChestOverlayCenter(centerTarget);
+    });
+
+    scheduleChestSequenceStep(SAGA_CHEST_MOVE_TO_CENTER_MS, () => {
+      setIsChestOpen(true);
+      setIsChestTremoring(true);
+    });
+
+    scheduleChestSequenceStep(
+      SAGA_CHEST_MOVE_TO_CENTER_MS + SAGA_CHEST_TREMOR_MS,
+      () => {
+        setIsChestTremoring(false);
+        triggerChestCoinBurst(centerTarget.x, centerTarget.y);
+        void claimSagaUnlockReward(completedSagaNumberFromReturn);
+      },
+    );
+
+    scheduleChestSequenceStep(
+      SAGA_CHEST_SEQUENCE_TOTAL_MS - SAGA_CHEST_RETURN_MS,
+      () => {
+        const returnTarget = getChestStartViewportCenter() || startPosition;
+        setChestOverlayTransitionMs(SAGA_CHEST_RETURN_MS);
+        setChestOverlayScale(1);
+        setChestOverlayCenter(returnTarget);
+      },
+    );
+
+    scheduleChestSequenceStep(SAGA_CHEST_SEQUENCE_TOTAL_MS, () => {
+      setIsChestSequenceActive(false);
+      setChestOverlayTransitionMs(0);
+      setChestOverlayScale(1);
+      setChestOverlayCenter(null);
+    });
+  }, [
+    isProgressLoading,
+    isInitialMapReady,
+    shouldAnimateUnlockOnEntry,
+    completedSagaNumberFromReturn,
+  ]);
+
+  useEffect(() => {
     if (unlockAnimatingLevel === null) {
       return;
     }
@@ -589,6 +846,7 @@ export default function SagaMap() {
       if (economyBarSlideTimerRef.current !== null) {
         window.clearTimeout(economyBarSlideTimerRef.current);
       }
+      clearChestSequenceTimers();
     };
   }, []);
 
@@ -606,6 +864,10 @@ export default function SagaMap() {
         Restoring your session...
       </div>
     );
+  }
+
+  if (isProgressLoading) {
+    return <SplashScreen dataLoaded={false} />;
   }
 
   return (
@@ -650,6 +912,20 @@ export default function SagaMap() {
           userGem1={user.wisdomGems ?? 0}
           userGem2={user.enlightenmentCrystals ?? 0}
           showSecondaryEconomyItems={false}
+          economyNumberStyle="whiteOutline"
+          sagaKpOverlayOnly
+          showKpProgressBar
+          kpProgressPercent={levelProgressPercent}
+          kpProgressLabel={
+            levelProgressTarget > 0
+              ? `${levelProgressPoints}/${levelProgressTarget}`
+              : `${knowledgePoints}`
+          }
+          kpProgressMeta={
+            levelProgress?.isMaxLevel
+              ? "Max level reached"
+              : `${remainingKpToNextLevel} KP to Level ${nextLevel}`
+          }
           compactMode={isCompactEconomyResolution}
           panelVariant="saga3d"
           centerImageSrc={userAvatarImage}
@@ -705,75 +981,196 @@ export default function SagaMap() {
             ))}
           </svg>
 
+          {!isChestSequenceActive ? (
+            <img
+              src={
+                isChestOpen || shouldShowOpenedChestByProgress
+                  ? "/assets/images/icons/treasure-chest-open.png"
+                  : "/assets/images/icons/treasure-chest-closed.png"
+              }
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute z-30 select-none drop-shadow-[0_4px_10px_rgba(0,0,0,0.45)]"
+              style={{
+                width: treasureChestWidth,
+                height: "auto",
+                left: treasureChestCenterXClamped,
+                top: treasureChestCenterY,
+                transform: "translate(-50%, -50%) rotate(-7deg)",
+              }}
+            />
+          ) : null}
+
+          {isChestSequenceActive && chestOverlayCenter ? (
+            <img
+              src={
+                isChestOpen
+                  ? "/assets/images/icons/treasure-chest-open.png"
+                  : "/assets/images/icons/treasure-chest-closed.png"
+              }
+              alt=""
+              aria-hidden="true"
+              className={`pointer-events-none fixed z-[120] select-none drop-shadow-[0_12px_28px_rgba(0,0,0,0.5)] ${
+                isChestTremoring ? "saga-chest-tremor" : ""
+              }`}
+              style={{
+                width: treasureChestWidth,
+                height: "auto",
+                left: chestOverlayCenter.x,
+                top: chestOverlayCenter.y,
+                transform: `translate(-50%, -50%) rotate(-7deg) scale(${chestOverlayScale})`,
+                transition: chestOverlayTransitionMs > 0
+                  ? `left ${chestOverlayTransitionMs}ms cubic-bezier(0.2,0.92,0.28,1.05), top ${chestOverlayTransitionMs}ms cubic-bezier(0.2,0.92,0.28,1.05), transform ${chestOverlayTransitionMs}ms cubic-bezier(0.2,0.92,0.28,1.05)`
+                  : undefined,
+              }}
+            />
+          ) : null}
+
+          {showChestCoinBurst ? (
+            <>
+              {chestCoinTokens.map((token) => (
+                <span
+                  key={`saga-chest-coin-token-${token.id}`}
+                  className="saga-chest-coin-token pointer-events-none fixed z-[121]"
+                  style={{ "--saga-chest-coin-delay": `${token.delayMs}ms` } as CSSProperties}
+                >
+                  <img
+                    src="/assets/images/icons/coin.png"
+                    alt=""
+                    aria-hidden="true"
+                    className="h-4 w-4 rounded-full object-cover sm:h-5 sm:w-5"
+                  />
+                </span>
+              ))}
+            </>
+          ) : null}
+
           {visibleBubbles.map((bubble) => (
             (() => {
               const isNextPlayable = bubble.level === nextPlayableSagaLevel;
+              const isCompletedSagaHighlight =
+                isChestSequenceActive && bubble.level === completedSagaNumberFromReturn;
               const isUnlockAnimating = bubble.level === unlockAnimatingLevel;
               const renderedBubbleSize = isNextPlayable ? highlightedBubbleSize : bubbleSize;
+              const playPanelWidth = viewport.width < 420 ? 176 : 248;
+              const playPanelHeight = viewport.width < 420 ? 44 : 58;
+              const playPanelTop = bubble.y + renderedBubbleSize / 2 + (viewport.width < 420 ? 12 : 18);
 
               return (
-                <button
-                  key={`bubble-${bubble.level}`}
-                  type="button"
-                  onClick={() => handleBubbleClick(bubble.level)}
-                  onAnimationEnd={() => {
-                    if (isUnlockAnimating) {
-                      setUnlockAnimatingLevel(null);
-                    }
-                  }}
-                  disabled={!isBubbleClickable(bubble.level) || creatingSagaLevel !== null}
-                  className={`absolute rounded-full border-4 font-black flex items-center justify-center transition-transform ${
-                    isBubbleClickable(bubble.level)
-                      ? `border-cyan-300/85 text-slate-100 shadow-[0_0_22px_rgba(34,211,238,0.45)] cursor-pointer ${isUnlockAnimating ? "" : "hover:scale-105"}`
-                      : "border-slate-500/70 text-slate-300/75 shadow-[0_0_10px_rgba(100,116,139,0.3)] cursor-default opacity-70"
-                  } ${
-                    selectedSagaLevel === bubble.level
-                      ? "ring-4 ring-cyan-200/75 ring-offset-2 ring-offset-[#080f1d]"
-                      : ""
-                  } ${
-                    isNextPlayable
-                      ? isUnlockAnimating
-                        ? "z-40 saga-unlock-entry-bubble"
-                        : "z-40 saga-next-playable-bubble"
-                      : "z-20"
-                  }`}
-                  style={{
-                    width: renderedBubbleSize,
-                    height: renderedBubbleSize,
-                    left: bubble.x - renderedBubbleSize / 2,
-                    top: bubble.y - renderedBubbleSize / 2,
-                    background: isUnlockAnimating
-                      ? "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.75) 0%, rgba(56,189,248,0.88) 30%, rgba(14,116,144,0.95) 100%)"
-                      : isNextPlayable
-                      ? "radial-gradient(circle at 28% 20%, rgba(255,255,255,0.95) 0%, rgba(250,204,21,0.96) 24%, rgba(234,179,8,0.95) 54%, rgba(14,116,144,0.98) 100%)"
-                      : isBubbleClickable(bubble.level)
-                        ? "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.75) 0%, rgba(56,189,248,0.88) 30%, rgba(14,116,144,0.95) 100%)"
-                        : "radial-gradient(circle at 30% 22%, rgba(226,232,240,0.65) 0%, rgba(100,116,139,0.8) 36%, rgba(51,65,85,0.95) 100%)",
-                    borderColor: isUnlockAnimating
-                      ? "rgba(103, 232, 249, 0.95)"
-                      : isNextPlayable
-                        ? "rgba(253, 224, 71, 0.95)"
-                        : undefined,
-                    boxShadow: isUnlockAnimating
-                      ? "0 0 18px rgba(34, 211, 238, 0.5), 0 0 34px rgba(14, 165, 233, 0.36)"
-                      : isNextPlayable
-                      ? "0 0 24px rgba(250, 204, 21, 0.75), 0 0 44px rgba(6, 182, 212, 0.55)"
-                      : undefined,
-                  }}
-                >
-                  <span
-                    className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]"
+                <Fragment key={`bubble-${bubble.level}`}>
+                  <button
+                    type="button"
+                    onClick={() => handleBubbleClick(bubble.level)}
+                    onAnimationEnd={() => {
+                      if (isUnlockAnimating) {
+                        setUnlockAnimatingLevel(null);
+                      }
+                    }}
+                    disabled={!isBubbleClickable(bubble.level) || creatingSagaLevel !== null}
+                    className={`absolute rounded-full border-4 font-black flex items-center justify-center transition-transform ${
+                      isBubbleClickable(bubble.level)
+                        ? `border-cyan-300/85 text-slate-100 shadow-[0_0_22px_rgba(34,211,238,0.45)] cursor-pointer ${isUnlockAnimating ? "" : "hover:scale-105"}`
+                        : "border-slate-500/70 text-slate-300/75 shadow-[0_0_10px_rgba(100,116,139,0.3)] cursor-default opacity-70"
+                    } ${
+                      selectedSagaLevel === bubble.level
+                        ? "ring-4 ring-cyan-200/75 ring-offset-2 ring-offset-[#080f1d]"
+                        : ""
+                    } ${
+                      isNextPlayable
+                        ? isUnlockAnimating
+                          ? "z-40 saga-unlock-entry-bubble"
+                          : "z-40 saga-next-playable-bubble"
+                        : isCompletedSagaHighlight
+                          ? "z-30"
+                        : "z-20"
+                    }`}
                     style={{
-                      fontSize: isNextPlayable ? "1.5rem" : undefined,
-                      color: isNextPlayable && !isUnlockAnimating ? "rgba(255, 251, 235, 0.98)" : undefined,
-                      textShadow: isNextPlayable && !isUnlockAnimating
-                        ? "0 0 8px rgba(255,255,255,0.7), 0 0 16px rgba(251,191,36,0.6)"
+                      width: renderedBubbleSize,
+                      height: renderedBubbleSize,
+                      left: bubble.x - renderedBubbleSize / 2,
+                      top: bubble.y - renderedBubbleSize / 2,
+                      background: isUnlockAnimating
+                        ? "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.75) 0%, rgba(56,189,248,0.88) 30%, rgba(14,116,144,0.95) 100%)"
+                        : isNextPlayable
+                        ? "radial-gradient(circle at 30% 20%, rgba(255,255,255,0.38) 0%, rgba(14,116,144,0.78) 40%, rgba(8,47,73,0.97) 100%)"
+                        : isCompletedSagaHighlight
+                          ? "radial-gradient(circle at 28% 20%, rgba(255,255,255,0.95) 0%, rgba(250,204,21,0.96) 24%, rgba(234,179,8,0.95) 54%, rgba(14,116,144,0.98) 100%)"
+                        : isBubbleClickable(bubble.level)
+                          ? "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.75) 0%, rgba(56,189,248,0.88) 30%, rgba(14,116,144,0.95) 100%)"
+                          : "radial-gradient(circle at 30% 22%, rgba(226,232,240,0.65) 0%, rgba(100,116,139,0.8) 36%, rgba(51,65,85,0.95) 100%)",
+                      borderColor: isUnlockAnimating
+                        ? "rgba(103, 232, 249, 0.95)"
+                        : isNextPlayable
+                          ? "rgba(253, 224, 71, 0.95)"
+                          : isCompletedSagaHighlight
+                            ? "rgba(253, 224, 71, 0.9)"
+                          : undefined,
+                      boxShadow: isUnlockAnimating
+                        ? "0 0 18px rgba(34, 211, 238, 0.5), 0 0 34px rgba(14, 165, 233, 0.36)"
+                        : isNextPlayable
+                        ? "0 0 24px rgba(250, 204, 21, 0.75), 0 0 44px rgba(6, 182, 212, 0.55)"
+                        : isCompletedSagaHighlight
+                          ? "0 0 18px rgba(250, 204, 21, 0.62), 0 0 34px rgba(6, 182, 212, 0.42)"
                         : undefined,
                     }}
                   >
-                    {bubble.level}
-                  </span>
-                </button>
+                    {isNextPlayable && !isUnlockAnimating ? (
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-[5px] overflow-hidden rounded-full"
+                      >
+                        <span
+                          className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#f59e0b] via-[#fbbf24] to-[#fde68a] transition-[height] duration-700 ease-out"
+                          style={{
+                            height: `${nextPlayableBubbleFillPercent}%`,
+                          }}
+                        />
+                        <span className="absolute inset-0 rounded-full border border-amber-100/65" />
+                      </span>
+                    ) : null}
+                    <span
+                      className="relative z-10 drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]"
+                      style={{
+                        fontSize: isNextPlayable ? "1.5rem" : undefined,
+                        color: isNextPlayable && !isUnlockAnimating ? "rgba(255, 251, 235, 0.98)" : undefined,
+                        textShadow: isNextPlayable && !isUnlockAnimating
+                          ? "0 0 8px rgba(255,255,255,0.7), 0 0 16px rgba(251,191,36,0.6)"
+                          : undefined,
+                      }}
+                    >
+                      {bubble.level}
+                    </span>
+                  </button>
+                  {isNextPlayable && !isUnlockAnimating ? (
+                    <button
+                      type="button"
+                      onClick={() => handleBubbleClick(bubble.level)}
+                      disabled={!isBubbleClickable(bubble.level) || creatingSagaLevel !== null}
+                      className="absolute z-50 flex items-center justify-center gap-2 rounded-full border-2 border-[#fff2ad] bg-gradient-to-b from-[#ffd953] via-[#ffc125] to-[#f5a808] text-[#522705] font-black tracking-wide shadow-[inset_0_2px_0_rgba(255,255,255,0.52),inset_0_-2px_0_rgba(169,103,0,0.48),0_0_0_2px_rgba(255,189,41,0.58),0_12px_26px_rgba(71,33,2,0.5)] transition-transform duration-200 hover:scale-[1.02] active:scale-[0.99] disabled:opacity-70 disabled:cursor-default"
+                      style={{
+                        width: playPanelWidth,
+                        height: playPanelHeight,
+                        left: bubble.x - playPanelWidth / 2,
+                        top: playPanelTop,
+                        fontSize: viewport.width < 420 ? "1.25rem" : "2rem",
+                        textShadow:
+                          "0 1px 0 rgba(255,245,205,0.9), 0 2px 0 rgba(111,63,0,0.34)",
+                      }}
+                      aria-label={`Play quest ${bubble.level}`}
+                    >
+                      <span>PLAY QUEST {bubble.level}</span>
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          fontSize: viewport.width < 420 ? "1.35rem" : "2.15rem",
+                          lineHeight: 1,
+                        }}
+                      >
+                        ›
+                      </span>
+                    </button>
+                  ) : null}
+                </Fragment>
               );
             })()
           ))}
@@ -918,6 +1315,44 @@ export default function SagaMap() {
         .saga-economy-bar-slide-cycle {
           animation: sagaEconomyBarSlideDownUp 900ms cubic-bezier(0.2, 0.92, 0.28, 1.05) both;
           will-change: transform;
+        }
+
+        @keyframes sagaChestTremor {
+          0% { transform: translate(-50%, -50%) rotate(-7deg) scale(2) translateX(0); }
+          25% { transform: translate(-50%, -50%) rotate(-6deg) scale(2) translateX(1.6px); }
+          50% { transform: translate(-50%, -50%) rotate(-8deg) scale(2) translateX(-1.6px); }
+          75% { transform: translate(-50%, -50%) rotate(-6deg) scale(2) translateX(1.2px); }
+          100% { transform: translate(-50%, -50%) rotate(-7deg) scale(2) translateX(0); }
+        }
+
+        .saga-chest-tremor {
+          animation: sagaChestTremor 75ms linear infinite;
+        }
+
+        @keyframes sagaChestCoinFly {
+          0% {
+            transform: translate(var(--saga-chest-coin-start-x), var(--saga-chest-coin-start-y)) scale(0.7);
+            opacity: 0;
+          }
+          12% {
+            opacity: 1;
+          }
+          80% {
+            opacity: 1;
+          }
+          100% {
+            transform: translate(var(--saga-chest-coin-end-x), var(--saga-chest-coin-end-y)) scale(0.35);
+            opacity: 0;
+          }
+        }
+
+        .saga-chest-coin-token {
+          left: 0;
+          top: 0;
+          will-change: transform, opacity;
+          animation: sagaChestCoinFly 920ms cubic-bezier(0.12, 0.78, 0.2, 1) forwards;
+          animation-delay: var(--saga-chest-coin-delay);
+          filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.8));
         }
 
         .saga-scroll {
