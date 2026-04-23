@@ -1649,7 +1649,7 @@ export default function SagaLevel() {
       const viewportHeight = window.innerHeight || 0;
       if (viewportHeight <= 0) return;
 
-      const fallbackFrameHeight = window.innerWidth >= 640 ? 194 : 171;
+      const fallbackFrameHeight = window.innerWidth >= 640 ? 243 : 214;
       const lastIndex = Math.max(0, gridCells.length - 1);
       const firstFrameHeight =
         frameRefs.current[0]?.getBoundingClientRect().height ?? fallbackFrameHeight;
@@ -2159,7 +2159,7 @@ export default function SagaLevel() {
             --green-2: #2ab373;
             --locked-1: #8c94aa;
             --locked-2: #495066;
-            --panel-scale: 0.625;
+            --panel-scale: 0.78125;
             --radius: calc(1.25rem * var(--panel-scale));
             --border-size: clamp(2px, 0.35vw, 4px);
             --glow-size: clamp(8px, 1vw, 18px);
@@ -2388,11 +2388,11 @@ export default function SagaLevel() {
           }
 
           .saga-level-panel-theme .category-card.current .category-frame {
-            border-color: rgba(147, 182, 255, 0.75);
+            border-color: rgba(251, 146, 60, 0.88);
             box-shadow:
               0 -5px 26px rgba(9, 19, 52, 0.42),
               0 18px 42px rgba(6, 15, 42, 0.68),
-              0 0 0 1px rgba(147, 182, 255, 0.28) inset;
+              0 0 0 1px rgba(251, 146, 60, 0.34) inset;
           }
 
           .saga-level-panel-theme .category-card.completed .category-frame::before {
@@ -2742,7 +2742,7 @@ export default function SagaLevel() {
             />
             <div
               ref={gridRef}
-              className="relative grid grid-cols-1 gap-[24px] sm:gap-[26px] auto-rows-[minmax(108px,1fr)] sm:auto-rows-[minmax(121px,1fr)] max-w-3xl mx-auto w-full"
+              className="relative grid grid-cols-1 gap-[24px] sm:gap-[26px] auto-rows-[minmax(135px,1fr)] sm:auto-rows-[minmax(151px,1fr)] max-w-3xl mx-auto w-full"
             >
               <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full overflow-visible">
                 {pathSegments.map((segment) => (
@@ -2773,7 +2773,7 @@ export default function SagaLevel() {
               {gridCells.map((row, index) => {
               const rowId = getRowId(row);
               const categoryIdForRow = getCategoryId(row);
-              const frameShift = "clamp(28px, 10vw, 118px)";
+              const frameShift = "clamp(35px, 12.5vw, 148px)";
               const isPanelOnRightSide = index % 2 === 1;
               const horizontalOffsetStyle = {
                 transform: `translateX(${isPanelOnRightSide ? "" : "-"}${frameShift})`,
@@ -2853,7 +2853,7 @@ export default function SagaLevel() {
                   ref={(element) => {
                     frameRefs.current[index] = element;
                   }}
-                  className="relative z-10 mx-auto w-[clamp(131px,calc((100vw-48px)*0.469),356px)]"
+                  className="relative z-10 mx-auto w-[clamp(164px,calc((100vw-48px)*0.58625),445px)]"
                   style={horizontalOffsetStyle}
                 >
                   <div

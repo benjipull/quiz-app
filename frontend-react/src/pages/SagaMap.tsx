@@ -900,40 +900,42 @@ export default function SagaMap() {
       </div>
 
       <div
-        className={`relative z-20 pt-[max(0.25rem,env(safe-area-inset-top))] px-1 ${
+        className={`pointer-events-none absolute inset-x-0 top-0 z-20 pt-[max(0.25rem,env(safe-area-inset-top))] px-1 ${
           isEconomyBarSliding ? "saga-economy-bar-slide-cycle" : ""
         }`}
       >
-        <GameStatsHeader
-          userToken={userToken}
-          isParentLoading={false}
-          currentCoinsFromParent={currentCoins}
-          userXP={user.knowledgePoints ?? 0}
-          userGem1={user.wisdomGems ?? 0}
-          userGem2={user.enlightenmentCrystals ?? 0}
-          showSecondaryEconomyItems={false}
-          economyNumberStyle="whiteOutline"
-          sagaKpOverlayOnly
-          showKpProgressBar
-          kpProgressPercent={levelProgressPercent}
-          kpProgressLabel={
-            levelProgressTarget > 0
-              ? `${levelProgressPoints}/${levelProgressTarget}`
-              : `${knowledgePoints}`
-          }
-          kpProgressMeta={
-            levelProgress?.isMaxLevel
-              ? "Max level reached"
-              : `${remainingKpToNextLevel} KP to Level ${nextLevel}`
-          }
-          compactMode={isCompactEconomyResolution}
-          panelVariant="saga3d"
-          centerImageSrc={userAvatarImage}
-          centerSubLabel={user.alias || ""}
-          centerBadgeValue={user.level ?? 1}
-          onCenterClick={openEditDialog}
-          centerAriaLabel="Edit avatar and alias"
-        />
+        <div className="pointer-events-auto">
+          <GameStatsHeader
+            userToken={userToken}
+            isParentLoading={false}
+            currentCoinsFromParent={currentCoins}
+            userXP={user.knowledgePoints ?? 0}
+            userGem1={user.wisdomGems ?? 0}
+            userGem2={user.enlightenmentCrystals ?? 0}
+            showSecondaryEconomyItems={false}
+            economyNumberStyle="whiteOutline"
+            sagaKpOverlayOnly
+            showKpProgressBar
+            kpProgressPercent={levelProgressPercent}
+            kpProgressLabel={
+              levelProgressTarget > 0
+                ? `${levelProgressPoints}/${levelProgressTarget}`
+                : `${knowledgePoints}`
+            }
+            kpProgressMeta={
+              levelProgress?.isMaxLevel
+                ? "Max level reached"
+                : `${remainingKpToNextLevel} KP to Level ${nextLevel}`
+            }
+            compactMode={isCompactEconomyResolution}
+            panelVariant="saga3d"
+            centerImageSrc={userAvatarImage}
+            centerSubLabel={user.alias || ""}
+            centerBadgeValue={user.level ?? 1}
+            onCenterClick={openEditDialog}
+            centerAriaLabel="Edit avatar and alias"
+          />
+        </div>
       </div>
 
       <div
@@ -1055,6 +1057,18 @@ export default function SagaMap() {
               const playPanelWidth = viewport.width < 420 ? 176 : 248;
               const playPanelHeight = viewport.width < 420 ? 44 : 58;
               const playPanelTop = bubble.y + renderedBubbleSize / 2 + (viewport.width < 420 ? 12 : 18);
+              const playQuestLabel = `PLAY QUEST ${bubble.level}`;
+              const hasThreeOrMoreDigits = String(bubble.level).length >= 3;
+              const playQuestFontSize = viewport.width < 420
+                ? "1.08rem"
+                : hasThreeOrMoreDigits
+                  ? "1.36rem"
+                  : "1.52rem";
+              const playQuestArrowFontSize = viewport.width < 420
+                ? "1.2rem"
+                : hasThreeOrMoreDigits
+                  ? "1.5rem"
+                  : "1.75rem";
 
               return (
                 <Fragment key={`bubble-${bubble.level}`}>
@@ -1146,23 +1160,24 @@ export default function SagaMap() {
                       type="button"
                       onClick={() => handleBubbleClick(bubble.level)}
                       disabled={!isBubbleClickable(bubble.level) || creatingSagaLevel !== null}
-                      className="absolute z-50 flex items-center justify-center gap-2 rounded-full border-2 border-[#fff2ad] bg-gradient-to-b from-[#ffd953] via-[#ffc125] to-[#f5a808] text-[#522705] font-black tracking-wide shadow-[inset_0_2px_0_rgba(255,255,255,0.52),inset_0_-2px_0_rgba(169,103,0,0.48),0_0_0_2px_rgba(255,189,41,0.58),0_12px_26px_rgba(71,33,2,0.5)] transition-transform duration-200 hover:scale-[1.02] active:scale-[0.99] disabled:opacity-70 disabled:cursor-default"
+                      className="absolute z-50 flex flex-nowrap items-center justify-center gap-2 rounded-full border-2 border-[#fff2ad] bg-gradient-to-b from-[#ffd953] via-[#ffc125] to-[#f5a808] text-[#522705] font-black tracking-wide shadow-[inset_0_2px_0_rgba(255,255,255,0.52),inset_0_-2px_0_rgba(169,103,0,0.48),0_0_0_2px_rgba(255,189,41,0.58),0_12px_26px_rgba(71,33,2,0.5)] transition-transform duration-200 hover:scale-[1.02] active:scale-[0.99] disabled:opacity-70 disabled:cursor-default"
                       style={{
                         width: playPanelWidth,
                         height: playPanelHeight,
                         left: bubble.x - playPanelWidth / 2,
                         top: playPanelTop,
-                        fontSize: viewport.width < 420 ? "1.25rem" : "2rem",
+                        fontSize: playQuestFontSize,
                         textShadow:
                           "0 1px 0 rgba(255,245,205,0.9), 0 2px 0 rgba(111,63,0,0.34)",
                       }}
                       aria-label={`Play quest ${bubble.level}`}
                     >
-                      <span>PLAY QUEST {bubble.level}</span>
+                      <span className="whitespace-nowrap leading-none">{playQuestLabel}</span>
                       <span
+                        className="flex-shrink-0 leading-none"
                         aria-hidden="true"
                         style={{
-                          fontSize: viewport.width < 420 ? "1.35rem" : "2.15rem",
+                          fontSize: playQuestArrowFontSize,
                           lineHeight: 1,
                         }}
                       >
