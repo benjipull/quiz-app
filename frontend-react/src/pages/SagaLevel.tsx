@@ -1649,7 +1649,7 @@ export default function SagaLevel() {
       const viewportHeight = window.innerHeight || 0;
       if (viewportHeight <= 0) return;
 
-      const fallbackFrameHeight = window.innerWidth >= 640 ? 194 : 171;
+      const fallbackFrameHeight = window.innerWidth >= 640 ? 243 : 214;
       const lastIndex = Math.max(0, gridCells.length - 1);
       const firstFrameHeight =
         frameRefs.current[0]?.getBoundingClientRect().height ?? fallbackFrameHeight;
@@ -1719,11 +1719,11 @@ export default function SagaLevel() {
 
           const start: Point = {
             x: lowerFrameRect.left + lowerFrameRect.width / 2 - gridRect.left,
-            y: lowerFrameRect.top - gridRect.top + 33,
+            y: lowerFrameRect.top - gridRect.top + 20,
           };
           const end: Point = {
             x: upperFrameRect.left + upperFrameRect.width / 2 - gridRect.left,
-            y: upperFrameRect.bottom - gridRect.top - 33,
+            y: upperFrameRect.bottom - gridRect.top - 20,
           };
 
           const verticalDistance = Math.abs(start.y - end.y);
@@ -1989,6 +1989,8 @@ export default function SagaLevel() {
                     ? "Max level reached"
                     : `${remainingKpToNextLevel} KP to Level ${nextLevel}`
                 }
+                economyNumberStyle="whiteOutline"
+                economyValueTextSize="large"
                 compactMode
                 centerImageSrc={userAvatarImage}
                 centerSubLabel={user.alias || ""}
@@ -2139,22 +2141,26 @@ export default function SagaLevel() {
       <style>
         {`
           .saga-level-panel-theme {
-            --bg-1: #10182f;
-            --bg-2: #19284a;
-            --panel: rgba(14, 24, 48, 0.88);
-            --panel-2: rgba(27, 39, 71, 0.95);
-            --gold-1: #fff2b3;
-            --gold-2: #ffd76a;
-            --gold-3: #d9961a;
-            --gold-4: #7b4d00;
-            --blue-1: #9fe7ff;
-            --blue-2: #46c8ff;
-            --blue-3: #1d74ff;
-            --green-1: #7dffb2;
-            --green-2: #18c46b;
+            --bg-1: #0f1d41;
+            --bg-2: #162c61;
+            --panel: rgba(22, 41, 92, 0.94);
+            --panel-2: rgba(45, 68, 132, 0.95);
+            --nav-top: #37539a;
+            --nav-mid: #223a78;
+            --nav-bottom: #15295a;
+            --nav-border: rgba(95, 119, 189, 0.55);
+            --nav-border-soft: rgba(123, 154, 222, 0.35);
+            --nav-highlight: rgba(255, 255, 255, 0.7);
+            --nav-glow: rgba(9, 19, 52, 0.42);
+            --blue-1: #cfe0ff;
+            --blue-2: #93b6ff;
+            --blue-3: #4b66b4;
+            --green-1: #83f6be;
+            --green-2: #2ab373;
             --locked-1: #8c94aa;
             --locked-2: #495066;
-            --radius: 1.25rem;
+            --panel-scale: 0.78125;
+            --radius: calc(1.25rem * var(--panel-scale));
             --border-size: clamp(2px, 0.35vw, 4px);
             --glow-size: clamp(8px, 1vw, 18px);
           }
@@ -2197,9 +2203,13 @@ export default function SagaLevel() {
           .saga-level-panel-theme .category-frame {
             position: relative;
             border-radius: var(--radius);
-            padding: clamp(0.38rem, 0.75vw, 0.6rem);
+            padding: calc(clamp(0.38rem, 0.75vw, 0.6rem) * var(--panel-scale));
             background:
-              linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02));
+              linear-gradient(180deg, var(--nav-top) 0%, var(--nav-mid) 52%, var(--nav-bottom) 100%);
+            border: 1px solid var(--nav-border);
+            box-shadow:
+              0 -4px 24px rgba(9, 19, 52, 0.35),
+              0 14px 34px rgba(6, 15, 42, 0.62);
             overflow: hidden;
             isolation: isolate;
           }
@@ -2207,53 +2217,48 @@ export default function SagaLevel() {
           .saga-level-panel-theme .category-frame::before {
             content: "";
             position: absolute;
-            inset: 0;
-            border-radius: inherit;
-            padding: var(--border-size);
+            inset: 0.1rem 14% auto;
+            height: 1px;
+            border-radius: 999px;
             background:
               linear-gradient(
-                135deg,
-                var(--gold-1) 0%,
-                var(--gold-2) 18%,
-                var(--blue-1) 35%,
-                var(--blue-2) 50%,
-                var(--gold-2) 68%,
-                var(--gold-3) 84%,
-                var(--gold-1) 100%
+                90deg,
+                transparent 0%,
+                var(--nav-highlight) 50%,
+                transparent 100%
               );
-            -webkit-mask:
-              linear-gradient(#000 0 0) content-box,
-              linear-gradient(#000 0 0);
-            -webkit-mask-composite: xor;
-                    mask-composite: exclude;
-            animation: sagaPanelBorderFlow 6s linear infinite;
             z-index: 0;
+            opacity: 0.95;
           }
 
           .saga-level-panel-theme .category-frame::after {
             content: "";
             position: absolute;
-            inset: -8px;
-            border-radius: calc(var(--radius) + 8px);
+            inset: 0;
+            border-radius: inherit;
             background:
-              radial-gradient(circle at 50% 50%, rgba(116, 225, 255, 0.18), transparent 60%);
-            filter: blur(var(--glow-size));
-            z-index: -1;
-            opacity: 0.9;
+              radial-gradient(circle at 50% 8%, rgba(195, 214, 255, 0.2), transparent 48%),
+              radial-gradient(circle at 50% 100%, rgba(91, 127, 212, 0.16), transparent 56%);
+            z-index: 0;
+            pointer-events: none;
           }
 
           .saga-level-panel-theme .category-content {
             position: relative;
             display: grid;
-            grid-template-columns: minmax(102px, 34%) 1fr;
-            gap: clamp(0.54rem, 1.5vw, 0.82rem);
+            grid-template-columns: minmax(calc(102px * var(--panel-scale)), 34%) 1fr;
+            gap: calc(clamp(0.54rem, 1.5vw, 0.82rem) * var(--panel-scale));
             background:
-              linear-gradient(180deg, var(--panel-2), var(--panel));
+              linear-gradient(180deg, rgba(39, 63, 125, 0.92), rgba(27, 47, 102, 0.96));
+            border: 1px solid var(--nav-border-soft);
+            box-shadow:
+              inset 0 1px 0 rgba(255, 255, 255, 0.12),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.25);
             border-radius: calc(var(--radius) - 0.3rem);
-            padding: clamp(0.6rem, 1.5vw, 0.82rem);
-            min-height: clamp(117px, 19.5vw, 159px);
+            padding: calc(clamp(0.6rem, 1.5vw, 0.82rem) * var(--panel-scale));
+            min-height: calc(clamp(117px, 19.5vw, 159px) * var(--panel-scale));
             overflow: hidden;
-            z-index: 1;
+            z-index: 2;
           }
 
           .saga-level-panel-theme .category-content::before {
@@ -2282,16 +2287,15 @@ export default function SagaLevel() {
 
           .saga-level-panel-theme .category-image {
             position: relative;
-            border-radius: 1rem;
-            min-height: 102px;
+            border-radius: calc(1rem * var(--panel-scale));
+            min-height: calc(102px * var(--panel-scale));
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
-              radial-gradient(circle at 30% 20%, rgba(255, 219, 110, 0.22), transparent 35%),
-              linear-gradient(135deg, #4d6ea8, #223456 60%, #18243d);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+              linear-gradient(180deg, rgba(75, 102, 180, 0.94), rgba(48, 74, 144, 0.96));
+            border: 1px solid rgba(147, 182, 255, 0.45);
             box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.12),
-              inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+              inset 0 1px 0 rgba(255, 255, 255, 0.16),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+              0 8px 20px rgba(44, 86, 178, 0.34);
             overflow: hidden;
           }
 
@@ -2311,41 +2315,51 @@ export default function SagaLevel() {
 
           .saga-level-panel-theme .category-badge {
             position: absolute;
-            left: 0.38rem;
-            bottom: 0.38rem;
+            left: calc(0.38rem * var(--panel-scale));
+            bottom: calc(0.38rem * var(--panel-scale));
             z-index: 2;
-            padding: 0.26rem 0.56rem;
+            padding: calc(0.26rem * var(--panel-scale)) calc(0.56rem * var(--panel-scale));
             border-radius: 999px;
-            font-size: 0.62rem;
+            font-size: calc(0.62rem * var(--panel-scale));
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: #f8fafc;
-            background: linear-gradient(180deg, #48bfff, #1978ff);
+            border: 1px solid rgba(147, 182, 255, 0.8);
+            background: linear-gradient(180deg, #4b66b4, #304a90);
             box-shadow:
-              0 0 0 1px rgba(255, 255, 255, 0.2) inset,
-              0 8px 20px rgba(50, 130, 255, 0.35);
+              0 0 0 1px rgba(255, 255, 255, 0.14) inset,
+              0 8px 20px rgba(44, 86, 178, 0.44);
             backdrop-filter: blur(4px);
             pointer-events: none;
           }
 
           .saga-level-panel-theme .category-info h3 {
-            margin: 0 0 0.45rem;
-            font-size: clamp(0.9rem, 1.65vw, 1.24rem);
+            margin: 0 0 calc(0.45rem * var(--panel-scale));
+            font-size: calc(clamp(1.02rem, 1.9vw, 1.38rem) * var(--panel-scale));
             line-height: 1.1;
-            color: #f8fafc;
+            font-family: "Poppins", "Segoe UI", sans-serif;
+            font-weight: 800;
+            letter-spacing: 0.045em;
+            text-transform: uppercase;
+            color: #f2f7ff;
+            text-shadow:
+              0 1px 0 rgba(7, 19, 50, 0.95),
+              0 0 12px rgba(147, 182, 255, 0.38),
+              0 3px 10px rgba(7, 19, 50, 0.6);
+            -webkit-text-stroke: 0.3px rgba(217, 232, 255, 0.5);
             text-wrap: balance;
           }
 
           .saga-level-panel-theme .category-info p {
-            margin: 0 0 0.68rem;
-            font-size: clamp(0.72rem, 1.08vw, 0.84rem);
+            margin: 0 0 calc(0.68rem * var(--panel-scale));
+            font-size: calc(clamp(0.72rem, 1.08vw, 0.84rem) * var(--panel-scale));
             color: rgba(255, 255, 255, 0.82);
           }
 
           .saga-level-panel-theme .corner {
             position: absolute;
-            width: clamp(14px, 1.9vw, 20px);
+            width: calc(clamp(14px, 1.9vw, 20px) * var(--panel-scale));
             aspect-ratio: 1;
             z-index: 3;
             pointer-events: none;
@@ -2355,26 +2369,30 @@ export default function SagaLevel() {
             content: "";
             position: absolute;
             inset: 0;
-            background: linear-gradient(180deg, #d6fbff, #67dbff 55%, #1e8fff);
+            background: linear-gradient(180deg, #d6e4ff, #9db8f6 55%, #5278d1);
             clip-path: polygon(50% 0%, 88% 25%, 100% 70%, 50% 100%, 0% 70%, 12% 25%);
             box-shadow:
-              0 0 14px rgba(90, 220, 255, 0.55),
-              inset 0 1px 3px rgba(255, 255, 255, 0.7);
+              0 0 12px rgba(151, 180, 252, 0.45),
+              inset 0 1px 3px rgba(255, 255, 255, 0.62);
           }
 
-          .saga-level-panel-theme .tl { top: 0.22rem; left: 0.22rem; }
-          .saga-level-panel-theme .tr { top: 0.22rem; right: 0.22rem; }
-          .saga-level-panel-theme .bl { bottom: 0.22rem; left: 0.22rem; }
-          .saga-level-panel-theme .br { bottom: 0.22rem; right: 0.22rem; }
+          .saga-level-panel-theme .tl { top: calc(0.22rem * var(--panel-scale)); left: calc(0.22rem * var(--panel-scale)); }
+          .saga-level-panel-theme .tr { top: calc(0.22rem * var(--panel-scale)); right: calc(0.22rem * var(--panel-scale)); }
+          .saga-level-panel-theme .bl { bottom: calc(0.22rem * var(--panel-scale)); left: calc(0.22rem * var(--panel-scale)); }
+          .saga-level-panel-theme .br { bottom: calc(0.22rem * var(--panel-scale)); right: calc(0.22rem * var(--panel-scale)); }
 
           .saga-level-panel-theme .category-card.current .category-frame::after {
             background:
-              radial-gradient(circle at 50% 50%, rgba(84, 227, 255, 0.28), transparent 60%);
+              radial-gradient(circle at 50% 50%, rgba(173, 195, 255, 0.24), transparent 60%);
             animation: sagaPanelPulseGlow 1.8s ease-in-out infinite;
           }
 
           .saga-level-panel-theme .category-card.current .category-frame {
-            filter: drop-shadow(0 0 16px rgba(92, 214, 255, 0.35));
+            border-color: rgba(251, 146, 60, 0.88);
+            box-shadow:
+              0 -5px 26px rgba(9, 19, 52, 0.42),
+              0 18px 42px rgba(6, 15, 42, 0.68),
+              0 0 0 1px rgba(251, 146, 60, 0.34) inset;
           }
 
           .saga-level-panel-theme .category-card.completed .category-frame::before {
@@ -2389,8 +2407,13 @@ export default function SagaLevel() {
               );
           }
 
+          .saga-level-panel-theme .category-card.completed .category-frame {
+            border-color: rgba(115, 228, 168, 0.72);
+          }
+
           .saga-level-panel-theme .category-card.completed .category-badge {
             background: linear-gradient(180deg, #41d884, #159a53);
+            border-color: rgba(125, 255, 178, 0.85);
           }
 
           .saga-level-panel-theme .category-card.locked {
@@ -2398,11 +2421,12 @@ export default function SagaLevel() {
           }
 
           .saga-level-panel-theme .category-card.locked .category-frame::before {
-            background: linear-gradient(135deg, var(--locked-1), var(--locked-2));
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.24), transparent);
           }
 
           .saga-level-panel-theme .category-card.locked .category-badge {
             background: linear-gradient(180deg, #8d94a8, #586074);
+            border-color: rgba(169, 178, 197, 0.68);
           }
 
           .saga-level-panel-theme .category-card.locked .category-content {
@@ -2443,7 +2467,7 @@ export default function SagaLevel() {
             }
 
             .saga-level-panel-theme .category-image {
-              min-height: 93px;
+              min-height: calc(93px * var(--panel-scale));
             }
           }
 
@@ -2718,7 +2742,7 @@ export default function SagaLevel() {
             />
             <div
               ref={gridRef}
-              className="relative grid grid-cols-1 gap-[38px] sm:gap-[42px] auto-rows-[minmax(171px,1fr)] sm:auto-rows-[minmax(194px,1fr)] max-w-4xl mx-auto w-full"
+              className="relative grid grid-cols-1 gap-[24px] sm:gap-[26px] auto-rows-[minmax(135px,1fr)] sm:auto-rows-[minmax(151px,1fr)] max-w-3xl mx-auto w-full"
             >
               <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full overflow-visible">
                 {pathSegments.map((segment) => (
@@ -2749,10 +2773,10 @@ export default function SagaLevel() {
               {gridCells.map((row, index) => {
               const rowId = getRowId(row);
               const categoryIdForRow = getCategoryId(row);
-              const frameShift =
-                "max(0px, calc((100vw - clamp(210px, calc((100vw - 48px) * 0.75), 570px) - 30px) / 2))";
+              const frameShift = "clamp(35px, 12.5vw, 148px)";
+              const isPanelOnRightSide = index % 2 === 1;
               const horizontalOffsetStyle = {
-                transform: `translateX(${(index + 1) % 2 === 0 ? "-" : ""}${frameShift})`,
+                transform: `translateX(${isPanelOnRightSide ? "" : "-"}${frameShift})`,
               };
               const categoryImageSrc = row ? getCategoryImageSrc(row) : "";
               const isLoadingPlaceholder = isShowingLoadingSkeleton;
@@ -2829,7 +2853,7 @@ export default function SagaLevel() {
                   ref={(element) => {
                     frameRefs.current[index] = element;
                   }}
-                  className="relative z-10 mx-auto w-[clamp(210px,calc((100vw-48px)*0.75),570px)]"
+                  className="relative z-10 mx-auto w-[clamp(164px,calc((100vw-48px)*0.58625),445px)]"
                   style={horizontalOffsetStyle}
                 >
                   <div

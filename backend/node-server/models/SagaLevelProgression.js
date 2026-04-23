@@ -37,6 +37,14 @@ const SagaSchema = new mongoose.Schema(
       type: [SagaLevelSchema],
       default: [],
     },
+    completionRewardClaimed: {
+      type: Boolean,
+      default: false,
+    },
+    completionRewardClaimedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     _id: false,
@@ -62,5 +70,6 @@ const SagaLevelProgressionSchema = new mongoose.Schema(
 );
 
 SagaLevelProgressionSchema.index({ player: 1 });
+SagaLevelProgressionSchema.index({ player: 1, updatedAt: -1 });
 
 module.exports = mongoose.model("SagaLevelProgression", SagaLevelProgressionSchema);
