@@ -28,6 +28,7 @@ interface GameStatsHeaderProps {
   economyNumberStyle?: "default" | "whiteOutline";
   economyValueTextSize?: "default" | "large";
   sagaKpOverlayOnly?: boolean;
+  transparentPanelBackground?: boolean;
 }
 
 const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
@@ -52,6 +53,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
   economyNumberStyle = "default",
   economyValueTextSize = "default",
   sagaKpOverlayOnly = false,
+  transparentPanelBackground = false,
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [animatedXP, setAnimatedXP] = useState(userXP);
@@ -191,6 +193,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
     ? Math.max(0, Math.min(100, kpProgressPercent))
     : 0;
   const useSagaEconomyTileStyle = useSaga3dPanels && !showSecondaryEconomyItems;
+  const useTransparentSagaPanels = useSagaEconomyTileStyle && transparentPanelBackground;
   const economyTileRadiusClass = useSagaEconomyTileStyle ? "rounded-xl sm:rounded-2xl" : "rounded-full";
   const useWhiteOutlinedEconomyNumbers = economyNumberStyle === "whiteOutline";
   const useLargeEconomyValueText = economyValueTextSize === "large";
@@ -212,9 +215,8 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
     ? "text-[12px] sm:text-[14px]"
     : "text-[9px] sm:text-[10px]";
   const sagaKpBarHeightRem = compact ? 0.52 : 0.68;
-  const resolvedSagaKpBarHeightRem = sagaKpOverlayOnly
-    ? sagaKpBarHeightRem * 1.5
-    : sagaKpBarHeightRem;
+  const resolvedSagaKpBarHeightRem =
+    (sagaKpOverlayOnly ? sagaKpBarHeightRem * 1.5 : sagaKpBarHeightRem) * 1.2;
 
   return (
     <div className={`w-full px-2 ${compact ? "py-0.5" : "py-1.5 sm:py-2"}`}>
@@ -231,7 +233,13 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
                   : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
               } ${
                 useSagaEconomyTileStyle
-                  ? `${compact ? "justify-center py-[0.16rem] pr-8 pl-3" : "justify-center py-[0.26rem] pr-12 pl-4"} relative bg-gradient-to-b from-[#40c7ef] via-[#20ace2] to-[#1792d3] border-2 border-[#6fe6ff] shadow-[inset_0_2px_0_rgba(255,255,255,0.36),inset_0_-2px_0_rgba(8,56,116,0.6),0_8px_18px_rgba(5,18,58,0.45)]`
+                  ? `${
+                      compact ? "justify-center py-[0.16rem] pr-8 pl-3" : "justify-center py-[0.26rem] pr-12 pl-4"
+                    } relative ${
+                      useTransparentSagaPanels
+                        ? "bg-transparent border-2 border-[#64d6f4]/70 shadow-none"
+                        : "bg-gradient-to-b from-[#35b1dd] via-[#1f92c8] to-[#1378af] border-2 border-[#64d6f4] shadow-[inset_0_2px_0_rgba(255,255,255,0.36),inset_0_-2px_0_rgba(8,56,116,0.6),0_8px_18px_rgba(5,18,58,0.45)]"
+                    }`
                   : "bg-gradient-to-r from-cyan-400 to-blue-400 border-2 border-blue-300"
               } ${economyTileRadiusClass} ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
               style={useSagaEconomyTileStyle ? undefined : getPanel3DStyle("blue")}
@@ -333,7 +341,9 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
             aria-label={onCenterClick ? centerAriaLabel : undefined}
           >
             <div className="relative">
-              <div className={`${compact ? "w-[3.75rem] h-[3.75rem] border-2" : "w-20 h-20 sm:w-[6.25rem] sm:h-[6.25rem] md:w-[7.5rem] md:h-[7.5rem] lg:w-[8.75rem] lg:h-[8.75rem] border-4"} rounded-full border-slate-300 shadow-2xl overflow-hidden`}>
+              <div
+                className={`${compact ? "w-[3.75rem] h-[3.75rem] border-2" : "w-20 h-20 sm:w-[6.25rem] sm:h-[6.25rem] md:w-[7.5rem] md:h-[7.5rem] lg:w-[8.75rem] lg:h-[8.75rem] border-4"} rounded-full border-slate-300 shadow-2xl overflow-hidden ${useSaga3dPanels && !transparentPanelBackground ? "bg-[#123872]" : ""}`}
+              >
                 <img
                   src={centerImageSrc}
                   alt="center icon"
@@ -368,7 +378,13 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
                 : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"
             } ${
               useSagaEconomyTileStyle
-                ? `${compact ? "justify-center py-[0.16rem] pl-8 pr-3" : "justify-center py-[0.26rem] pl-12 pr-4"} relative bg-gradient-to-b from-[#40c7ef] via-[#20ace2] to-[#1792d3] border-2 border-[#6fe6ff] shadow-[inset_0_2px_0_rgba(255,255,255,0.36),inset_0_-2px_0_rgba(8,56,116,0.6),0_8px_18px_rgba(5,18,58,0.45)]`
+                ? `${
+                    compact ? "justify-center py-[0.16rem] pl-8 pr-3" : "justify-center py-[0.26rem] pl-12 pr-4"
+                  } relative ${
+                    useTransparentSagaPanels
+                      ? "bg-transparent border-2 border-[#64d6f4]/70 shadow-none"
+                      : "bg-gradient-to-b from-[#35b1dd] via-[#1f92c8] to-[#1378af] border-2 border-[#64d6f4] shadow-[inset_0_2px_0_rgba(255,255,255,0.36),inset_0_-2px_0_rgba(8,56,116,0.6),0_8px_18px_rgba(5,18,58,0.45)]"
+                  }`
                 : "bg-gradient-to-r from-cyan-400 to-blue-400 border-2 border-blue-300"
             } ${economyTileRadiusClass} ${useSaga3dPanels ? "shadow-none" : "shadow-lg"} w-full transition-all duration-200 ${panelInteractionClass}`}
               style={useSagaEconomyTileStyle ? undefined : getPanel3DStyle("blue")}
@@ -377,8 +393,10 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
                 <img
                   data-coin-header-icon=""
                   className={`absolute top-1/2 ${
-                    compact ? "-left-2 h-9 w-9" : "-left-4 h-14 w-14 sm:h-16 sm:w-16"
-                  } -translate-y-1/2 z-10 rounded-full object-contain`}
+                    compact
+                      ? "-left-2 h-[2.475rem] w-[2.475rem]"
+                      : "-left-4 h-[3.85rem] w-[3.85rem] sm:h-[4.4rem] sm:w-[4.4rem]"
+                  } -translate-y-[calc(50%+5px)] z-10 rounded-full object-contain`}
                   src="/assets/images/icons/KP Icon.png"
                   alt=""
                   aria-hidden="true"
@@ -475,35 +493,41 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
                     <span>{kpProgressLabel}</span>
                   </div>
                 ) : null}
-                <div className={`${sagaKpOverlayOnly ? "mt-0.5" : "mt-1"} rounded-full border-2 border-[#2f86ff] bg-[#0f3576] p-px shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]`}>
+                <div
+                  className={`${sagaKpOverlayOnly ? "mt-0.5" : "mt-1"} rounded-full border-2 ${
+                    useTransparentSagaPanels
+                      ? "border-[#2f86ff]/75 bg-transparent shadow-none"
+                      : "border-[#2f86ff] bg-[#0f3576] shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]"
+                  } p-px`}
+                >
                   <div
-                    className="h-6 w-full overflow-hidden rounded-full bg-[#0d2f69]"
+                    className={`relative w-full overflow-hidden rounded-full ${
+                      useTransparentSagaPanels ? "bg-transparent" : "bg-[#0d2f69]"
+                    }`}
                     style={{ height: `${resolvedSagaKpBarHeightRem}rem` }}
                   >
                     <div
                       className="relative h-full rounded-full bg-gradient-to-r from-[#4fe8ff] via-[#38d8ff] to-[#2cb7ff] transition-[width] duration-500 ease-out shadow-[0_0_16px_rgba(79,232,255,0.7)]"
                       style={{ width: `${normalizedKpProgressPercent}%` }}
                     >
-                      <span className="game-stats-kp-shine absolute inset-y-0 left-[-24%] w-[28%] bg-gradient-to-r from-transparent via-white/80 to-transparent" />
+                        <span className="game-stats-kp-shine absolute inset-y-0 left-[-24%] w-[28%] bg-gradient-to-r from-transparent via-white/80 to-transparent" />
                     </div>
+                    {kpMetaText ? (
+                      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-2">
+                        {remainingKpLabel && nextLevelLabel ? (
+                          <p className={`${sagaKpMetaTextClass} font-black tracking-wide leading-none drop-shadow-[0_1px_2px_rgba(6,15,42,0.8)] whitespace-nowrap`}>
+                            <span className="text-[#26e4ff]">{remainingKpLabel} KP</span>
+                            <span className="text-[#d5e5ff]"> to Level {nextLevelLabel}</span>
+                          </p>
+                        ) : (
+                          <p className={`${sagaKpMetaTextClass} font-black tracking-wide leading-none text-[#d5e5ff] drop-shadow-[0_1px_2px_rgba(6,15,42,0.8)] whitespace-nowrap`}>
+                            {kpMetaText}
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
-                {kpMetaText ? (
-                  <div className="mt-1 flex items-center justify-center gap-1">
-                    <span className="game-stats-kp-dot-line" aria-hidden="true" />
-                    {remainingKpLabel && nextLevelLabel ? (
-                      <p className={`${sagaKpMetaTextClass} font-black tracking-wide leading-none drop-shadow-[0_1px_2px_rgba(6,15,42,0.7)]`}>
-                        <span className="text-[#26e4ff]">{remainingKpLabel} KP</span>
-                        <span className="text-[#d5e5ff]"> to Level {nextLevelLabel}</span>
-                      </p>
-                    ) : (
-                      <p className={`${sagaKpMetaTextClass} font-black tracking-wide leading-none text-[#d5e5ff] drop-shadow-[0_1px_2px_rgba(6,15,42,0.7)]`}>
-                        {kpMetaText}
-                      </p>
-                    )}
-                    <span className="game-stats-kp-dot-line" aria-hidden="true" />
-                  </div>
-                ) : null}
               </div>
             </div>
           ) : (
@@ -542,15 +566,6 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
           .game-stats-kp-shine {
             animation: gameStatsKpShineSweep 1.35s linear infinite;
             filter: blur(0.5px);
-          }
-
-          .game-stats-kp-dot-line {
-            display: block;
-            width: clamp(28px, 8vw, 61px);
-            height: 4px;
-            opacity: 0.8;
-            background:
-              radial-gradient(circle, rgba(169, 201, 255, 0.8) 0.72px, transparent 0.8px) center / 5px 4px repeat-x;
           }
         `}</style>
       ) : null}
