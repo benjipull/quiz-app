@@ -3,16 +3,9 @@ const mongoose = require("mongoose");
 const Interest = require("../../models/interest");
 const auth = require("../../middleware/auth");
 const adminAuth = require("../../middleware/adminauth");
+const { normalizeWhitespace, escapeRegExp } = require("../../utils/stringUtils");
 
 const router = express.Router();
-
-function normalizeName(rawName) {
-  return String(rawName || "").trim().replace(/\s+/g, " ");
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 // GET /api/admin/interests
 router.get("/", auth, adminAuth, async (req, res) => {
@@ -33,7 +26,7 @@ router.put("/:id", auth, adminAuth, async (req, res) => {
       return res.status(400).json({ message: "Invalid interest id" });
     }
 
-    const name = normalizeName(req.body?.name);
+    const name = normalizeWhitespace(req.body?.name);
     if (!name) {
       return res.status(400).json({ message: "Interest name is required" });
     }

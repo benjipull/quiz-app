@@ -15,6 +15,12 @@ const { optimizeBase64Image } = require("../utils/optimizeBase64Image");
 const {
   buildQuestionImage64Prompt,
 } = require("./prompts/questionImage64Prompt");
+const { sleep } = require("../utils/asyncUtils");
+const { toPreviewString } = require("../utils/logUtils");
+const {
+  buildPendingImageConditions,
+  buildEligibleQuestionWriteMatch,
+} = require("./questionImage64Helpers");
 
 const QUESTION_IMAGE_VERSION = Number(process.env.QUESTION_IMAGE64_VERSION || 1);
 const REQUEST_DELAY_MS = Number(
@@ -33,31 +39,6 @@ const OPTIMIZE_BEFORE_SAVE = String(
 const INCLUDE_EXISTING_BY_DEFAULT = String(
   process.env.QUESTION_IMAGE64_INCLUDE_EXISTING || "false",
 ).toLowerCase() === "true";
-
-function buildPendingImageConditions(pathPrefix = "questions.") {
-  return [
-    { [`${pathPrefix}image64`]: { $exists: false } },
-    { [`${pathPrefix}image64`]: null },
-    { [`${pathPrefix}image64`]: "" },
-    { [`${pathPrefix}image_version`]: { $exists: false } },
-    { [`${pathPrefix}image_version`]: null },
-    { [`${pathPrefix}image_version`]: { $lt: QUESTION_IMAGE_VERSION } },
-  ];
-}
-
-function buildEligibleQuestionWriteMatch(questionId, includeExistingImages) {
-  const questionMatch = {
-    _id: questionId,
-    disabled: { $ne: true },
-    "image_eligibility.should_use_image": true,
-  };
-
-  if (!includeExistingImages) {
-    questionMatch.$or = buildPendingImageConditions("");
-  }
-
-  return questionMatch;
-}
 
 function printUsage() {
   console.log("Usage: node scripts/populateQuestionImage64FromEligibility.js [--all] [--help]");
@@ -84,32 +65,6 @@ function parseArgs(argv) {
   };
 }
 
-function sleep(ms) {
-  if (ms <= 0) return Promise.resolve();
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function toPreviewString(value, maxChars = ERROR_OUTPUT_PREVIEW_MAX_CHARS) {
-  if (value == null) return "";
-
-  let rendered = "";
-  if (typeof value === "string") {
-    rendered = value;
-  } else {
-    try {
-      rendered = JSON.stringify(value, null, 2);
-    } catch (error) {
-      rendered = String(value);
-    }
-  }
-
-  if (rendered.length <= maxChars) {
-    return rendered;
-  }
-
-  return `${rendered.slice(0, maxChars)}\n... [truncated ${rendered.length - maxChars} chars]`;
-}
-
 function buildPipeline(includeExistingImages) {
   const match = {
     "questions.disabled": { $ne: true },
@@ -117,7 +72,7 @@ function buildPipeline(includeExistingImages) {
   };
 
   if (!includeExistingImages) {
-    match.$or = buildPendingImageConditions();
+    match.$or = buildPendingImageConditions(QUESTION_IMAGE_VERSION);
   }
 
   return [
@@ -196,6 +151,7 @@ async function populateQuestionImage64FromEligibility(options = {}) {
             $elemMatch: buildEligibleQuestionWriteMatch(
               row.questionId,
               includeExistingImages,
+              QUESTION_IMAGE_VERSION,
             ),
           },
         },
@@ -220,7 +176,10 @@ async function populateQuestionImage64FromEligibility(options = {}) {
     } catch (error) {
       failed += 1;
       console.error(`Failed ${label}: ${error.message}`);
-      const apiOutputPreview = toPreviewString(error?.apiOutput);
+      const apiOutputPreview = toPreviewString(
+        error?.apiOutput,
+        ERROR_OUTPUT_PREVIEW_MAX_CHARS,
+      );
       if (apiOutputPreview) {
         console.error(`Image API output for ${label}:\n${apiOutputPreview}`);
       }
