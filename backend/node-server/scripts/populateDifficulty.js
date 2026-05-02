@@ -18,6 +18,7 @@ const {
   parseJsonObjectOrThrow,
 } = require("./jsonParsingHelper");
 const { buildPopulateDifficultyPrompt } = require("./prompts/populateDifficultyPrompt");
+const { escapeRegExp } = require("../utils/stringUtils");
 
 const DIFFICULTY_VERSION = 0.03;
 
@@ -72,10 +73,6 @@ function hasPopulatedImage64(image64) {
       normalized.toLowerCase() !== "null" &&
       normalized.toLowerCase() !== "undefined",
   );
-}
-
-function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function isCorrectAnswerInQuestionText(question) {

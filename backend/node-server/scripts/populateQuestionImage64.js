@@ -12,9 +12,19 @@ const {
   generateQuestionImageBase64,
 } = require("../services/imageClient");
 const { optimizeBase64Image } = require("../utils/optimizeBase64Image");
+const { sleep } = require("../utils/asyncUtils");
+const { toPreviewString } = require("../utils/logUtils");
+const {
+  parseNonNegativeIntOrThrow,
+  parseMinOneIntOrThrow,
+} = require("../utils/numberUtils");
 const { runWithConcurrencyPool } = require("./concurrencyPool");
+const {
+  buildPendingImageConditions,
+  buildEligibleQuestionWriteMatch,
+} = require("./questionImage64Helpers");
 
-const QUESTION_IMAGE_VERSION = Number(process.env.QUESTION_IMAGE64_VERSION || 1);
+const QUESTION_IMAGE_VERSION = Number(process.env.QUESTION_IMAGE64_VERSION || 2);
 const DEFAULT_LIMIT = 1000;
 const DEFAULT_DELAY_MS = Number(
   process.env.QUESTION_IMAGE64_REQUEST_DELAY_MS || process.env.IMAGE64_REQUEST_DELAY_MS || 300,
@@ -30,31 +40,6 @@ const OPTIMIZE_BEFORE_SAVE = String(
     process.env.IMAGE64_OPTIMIZE_BEFORE_SAVE ||
     "true",
 ).toLowerCase() !== "false";
-
-function buildPendingImageConditions(pathPrefix = "questions.") {
-  return [
-    { [`${pathPrefix}image64`]: { $exists: false } },
-    { [`${pathPrefix}image64`]: null },
-    { [`${pathPrefix}image64`]: "" },
-    { [`${pathPrefix}image_version`]: { $exists: false } },
-    { [`${pathPrefix}image_version`]: null },
-    { [`${pathPrefix}image_version`]: { $lt: QUESTION_IMAGE_VERSION } },
-  ];
-}
-
-function buildEligibleQuestionWriteMatch(questionId, processAll) {
-  const questionMatch = {
-    _id: questionId,
-    disabled: { $ne: true },
-    "image_eligibility.should_use_image": true,
-  };
-
-  if (!processAll) {
-    questionMatch.$or = buildPendingImageConditions("");
-  }
-
-  return questionMatch;
-}
 
 function printUsage() {
   console.log("Usage: node scripts/populateQuestionImage64.js [options]");
@@ -73,22 +58,6 @@ function printUsage() {
   console.log(
     `Current question image version in code: ${QUESTION_IMAGE_VERSION} (bump this to force reprocessing).`,
   );
-}
-
-function parsePositiveInt(value, fieldName) {
-  const num = Number(value);
-  if (!Number.isInteger(num) || num < 0) {
-    throw new Error(`Invalid ${fieldName}: ${value}`);
-  }
-  return num;
-}
-
-function parseMinOneInt(value, fieldName) {
-  const num = Number(value);
-  if (!Number.isInteger(num) || num < 1) {
-    throw new Error(`Invalid ${fieldName}: ${value}`);
-  }
-  return num;
 }
 
 function parseArgs(args) {
@@ -122,26 +91,26 @@ function parseArgs(args) {
     if (arg === "--limit") {
       const value = args[i + 1];
       if (value == null) throw new Error("Missing value for --limit");
-      options.limit = parsePositiveInt(value, "limit");
+      options.limit = parseNonNegativeIntOrThrow(value, "limit");
       i += 1;
       continue;
     }
 
     if (arg.startsWith("--limit=")) {
-      options.limit = parsePositiveInt(arg.split("=")[1], "limit");
+      options.limit = parseNonNegativeIntOrThrow(arg.split("=")[1], "limit");
       continue;
     }
 
     if (arg === "--delay-ms") {
       const value = args[i + 1];
       if (value == null) throw new Error("Missing value for --delay-ms");
-      options.delayMs = parsePositiveInt(value, "delay-ms");
+      options.delayMs = parseNonNegativeIntOrThrow(value, "delay-ms");
       i += 1;
       continue;
     }
 
     if (arg.startsWith("--delay-ms=")) {
-      options.delayMs = parsePositiveInt(arg.split("=")[1], "delay-ms");
+      options.delayMs = parseNonNegativeIntOrThrow(arg.split("=")[1], "delay-ms");
       continue;
     }
 
@@ -153,28 +122,28 @@ function parseArgs(args) {
     ) {
       const value = args[i + 1];
       if (value == null) throw new Error(`Missing value for ${arg}`);
-      options.parallel = parseMinOneInt(value, "parallel");
+      options.parallel = parseMinOneIntOrThrow(value, "parallel");
       i += 1;
       continue;
     }
 
     if (arg.startsWith("--parallel=")) {
-      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      options.parallel = parseMinOneIntOrThrow(arg.split("=")[1], "parallel");
       continue;
     }
 
     if (arg.startsWith("--concurrency=")) {
-      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      options.parallel = parseMinOneIntOrThrow(arg.split("=")[1], "parallel");
       continue;
     }
 
     if (arg.startsWith("-n=")) {
-      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      options.parallel = parseMinOneIntOrThrow(arg.split("=")[1], "parallel");
       continue;
     }
 
     if (arg.startsWith("-p=")) {
-      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      options.parallel = parseMinOneIntOrThrow(arg.split("=")[1], "parallel");
       continue;
     }
 
@@ -215,7 +184,7 @@ function buildPipeline(options) {
   }
 
   if (!options.processAll) {
-    match.$or = buildPendingImageConditions();
+    match.$or = buildPendingImageConditions(QUESTION_IMAGE_VERSION);
   }
 
   const pipeline = [
@@ -238,32 +207,6 @@ function buildPipeline(options) {
   }
 
   return pipeline;
-}
-
-function sleep(ms) {
-  if (ms <= 0) return Promise.resolve();
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function toPreviewString(value, maxChars = ERROR_OUTPUT_PREVIEW_MAX_CHARS) {
-  if (value == null) return "";
-
-  let rendered = "";
-  if (typeof value === "string") {
-    rendered = value;
-  } else {
-    try {
-      rendered = JSON.stringify(value, null, 2);
-    } catch (error) {
-      rendered = String(value);
-    }
-  }
-
-  if (rendered.length <= maxChars) {
-    return rendered;
-  }
-
-  return `${rendered.slice(0, maxChars)}\n... [truncated ${rendered.length - maxChars} chars]`;
 }
 
 async function populateQuestionImage(item, progress, options = {}) {
@@ -299,6 +242,7 @@ async function populateQuestionImage(item, progress, options = {}) {
           $elemMatch: buildEligibleQuestionWriteMatch(
             item.questionId,
             options.processAll,
+            QUESTION_IMAGE_VERSION,
           ),
         },
       },
@@ -321,7 +265,10 @@ async function populateQuestionImage(item, progress, options = {}) {
     return "updated";
   } catch (error) {
     console.error(`Failed ${label}: ${error.message}`);
-    const apiOutputPreview = toPreviewString(error?.apiOutput);
+    const apiOutputPreview = toPreviewString(
+      error?.apiOutput,
+      ERROR_OUTPUT_PREVIEW_MAX_CHARS,
+    );
     if (apiOutputPreview) {
       console.error(`Image API output for ${label}:\n${apiOutputPreview}`);
     }

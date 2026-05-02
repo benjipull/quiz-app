@@ -26,6 +26,7 @@ const QUIZ_COMPLETION_CENTER_COIN_STAGGER_MS = 110;
 const QUIZ_COMPLETION_CENTER_MINI_COIN_COUNT = 15;
 const QUIZ_COMPLETION_CENTER_MINI_COIN_SIZE_PX = 60;
 const QUIZ_COMPLETION_CENTER_COIN_HIDE_TAIL_MS = 290;
+const QUIZ_COMPLETION_CENTER_REWARD_PHASE_GAP_MS = 180;
 const QUIZ_COMPLETION_COIN_PHASE_TOTAL_MS =
   QUIZ_COMPLETION_CENTER_COIN_LAUNCH_DELAY_MS +
   QUIZ_COMPLETION_CENTER_COIN_FLIGHT_MS +
@@ -132,6 +133,19 @@ type CompletionMiniCoin = {
   endScale: number;
   startRotateDeg: number;
   endRotateDeg: number;
+};
+
+const getCompletionRewardPhaseTotalMs = (
+  hasCoinPhase: boolean,
+  hasKpPhase: boolean,
+) => {
+  if (!hasCoinPhase && !hasKpPhase) return 0;
+  if (hasCoinPhase && hasKpPhase) {
+    return QUIZ_COMPLETION_COIN_PHASE_TOTAL_MS +
+      QUIZ_COMPLETION_CENTER_REWARD_PHASE_GAP_MS +
+      QUIZ_COMPLETION_COIN_PHASE_TOTAL_MS;
+  }
+  return QUIZ_COMPLETION_COIN_PHASE_TOTAL_MS;
 };
 
 const normalizeId = (value: unknown): string | null => {
@@ -665,7 +679,7 @@ const SagaLevelTransitionScreen = ({
 };
 
 export default function SagaLevel() {
-  const { user, loading, refreshUser, updateCoins, markUserStale } = useUser();
+  const { user, loading, refreshUser, updateUserLocally, updateCoins, markUserStale } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const { sagaNumber: sagaNumberParam } = useParams();
@@ -778,6 +792,13 @@ export default function SagaLevel() {
           completionReturnFromStorage?.completedCoinsEarned,
       )
     : 0;
+  const completedKnowledgeGainedFromQuizReturn = isReturningFromQuizCompletion
+    ? toNonNegativeInt(
+        locationState?.completedKnowledgeGained ??
+          completionReturnFromQuery?.completedKnowledgeGained ??
+          completionReturnFromStorage?.completedKnowledgeGained,
+      )
+    : 0;
 
   const [rows, setRows] = useState<SagaLevelRow[]>(
     () => normalizeSagaLevelRows(preloadedRowsFromSagaMap || []),
@@ -806,6 +827,13 @@ export default function SagaLevel() {
   const [isCompletionCenterCoinVisible, setIsCompletionCenterCoinVisible] = useState(false);
   const [completionMiniCoins, setCompletionMiniCoins] = useState<CompletionMiniCoin[]>([]);
   const [isCompletionMiniCoinsInMotion, setIsCompletionMiniCoinsInMotion] = useState(false);
+  const [showCompletionKpOverlay, setShowCompletionKpOverlay] = useState(false);
+  const [isCompletionCenterKpVisible, setIsCompletionCenterKpVisible] = useState(false);
+  const [completionMiniKpIcons, setCompletionMiniKpIcons] = useState<CompletionMiniCoin[]>([]);
+  const [isCompletionMiniKpInMotion, setIsCompletionMiniKpInMotion] = useState(false);
+  const [displayKnowledgePoints, setDisplayKnowledgePoints] = useState(
+    Math.max(0, Number(user?.knowledgePoints ?? 0)),
+  );
   const [edgeCenterSpacerHeights, setEdgeCenterSpacerHeights] = useState({
     top: 0,
     bottom: 0,
@@ -818,12 +846,14 @@ export default function SagaLevel() {
   const hasAutoScrolledRef = useRef(false);
   const hasHandledCompletionReturnRef = useRef(false);
   const hasAppliedCompletionCoinsRef = useRef(false);
+  const hasAppliedCompletionKnowledgeRef = useRef(false);
   const hasTriggeredCompletionCoinSequenceRef = useRef(false);
+  const hasTriggeredCompletionKpSequenceRef = useRef(false);
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const sagaLevelUserToken =
     typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
   const currentCoins = user?.coins ?? 0;
-  const knowledgePoints = Math.max(0, Number(user?.knowledgePoints ?? 0));
+  const knowledgePoints = displayKnowledgePoints;
   const levelProgress = levelConfig ? resolveLevelProgress(knowledgePoints, levelConfig) : null;
   const levelProgressPoints = levelProgress?.progressIntoLevel ?? 0;
   const levelProgressTarget = levelProgress?.progressToNextLevel ?? 0;
@@ -1083,6 +1113,52 @@ export default function SagaLevel() {
       };
     });
   };
+  const buildCompletionMiniKpIcons = (): CompletionMiniCoin[] => {
+    const kpProgressTargetElement =
+      (document.querySelector("[data-kp-progress-bar]") as HTMLElement | null) ||
+      (document.querySelector("[data-kp-progress-bar-fill]") as HTMLElement | null) ||
+      (document.querySelector("[data-kp-header-icon]") as HTMLElement | null);
+    if (!kpProgressTargetElement) {
+      return [];
+    }
+
+    const targetRect = kpProgressTargetElement.getBoundingClientRect();
+    const halfMiniKpSize = QUIZ_COMPLETION_CENTER_MINI_COIN_SIZE_PX / 2;
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight * 0.56;
+    const baseRadius = Math.min(72, Math.max(42, window.innerWidth * 0.1));
+    const targetSpreadX = Math.max(16, targetRect.width * 0.42);
+    const targetSpreadY = Math.max(6, targetRect.height * 0.22);
+
+    return Array.from({ length: QUIZ_COMPLETION_CENTER_MINI_COIN_COUNT }, (_, index) => {
+      const angle =
+        (index / QUIZ_COMPLETION_CENTER_MINI_COIN_COUNT) * Math.PI * 2 - Math.PI / 2;
+      const jitter = (Math.random() - 0.5) * 16;
+      const radialDistance = baseRadius + jitter;
+      const startX = centerX + Math.cos(angle) * radialDistance - halfMiniKpSize;
+      const startY = centerY + Math.sin(angle) * radialDistance - halfMiniKpSize;
+      const spreadRatio = QUIZ_COMPLETION_CENTER_MINI_COIN_COUNT > 1
+        ? index / (QUIZ_COMPLETION_CENTER_MINI_COIN_COUNT - 1)
+        : 0.5;
+      const spreadOffsetX = (spreadRatio - 0.5) * targetSpreadX + (Math.random() - 0.5) * 10;
+      const spreadOffsetY = (Math.random() - 0.5) * targetSpreadY;
+      const endX = targetRect.left + targetRect.width / 2 + spreadOffsetX - halfMiniKpSize;
+      const endY = targetRect.top + targetRect.height / 2 + spreadOffsetY - halfMiniKpSize;
+
+      return {
+        id: `completion-mini-kp-${Date.now()}-${index}`,
+        startX,
+        startY,
+        endX,
+        endY,
+        delay: index * QUIZ_COMPLETION_CENTER_COIN_STAGGER_MS,
+        startScale: 0.78 + Math.random() * 0.18,
+        endScale: 0.42 + Math.random() * 0.14,
+        startRotateDeg: (Math.random() - 0.5) * 32,
+        endRotateDeg: (Math.random() - 0.5) * 100,
+      };
+    });
+  };
 
   const handleStartCategoryQuiz = async (categoryId: string, sagaLevelId?: string) => {
     if (!categoryId || startingCategoryId) return;
@@ -1277,6 +1353,13 @@ export default function SagaLevel() {
   }, [loading, user?._id, hasValidSagaNumber, sagaNumber, preloadedRowsFromSagaMap, cameFromSagaMap]);
 
   useEffect(() => {
+    if (isCompletionCoinAnimationActive) {
+      return;
+    }
+    setDisplayKnowledgePoints(Math.max(0, Number(user?.knowledgePoints ?? 0)));
+  }, [user?.knowledgePoints, isCompletionCoinAnimationActive]);
+
+  useEffect(() => {
     hasAutoScrolledRef.current = false;
     hasHandledCompletionReturnRef.current = false;
     setCompletionStarAnimationRowId(null);
@@ -1292,8 +1375,14 @@ export default function SagaLevel() {
     setIsCompletionCenterCoinVisible(false);
     setCompletionMiniCoins([]);
     setIsCompletionMiniCoinsInMotion(false);
+    setShowCompletionKpOverlay(false);
+    setIsCompletionCenterKpVisible(false);
+    setCompletionMiniKpIcons([]);
+    setIsCompletionMiniKpInMotion(false);
     hasAppliedCompletionCoinsRef.current = false;
+    hasAppliedCompletionKnowledgeRef.current = false;
     hasTriggeredCompletionCoinSequenceRef.current = false;
+    hasTriggeredCompletionKpSequenceRef.current = false;
   }, [sagaNumber]);
 
   useEffect(() => {
@@ -1372,6 +1461,52 @@ export default function SagaLevel() {
     isCompletionMiniCoinsInMotion,
     refreshUser,
     updateCoins,
+    markUserStale,
+  ]);
+
+  useEffect(() => {
+    if (loading || !user || !isReturningFromQuizCompletion) return;
+    if (hasAppliedCompletionKnowledgeRef.current) return;
+    if (completedKnowledgeGainedFromQuizReturn <= 0) {
+      hasAppliedCompletionKnowledgeRef.current = true;
+      return;
+    }
+    if (isCompletionMiniKpInMotion) return;
+
+    const hasCoinPhase = completedCoinsEarnedFromQuizReturn > 0;
+    const fallbackDelayMs =
+      QUIZ_COMPLETION_SCROLL_TO_COMPLETED_DELAY_MS +
+      QUIZ_COMPLETION_SCROLL_SETTLE_BEFORE_STARS_MS +
+      QUIZ_COMPLETION_STARS_SEQUENCE_MS +
+      getCompletionRewardPhaseTotalMs(hasCoinPhase, true) +
+      450;
+    const fallbackTimer = window.setTimeout(() => {
+      if (hasAppliedCompletionKnowledgeRef.current) return;
+      hasAppliedCompletionKnowledgeRef.current = true;
+      const nextKnowledgePoints = Math.max(
+        0,
+        Number(displayKnowledgePoints ?? 0) + completedKnowledgeGainedFromQuizReturn,
+      );
+      setDisplayKnowledgePoints(nextKnowledgePoints);
+      updateUserLocally({ knowledgePoints: nextKnowledgePoints });
+      markUserStale();
+      void refreshUser();
+    }, fallbackDelayMs);
+
+    return () => {
+      window.clearTimeout(fallbackTimer);
+    };
+  }, [
+    loading,
+    user?._id,
+    user?.knowledgePoints,
+    isReturningFromQuizCompletion,
+    completedKnowledgeGainedFromQuizReturn,
+    completedCoinsEarnedFromQuizReturn,
+    isCompletionMiniKpInMotion,
+    displayKnowledgePoints,
+    refreshUser,
+    updateUserLocally,
     markUserStale,
   ]);
 
@@ -1528,7 +1663,9 @@ export default function SagaLevel() {
       });
 
       const hasCoinPhase = completedCoinsEarnedFromQuizReturn > 0;
-      setIsCompletionCoinAnimationActive(hasCoinPhase);
+      const hasKpPhase = completedKnowledgeGainedFromQuizReturn > 0;
+      const hasRewardPhase = hasCoinPhase || hasKpPhase;
+      setIsCompletionCoinAnimationActive(hasRewardPhase);
 
       if (finalizeCompletionTimer !== null) {
         window.clearTimeout(finalizeCompletionTimer);
@@ -1577,7 +1714,7 @@ export default function SagaLevel() {
             nextPlayableRowIndex,
           });
         }, 500);
-      }, hasCoinPhase ? QUIZ_COMPLETION_COIN_PHASE_TOTAL_MS : 0);
+      }, getCompletionRewardPhaseTotalMs(hasCoinPhase, hasKpPhase));
     }, QUIZ_COMPLETION_SCROLL_TO_COMPLETED_DELAY_MS + QUIZ_COMPLETION_SCROLL_SETTLE_BEFORE_STARS_MS + QUIZ_COMPLETION_STARS_SEQUENCE_MS);
 
     return () => {
@@ -1614,6 +1751,7 @@ export default function SagaLevel() {
     completedCategoryIdFromQuizReturn,
     completedStarCountFromQuizReturn,
     completedCoinsEarnedFromQuizReturn,
+    completedKnowledgeGainedFromQuizReturn,
     sagaNumber,
   ]);
 
@@ -1845,6 +1983,7 @@ export default function SagaLevel() {
       return;
     }
     hasTriggeredCompletionCoinSequenceRef.current = true;
+    const coinsBeforeReward = Math.max(0, Number(user?.coins ?? 0));
 
     setShowCompletionCoinOverlay(true);
     setIsCompletionCenterCoinVisible(false);
@@ -1873,7 +2012,7 @@ export default function SagaLevel() {
           setIsCompletionMiniCoinsInMotion(true);
           if (!hasAppliedCompletionCoinsRef.current) {
             hasAppliedCompletionCoinsRef.current = true;
-            const nextCoins = Math.max(0, (user?.coins ?? 0) + completedCoinsEarnedFromQuizReturn);
+            const nextCoins = Math.max(0, coinsBeforeReward + completedCoinsEarnedFromQuizReturn);
             updateCoins(nextCoins);
             markUserStale();
             void refreshUser();
@@ -1887,7 +2026,6 @@ export default function SagaLevel() {
       setIsCompletionCenterCoinVisible(false);
       setCompletionMiniCoins([]);
       setIsCompletionMiniCoinsInMotion(false);
-      setIsCompletionCoinAnimationActive(false);
     }, QUIZ_COMPLETION_CENTER_COIN_LAUNCH_DELAY_MS +
       QUIZ_COMPLETION_CENTER_COIN_FLIGHT_MS +
       QUIZ_COMPLETION_CENTER_COIN_STAGGER_MS * (QUIZ_COMPLETION_CENTER_MINI_COIN_COUNT - 1) +
@@ -1917,10 +2055,118 @@ export default function SagaLevel() {
     isCompletionCoinAnimationActive,
     isReturningFromQuizCompletion,
     completedCoinsEarnedFromQuizReturn,
-    user?.coins,
-    updateCoins,
-    markUserStale,
-    refreshUser,
+    user?._id,
+  ]);
+
+  useEffect(() => {
+    if (
+      !isCompletionCoinAnimationActive ||
+      !isReturningFromQuizCompletion ||
+      completedKnowledgeGainedFromQuizReturn <= 0
+    ) {
+      setShowCompletionKpOverlay(false);
+      setIsCompletionCenterKpVisible(false);
+      setCompletionMiniKpIcons([]);
+      setIsCompletionMiniKpInMotion(false);
+      return;
+    }
+
+    if (hasTriggeredCompletionKpSequenceRef.current) {
+      return;
+    }
+    const knowledgePointsBeforeReward = Math.max(0, Number(knowledgePoints ?? 0));
+
+    const hasCoinPhase = completedCoinsEarnedFromQuizReturn > 0;
+    const phaseStartDelay = hasCoinPhase
+      ? QUIZ_COMPLETION_COIN_PHASE_TOTAL_MS + QUIZ_COMPLETION_CENTER_REWARD_PHASE_GAP_MS
+      : 0;
+
+    setShowCompletionKpOverlay(false);
+    setIsCompletionCenterKpVisible(false);
+    setCompletionMiniKpIcons([]);
+    setIsCompletionMiniKpInMotion(false);
+
+    let startPhaseTimer: number | null = null;
+    let fadeInRafOne: number | null = null;
+    let fadeInRafTwo: number | null = null;
+    let launchMiniKpTimer: number | null = null;
+    let launchMotionRafOne: number | null = null;
+    let launchMotionRafTwo: number | null = null;
+    let hideOverlayTimer: number | null = null;
+
+    startPhaseTimer = window.setTimeout(() => {
+      hasTriggeredCompletionKpSequenceRef.current = true;
+      setShowCompletionKpOverlay(true);
+
+      fadeInRafOne = window.requestAnimationFrame(() => {
+        fadeInRafTwo = window.requestAnimationFrame(() => {
+          setIsCompletionCenterKpVisible(true);
+        });
+      });
+
+      launchMiniKpTimer = window.setTimeout(() => {
+        const miniKpIcons = buildCompletionMiniKpIcons();
+        setCompletionMiniKpIcons(miniKpIcons);
+
+        launchMotionRafOne = window.requestAnimationFrame(() => {
+          launchMotionRafTwo = window.requestAnimationFrame(() => {
+            setIsCompletionMiniKpInMotion(true);
+            if (!hasAppliedCompletionKnowledgeRef.current) {
+              hasAppliedCompletionKnowledgeRef.current = true;
+              const nextKnowledgePoints = Math.max(
+                0,
+                knowledgePointsBeforeReward + completedKnowledgeGainedFromQuizReturn,
+              );
+              setDisplayKnowledgePoints(nextKnowledgePoints);
+              updateUserLocally({ knowledgePoints: nextKnowledgePoints });
+              markUserStale();
+              void refreshUser();
+            }
+          });
+        });
+      }, QUIZ_COMPLETION_CENTER_COIN_LAUNCH_DELAY_MS);
+    }, phaseStartDelay);
+
+    hideOverlayTimer = window.setTimeout(() => {
+      setShowCompletionKpOverlay(false);
+      setIsCompletionCenterKpVisible(false);
+      setCompletionMiniKpIcons([]);
+      setIsCompletionMiniKpInMotion(false);
+    }, phaseStartDelay +
+      QUIZ_COMPLETION_CENTER_COIN_LAUNCH_DELAY_MS +
+      QUIZ_COMPLETION_CENTER_COIN_FLIGHT_MS +
+      QUIZ_COMPLETION_CENTER_COIN_STAGGER_MS * (QUIZ_COMPLETION_CENTER_MINI_COIN_COUNT - 1) +
+      QUIZ_COMPLETION_CENTER_COIN_HIDE_TAIL_MS);
+
+    return () => {
+      if (startPhaseTimer !== null) {
+        window.clearTimeout(startPhaseTimer);
+      }
+      if (fadeInRafOne !== null) {
+        window.cancelAnimationFrame(fadeInRafOne);
+      }
+      if (fadeInRafTwo !== null) {
+        window.cancelAnimationFrame(fadeInRafTwo);
+      }
+      if (launchMiniKpTimer !== null) {
+        window.clearTimeout(launchMiniKpTimer);
+      }
+      if (launchMotionRafOne !== null) {
+        window.cancelAnimationFrame(launchMotionRafOne);
+      }
+      if (launchMotionRafTwo !== null) {
+        window.cancelAnimationFrame(launchMotionRafTwo);
+      }
+      if (hideOverlayTimer !== null) {
+        window.clearTimeout(hideOverlayTimer);
+      }
+    };
+  }, [
+    isCompletionCoinAnimationActive,
+    isReturningFromQuizCompletion,
+    completedCoinsEarnedFromQuizReturn,
+    completedKnowledgeGainedFromQuizReturn,
+    knowledgePoints,
   ]);
 
   if (!hasValidSagaNumber) {
@@ -1973,7 +2219,7 @@ export default function SagaLevel() {
                 userToken={sagaLevelUserToken}
                 isParentLoading={false}
                 currentCoinsFromParent={currentCoins}
-                userXP={user.knowledgePoints ?? 0}
+                userXP={knowledgePoints}
                 userGem1={user.wisdomGems ?? 0}
                 userGem2={user.enlightenmentCrystals ?? 0}
                 showSecondaryEconomyItems={false}
@@ -2055,6 +2301,72 @@ export default function SagaLevel() {
                   alt=""
                   aria-hidden="true"
                   className="h-[3.75rem] w-[3.75rem] rounded-full shadow-[0_0_18px_rgba(250,204,21,0.58)]"
+                />
+              </span>
+            ))}
+          </div>,
+          document.body,
+        )
+      : null;
+  const completionKpOverlay =
+    showCompletionKpOverlay &&
+    completedKnowledgeGainedFromQuizReturn > 0 &&
+    typeof document !== "undefined"
+      ? createPortal(
+          <div className="pointer-events-none fixed inset-0 z-[10009]">
+            <div className="absolute left-1/2 top-[56%] -translate-x-1/2 -translate-y-1/2">
+              <div className="flex flex-col items-center gap-2">
+                <div
+                  className={`saga-completion-center-coin relative transition-all duration-500 ${
+                    isCompletionCenterKpVisible
+                      ? "opacity-100 scale-100"
+                      : "opacity-0 scale-75"
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="saga-completion-center-coin-glow absolute left-1/2 top-1/2 block -translate-x-1/2 -translate-y-1/2 rounded-full"
+                    style={{
+                      background:
+                        "radial-gradient(circle, rgba(34,211,238,0.76) 0%, rgba(59,130,246,0.42) 48%, rgba(12,74,110,0) 72%)",
+                      boxShadow: "0 0 44px rgba(34,211,238,0.62), 0 0 72px rgba(56,189,248,0.3)",
+                    }}
+                  />
+                  <img
+                    src="/assets/images/icons/KP Icon.png"
+                    alt="KP reward"
+                    className="relative z-10 h-[8.5rem] w-[8.5rem] sm:h-[10rem] sm:w-[10rem] drop-shadow-[0_0_22px_rgba(56,189,248,0.7)]"
+                  />
+                </div>
+                <p
+                  className={`saga-completion-coin-label text-center text-sm font-black tracking-wide text-cyan-100 drop-shadow-[0_2px_8px_rgba(0,0,0,0.65)] transition-all duration-500 sm:text-base ${
+                    isCompletionCenterKpVisible
+                      ? "opacity-100 translate-y-0"
+                      : "opacity-0 translate-y-2"
+                  }`}
+                >
+                  +{completedKnowledgeGainedFromQuizReturn.toLocaleString("en-US")} KP Won
+                </p>
+              </div>
+            </div>
+            {completionMiniKpIcons.map((kpIcon) => (
+              <span
+                key={kpIcon.id}
+                className="fixed block"
+                style={{
+                  left: 0,
+                  top: 0,
+                  opacity: isCompletionMiniKpInMotion ? 0.98 : 0,
+                  transform: `translate(${isCompletionMiniKpInMotion ? kpIcon.endX : kpIcon.startX}px, ${isCompletionMiniKpInMotion ? kpIcon.endY : kpIcon.startY}px) scale(${isCompletionMiniKpInMotion ? kpIcon.endScale : kpIcon.startScale}) rotate(${isCompletionMiniKpInMotion ? kpIcon.endRotateDeg : kpIcon.startRotateDeg}deg)`,
+                  transition: `transform ${QUIZ_COMPLETION_CENTER_COIN_FLIGHT_MS}ms cubic-bezier(0.2,0.86,0.26,1.05) ${kpIcon.delay}ms, opacity 180ms ease-out ${kpIcon.delay}ms`,
+                  willChange: "transform, opacity",
+                }}
+              >
+                <img
+                  src="/assets/images/icons/KP Icon.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-[3.75rem] w-[3.75rem] rounded-full shadow-[0_0_18px_rgba(34,211,238,0.65)]"
                 />
               </span>
             ))}
@@ -2716,6 +3028,7 @@ export default function SagaLevel() {
       {economyBarOverlay}
       {sagaProgressOverlay}
       {completionCoinOverlay}
+      {completionKpOverlay}
       <div className="relative z-10 mx-auto min-h-[100dvh] w-full max-w-5xl flex flex-col gap-2 sm:gap-3">
         <div className="relative flex-1 min-h-0">
         {isShowingLoadingSkeleton ? (

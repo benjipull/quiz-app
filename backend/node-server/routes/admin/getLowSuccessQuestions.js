@@ -3,25 +3,18 @@ const router = express.Router();
 const Category = require("../../models/categoryModel");
 const auth = require("../../middleware/auth");
 const adminAuth = require("../../middleware/adminauth");
-
-function parseNumber(value, fallback) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function normalizeText(value) {
-  return String(value ?? "").trim().toLowerCase();
-}
+const { parseFiniteNumber } = require("../../utils/numberUtils");
+const { normalizeText } = require("../../utils/stringUtils");
 
 // GET /api/admin/questions/low-success
 // Returns questions answered more than `minAttempts` times
 // where correct answer success-rate is below `maxSuccessRate` percent.
 router.get("/low-success", auth, adminAuth, async (req, res) => {
   try {
-    const minAttempts = Math.max(0, Math.trunc(parseNumber(req.query.minAttempts, 10)));
-    const maxSuccessRate = Math.max(0, Math.min(100, parseNumber(req.query.maxSuccessRate, 50)));
+    const minAttempts = Math.max(0, Math.trunc(parseFiniteNumber(req.query.minAttempts, 10)));
+    const maxSuccessRate = Math.max(0, Math.min(100, parseFiniteNumber(req.query.maxSuccessRate, 50)));
     const showDisabled = req.query.showDisabled === "true";
-    const limit = Math.max(1, Math.min(2000, Math.trunc(parseNumber(req.query.limit, 500))));
+    const limit = Math.max(1, Math.min(2000, Math.trunc(parseFiniteNumber(req.query.limit, 500))));
 
     const pipeline = [
       { $unwind: "$questions" },

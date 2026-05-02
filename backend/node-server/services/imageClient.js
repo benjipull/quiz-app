@@ -7,6 +7,7 @@ const RUNPOD_IMAGE_API_KEY = process.env.RUNPOD_IMAGE_API_KEY || process.env.RUN
 const MIN_IMAGE_SIZE = 512;
 const MAX_IMAGE_SIZE = 5120;
 const IMAGE_SIZE_STEP = 512;
+const DEFAULT_NEGATIVE_PROMPT = "blurry, low quality, deformed, ugly, text, watermark, signature";
 
 function assertImageSetup() {
   if (!RUNPOD_IMAGE_URL) {
@@ -37,18 +38,32 @@ function normalizeSquareSize(size) {
   return numericSize;
 }
 
-function buildPayloadForPrompt(prompt, size = MIN_IMAGE_SIZE) {
+function normalizeNegativePrompt(negativePrompt) {
+  if (negativePrompt == null) {
+    return DEFAULT_NEGATIVE_PROMPT;
+  }
+
+  const normalized = String(negativePrompt).trim();
+  return normalized || DEFAULT_NEGATIVE_PROMPT;
+}
+
+function buildPayloadForPrompt(
+  prompt,
+  size = MIN_IMAGE_SIZE,
+  negativePrompt = DEFAULT_NEGATIVE_PROMPT,
+) {
   const safePrompt = String(prompt || "").trim();
   if (!safePrompt) {
     throw new Error("Image prompt cannot be empty.");
   }
 
   const normalizedSize = normalizeSquareSize(size);
+  const normalizedNegativePrompt = normalizeNegativePrompt(negativePrompt);
 
   return {
     input: {
       prompt: safePrompt,
-      negative_prompt: "blurry, low quality, deformed, ugly, text, watermark, signature",
+      negative_prompt: normalizedNegativePrompt,
       height: normalizedSize,
       width: normalizedSize,
       num_inference_steps: 1,
@@ -107,8 +122,8 @@ function resolveImageGenerationOptions(options) {
 async function generateImageBase64FromPrompt(prompt, options = {}) {
   assertImageSetup();
 
-  const { size } = resolveImageGenerationOptions(options);
-  const payload = buildPayloadForPrompt(prompt, size);
+  const { size, negativePrompt } = resolveImageGenerationOptions(options);
+  const payload = buildPayloadForPrompt(prompt, size, negativePrompt);
   let response;
   try {
     response = await axios.post(RUNPOD_IMAGE_URL, payload, {
@@ -138,6 +153,7 @@ async function generateImageBase64FromPrompt(prompt, options = {}) {
   return {
     base64: imageBase64,
     prompt: String(prompt || "").trim(),
+    negativePrompt: payload.input.negative_prompt,
     size: payload.input.width,
     raw: response.data,
   };
@@ -158,6 +174,7 @@ module.exports = {
   MIN_IMAGE_SIZE,
   MAX_IMAGE_SIZE,
   IMAGE_SIZE_STEP,
+  DEFAULT_NEGATIVE_PROMPT,
   assertImageSetup,
   normalizeSquareSize,
   buildQuestionImagePrompt,

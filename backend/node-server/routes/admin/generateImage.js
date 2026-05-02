@@ -5,6 +5,7 @@ const {
   MIN_IMAGE_SIZE,
   MAX_IMAGE_SIZE,
   IMAGE_SIZE_STEP,
+  DEFAULT_NEGATIVE_PROMPT,
   normalizeSquareSize,
   generateImageBase64FromPrompt,
 } = require("../../services/imageClient");
@@ -20,10 +21,12 @@ router.post("/generate", auth, adminAuth, async (req, res) => {
     }
 
     const size = normalizeSquareSize(req.body?.size);
-    const generated = await generateImageBase64FromPrompt(prompt, { size });
+    const negativePrompt = String(req.body?.negativePrompt ?? DEFAULT_NEGATIVE_PROMPT).trim();
+    const generated = await generateImageBase64FromPrompt(prompt, { size, negativePrompt });
 
     return res.json({
       prompt: generated.prompt,
+      negativePrompt: generated.negativePrompt,
       size: generated.size,
       imageBase64: generated.base64,
     });

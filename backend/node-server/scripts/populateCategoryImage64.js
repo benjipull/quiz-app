@@ -11,6 +11,8 @@ const {
   generateCategoryImageBase64,
 } = require("../services/imageClient");
 const { optimizeBase64Image } = require("../utils/optimizeBase64Image");
+const { sleep } = require("../utils/asyncUtils");
+const { toPreviewString } = require("../utils/logUtils");
 
 const REQUEST_DELAY_MS = Number(process.env.IMAGE64_REQUEST_DELAY_MS || 300);
 const ERROR_OUTPUT_PREVIEW_MAX_CHARS = Number(
@@ -22,32 +24,6 @@ const OPTIMIZE_BEFORE_SAVE = String(
 const INCLUDE_EXISTING_BY_DEFAULT = String(
   process.env.IMAGE64_INCLUDE_EXISTING || "false",
 ).toLowerCase() === "true";
-
-function sleep(ms) {
-  if (ms <= 0) return Promise.resolve();
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function toPreviewString(value, maxChars = ERROR_OUTPUT_PREVIEW_MAX_CHARS) {
-  if (value == null) return "";
-
-  let rendered = "";
-  if (typeof value === "string") {
-    rendered = value;
-  } else {
-    try {
-      rendered = JSON.stringify(value, null, 2);
-    } catch (error) {
-      rendered = String(value);
-    }
-  }
-
-  if (rendered.length <= maxChars) {
-    return rendered;
-  }
-
-  return `${rendered.slice(0, maxChars)}\n... [truncated ${rendered.length - maxChars} chars]`;
-}
 
 function shouldIncludeExistingImagesFromArgs(argv) {
   return argv.includes("--all") || argv.includes("--force");
@@ -122,7 +98,10 @@ async function populateCategoryImage64(options = {}) {
     } catch (error) {
       failed += 1;
       console.error(`Failed ${label}: ${error.message}`);
-      const apiOutputPreview = toPreviewString(error?.apiOutput);
+      const apiOutputPreview = toPreviewString(
+        error?.apiOutput,
+        ERROR_OUTPUT_PREVIEW_MAX_CHARS,
+      );
       if (apiOutputPreview) {
         console.error(`Image API output for ${label}:\n${apiOutputPreview}`);
       }

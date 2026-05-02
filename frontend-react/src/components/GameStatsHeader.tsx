@@ -391,7 +391,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
             >
               {useSagaEconomyTileStyle ? (
                 <img
-                  data-coin-header-icon=""
+                  data-kp-header-icon=""
                   className={`absolute top-1/2 ${
                     compact
                       ? "-left-2 h-[2.475rem] w-[2.475rem]"
@@ -404,6 +404,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
                 />
               ) : (
                 <div
+                  data-kp-header-icon=""
                   className={`${compact ? "w-5 h-5" : "w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-9 lg:h-9"} flex-shrink-0 bg-amber-200 rounded-full flex items-center justify-center ${useSaga3dPanels ? "shadow-none" : "shadow-md"}`}
                   style={icon3DStyle}
                 >
@@ -494,6 +495,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
                   </div>
                 ) : null}
                 <div
+                  data-kp-progress-bar=""
                   className={`${sagaKpOverlayOnly ? "mt-0.5" : "mt-1"} rounded-full border-2 ${
                     useTransparentSagaPanels
                       ? "border-[#2f86ff]/75 bg-transparent shadow-none"
@@ -501,6 +503,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
                   } p-px`}
                 >
                   <div
+                    data-kp-progress-bar-fill=""
                     className={`relative w-full overflow-hidden rounded-full ${
                       useTransparentSagaPanels ? "bg-transparent" : "bg-[#0d2f69]"
                     }`}
@@ -537,8 +540,12 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
                   <span>KP</span>
                   <span>{kpProgressLabel}</span>
                 </div>
-                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800/80 ring-1 ring-cyan-200/30">
+                <div
+                  data-kp-progress-bar=""
+                  className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800/80 ring-1 ring-cyan-200/30"
+                >
                   <div
+                    data-kp-progress-bar-fill=""
                     className="relative h-full rounded-full bg-gradient-to-r from-cyan-300 via-cyan-400 to-sky-300 transition-[width] duration-500 ease-out shadow-[0_0_10px_rgba(34,211,238,0.75)]"
                     style={{ width: `${normalizedKpProgressPercent}%` }}
                   >

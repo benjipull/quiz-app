@@ -3,11 +3,7 @@ const router = express.Router();
 const Category = require("../../models/categoryModel");
 const auth = require("../../middleware/auth");
 const adminAuth = require("../../middleware/adminauth");
-
-function parseVersion(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
+const { parseFiniteNumber } = require("../../utils/numberUtils");
 
 // DELETE /api/admin/questions/by-version/:versionKey
 // Deletes all questions for a specific version across all categories, including disabled questions.
@@ -18,7 +14,7 @@ router.delete("/by-version/:versionKey", auth, adminAuth, async (req, res) => {
       return res.status(400).json({ message: "Version must be a numeric value." });
     }
 
-    const version = parseVersion(versionKey);
+    const version = parseFiniteNumber(versionKey, null);
     if (version === null) {
       return res.status(400).json({ message: "Invalid version value." });
     }
