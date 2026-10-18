@@ -1,200 +1,100 @@
 function buildQuestionPrompt(categoryName, avoidSection = "") {
   return `
-You are an international trivia expert creating fun, engaging and high-quality quiz questions.
-
-Use metric units, global examples, and neutral English spelling.
-
-Output STRICT JSON only. No prose or markdown.
-
-=== TASK ===
-Generate ONE engaging, factual trivia question that is clearly and naturally related to the provided category.
-
-=== CORE RULES ===
-- Exactly 4 distinct answers
-- Exactly 1 correct answer
-- Must be based on a clear, verifiable fact
-- All answers must belong to the same logical context
-
-=== PRIORITY RULE ===
-When rules conflict, prioritize:
-1. Clarity and factual correctness
-2. Natural, complete sentence
-3. Engagement and creativity
-4. Brevity (≤14 words)
-
-=== FACT-FIRST RULE ===
-Internally identify a single fact first.
-
-Ensure:
-- question
-- correct_answer
-- explanation
-
-are all derived from that same fact.
-
-Do not output the internal fact.
-
-=== QUESTION QUALITY ===
-- Ideally not more than 14 words
-- Must be a complete, natural sentence or prompt
-- Must sound like a human would say it
-- Must not feel truncated, awkward, or robotic
-
-=== FORMAT RULES ===
-- Do NOT include answer options in the question
-- Do NOT use A), B), C), D)
-- Do NOT force endings like "what is it?"
-
-The question can be:
-- a statement
-- a prompt
-- a direct question (only if it improves clarity)
-
-=== STYLE RULE ===
-The question MUST feel engaging and non-generic.
-
-Use ONE of these approaches:
-- curiosity hook
-- playful scenario
-- surprising comparison
-- dramatic framing
-- indirect/reverse logic
-
-Avoid safe or textbook phrasing.
-
-=== ANTI-BORING RULE ===
-If the question feels like a school exam question, rewrite it.
-
-Avoid:
-- "Which of the following..."
-- "What is..."
-- "Who was..."
-
-Avoid vague phrasing like:
-- "known for"
-- "famous for"
-
-Avoid unnecessary or obscure numbers.
-
-
-=== QUESTION OPENING VARIETY ===
-Avoid overusing the same opening word.
-
-Do NOT start most questions with:
-- "Which"
-
-Use a variety of openings such as:
-- "Name the..."
-- "Identify the..."
-- "In which..."
-- "Where would you find..."
-- "This..."
-- "You..."
-- "From these..."
-
-The opening should feel natural and varied across questions.
-
-Use varied and natural phrasing.
-
-
-=== NO VAGUE CONTEXT RULE ===
-Avoid unnecessary or vague qualifiers that do not add meaningful information.
-
-Do NOT use phrases like:
-- "in ancient times"
-- "in history"
-- "around the world"
-- "generally"
-- "typically"
-- "often"
-
-Every word in the question must add clear, useful meaning.
-
-If a phrase can be removed without changing the fact, remove it.
-
-=== STYLE RULE ===
-The question MUST feel lively, playful, and human.
-
-It should feel like a quiz host speaking, not a textbook.
-
-You are encouraged to:
-- add light humour
-- use playful phrasing
-- create curiosity or surprise
-- make the player smile or feel intrigued
-
-Creativity is REQUIRED, not optional.
-
-The question should feel fun to read.
-
-
-=== ANTI-AMBIGUITY RULE ===
-The question must have exactly one clearly correct answer with no reasonable competing interpretation.
-
-Reject any question that depends on:
-- opinion
-- cultural interpretation
-- disputed history
-- vague time periods
-- relative wording
-- unclear scope
-- partially true distractors
-
-Avoid words and ideas like:
-- first to popularise
-- helped make
-- became known as
-- staple of
-- iconic for
-- associated with
-- one of the first
-- among the most famous
-- widely regarded as
-- often considered
-- is linked to
-
-If the answer could be debated by a well-informed player, rewrite the question.
-
-
-=== FUN FACTOR RULE ===
-The question should trigger at least one of:
-- curiosity ("wait, really?")
-- amusement ("that’s clever")
-- surprise ("I didn’t expect that")
-
-If it feels neutral or flat, rewrite it to be more engaging.
-
-
-=== FINAL CHECK ===
-Before output:
-- Ensure the question is complete and natural
-- Ensure it is not templated or repetitive
-- Ensure it is ≤14 words
-- If it feels generic, rewrite it
-
-=== ANSWER RULES ===
-- 4 plausible, clearly distinct answers
-- Correct answer must exactly match one option
-
-=== EXPLANATION ===
-1–2 concise sentences explaining the fact.
-
-=== OUTPUT FORMAT ===
-{
-  "question": string,
-  "answers": [string, string, string, string],
-  "correct_answer": string,
-  "explanation": string
-}
-
-If any requirement cannot be satisfied, output {}.
+You are an expert trivia question writer. Your goal is to create ONE high-quality,
+factually accurate quiz question that is fun, clear, and unambiguous.
 
 === CATEGORY ===
+
 ${categoryName}
 
-${avoidSection}
+=== CORE REQUIREMENTS ===
+
+Your question MUST:
+
+1. **Test exactly one verifiable, widely-accepted fact**
+   - The fact must be definitively true and not subject to debate
+   - Avoid facts that change frequently (e.g., "most moons as of [year]")
+   - Use stable, well-documented facts from reliable sources
+
+2. **Have exactly one unambiguously correct answer**
+   - No room for interpretation or debate
+   - Not dependent on context, scope, or additional qualifications
+   - The correct answer must be universally accepted by experts
+
+3. **Be clear and precise**
+   - Keep it to 14 words or fewer when possible
+   - Avoid vague terms like "typically," "often," "usually"
+   - Don't use "complete the sequence" formats unless the pattern is mathematical or strictly defined
+
+4. **Avoid common pitfalls**:
+   - ❌ DON'T ask about rankings that change (e.g., "tallest building," "most populous")
+   - ❌ DON'T create "complete the list" questions with arbitrary orderings
+   - ❌ DON'T ask questions where multiple answers could be considered correct
+   - ❌ DON'T use facts you're uncertain about - only use facts you're 100% confident in
+   - ✅ DO ask about historical facts, scientific constants, geographical facts, cultural knowledge
+   - ✅ DO verify mentally that you know this fact with absolute certainty
+
+=== ANSWER REQUIREMENTS ===
+
+Provide exactly four plausible answers:
+
+1. All four answers must be the **same type** (e.g., all countries, all numbers, all names)
+2. All four answers must be **plausible** in the context of the question
+3. The three wrong answers should be reasonable distractors, not obviously wrong
+4. Exactly one answer must be unquestionably correct
+
+=== FACTUAL ACCURACY - CRITICAL ===
+
+Before finalizing your question, ask yourself:
+
+- "Am I 100% certain this fact is correct?"
+- "Could any credible source disagree with this answer?"
+- "Is this fact stable and unlikely to change?"
+- "Have I verified this mentally against my knowledge?"
+
+If you have ANY doubt, choose a different fact.
+
+=== EXISTING QUESTIONS TO AVOID ===
+
+${avoidSection || "None (this is the first question for this category)"}
+
+Do NOT create a question that tests the same underlying fact as any existing question,
+even if worded differently. Choose a different subtopic or angle within the category.
+
+=== STYLE GUIDELINES ===
+
+- Write naturally, like a good quiz host
+- Prefer interesting or surprising facts over the most obvious ones
+- Light humor is welcome when natural, but clarity comes first
+- Don't force creativity - simple and clear beats clever and confusing
+
+=== OUTPUT FORMAT ===
+
+Return ONLY valid JSON with this exact structure:
+
+{
+  "question": "Your question text here",
+  "answers": ["Answer 1", "Answer 2", "Answer 3", "Answer 4"],
+  "correct_answer": "The correct answer (must match one of the four answers exactly)",
+  "explanation": "A brief 1-2 sentence explanation of why this answer is correct"
+}
+
+The explanation should cite the fact and be helpful for learning.
+
+=== FINAL CHECKLIST ===
+
+Before submitting, verify:
+- ✓ The fact is 100% accurate and verifiable
+- ✓ Only ONE answer is unambiguously correct
+- ✓ All four answers are plausible and the same type
+- ✓ The question is clear and under 14 words if possible
+- ✓ This fact hasn't been tested in existing questions
+- ✓ The explanation clearly states why the answer is correct
+
+Now generate your question for the category: ${categoryName}
 
   `.trim();
+  
 }
 
 module.exports = { buildQuestionPrompt };

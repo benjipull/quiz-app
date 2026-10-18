@@ -18,7 +18,8 @@
     "populate:question-image64:eligibility:all": "node scripts/populateQuestionImage64FromEligibility.js --all",
     "populate:image64": "node scripts/populateCategoryImage64.js",
     "populate:image64:all": "node scripts/populateCategoryImage64.js --all",
-    "populate:tags": "node scripts/populateTags.js"
+    "populate:tags": "node scripts/populateTags.js",
+    "revalidate:disabled": "node revalidateDisabledQuestions.js"
   },
   "dependencies": {
     "@sendgrid/mail": "^7.7.0",

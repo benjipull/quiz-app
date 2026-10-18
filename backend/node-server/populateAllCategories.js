@@ -7,9 +7,9 @@ const connectDB = require("./config/db");
 const { populateCategoryLoop } = require("./scripts/populateCategories");
 
 // --- Config ---
-const BATCH_SIZE = 10;          // how many categories to process each iteration
-const QUESTIONS_TO_FILL = 30;   // how many questions to add per category
-const THRESHOLD = 60;           // only categories with <60 enabled questions
+const BATCH_SIZE = 40;          // how many categories to process each iteration
+const QUESTIONS_TO_FILL = 40;   // how many questions to add per category
+const THRESHOLD = 50;           // only categories with <60 enabled questions
 
 /**
  * Get categories with the lowest enabled-question count

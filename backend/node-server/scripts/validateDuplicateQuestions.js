@@ -158,6 +158,17 @@ async function queryOllama(prompt) {
 }
 
 async function isDuplicate(q1, q2) {
+  // Check if answers match - if they do, mark as duplicate without AI check
+  if (q1.correct_answer && q2.correct_answer &&
+      q1.correct_answer.trim().toLowerCase() === q2.correct_answer.trim().toLowerCase()) {
+    console.log(`   ⚡ FAST-DUPLICATE (same answer): "${q1.text}" <-> "${q2.text}"`);
+    console.log(`      Answer: "${q1.correct_answer}"`);
+    return {
+      duplicate: true,
+      reason: "Same correct answer in same category"
+    };
+  }
+
   const prompt = buildDuplicatePrompt(q1, q2);
   return queryOllama(prompt);
 }
@@ -378,6 +389,64 @@ async function processSingleQuestion(categoryId, questionId) {
   };
 }
 
+async function processCategoryAnswerDuplicatesOnly(category) {
+  console.log(`\n[FAST PASS] Category: ${category.name}`);
+
+  const questions = category.questions.filter((q) => !q.disabled);
+
+  if (questions.length <= 1) {
+    console.log(`   Skipping (only ${questions.length} enabled question)`);
+    return;
+  }
+
+  // Group questions by their correct answer
+  const answerGroups = new Map();
+  for (const q of questions) {
+    if (!q.correct_answer) continue;
+    const normalizedAnswer = q.correct_answer.trim().toLowerCase();
+    if (!answerGroups.has(normalizedAnswer)) {
+      answerGroups.set(normalizedAnswer, []);
+    }
+    answerGroups.get(normalizedAnswer).push(q);
+  }
+
+  let duplicatesFound = 0;
+  // Process groups with more than one question
+  for (const [answer, group] of answerGroups.entries()) {
+    if (group.length > 1) {
+      duplicatesFound++;
+      const groupId = new mongoose.Types.ObjectId().toString();
+      const ids = group.map((q) => q._id);
+      const keepQuestion = pickOldestVersionQuestion(group);
+
+      await updateDuplicateGroup(category._id, ids, groupId);
+      if (keepQuestion?._id) {
+        await disableDuplicateGroupExceptKeep(category._id, ids, keepQuestion._id);
+      }
+
+      console.log(
+        `   ⚡ Same-answer group (${group.length}) - Answer: "${answer}"`
+      );
+      if (keepQuestion) {
+        console.log(
+          `      ✓ Keeping: "${keepQuestion.text}" (v${Number(keepQuestion.version) || 0})`
+        );
+      }
+      group.forEach((q) => {
+        if (q._id.toString() !== keepQuestion?._id.toString()) {
+          console.log(`      ✗ Disabled: "${q.text}"`);
+        }
+      });
+    }
+  }
+
+  if (duplicatesFound === 0) {
+    console.log(`   ✓ No same-answer duplicates found`);
+  } else {
+    console.log(`   ✓ Processed ${duplicatesFound} duplicate group(s)`);
+  }
+}
+
 async function processCategory(category) {
   console.log(`\nCategory: ${category.name}`);
 
@@ -397,6 +466,7 @@ async function processCategory(category) {
 
     const group = [qI];
     checked.add(qI._id.toString());
+    let isFastDuplicate = false;
 
     for (let j = 0; j < questions.length; j++) {
       const qJ = questions[j];
@@ -408,6 +478,12 @@ async function processCategory(category) {
         console.log(`      Reason: ${reason}`);
         group.push(qJ);
         checked.add(qJ._id.toString());
+
+        // If this was a fast duplicate (same answer), stop checking further
+        if (reason === "Same correct answer in same category") {
+          isFastDuplicate = true;
+          break;
+        }
       }
     }
 
@@ -452,6 +528,29 @@ function ensureOllamaSetupOrExit() {
   }
 }
 
+async function findAnswerDuplicatesOnly() {
+  try {
+    await connectDB();
+    console.log("OK Connected to MongoDB");
+    console.log("INFO Running FAST PASS - checking for same-answer duplicates only\n");
+
+    const categories = await Category.find(
+      { "questions.disabled": false },
+      { name: 1, questions: 1 }
+    );
+
+    for (const category of categories) {
+      await processCategoryAnswerDuplicatesOnly(category);
+    }
+
+    console.log("\n✓ Answer-based duplicate detection complete.");
+  } catch (error) {
+    console.error("ERROR:", error.message);
+  } finally {
+    mongoose.connection.close();
+  }
+}
+
 async function findDuplicatesAndMarkChecked() {
   try {
     const hasValidSetup = ensureOllamaSetupOrExit();
@@ -480,12 +579,17 @@ async function findDuplicatesAndMarkChecked() {
   }
 }
 
-if (require.main === module && process.env.RUN_DUPLICATE_CHECK === "true") {
-  findDuplicatesAndMarkChecked();
+if (require.main === module) {
+  if (process.env.RUN_ANSWER_DUPLICATE_CHECK === "true") {
+    findAnswerDuplicatesOnly();
+  } else if (process.env.RUN_DUPLICATE_CHECK === "true") {
+    findDuplicatesAndMarkChecked();
+  }
 }
 
 module.exports = {
   processSingleQuestion,
   pickOldestVersionQuestion,
   buildDisableDuplicateGroupUpdate,
+  findAnswerDuplicatesOnly,
 };

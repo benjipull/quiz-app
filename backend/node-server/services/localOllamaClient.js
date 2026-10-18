@@ -1,6 +1,7 @@
 require("dotenv").config();
 const axios = require("axios");
 const { OLLAMA_MODEL, OLLAMA_PRESETS } = require("./ollamaPresets");
+const { getOllamaResponseText } = require("./ollamaResponseText");
 
 const OLLAMA_URL = process.env.OLLAMA_URL;
 
@@ -49,16 +50,6 @@ async function callOllama({ prompt, presetName, overrides = {} }) {
   const timeout = overrides.timeoutMs ?? preset.timeoutMs ?? 180_000;
 
   return axios.post(OLLAMA_URL, payload, { timeout });
-}
-
-function getOllamaResponseText(response) {
-  const data = response?.data || {};
-  const text =
-    data.response ??
-    data?.message?.content ??
-    data?.output?.[0]?.choices?.[0]?.text ??
-    "";
-  return String(text).trim();
 }
 
 async function callOllamaForText({ prompt, presetName, overrides = {} }) {
