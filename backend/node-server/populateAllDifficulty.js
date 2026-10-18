@@ -8,6 +8,10 @@ const Category = require("./models/categoryModel");
 const connectDB = require("./config/db");
 const { populateDifficulty } = require("./scripts/populateDifficulty");
 const { runWithConcurrencyPool } = require("./scripts/concurrencyPool");
+const {
+  parseNonNegativeIntOrThrow,
+  parseMinOneIntOrThrow,
+} = require("./utils/numberUtils");
 
 const DEFAULT_LIMIT = 1000;
 const DEFAULT_DELAY_MS = 500;
@@ -53,24 +57,8 @@ function printUsage() {
   console.log("  --help                Show this help.");
 }
 
-function parsePositiveInt(value, fieldName) {
-  const num = Number(value);
-  if (!Number.isInteger(num) || num < 0) {
-    throw new Error(`Invalid ${fieldName}: ${value}`);
-  }
-  return num;
-}
-
-function parseMinOneInt(value, fieldName) {
-  const num = Number(value);
-  if (!Number.isInteger(num) || num < 1) {
-    throw new Error(`Invalid ${fieldName}: ${value}`);
-  }
-  return num;
-}
-
 function parseDifficultyLevel(value) {
-  const level = parseMinOneInt(value, "difficulty-level");
+  const level = parseMinOneIntOrThrow(value, "difficulty-level");
   if (level > 10) {
     throw new Error(`Invalid difficulty-level: ${value}`);
   }
@@ -117,13 +105,13 @@ function parseArgs(args) {
       if (value == null) {
         throw new Error("Missing value for --limit");
       }
-      options.limit = parsePositiveInt(value, "limit");
+      options.limit = parseNonNegativeIntOrThrow(value, "limit");
       i += 1;
       continue;
     }
 
     if (arg.startsWith("--limit=")) {
-      options.limit = parsePositiveInt(arg.split("=")[1], "limit");
+      options.limit = parseNonNegativeIntOrThrow(arg.split("=")[1], "limit");
       continue;
     }
 
@@ -132,13 +120,13 @@ function parseArgs(args) {
       if (value == null) {
         throw new Error("Missing value for --delay-ms");
       }
-      options.delayMs = parsePositiveInt(value, "delay-ms");
+      options.delayMs = parseNonNegativeIntOrThrow(value, "delay-ms");
       i += 1;
       continue;
     }
 
     if (arg.startsWith("--delay-ms=")) {
-      options.delayMs = parsePositiveInt(arg.split("=")[1], "delay-ms");
+      options.delayMs = parseNonNegativeIntOrThrow(arg.split("=")[1], "delay-ms");
       continue;
     }
 
@@ -152,28 +140,28 @@ function parseArgs(args) {
       if (value == null) {
         throw new Error(`Missing value for ${arg}`);
       }
-      options.parallel = parseMinOneInt(value, "parallel");
+      options.parallel = parseMinOneIntOrThrow(value, "parallel");
       i += 1;
       continue;
     }
 
     if (arg.startsWith("--parallel=")) {
-      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      options.parallel = parseMinOneIntOrThrow(arg.split("=")[1], "parallel");
       continue;
     }
 
     if (arg.startsWith("--concurrency=")) {
-      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      options.parallel = parseMinOneIntOrThrow(arg.split("=")[1], "parallel");
       continue;
     }
 
     if (arg.startsWith("-n=")) {
-      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      options.parallel = parseMinOneIntOrThrow(arg.split("=")[1], "parallel");
       continue;
     }
 
     if (arg.startsWith("-p=")) {
-      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      options.parallel = parseMinOneIntOrThrow(arg.split("=")[1], "parallel");
       continue;
     }
 

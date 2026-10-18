@@ -12,17 +12,24 @@ const {
   populateImageEligibility,
 } = require("./scripts/populateImageEligibility");
 const { runWithConcurrencyPool } = require("./scripts/concurrencyPool");
+const {
+  parseNonNegativeIntOrThrow,
+  parseMinOneIntOrThrow,
+} = require("./utils/numberUtils");
 
 const DEFAULT_LIMIT = 10000;
-const DEFAULT_DELAY_MS = 40;
+const DEFAULT_DELAY_MS = 0;
 const DEFAULT_PARALLEL = 10;
 
 function printUsage() {
   console.log("Usage: node populateAllImageEligibility.js [options]");
   console.log("");
   console.log("Options:");
-  console.log("  --all                 Reprocess all questions regardless of saved version.");
+  console.log("  --all, --force        Reprocess all questions regardless of saved version.");
   console.log("  --pending-only        Process only questions below current version (default).");
+  console.log(
+    "  --reprocess-eligible-true  Include questions already marked should_use_image=true.",
+  );
   console.log("  --category-id=<id>    Process questions only from a specific category.");
   console.log(
     `  --limit=<n>           Max questions to process (${DEFAULT_LIMIT} default, 0 = no limit).`,
@@ -42,25 +49,11 @@ function printUsage() {
   );
 }
 
-function parsePositiveInt(value, fieldName) {
-  const num = Number(value);
-  if (!Number.isInteger(num) || num < 0) {
-    throw new Error(`Invalid ${fieldName}: ${value}`);
-  }
-  return num;
-}
-
-function parseMinOneInt(value, fieldName) {
-  const num = Number(value);
-  if (!Number.isInteger(num) || num < 1) {
-    throw new Error(`Invalid ${fieldName}: ${value}`);
-  }
-  return num;
-}
 
 function parseArgs(args) {
   const options = {
     processAll: false,
+    reprocessEligibleTrue: false,
     limit: DEFAULT_LIMIT,
     delayMs: DEFAULT_DELAY_MS,
     parallel: DEFAULT_PARALLEL,
@@ -71,13 +64,18 @@ function parseArgs(args) {
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
 
-    if (arg === "--all") {
+    if (arg === "--all" || arg === "--force") {
       options.processAll = true;
       continue;
     }
 
     if (arg === "--pending-only") {
       options.processAll = false;
+      continue;
+    }
+
+    if (arg === "--reprocess-eligible-true") {
+      options.reprocessEligibleTrue = true;
       continue;
     }
 
@@ -91,13 +89,13 @@ function parseArgs(args) {
       if (value == null) {
         throw new Error("Missing value for --limit");
       }
-      options.limit = parsePositiveInt(value, "limit");
+      options.limit = parseNonNegativeIntOrThrow(value, "limit");
       i += 1;
       continue;
     }
 
     if (arg.startsWith("--limit=")) {
-      options.limit = parsePositiveInt(arg.split("=")[1], "limit");
+      options.limit = parseNonNegativeIntOrThrow(arg.split("=")[1], "limit");
       continue;
     }
 
@@ -106,13 +104,13 @@ function parseArgs(args) {
       if (value == null) {
         throw new Error("Missing value for --delay-ms");
       }
-      options.delayMs = parsePositiveInt(value, "delay-ms");
+      options.delayMs = parseNonNegativeIntOrThrow(value, "delay-ms");
       i += 1;
       continue;
     }
 
     if (arg.startsWith("--delay-ms=")) {
-      options.delayMs = parsePositiveInt(arg.split("=")[1], "delay-ms");
+      options.delayMs = parseNonNegativeIntOrThrow(arg.split("=")[1], "delay-ms");
       continue;
     }
 
@@ -126,28 +124,28 @@ function parseArgs(args) {
       if (value == null) {
         throw new Error(`Missing value for ${arg}`);
       }
-      options.parallel = parseMinOneInt(value, "parallel");
+      options.parallel = parseMinOneIntOrThrow(value, "parallel");
       i += 1;
       continue;
     }
 
     if (arg.startsWith("--parallel=")) {
-      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      options.parallel = parseMinOneIntOrThrow(arg.split("=")[1], "parallel");
       continue;
     }
 
     if (arg.startsWith("--concurrency=")) {
-      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      options.parallel = parseMinOneIntOrThrow(arg.split("=")[1], "parallel");
       continue;
     }
 
     if (arg.startsWith("-n=")) {
-      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      options.parallel = parseMinOneIntOrThrow(arg.split("=")[1], "parallel");
       continue;
     }
 
     if (arg.startsWith("-p=")) {
-      options.parallel = parseMinOneInt(arg.split("=")[1], "parallel");
+      options.parallel = parseMinOneIntOrThrow(arg.split("=")[1], "parallel");
       continue;
     }
 
@@ -188,6 +186,9 @@ function buildPipeline(options) {
 
   // Only process enabled questions.
   match["questions.disabled"] = { $ne: true };
+  if (!options.reprocessEligibleTrue) {
+    match["questions.image_eligibility.should_use_image"] = { $ne: true };
+  }
 
   if (!options.processAll) {
     match.$or = [
@@ -228,8 +229,9 @@ async function batchPopulateImageEligibility(options) {
   const mode = options.processAll ? "all questions" : "pending-only questions";
   const categoryLabel = options.categoryId ? options.categoryId : "all categories";
   const limitLabel = options.limit > 0 ? String(options.limit) : "none";
+  const eligibleTrueLabel = options.reprocessEligibleTrue ? "included" : "skipped";
   console.log(
-    `Running image eligibility in ${mode} mode (category=${categoryLabel}, limit=${limitLabel}, delay=${options.delayMs}ms, parallel=${options.parallel}, version=${CURRENT_IMAGE_ELIGIBILITY_VERSION}).`,
+    `Running image eligibility in ${mode} mode (category=${categoryLabel}, eligibleTrue=${eligibleTrueLabel}, limit=${limitLabel}, delay=${options.delayMs}ms, parallel=${options.parallel}, version=${CURRENT_IMAGE_ELIGIBILITY_VERSION}).`,
   );
 
   const questions = await Category.aggregate(buildPipeline(options));

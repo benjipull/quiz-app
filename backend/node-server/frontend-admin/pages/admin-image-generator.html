@@ -56,6 +56,10 @@
       align-items: end;
     }
 
+    .field-span-all {
+      grid-column: 1 / -1;
+    }
+
     label {
       display: block;
       margin-bottom: 0.4rem;
@@ -159,6 +163,11 @@
           <textarea id="promptInput" placeholder="Describe the image you want to generate..."></textarea>
         </div>
 
+        <div class="field-span-all">
+          <label for="negativePromptInput">Negative Prompt</label>
+          <textarea id="negativePromptInput" placeholder="Describe what should be avoided...">blurry, low quality, deformed, ugly, text, watermark, signature</textarea>
+        </div>
+
         <div>
           <label for="sizeSelect">Image Size (px)</label>
           <select id="sizeSelect">
@@ -200,6 +209,7 @@
     }
 
     const promptInput = document.getElementById("promptInput");
+    const negativePromptInput = document.getElementById("negativePromptInput");
     const sizeSelect = document.getElementById("sizeSelect");
     const generateBtn = document.getElementById("generateBtn");
     const statusEl = document.getElementById("status");
@@ -214,6 +224,7 @@
 
     async function generateImage() {
       const prompt = promptInput.value.trim();
+      const negativePrompt = negativePromptInput.value.trim();
       const size = Number(sizeSelect.value);
 
       if (!prompt) {
@@ -231,7 +242,7 @@
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ prompt, size }),
+          body: JSON.stringify({ prompt, size, negativePrompt }),
         });
 
         const payload = await response.json().catch(() => ({}));
@@ -246,7 +257,9 @@
 
         generatedImage.src = `data:image/png;base64,${encoded}`;
         generatedImage.alt = `Generated image for prompt: ${prompt}`;
-        imageMeta.textContent = `Prompt: "${payload.prompt}" | Size: ${payload.size} x ${payload.size}px`;
+        const resolvedNegativePrompt = String(payload.negativePrompt || negativePrompt || "");
+        imageMeta.textContent =
+          `Prompt: "${payload.prompt}" | Negative: "${resolvedNegativePrompt}" | Size: ${payload.size} x ${payload.size}px`;
         previewWrap.style.display = "block";
         setStatus("Image generated successfully.");
       } catch (error) {

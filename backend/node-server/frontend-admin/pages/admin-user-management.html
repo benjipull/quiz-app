@@ -113,6 +113,28 @@
       letter-spacing: 0.01em;
     }
 
+    th.sortable {
+      position: relative;
+      padding-right: 1.35rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    th.sortable::after {
+      content: attr(data-sort-indicator);
+      position: absolute;
+      right: 0.45rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.7rem;
+      color: #8fbaff;
+      opacity: 0.85;
+    }
+
+    th.sortable:hover {
+      color: #d8e9ff;
+    }
+
     tbody tr:hover {
       background: #181818;
     }
@@ -170,16 +192,16 @@
       <table id="playersTable" style="display: none;">
         <thead>
           <tr>
-            <th>Alias</th>
-            <th>Player Type</th>
-            <th class="num">Level</th>
-            <th class="num">Knowledge Points</th>
-            <th class="num">Quizzes Completed</th>
-            <th class="num">Coins</th>
-            <th>Last Login</th>
-            <th>Created At</th>
-            <th class="num">Days Old</th>
-            <th>Actions</th>
+            <th class="sortable" data-sort-key="alias">Alias</th>
+            <th class="sortable" data-sort-key="playerType">Player Type</th>
+            <th class="num sortable" data-sort-key="level">Level</th>
+            <th class="num sortable" data-sort-key="knowledgePoints">Knowledge Points</th>
+            <th class="num sortable" data-sort-key="quizzesCompleted">Quizzes Completed</th>
+            <th class="num sortable" data-sort-key="coins">Coins</th>
+            <th class="sortable" data-sort-key="lastLogin">Last Login</th>
+            <th class="sortable" data-sort-key="createdAt">Created At</th>
+            <th class="num sortable" data-sort-key="retentionDays">Retention Days</th>
+            <th class="sortable" data-sort-key="actions">Actions</th>
           </tr>
         </thead>
         <tbody id="playersTableBody"></tbody>
@@ -199,7 +221,11 @@
     const playersTable = document.getElementById("playersTable");
     const playersTableBody = document.getElementById("playersTableBody");
     const hideZeroKnowledgeCheckbox = document.getElementById("hideZeroKnowledge");
+    const sortableHeaders = Array.from(
+      document.querySelectorAll("#playersTable thead th[data-sort-key]")
+    );
     let allPlayers = [];
+    let sortState = { key: "lastLogin", direction: "desc" };
 
     function escapeHtml(value) {
       return String(value)
@@ -230,15 +256,122 @@
       return Number.isNaN(date.getTime()) ? 0 : date.getTime();
     }
 
-    function calculateDaysOld(value) {
-      if (!value) return '<span class="muted">-</span>';
-      const createdDate = new Date(value);
-      if (Number.isNaN(createdDate.getTime())) return '<span class="muted">-</span>';
+    function getRetentionDaysNumber(createdAtValue, lastLoginValue) {
+      if (!createdAtValue || !lastLoginValue) return null;
+
+      const createdDate = new Date(createdAtValue);
+      const lastLoginDate = new Date(lastLoginValue);
+      if (Number.isNaN(createdDate.getTime()) || Number.isNaN(lastLoginDate.getTime())) {
+        return null;
+      }
+
+      const createdAtUtcDateOnly = Date.UTC(
+        createdDate.getUTCFullYear(),
+        createdDate.getUTCMonth(),
+        createdDate.getUTCDate()
+      );
+      const lastLoginUtcDateOnly = Date.UTC(
+        lastLoginDate.getUTCFullYear(),
+        lastLoginDate.getUTCMonth(),
+        lastLoginDate.getUTCDate()
+      );
 
       const msPerDay = 24 * 60 * 60 * 1000;
-      const days = Math.floor((Date.now() - createdDate.getTime()) / msPerDay);
-      const clampedDays = Math.max(0, days);
-      return clampedDays.toLocaleString();
+      const retentionDays = Math.floor((lastLoginUtcDateOnly - createdAtUtcDateOnly) / msPerDay);
+      return Math.max(0, retentionDays);
+    }
+
+    function formatRetentionDays(createdAtValue, lastLoginValue) {
+      const retentionDays = getRetentionDaysNumber(createdAtValue, lastLoginValue);
+      if (retentionDays === null) return '<span class="muted">-</span>';
+      return retentionDays.toLocaleString();
+    }
+
+    function getSortableValue(player, key) {
+      switch (key) {
+        case "alias":
+          return player.alias ? String(player.alias).trim().toLowerCase() : null;
+        case "playerType":
+          return player.userType ? String(player.userType).trim().toLowerCase() : "registered";
+        case "level": {
+          const value = Number(player.level);
+          return Number.isFinite(value) ? value : null;
+        }
+        case "knowledgePoints":
+          return Number(player.knowledgePoints ?? 0);
+        case "quizzesCompleted":
+          return Number(player.quizzesCompleted ?? 0);
+        case "coins":
+          return Number(player.coins ?? 0);
+        case "lastLogin":
+          return toSortableTime(player.lastlogin_at) || null;
+        case "createdAt":
+          return toSortableTime(player.created_at) || null;
+        case "retentionDays":
+          return getRetentionDaysNumber(player.created_at, player.lastlogin_at);
+        case "actions":
+          return player.alias ? String(player.alias).trim().toLowerCase() : null;
+        default:
+          return null;
+      }
+    }
+
+    function compareByAliasThenId(a, b) {
+      const aliasA = a.alias ? String(a.alias).toLowerCase() : "";
+      const aliasB = b.alias ? String(b.alias).toLowerCase() : "";
+      const aliasCompare = aliasA.localeCompare(aliasB, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+      if (aliasCompare !== 0) return aliasCompare;
+
+      const idA = a._id ? String(a._id) : "";
+      const idB = b._id ? String(b._id) : "";
+      return idA.localeCompare(idB, undefined, { numeric: true, sensitivity: "base" });
+    }
+
+    function comparePlayers(a, b) {
+      const aValue = getSortableValue(a, sortState.key);
+      const bValue = getSortableValue(b, sortState.key);
+      const aMissing = aValue === null || aValue === undefined || aValue === "";
+      const bMissing = bValue === null || bValue === undefined || bValue === "";
+
+      if (aMissing && bMissing) return compareByAliasThenId(a, b);
+      if (aMissing) return 1;
+      if (bMissing) return -1;
+
+      let result = 0;
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        result = aValue - bValue;
+      } else {
+        result = String(aValue).localeCompare(String(bValue), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+      }
+
+      if (result === 0) return compareByAliasThenId(a, b);
+      return sortState.direction === "asc" ? result : -result;
+    }
+
+    function updateSortHeaderIndicators() {
+      sortableHeaders.forEach((header) => {
+        const headerSortKey = header.getAttribute("data-sort-key");
+        const isActive = headerSortKey === sortState.key;
+        const ariaSort = isActive
+          ? sortState.direction === "asc"
+            ? "ascending"
+            : "descending"
+          : "none";
+        const indicator = isActive
+          ? sortState.direction === "asc"
+            ? "▲"
+            : "▼"
+          : "↕";
+
+        header.setAttribute("aria-sort", ariaSort);
+        header.setAttribute("data-sort-indicator", indicator);
+      });
     }
 
     function renderPlayers() {
@@ -260,7 +393,9 @@
         return;
       }
 
-      playersTableBody.innerHTML = filteredPlayers
+      const sortedPlayers = [...filteredPlayers].sort(comparePlayers);
+
+      playersTableBody.innerHTML = sortedPlayers
         .map((player) => {
           const aliasValue = player.alias ? escapeHtml(player.alias) : '<span class="muted">Unknown</span>';
           const aliasPlain = player.alias ? String(player.alias) : "Unknown";
@@ -283,7 +418,7 @@
               <td class="num">${coins.toLocaleString()}</td>
               <td>${formatLastLogin(player.lastlogin_at)}</td>
               <td>${formatCreatedAt(player.created_at)}</td>
-              <td class="num">${calculateDaysOld(player.created_at)}</td>
+              <td class="num">${formatRetentionDays(player.created_at, player.lastlogin_at)}</td>
               <td>
                 <button
                   type="button"
@@ -301,6 +436,7 @@
 
       playersStatus.textContent = `${filteredPlayers.length} of ${allPlayers.length} player(s) shown.`;
       playersTable.style.display = "table";
+      updateSortHeaderIndicators();
     }
 
     async function resetPlayerProgress(playerId, alias) {
@@ -364,9 +500,7 @@
           throw new Error(players?.error || players?.message || "Failed to load players");
         }
 
-        allPlayers = [...players].sort(
-          (a, b) => toSortableTime(b.lastlogin_at) - toSortableTime(a.lastlogin_at)
-        );
+        allPlayers = Array.isArray(players) ? [...players] : [];
         renderPlayers();
       } catch (error) {
         playersStatus.textContent = `Error loading players: ${error.message}`;
@@ -375,6 +509,21 @@
     }
 
     hideZeroKnowledgeCheckbox.addEventListener("change", renderPlayers);
+    sortableHeaders.forEach((header) => {
+      header.addEventListener("click", () => {
+        const headerSortKey = header.getAttribute("data-sort-key");
+        if (!headerSortKey) return;
+
+        if (sortState.key === headerSortKey) {
+          sortState.direction = sortState.direction === "asc" ? "desc" : "asc";
+        } else {
+          sortState = { key: headerSortKey, direction: "asc" };
+        }
+
+        renderPlayers();
+      });
+    });
+    updateSortHeaderIndicators();
     playersTableBody.addEventListener("click", (event) => {
       const target = event.target instanceof Element ? event.target : null;
       const resetButton = target ? target.closest(".reset-progress-btn") : null;
