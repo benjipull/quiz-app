@@ -10,7 +10,7 @@ function buildQuestionImage64Prompt(question, categoryName = "") {
     "trivia subject";
 
   // Keep this prompt independent from category/question prompt builders.
-  return `A photorealistic image clearly representing ${subject}, focused on the defining visual traits most commonly associated with ${subject}`;
+  return `A cartoon style image clearly representing ${subject}, focused on the defining visual traits most commonly associated with ${subject}`;
 }
 
 module.exports = {

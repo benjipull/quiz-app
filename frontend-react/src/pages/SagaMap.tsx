@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "@/contexts/UserContext";
 import { getApiBaseUrl } from "@/utils/baseUrl";
 import GameStatsHeader from "@/components/GameStatsHeader";
+import Shop from "@/components/shop/Shop";
 import { avatarUrls } from "@/utils/avatarPaths";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -222,6 +223,7 @@ export default function SagaMap() {
   const [isChestSequenceActive, setIsChestSequenceActive] = useState(false);
   const [isChestOpen, setIsChestOpen] = useState(false);
   const [isChestTremoring, setIsChestTremoring] = useState(false);
+  const [showShop, setShowShop] = useState(false);
   const [chestOverlayCenter, setChestOverlayCenter] = useState<{ x: number; y: number } | null>(null);
   const [chestOverlayScale, setChestOverlayScale] = useState(1);
   const [chestOverlayTransitionMs, setChestOverlayTransitionMs] = useState(0);
@@ -933,6 +935,7 @@ export default function SagaMap() {
             centerSubLabel={user.alias || ""}
             centerBadgeValue={user.level ?? 1}
             onCenterClick={openEditDialog}
+            onCoinsClick={() => setShowShop(true)}
             centerAriaLabel="Edit avatar and alias"
           />
         </div>
@@ -1645,6 +1648,17 @@ export default function SagaMap() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {showShop && (
+        <Shop
+          onClose={() => setShowShop(false)}
+          userCoins={currentCoins}
+          userInventory={user?.inventory}
+          onPurchaseComplete={() => {
+            refreshUser();
+          }}
+        />
+      )}
     </div>
   );
 }

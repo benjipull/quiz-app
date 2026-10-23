@@ -26,6 +26,7 @@ import GameStatsHeader from "../components/GameStatsHeader";
 import { useToast } from "@/hooks/use-toast";
 import DailyCoinClaim from "@/components/DailyCoinClaim";
 import { useUser } from "@/contexts/UserContext";
+import Shop from "@/components/shop/Shop";
 import { loadLevelConfig, resolveLevelProgress, type LevelConfigEntry } from "@/utils/levelConfig";
 import { getApiBaseUrl } from "@/utils/baseUrl";
 import { areSplashAssetsReady, getPreloadedImageSrc, preloadSplashAssets } from "@/utils/splashAssets";
@@ -88,6 +89,7 @@ export default function Home() {
   const [playButtonLoading, setPlayButtonLoading] = useState(false);
   const [refreshCategoryLoading, setRefreshCategoryLoading] = useState(false);
   const [nextCategoryPreview, setNextCategoryPreview] = useState<CategoryToPlayResponse | null>(null);
+  const [showShop, setShowShop] = useState(false);
   const [assetsReady, setAssetsReady] = useState<boolean>(areSplashAssetsReady());
   const [levelConfig, setLevelConfig] = useState<LevelConfigEntry[] | null>(null);
   const [levelConfigError, setLevelConfigError] = useState<string | null>(null);
@@ -665,6 +667,7 @@ export default function Home() {
             userGem2={user.enlightenmentCrystals ?? 0}
             showSecondaryEconomyItems={false}
             compactMode={isCompactEconomyResolution}
+            onCoinsClick={() => setShowShop(true)}
           />
 
           <DailyCoinClaim
@@ -1003,6 +1006,17 @@ export default function Home() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {showShop && (
+        <Shop
+          onClose={() => setShowShop(false)}
+          userCoins={currentCoins}
+          userInventory={user?.inventory}
+          onPurchaseComplete={() => {
+            refreshUser();
+          }}
+        />
+      )}
     </div>
   );
 }

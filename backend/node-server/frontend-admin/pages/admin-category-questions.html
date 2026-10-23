@@ -615,6 +615,7 @@
           <div style="margin-top:.4rem;"><span class="label">Difficulty Rationale:</span>${difficultyRationale ? escapeHtml(difficultyRationale) : "—"}</div>
         </div>`;
 
+      const metadataHTML = renderQuestionMetadata(q);
       const validationMetaHTML = renderValidationMeta(q);
 
       const validationHTML = q.needs_validation
@@ -626,6 +627,77 @@
        </div>`
         : "";
 
+      return answersHTML + explanationHTML + difficultyMetaHTML + metadataHTML + validationMetaHTML + validationHTML;
+    }
+
+    function renderQuestionMetadata(q = {}) {
+      const metadata = {};
+
+      // Source fields
+      if (q.source_domain) metadata["Source Domain"] = q.source_domain;
+      if (q.source_title) metadata["Source Title"] = q.source_title;
+      if (q.source_quote) metadata["Source Quote"] = q.source_quote;
+
+      // Statistics
+      metadata["Times Loaded"] = q.timesLoaded ?? 0;
+      metadata["Times Answered Correctly"] = q.timesAnsweredCorrectly ?? 0;
+      metadata["Times Answered Incorrectly"] = q.timesAnsweredIncorrectly ?? 0;
+
+      // Status fields
+      metadata["Disabled"] = q.disabled ? "Yes" : "No";
+      if (q.disabled && q.disabled_reason) metadata["Disabled Reason"] = q.disabled_reason;
+      metadata["Needs Validation"] = q.needs_validation ? "Yes" : "No";
+      metadata["New Question"] = q.new_question ? "Yes" : "No";
+
+      // Version & Hash
+      metadata["Version"] = q.version ?? "—";
+      metadata["Hash"] = q.hash ?? "—";
+
+      // Duplicate info
+      if (q.duplicate) {
+        const dup = q.duplicate;
+        if (dup.duplicate_checked_version) metadata["Duplicate Checked Version"] = dup.duplicate_checked_version;
+        if (dup.duplicate_group_id) metadata["Duplicate Group ID"] = dup.duplicate_group_id;
+        if (dup.duplicate_of && dup.duplicate_of.length > 0) {
+          metadata["Duplicate Of"] = dup.duplicate_of.join(", ");
+        }
+        if (dup.reasoning) metadata["Duplicate Reasoning"] = dup.reasoning;
+        if (dup.confidence !== null && dup.confidence !== undefined) metadata["Duplicate Confidence"] = dup.confidence;
+        if (dup.last_checked_at) metadata["Duplicate Last Checked"] = new Date(dup.last_checked_at).toLocaleString();
+      }
+
+      // Image eligibility
+      if (q.image_eligibility) {
+        const img = q.image_eligibility;
+        metadata["Should Use Image"] = img.should_use_image ? "Yes" : "No";
+        if (img.reason) metadata["Image Eligibility Reason"] = img.reason;
+        if (img.version) metadata["Image Eligibility Version"] = img.version;
+        if (img.processed_at) metadata["Image Eligibility Processed"] = new Date(img.processed_at).toLocaleString();
+      }
+
+      // Image fields
+      if (q.image_prompt) metadata["Image Prompt"] = q.image_prompt;
+      if (q.image_version) metadata["Image Version"] = q.image_version;
+      if (q.image_generated_at) metadata["Image Generated"] = new Date(q.image_generated_at).toLocaleString();
+      if (q.image64) metadata["Has Image Data"] = "Yes";
+
+      if (Object.keys(metadata).length === 0) {
+        return "";
+      }
+
+      const rows = Object.entries(metadata)
+        .map(([key, value]) => `
+          <div class="validation-label">${escapeHtml(key)}</div>
+          <div class="validation-value">${escapeHtml(String(value))}</div>
+        `)
+        .join("");
+
+      return `
+        <div class="validation-meta" style="border-left-color: #6c9fff;">
+          <div class="title">Question Metadata</div>
+          <div class="validation-grid">${rows}</div>
+        </div>
+      `;
       return answersHTML + explanationHTML + difficultyMetaHTML + validationMetaHTML + validationHTML;
     }
 

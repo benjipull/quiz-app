@@ -4,6 +4,11 @@ import { getApiBaseUrl } from "@/utils/baseUrl";
 
 const BASE_URL = getApiBaseUrl();
 
+interface InventoryItem {
+  itemType: string;
+  quantity: number;
+}
+
 interface UserDetails {
   _id: string;
   alias: string;
@@ -19,6 +24,7 @@ interface UserDetails {
   enlightenmentCrystals?: number;
   dailyClaimAvailable?: boolean;
   lastDailyCoinClaim?: string | null; // ✅ NEW: Add this field
+  inventory?: InventoryItem[];
 }
 
 interface UserContextType {

@@ -5,6 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ThumbsUp, ThumbsDown, Flag, X } from "lucide-react";
 import QuizResults from "@/components/quiz/QuizResults";
+import InventoryBar from "@/components/quiz/InventoryBar";
+import { useUser } from "@/contexts/UserContext";
 import {
   trackQuizStart,
   trackQuestionAnswered,
@@ -358,6 +360,7 @@ export default function Quiz() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = (location.state as QuizLocationState) || null;
+  const { user, refreshUser } = useUser();
   const explanationRef = useRef<HTMLDivElement>(null);
   const timerInSecondsRef = useRef<NodeJS.Timeout | null>(null);
   // FIX: hasStartedRef is the key to prevent double execution in React Strict Mode
@@ -402,12 +405,22 @@ export default function Quiz() {
   const [isReporting, setIsReporting] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState(10);
+  const [showInventory, setShowInventory] = useState(true);
+  const [usedPowerUps, setUsedPowerUps] = useState<Set<string>>(new Set());
+  const [powerUpEffect, setPowerUpEffect] = useState<any>(null);
+  const [showAudienceBars, setShowAudienceBars] = useState(false);
   const questionHasImagePayload = hasImagePayload(quizState.question?.image64);
   const currentQuestionImageSrc = getQuestionImageSrc(quizState.question?.image64);
 
   const userToken = localStorage.getItem("token");
   const storedUser = localStorage.getItem("user");
   const userId = storedUser ? JSON.parse(storedUser)._id : null;
+
+  // Debug: Log user inventory
+  useEffect(() => {
+    console.log('Quiz - User inventory:', user?.inventory);
+    console.log('Quiz - Full user object:', user);
+  }, [user]);
   const returnPath = locationState?.from || "";
   const sagaLevelMatch = typeof returnPath === "string"
     ? returnPath.match(/^\/saga-level\/(\d+)/)
@@ -655,6 +668,10 @@ export default function Quiz() {
     setTimeUp(false);
     setShowBars(false);
     setAnswerResponse(null);
+    setShowInventory(true); // Show inventory when new question loads
+    setUsedPowerUps(new Set()); // Reset used power-ups for new question
+    setPowerUpEffect(null); // Clear power-up effects
+    setShowAudienceBars(false); // Clear audience bars
   }, [quizState.question, quizState.currentQuestionIndex]);
 
   useEffect(() => {
@@ -998,6 +1015,8 @@ export default function Quiz() {
       setShowBars(true);
     }, ANSWER_BAR_REVEAL_DELAY_MS);
 
+    setShowInventory(false); // Hide inventory when answer is submitted
+
     void submitAnswerInBackground("")
       .catch((error) => {
         console.error("Error handling timeout submission:", error);
@@ -1191,6 +1210,7 @@ export default function Quiz() {
     }, ANSWER_BAR_REVEAL_DELAY_MS);
 
     setShowExplanation(true);
+    setShowInventory(false); // Hide inventory when answer is submitted
 
     void submitAnswerInBackground(answer)
       .catch((error) => {
@@ -1257,6 +1277,77 @@ export default function Quiz() {
     }
   };
 
+  const handlePowerUpClick = async (powerUpType: string) => {
+    if (!quizState.question?._id || !userToken) return;
+    if (usedPowerUps.has(powerUpType)) {
+      console.log("Power-up already used for this question");
+      return;
+    }
+
+    try {
+      console.log("Using power-up:", powerUpType, "for question:", quizState.question._id);
+
+      const response = await fetch(`${BASE_URL}/api/usePowerUp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({
+          powerUpType,
+          questionId: quizState.question._id
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Failed to use power-up:", data.error || data);
+        setError(data.error || "Failed to use power-up");
+        return;
+      }
+
+      console.log("Power-up used successfully:", data);
+
+      // Mark this power-up as used for this question
+      setUsedPowerUps(prev => new Set(prev).add(powerUpType));
+
+      // Store the effect
+      setPowerUpEffect(data.effect);
+
+      // Refresh user data to update inventory
+      if (data.inventory) {
+        await refreshUser();
+      }
+
+      // Handle specific power-up effects
+      if (data.effect.type === 'ASK_THE_AUDIENCE') {
+        // Show audience bars after a delay (same as answer bars)
+        setTimeout(() => {
+          setShowAudienceBars(true);
+        }, ANSWER_BAR_REVEAL_DELAY_MS);
+      } else if (data.effect.type === 'SWAP_QUESTION' || data.effect.type === 'DIFFICULTY_SWAP') {
+        // Replace the current question
+        const newQuestion = data.effect.data.newQuestion;
+        setQuizState(prev => ({
+          ...prev,
+          question: {
+            ...newQuestion,
+            shuffledAnswers: shuffleArray(newQuestion.answers || []),
+            timerInSeconds: prev.question?.timerInSeconds || 30
+          }
+        }));
+        // Reset timer for new question
+        setTimeLeft(quizState.question?.timerInSeconds || 30);
+        setPowerUpEffect(null); // Clear effect after applying
+      }
+
+    } catch (err) {
+      console.error("Error using power-up:", err);
+      setError("Failed to use power-up. Please try again.");
+    }
+  };
+
   const getOptionStyle = (answer: string) => {
     const baseStyle = "border-2 transition-all duration-300 backdrop-blur-sm";
     const baseColor = "border-purple-500/50 text-white";
@@ -1305,6 +1396,13 @@ export default function Quiz() {
 
     const answerStat = answerResponse.answerStats.find(stat => stat.text === answer);
     return answerStat ? answerStat.percentage : 0;
+  };
+
+  const getAskAudiencePercentage = (answer: string) => {
+    if (!powerUpEffect || powerUpEffect.type !== 'ASK_THE_AUDIENCE') return null;
+
+    const stat = powerUpEffect.data.answerStats.find((s: any) => s.text === answer);
+    return stat ? stat.percentage : 0;
   };
   
   const getInitialOptionAuraStyle = (answer: string) => {
@@ -1441,7 +1539,7 @@ export default function Quiz() {
             <div className="w-full bg-purple-950/50 rounded-full h-3 overflow-hidden border-2 border-purple-500/40">
               <div
                 className="h-full rounded-full transition-all duration-300 ease-out bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 shadow-lg shadow-yellow-500/60"
-                style={{ 
+                style={{
                   width: `${((quizState.currentQuestionIndex - 0) / totalQuestions) * 100}%`,
                 }}
               />
@@ -1515,6 +1613,7 @@ export default function Quiz() {
                       ...getInitialOptionAuraStyle(answer)
                     }}
                   >
+                    {/* Answer bars after question is answered */}
                     {quizState.isAnswerSelected && showBars && !timeUp && answerResponse && (
                       <div
                         className={`absolute top-0 left-0 h-full animate-bar-fill rounded-l-lg ${answer === (answerResponse?.correctAnswer || quizState.question?.correct_answer)
@@ -1531,11 +1630,28 @@ export default function Quiz() {
                       />
                     )}
 
+                    {/* Audience bars when Ask the Audience is used */}
+                    {!quizState.isAnswerSelected && !timeUp && showAudienceBars && powerUpEffect?.type === 'ASK_THE_AUDIENCE' && (
+                      <div
+                        className="absolute top-0 left-0 h-full animate-bar-fill rounded-l-lg bg-blue-500/30 border-r-4 border-blue-400"
+                        style={{
+                          '--target-width': `${getAskAudiencePercentage(answer)}%`,
+                          animationDelay: '0ms',
+                          animationDuration: `${ANSWER_BAR_ANIMATION_DURATION_MS / 1000}s`
+                        } as React.CSSProperties}
+                      />
+                    )}
+
                     <div className="flex items-center gap-3 relative z-10">
                       <div className="flex-1 min-w-0 flex items-center justify-between">
                         <span className={`font-quiz ${getFontSize(answer)} leading-tight break-words w-full font-semibold text-left text-white`}>
                           {answer}
                         </span>
+                        {showAudienceBars && powerUpEffect?.type === 'ASK_THE_AUDIENCE' && getAskAudiencePercentage(answer) !== null && (
+                          <span className="ml-2 px-2 py-1 bg-blue-500/90 text-white text-sm font-bold rounded-md flex-shrink-0 animate-fade-in-delayed">
+                            {getAskAudiencePercentage(answer)}%
+                          </span>
+                        )}
                       </div>
                     </div>
                   </Card>
@@ -1667,11 +1783,36 @@ export default function Quiz() {
         />
       )}
 
+      <div
+        className={`fixed bottom-0 left-0 right-0 z-20 px-3 py-3 bg-black/40 backdrop-blur-md border-t-2 border-purple-500/30 transition-transform duration-500 ease-out ${
+          showInventory ? 'translate-y-0' : 'translate-y-full'
+        }`}
+      >
+        <div className="mx-auto w-full max-w-2xl lg:max-w-4xl">
+          <InventoryBar
+            inventory={user?.inventory || []}
+            onPowerUpClick={handlePowerUpClick}
+            disabled={quizState.isAnswerSelected || timeUp}
+          />
+        </div>
+      </div>
+
       <style>{`
         @keyframes slide-up {
           from {
             opacity: 0;
             transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes slide-up-inventory {
+          from {
+            opacity: 0;
+            transform: translateY(100px);
           }
           to {
             opacity: 1;
@@ -1721,6 +1862,10 @@ export default function Quiz() {
 
         .animate-slide-up {
           animation: slide-up 0.6s ease-out forwards;
+        }
+
+        .animate-slide-up-inventory {
+          animation: slide-up-inventory 0.6s ease-out forwards;
         }
 
         .animate-fade-in {

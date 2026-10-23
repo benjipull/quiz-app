@@ -746,6 +746,13 @@ async function validateAndPersistQuestion(categoryId, questionId, questionOverri
     disabled: shouldDisable,
     verdict: parsed.final_verdict,
     fixedQuestion: validation.ambiguity_fix_applied ? validation.fixed_question : "",
+    isCorrectAnswerValid: parsed.is_correct_answer_valid,
+    explanationConsistent: parsed.explanation_consistent,
+    correctAnswerReasoning: parsed.correct_answer_reasoning,
+    otherAnswersPossible: parsed.other_answers_possible,
+    ambiguityType: parsed.ambiguity_type,
+    ambiguityReasoning: parsed.ambiguity_reasoning,
+    ambiguityFixFailureReason: parsed.ambiguity_fix_failure_reason,
   };
 }
 

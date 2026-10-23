@@ -29,6 +29,7 @@ interface GameStatsHeaderProps {
   economyValueTextSize?: "default" | "large";
   sagaKpOverlayOnly?: boolean;
   transparentPanelBackground?: boolean;
+  onCoinsClick?: () => void;
 }
 
 const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
@@ -54,6 +55,7 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
   economyValueTextSize = "default",
   sagaKpOverlayOnly = false,
   transparentPanelBackground = false,
+  onCoinsClick,
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [animatedXP, setAnimatedXP] = useState(userXP);
@@ -225,9 +227,10 @@ const GameStatsHeader: React.FC<GameStatsHeaderProps> = ({
           {/* Left Stats - Coins & Gem1 */}
           <div className={`flex flex-col ${compact ? "gap-1" : "gap-1.5 sm:gap-2"} flex-1`}>
             {/* Coins */}
-            <div 
+            <div
               data-coin-header=""
-              className={`flex items-center justify-end ${
+              onClick={onCoinsClick}
+              className={`flex items-center justify-end ${onCoinsClick ? 'cursor-pointer' : ''} ${
                 compact
                   ? "gap-1 px-2 py-1"
                   : "gap-1.5 sm:gap-2 md:gap-3 px-3 sm:px-4 md:px-5 py-1.5 sm:py-2 md:py-2.5"

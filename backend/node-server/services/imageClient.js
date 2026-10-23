@@ -91,13 +91,7 @@ function buildQuestionImagePrompt(question, categoryName = "") {
     ? `Category: ${category}.`
     : "";
 
-  return [
-    `A clear, educational, family-friendly image of ${subject}.`,
-    contextLine,
-    categoryLine,
-    "Single subject, centered composition, realistic or clean illustration style.",
-    "No text, no labels, no logos, no watermark, no collage, no split-screen.",
-  ]
+  return [`A cartoon style image representing ${correctAnswer} within the context of ${text}`]
     .filter(Boolean)
     .join(" ");
 }

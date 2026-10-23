@@ -1,6 +1,7 @@
 require("dotenv").config();
 const axios = require("axios");
 const { OLLAMA_PRESETS } = require("./ollamaPresets");
+const { getOllamaResponseText } = require("./ollamaResponseText");
 
 const RUNPOD_OLLAMA_URL = process.env.RUNPOD_OLLAMA_URL || process.env.OLLAMA_URL;
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY || "";
@@ -20,26 +21,30 @@ function getPreset(presetName) {
 }
 
 function buildPayload(prompt, preset, overrides = {}) {
-  const payload = {
-    input: {
-      prompt,
-      ...(overrides.input || {}),
-    },
-    stream: overrides.stream ?? false,
+  const inputObj = {
+    prompt,
+    ...(overrides.input || {}),
   };
 
+  // Add format to input if specified
   const format = overrides.format !== undefined ? overrides.format : preset.format;
   if (format) {
-    payload.format = format;
+    inputObj.format = format;
   }
 
+  // Add options to input if specified
   const options = {
     ...(preset.options || {}),
     ...(overrides.options || {}),
   };
   if (Object.keys(options).length > 0) {
-    payload.options = options;
+    inputObj.options = options;
   }
+
+  const payload = {
+    input: inputObj,
+    stream: overrides.stream ?? false,
+  };
 
   return payload;
 }
@@ -65,26 +70,6 @@ async function callOllama({ prompt, presetName, overrides = {} }) {
   const headers = buildHeaders(overrides);
 
   return axios.post(RUNPOD_OLLAMA_URL, payload, { timeout, headers });
-}
-
-function getOllamaResponseText(response) {
-  const data = response?.data || {};
-  const output = data.output;
-
-  if (Array.isArray(output)) {
-    const candidate = output?.[0]?.choices?.[0]?.text ?? output?.[0]?.text ?? output?.[0];
-    if (candidate !== undefined && candidate !== null) {
-      return String(candidate).trim();
-    }
-  }
-
-  const text =
-    data?.output?.text ??
-    data?.response ??
-    data?.message?.content ??
-    "";
-
-  return String(text).trim();
 }
 
 async function callOllamaForText({ prompt, presetName, overrides = {} }) {
