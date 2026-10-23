@@ -409,6 +409,7 @@ export default function Quiz() {
   const [usedPowerUps, setUsedPowerUps] = useState<Set<string>>(new Set());
   const [powerUpEffect, setPowerUpEffect] = useState<any>(null);
   const [showAudienceBars, setShowAudienceBars] = useState(false);
+  const [isFlipping, setIsFlipping] = useState(false);
   const questionHasImagePayload = hasImagePayload(quizState.question?.image64);
   const currentQuestionImageSrc = getQuestionImageSrc(quizState.question?.image64);
 
@@ -1327,19 +1328,29 @@ export default function Quiz() {
           setShowAudienceBars(true);
         }, ANSWER_BAR_REVEAL_DELAY_MS);
       } else if (data.effect.type === 'SWAP_QUESTION' || data.effect.type === 'DIFFICULTY_SWAP') {
-        // Replace the current question
-        const newQuestion = data.effect.data.newQuestion;
-        setQuizState(prev => ({
-          ...prev,
-          question: {
-            ...newQuestion,
-            shuffledAnswers: shuffleArray(newQuestion.answers || []),
-            timerInSeconds: prev.question?.timerInSeconds || 30
-          }
-        }));
-        // Reset timer for new question
-        setTimeLeft(quizState.question?.timerInSeconds || 30);
-        setPowerUpEffect(null); // Clear effect after applying
+        // Trigger flip animation
+        setIsFlipping(true);
+
+        // Wait for flip to halfway point, then swap the question
+        setTimeout(() => {
+          const newQuestion = data.effect.data.newQuestion;
+          setQuizState(prev => ({
+            ...prev,
+            question: {
+              ...newQuestion,
+              shuffledAnswers: shuffleArray(newQuestion.answers || []),
+              timerInSeconds: prev.question?.timerInSeconds || 30
+            }
+          }));
+          // Reset timer for new question
+          setTimeLeft(quizState.question?.timerInSeconds || 30);
+          setPowerUpEffect(null); // Clear effect after applying
+        }, 300); // Swap at halfway point of 600ms animation
+
+        // End flip animation
+        setTimeout(() => {
+          setIsFlipping(false);
+        }, 600);
       }
 
     } catch (err) {
@@ -1404,7 +1415,12 @@ export default function Quiz() {
     const stat = powerUpEffect.data.answerStats.find((s: any) => s.text === answer);
     return stat ? stat.percentage : 0;
   };
-  
+
+  const isAnswerRemovedByFiftyFifty = (answer: string) => {
+    if (!powerUpEffect || powerUpEffect.type !== 'FIFTY_FIFTY') return false;
+    return powerUpEffect.data.removedAnswers?.includes(answer) || false;
+  };
+
   const getInitialOptionAuraStyle = (answer: string) => {
       if (selectedAnswer !== null || timeUp) return {};
 
@@ -1549,6 +1565,7 @@ export default function Quiz() {
 
         <div className="flex-1 px-3 py-3 mx-auto w-full max-w-2xl lg:max-w-4xl">
             <div className="space-y-6">
+              <div className={`question-flip-container ${isFlipping ? 'flipping' : ''}`}>
               <div className="px-1 py-1 md:py-2 text-center">
                 <div className="flex items-start justify-center px-1">
                   <h2
@@ -1598,11 +1615,13 @@ export default function Quiz() {
                   return 'text-base md:text-xl';
                 };
 
+                const isRemoved = isAnswerRemovedByFiftyFifty(answer);
+
                 return (
                   <Card
                     key={`${quizState.question?._id || "question"}-${answer}-${index}`}
-                    className={`px-6 py-[18px] md:px-8 md:py-6 transition-all duration-300 ${getOptionStyle(answer)} relative overflow-hidden cursor-pointer`}
-                    onClick={() => !timeUp && !quizState.isAnswerSelected && handleAnswerSelection(answer)}
+                    className={`px-6 py-[18px] md:px-8 md:py-6 transition-all duration-500 ${getOptionStyle(answer)} relative overflow-hidden ${isRemoved ? 'opacity-0 pointer-events-none' : 'cursor-pointer'}`}
+                    onClick={() => !timeUp && !quizState.isAnswerSelected && !isRemoved && handleAnswerSelection(answer)}
                     style={{ 
                       borderRadius: '0.875rem',
                       animationName: "answer-enter",
@@ -1657,6 +1676,7 @@ export default function Quiz() {
                   </Card>
                 );
               })}
+            </div>
             </div>
 
             {timeUp && (
@@ -1879,6 +1899,28 @@ export default function Quiz() {
         .animate-fade-in-delayed {
           animation: fade-in-delayed 0.4s ease-out forwards;
           opacity: 0;
+        }
+
+        .question-flip-container {
+          perspective: 1000px;
+          transform-style: preserve-3d;
+          transition: transform 0.6s;
+        }
+
+        .question-flip-container.flipping {
+          animation: flip-card 0.6s ease-in-out;
+        }
+
+        @keyframes flip-card {
+          0% {
+            transform: rotateY(0deg);
+          }
+          50% {
+            transform: rotateY(90deg);
+          }
+          100% {
+            transform: rotateY(0deg);
+          }
         }
       `}</style>
     </div>

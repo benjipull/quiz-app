@@ -62,16 +62,16 @@ export default function InventoryBar({ inventory = [], onPowerUpClick, disabled 
               key={itemType}
               variant="outline"
               onClick={() => handleClick(itemType, quantity)}
-              className={`relative px-2 py-1.5 sm:px-3 sm:py-2 border-purple-400/50 text-white transition-all group flex-shrink-0 ${
+              className={`relative px-3 py-2.5 sm:px-5 sm:py-3.5 border-purple-400/50 text-white transition-all group flex-shrink-0 ${
                 isAvailable
                   ? 'bg-purple-800/50 hover:bg-purple-700/60 cursor-pointer hover:scale-105'
                   : 'bg-purple-900/30 opacity-60 cursor-not-allowed'
               }`}
               title={config.description}
             >
-              <span className="text-base sm:text-lg mr-0.5 sm:mr-1">{config.icon}</span>
-              <span className="text-[10px] sm:text-xs font-semibold mr-0.5 sm:mr-1 hidden xs:inline">{config.label}</span>
-              <span className={`absolute -top-1 -right-1 text-[10px] sm:text-xs font-bold rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center border-2 ${
+              <span className="text-xl sm:text-2xl mr-1 sm:mr-1.5">{config.icon}</span>
+              <span className="text-xs sm:text-sm font-semibold mr-1 sm:mr-1.5 hidden xs:inline">{config.label}</span>
+              <span className={`absolute -top-1.5 -right-1.5 text-xs sm:text-sm font-bold rounded-full w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center border-2 ${
                 isAvailable
                   ? 'bg-yellow-500 text-black border-purple-900'
                   : 'bg-gray-600 text-gray-300 border-purple-900'
